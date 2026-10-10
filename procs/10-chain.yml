@@ -1,0 +1,23 @@
+version: "0.5"
+
+processes:
+  # DEV ONLY. Every interface, so a wallet outside the VM can reach it; anvil's admin RPC is
+  # unauthenticated and its keys are public. Never run this on a shared network.
+  anvil:
+    command: "anvil --host 0.0.0.0 --port $ANVIL_PORT"
+    availability:
+      restart: "on_failure"
+    readiness_probe:
+      exec:
+        command: "cast block-number --rpc-url http://127.0.0.1:$ANVIL_PORT"
+      initial_delay_seconds: 1
+      period_seconds: 2
+
+  # One-shot: anvil starts empty, so every start redeploys.
+  deploy:
+    command: "make deploy addresses"
+    availability:
+      restart: "no"
+    depends_on:
+      anvil:
+        condition: process_healthy

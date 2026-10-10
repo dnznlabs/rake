@@ -1,0 +1,22 @@
+.planning
+.envrc.local
+.claude/settings.local.json
+.devbox/
+
+# Project ignores below.
+
+# fragment: forge-anvil
+cache/
+out/
+# Dev-chain broadcast logs are throwaway; real-network ones are the deployment record.
+!/broadcast
+/broadcast/*/31337/
+/broadcast/**/dry-run/
+.env
+.env.*
+!.env.example
+
+# fragment: dapp
+# Built bundle: network-specific once addresses are substituted.
+app/dist/
+node_modules/

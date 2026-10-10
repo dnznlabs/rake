@@ -1,0 +1,19 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+script = "scripts/forge"
+solc = "0.8.26"
+optimizer = true
+optimizer_runs = 1000
+via_ir = true
+evm_version = "cancun"
+
+[fmt]
+line_length = 120
+
+# fragment: onchain-dapp
+# Chunks.s.sol reads the built bundle from disk.
+[[profile.default.fs_permissions]]
+access = "read"
+path = "./app/dist"

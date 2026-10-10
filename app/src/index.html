@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROJECT</title>
+<script>(function(){var t=localStorage.getItem('theme')||'system';var d=t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.className=d?'dark':'';})();</script>
+<style>
+/*@inline theme.css@*/
+</style>
+</head>
+<body>
+/*@inline layout.html@*/
+
+<script>
+/*@inline eth.js@*/
+</script>
+<script>
+/* Everything this script draws is styled by class alone: theme.css and layout.html are the design,
+   and replacing those two files reskins the app without touching this one.
+   Addresses and the chain are substituted by app/build.mjs; a deployed contract's token is its name,
+   uppercased, between double underscores. DEV-fenced blocks are stripped unless the build is --dev. */
+const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', counter: '__COUNTER__' };
+const CONTRACTS = [['Counter', CFG.counter]];
+const CHAINS = { 1: 'mainnet', 11155111: 'sepolia', 31337: 'anvil' };
+const EXPLORER = { 1: 'https://etherscan.io', 11155111: 'https://sepolia.etherscan.io' };
+/*DEV*/
+const Q = new URLSearchParams(location.search);
+/*DEV*/
+document.getElementById('ver').textContent = CFG.version;
+
+/* ---- provider ------------------------------------------------------------------------------ */
+let P = null, ACC = null, CHAIN = null;
+/*DEV*/
+const rpcProvider = url => ({
+  request: async ({ method, params }) => {
+    const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
+    const j = await r.json(); if (j.error) throw j.error; return j.result;
+  }
+});
+/*DEV*/
+async function discover() {
+  /*DEV*/
+  if (Q.get('rpc')) { P = rpcProvider(Q.get('rpc')); ACC = Q.get('from') || null; return; }
+  /*DEV*/
+  const found = [];
+  addEventListener('eip6963:announceProvider', e => found.push(e.detail));
+  dispatchEvent(new Event('eip6963:requestProvider'));
+  await new Promise(r => setTimeout(r, 150));
+  P = (found[0] && found[0].provider) || window.ethereum || null;
+  if (!P) return;
+  try { const a = await P.request({ method: 'eth_accounts' }); ACC = a[0] || null; } catch (e) {}
+  if (P.on) { P.on('accountsChanged', a => { ACC = a[0] || null; who(); route(); }); P.on('chainChanged', () => location.reload()); }
+}
+async function connect() { const a = await P.request({ method: 'eth_requestAccounts' }); ACC = a[0] || null; who(); route(); }
+// Wallets keep a network per site, so the extension's own picker may not move this page; asking does.
+// A successful switch lands in the chainChanged reload.
+async function switchChain() {
+  try { await P.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x' + Number(CFG.chainId).toString(16) }] }); }
+  catch (e) {
+    if (e && e.code === 4001) return;
+    nm.hidden = false;
+    nm.lastElementChild.textContent = e && e.code === 4902 ? `your wallet doesn't know ${cname(CFG.chainId)} — add it there first` : 'the wallet refused the switch';
+  }
+}
+// Revoking (EIP-2255) is what survives a reload; a wallet without it hands the account back next load.
+async function disconnect() {
+  try { await P.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] }); } catch (e) {}
+  ACC = null; who(); route();
+}
+const call = async (to, sig, args, types) => Eth.dec(types, await P.request({ method: 'eth_call', params: [{ to, data: Eth.enc(sig, args) }, 'latest'] }));
+const send = (to, sig, args, value) => P.request({ method: 'eth_sendTransaction', params: [{ from: ACC, to, data: Eth.enc(sig, args), ...(value ? { value: '0x' + value.toString(16) } : {}) }] });
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+// A deadline, not a failure: a timed-out transaction may still land. POLL_ERR tells a dead RPC from a slow block.
+const POLL_MS = 120000;
+let POLL_ERR = null;
+async function waitReceipt(hash, ms) {
+  POLL_ERR = null;
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    try { const rc = await P.request({ method: 'eth_getTransactionReceipt', params: [hash] }); if (rc) return rc; POLL_ERR = null; } catch (e) { POLL_ERR = e; }
+    await sleep(1500);
+  }
+  return null;
+}
+const short = a => a ? a.slice(0, 6) + '…' + a.slice(-4) : '';
+const cname = id => CHAINS[id] || 'chain ' + id;
+const wrongChain = () => !!CHAIN && String(CHAIN) !== String(CFG.chainId);
+// Every address and tx hash the page prints goes through here: a link where the chain has an
+// explorer, plain text with the full value in the title elsewhere.
+const ext = (kind, v, text) => EXPLORER[CFG.chainId] ? `<a href="${EXPLORER[CFG.chainId]}/${kind}/${v}" target="_blank" rel="noopener" title="${v}">${text}</a>` : `<span title="${v}">${text}</span>`;
+
+/* ---- header --------------------------------------------------------------------------------- */
+function who() {
+  const b = document.getElementById('who');
+  b.textContent = ACC ? short(ACC) : 'connect';
+  b.title = ACC || '';
+  b.onclick = !P ? null : ACC ? e => { e.stopPropagation(); toggle(wm); } : connect;
+  if (!ACC) wm.hidden = true;
+  const pill = document.getElementById('net'), wrong = wrongChain();
+  document.getElementById('netname').textContent = CHAIN ? cname(CHAIN) : cname(CFG.chainId);
+  nm.innerHTML = `<div class="k">This app lives on ${cname(CFG.chainId)}. Reads and transactions go through your wallet, so it has to be on the same network.</div>`
+    + `<div class="k">wallet: ${CHAIN ? cname(CHAIN) : 'none'}</div>`
+    + (wrong ? `<div data-a="switch">switch wallet to ${cname(CFG.chainId)}</div>` : '');
+  pill.classList.toggle('warn', wrong);
+  pill.title = wrong ? `expected ${cname(CFG.chainId)}` : '';
+}
+
+/* ---- state ---------------------------------------------------------------------------------- */
+const S = { number: null, loaded: false, error: null };
+async function load() {
+  CHAIN = parseInt(await P.request({ method: 'eth_chainId' }), 16);
+  // The same address on another network is another contract, or none: do not read it.
+  if (wrongChain()) return;
+  const [n] = await call(CFG.counter, 'number()', [], ['uint256']);
+  S.number = n; S.loaded = true;
+}
+
+/* ---- views ---------------------------------------------------------------------------------- */
+const V = document.getElementById('view');
+const ledgerRow = (k, sub, n, cls) => `<div class="row${cls ? ' ' + cls : ''}"><div><b>${k}</b>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="n">${n}</div></div>`;
+
+function home() {
+  V.innerHTML = `<div class="eyebrow">counter · ${cname(CFG.chainId)}</div>
+  <div class="ledger">${ledgerRow('number', `Counter at ${ext('address', CFG.counter, short(CFG.counter))}`, `<span class="sig">${S.number}</span>`)}</div>
+  <div class="ledger log" id="log"></div>
+  <div class="actions"><button class="btn" id="go">${ACC ? 'increment' : 'connect to increment'}</button><span class="status" id="st"></span></div>`;
+  document.getElementById('go').onclick = ACC ? increment : connect;
+}
+
+async function increment() {
+  const go = document.getElementById('go'), st = document.getElementById('st'), log = document.getElementById('log');
+  const say = (t, cls) => { st.textContent = t; st.className = 'status' + (cls ? ' ' + cls : ''); };
+  go.disabled = true; go.className = 'btn off';
+  say('confirm in your wallet', 'warn');
+  let hash;
+  try { hash = await send(CFG.counter, 'increment()', []); }
+  catch (e) { say('not sent: ' + ((e && e.message) || 'rejected'), 'bad'); go.disabled = false; go.className = 'btn'; return; }
+  say('sent · waiting for the block');
+  log.innerHTML = ledgerRow('increment', ext('tx', hash, short(hash)), 'sent');
+  let rc = await waitReceipt(hash, POLL_MS);
+  while (!rc) {
+    say(`still pending after ${POLL_MS / 1000}s${POLL_ERR ? ' · last poll errored: ' + (POLL_ERR.message || POLL_ERR) : ''}`, 'warn');
+    go.disabled = false; go.className = 'btn sec'; go.textContent = 'keep waiting';
+    await new Promise(r => { go.onclick = r; });
+    go.disabled = true; go.className = 'btn off';
+    say('sent · waiting for the block');
+    rc = await waitReceipt(hash, POLL_MS);
+  }
+  if (rc.status !== '0x1') { log.innerHTML = ledgerRow('increment', `block ${parseInt(rc.blockNumber, 16)}`, 'reverted', 'err'); say(''); go.disabled = false; go.className = 'btn'; go.textContent = 'increment'; go.onclick = increment; return; }
+  try { await load(); } catch (e) {}
+  home();
+  document.getElementById('log').innerHTML = ledgerRow('increment', `${ext('tx', hash, short(hash))} · block ${parseInt(rc.blockNumber, 16)}`, 'ok');
+}
+
+function docs() {
+  const rows = CONTRACTS.map(([name, a]) => `<tr><td><b>${name}</b></td><td>${ext('address', a, a)}</td></tr>`).join('');
+  V.innerHTML = `<div class="doc"><div class="eyebrow"><a href="#/">home</a> // docs</div>
+  <h1>How it works</h1>
+  <p>This page talks to nothing but your wallet. Every value it shows is read from ${cname(CFG.chainId)} through the wallet's own connection.</p>
+  <h2>Contracts</h2>
+  <div class="scroll"><table class="dtab"><tr><th>contract</th><th>address</th></tr>${rows}</table></div>
+  <h2>Verify it yourself</h2>
+  <pre>cast call ${CFG.counter} "number()(uint256)" --rpc-url $RPC</pre>
+  </div>`;
+}
+
+/* ---- routing · theme ------------------------------------------------------------------------ */
+function route() {
+  const h = location.hash || '#/';
+  document.getElementById('nav-home').className = h === '#/' ? 'on' : '';
+  document.getElementById('nav-docs').className = h === '#/docs' ? 'on' : '';
+  if (h === '#/docs') { docs(); scrollTo(0, 0); return; }
+  if (!P) { V.innerHTML = `<div class="notice">No wallet found. Open this page in a browser with a wallet.</div>`; return; }
+  if (wrongChain()) { V.innerHTML = `<div class="notice">Your wallet is on ${cname(CHAIN)}. This app lives on ${cname(CFG.chainId)}. <button id="sw">Switch network</button>.</div>`; document.getElementById('sw').onclick = switchChain; return; }
+  if (S.error) { V.innerHTML = `<div class="notice err">could not read the contract at ${CFG.counter}: ${S.error}</div>`; return; }
+  if (!S.loaded) return;
+  home();
+  scrollTo(0, 0);
+}
+addEventListener('hashchange', route);
+const tb = document.getElementById('theme-btn'), tm = document.getElementById('theme-menu'), wm = document.getElementById('who-menu'), nm = document.getElementById('net-menu');
+const menus = [tm, wm, nm], toggle = m => menus.forEach(x => x.hidden = x === m ? !x.hidden : true);
+tb.onclick = e => { e.stopPropagation(); toggle(tm); const t = localStorage.getItem('theme') || 'system'; tm.querySelectorAll('div').forEach(d => d.className = d.dataset.t === t ? 'on' : ''); };
+tm.onclick = e => { const t = e.target.dataset.t; if (!t) return; localStorage.setItem('theme', t); const d = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme:dark)').matches); document.documentElement.className = d ? 'dark' : ''; tm.hidden = true; };
+wm.onclick = e => { if (e.target.dataset.a === 'off') { wm.hidden = true; disconnect(); } };
+document.getElementById('net').onclick = e => { e.stopPropagation(); toggle(nm); };
+nm.onclick = e => { e.stopPropagation(); if (e.target.dataset.a === 'switch') switchChain(); };
+document.addEventListener('click', () => toggle(null)); document.addEventListener('keydown', e => { if (e.key === 'Escape') toggle(null); });
+
+(async () => {
+  await discover();
+  if (P) { try { await load(); } catch (e) { S.error = (e && e.message) || String(e); } }
+  who(); route();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: devbox
+        uses: jetify-com/devbox-install-action@v0.15.0
+        with:
+          # Pinned to the version devbox.json's $schema names.
+          devbox-version: 0.18.0
+          enable-cache: true
+
+      - name: cache solc
+        uses: actions/cache@v5
+        with:
+          path: ~/.svm
+          key: svm-${{ runner.os }}-${{ hashFiles('foundry.toml') }}
+
+      - name: build — no solc warning, no lint finding
+        shell: bash
+        env:
+          BUILD_LOG: ${{ runner.temp }}/build.log
+        run: |
+          set -eo pipefail
+          devbox run -- forge build --force 2>&1 | tee "$BUILD_LOG"
+          # Proves the compile ran before asserting what it did not print.
+          grep -q 'Compiler run successful' "$BUILD_LOG"
+          ! grep -q 'warning\[' "$BUILD_LOG"
+
+      - name: fmt
+        run: devbox run -- make fmt
+
+      - name: test
+        run: devbox run -- make test
+
+      - name: working tree clean
+        shell: bash
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --porcelain
+            exit 1
+          fi

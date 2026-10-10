@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RAKE — protocol fee transparency</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='2' width='3.2' height='6.8' fill='%23161616'/%3E%3Crect x='3' y='10' width='3.2' height='4' fill='%23161616'/%3E%3Cpath d='M6.2 3.6 H9.6 A2.9 2.9 0 0 1 9.6 9.4 H6.2' fill='none' stroke='%23161616' stroke-width='3.2'/%3E%3Cpath d='M9 9.4 L12.8 14' fill='none' stroke='%23161616' stroke-width='3.2'/%3E%3C/svg%3E">
+<link rel="icon" media="(prefers-color-scheme: dark)" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='2' width='3.2' height='6.8' fill='%23ECECE6'/%3E%3Crect x='3' y='10' width='3.2' height='4' fill='%23ECECE6'/%3E%3Cpath d='M6.2 3.6 H9.6 A2.9 2.9 0 0 1 9.6 9.4 H6.2' fill='none' stroke='%23ECECE6' stroke-width='3.2'/%3E%3Cpath d='M9 9.4 L12.8 14' fill='none' stroke='%23ECECE6' stroke-width='3.2'/%3E%3C/svg%3E">
+<!--
+  assembly model (design intent, not implementation):
+  this file is ONE assembled document, but it is cut into marked SEGMENTs that map
+  to the planned renderer contracts:
+    SEGMENT:core   -> Render.html()        — shell: tokens, chrome, router, landing/distros/create
+    SEGMENT:docs   -> DocsRenderer.html()  — the #/docs article; spliced into <main> via eth_call
+    (widget)       -> WidgetRenderer / rake-widget.html — separate file, separate budget (<10KB)
+  rule the split depends on: docs + widget segments may use the SHARED layer only —
+  css custom properties (var(- -*)), the type utility classes (.eyebrow .mutd .dim), esc().
+  nothing else crosses a segment boundary. comments are stripped by tooling; markers are free.
+-->
+<script>
+/* theme boot — before paint, no flash */
+(function(){var m='system';try{m=localStorage.getItem('rake.theme')||'system'}catch(e){}
+var dark=m==='dark'||(m==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);
+document.documentElement.dataset.theme=dark?'dark':'light';
+document.documentElement.dataset.thememode=m;})();
+</script>
+<style>
+:root{--paper:#FCFCFA;--ink:#161616;--muted:#6F6F6B;--dim:#A3A39E;--rule:#DCDCD7;--t1:#2E6379;--t2:#618999;--t3:#95B0BA;--amber:#B8741A;--err:#B23A2E;
+--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+[data-theme=dark]{--paper:#111311;--ink:#ECECE6;--muted:#8A8A85;--dim:#5C5E5A;--rule:#2E302E;--t1:#3F87A6;--t2:#6AA0B6;--t3:#95B9C6;--amber:#CE9640;--err:#D06456}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink)}
+body{font:13px/1.5 var(--mono)}
+a{color:inherit;text-decoration:none;border-bottom:1px solid var(--dim)}
+a:hover{color:var(--t1);border-color:var(--t1)}
+:focus-visible{outline:2px solid var(--t1);outline-offset:2px}
+button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer}
+input,textarea{font:13px var(--mono);color:var(--ink);background:var(--paper);border:1px solid var(--rule);padding:11px 13px;width:100%}
+input:focus,textarea:focus{outline:2px solid var(--t1);outline-offset:-1px;border-color:var(--ink)}
+::placeholder{color:var(--dim)}
+.wrap{max-width:960px;margin:0 auto;padding:0 40px}
+.eyebrow{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.h1{font:700 40px/1.15 var(--mono);letter-spacing:-.02em;margin:0 0 16px}
+.h2{font:700 20px/1.3 var(--mono);letter-spacing:-.01em;margin:0 0 10px}
+.prose{font:15px/1.65 var(--sans);text-wrap:pretty;max-width:56ch}
+.mutd{color:var(--muted)}.dim{color:var(--dim)}.amber{color:var(--amber)}.err{color:var(--err)}.acc{color:var(--t1)}
+.btn{display:inline-block;background:var(--ink);color:var(--paper);padding:11px 20px;font:13px var(--mono);border:1px solid var(--ink)}
+.btn:hover{background:var(--t1);border-color:var(--t1);color:#FCFCFA}
+.btn-ghost{display:inline-block;background:none;color:var(--ink);padding:10px 20px;border:1px solid var(--ink);font:13px var(--mono)}
+.btn-ghost:hover{color:var(--t1);border-color:var(--t1)}
+.btn-sm{padding:6px 14px;font-size:11.5px}
+.btn[disabled],.btn-ghost[disabled]{border-color:var(--rule);background:none;color:var(--dim);cursor:not-allowed}
+/* nav */
+.nav{border-bottom:1px solid var(--rule);max-width:960px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:16px 40px;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;border:none}
+.brand b{font-size:14px;letter-spacing:.04em}
+.brand .sub{font-size:10px;letter-spacing:.12em;color:var(--dim)}
+.navr{display:flex;align-items:center;gap:16px;font-size:12px}
+.navlink{border:none;padding-bottom:2px}
+.navlink.on{font-weight:700;border-bottom:2px solid var(--ink)}
+.ctl{display:flex;align-items:center;gap:7px;border:1px solid var(--rule);padding:6px 10px;position:relative}
+.ctl:hover{border-color:var(--ink)}
+.menu{position:absolute;top:calc(100% + 6px);right:-1px;min-width:150px;background:var(--paper);border:1px solid var(--ink);z-index:30;font-size:12px}
+.mi{display:flex;align-items:center;gap:9px;padding:9px 12px;width:100%;text-align:left}
+.mi:hover{background:var(--rule)}
+.mi.on{background:var(--ink);color:var(--paper)}
+.mhead{border-top:1px solid var(--rule);padding:7px 12px 3px;font:600 10px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+.wallet{border-color:var(--ink)}
+/* bar */
+.bar{display:flex;overflow:hidden}
+.seg{transition:flex-basis .25s ease}
+.seg.s0{background:var(--t1)}.seg.s1{background:var(--t2)}.seg.s2{background:var(--t3)}
+.seg.rest{background:repeating-linear-gradient(45deg,var(--rule) 0 5px,transparent 5px 10px)}
+.ticks{display:flex}
+.tick{border-left:1px solid var(--rule);padding:9px 12px 0 10px;min-width:0}
+.tick b{font-size:14px}
+.tick .nm{font-size:11.5px;color:var(--muted)}
+.tick .nt{font:11.5px/1.45 var(--sans);color:var(--muted);margin-top:3px}
+.tick .ad{font-size:10.5px;color:var(--dim);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pbar{display:flex;gap:3px}
+.pbar .pseg{border:1.5px solid var(--amber)}
+.pticks{display:flex;gap:3px;color:var(--amber)}
+.pticks .tick{border-color:var(--amber);color:var(--amber)}
+.pticks .nm{color:var(--amber);opacity:.75}
+/* ledger */
+.ledger{border-top:1px solid var(--ink)}
+.lrow{display:grid;grid-template-columns:1fr auto;gap:2px 20px;padding:12px 0;border-bottom:1px solid var(--rule);align-items:baseline}
+.lrow .nt{font:13px var(--sans);color:var(--muted)}
+.lrow .ad{font-size:11.5px;color:var(--dim);margin-top:3px}
+.pct{font:700 20px var(--mono);font-variant-numeric:tabular-nums}
+/* tables & meta */
+.meta{display:flex;flex-wrap:wrap;gap:16px 40px;border-top:1px solid var(--rule);padding:16px 0}
+.meta .k{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:4px}
+.meta .v{font-size:12.5px}
+.tabs{display:flex;gap:24px;font-size:12.5px;border-bottom:1px solid var(--rule)}
+.tab{padding:0 2px 10px;color:var(--muted);border:none}
+.tab.on{color:var(--ink);font-weight:700;border-bottom:2px solid var(--ink);margin-bottom:-1px}
+.list-row{display:grid;grid-template-columns:1fr auto auto;gap:4px 18px;align-items:center;padding:13px 0 13px 12px;border-bottom:1px solid var(--rule);width:100%;text-align:left;border-left:2px solid transparent}
+.list-row:hover{border-left-color:var(--dim)}
+.list-row.on{border-left-color:var(--ink)}
+.mini{display:flex;height:6px;width:120px}
+.dot{width:8px;height:8px;background:var(--amber)}
+.hist{border-top:1px solid var(--rule)}
+.hrow{display:grid;grid-template-columns:92px 1fr auto;gap:14px;padding:9px 0;border-bottom:1px solid var(--rule);font-size:12px;align-items:center}
+.hrow .t{color:var(--dim);font-size:11px;white-space:nowrap}
+/* forms */
+.field{margin-bottom:22px;max-width:520px}
+.field .lab{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.field .lab .opt{text-transform:none;color:var(--dim)}
+.help{font:12px/1.5 var(--sans);color:var(--dim);margin-top:6px}
+.res{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}
+.seg3{display:flex;border:1px solid var(--rule);max-width:400px;font-size:12px}
+.seg3 button{flex:1;padding:8px 0;text-align:center;color:var(--muted);border-left:1px solid var(--rule)}
+.seg3 button:first-child{border-left:none}
+.seg3 button.on{background:var(--ink);color:var(--paper)}
+.erow{display:grid;grid-template-columns:140px 1fr 170px 84px 24px;gap:10px;align-items:start;padding:10px 0;border-bottom:1px solid var(--rule)}
+.erow input{padding:9px 11px;font-size:12px}
+.erow .note-in{font-family:var(--sans);color:var(--muted)}
+.erow .bps{font-weight:700;font-size:15px;text-align:right}
+.erow .rm{color:var(--dim);font-size:14px;padding-top:10px}
+.erow .rm:hover{color:var(--err)}
+.sum{display:flex;justify-content:space-between;align-items:center;padding:13px 0}
+.drawer{border-top:2px solid var(--ink);background:var(--paper);padding:26px 0 8px;margin-top:34px}
+code,pre{font-family:var(--mono)}
+pre{border:1px solid var(--rule);padding:14px 16px;font-size:12px;line-height:1.7;overflow:auto;margin:0}
+/* docs */
+/* ── SEGMENT:docs · styles (DocsRenderer) ── */
+.docgrid{max-width:960px;margin:0 auto;display:grid;grid-template-columns:170px 1fr;gap:40px;padding:34px 40px 60px}
+.rail{align-self:start;position:sticky;top:20px;font-size:11.5px;line-height:2.05;color:var(--muted)}
+.rail a{display:block;border:none}
+.rail a:hover{color:var(--t1)}
+.doc{max-width:720px;min-width:0}
+.doc h1{font:700 30px/1.2 var(--mono);letter-spacing:-.015em;margin:0 0 30px}
+.doc h2{font:700 19px/1.3 var(--mono);letter-spacing:-.01em;margin:44px 0 10px;scroll-margin-top:20px}
+.doc p{font:15px/1.65 var(--sans);text-wrap:pretty;margin:0 0 14px}
+.doc .fig{margin:16px 0 4px;max-width:100%}
+.doc .cap{font-size:10.5px;color:var(--dim);margin:6px 0 0}
+.ftab{border-top:1px solid var(--ink);font-size:12px}
+.ftab>div{display:grid;grid-template-columns:1.4fr .7fr 2fr;gap:12px;padding:9px 0;border-bottom:1px solid var(--rule)}
+.ftab .fn{font-weight:700}
+.ftab .who{color:var(--muted)}
+.ftab .fx{font-family:var(--sans);color:var(--muted)}
+.chains{border-top:1px solid var(--ink);font-size:12px}
+.chains>div{display:grid;grid-template-columns:1fr 1.6fr .8fr;gap:12px;padding:9px 0;border-bottom:1px solid var(--rule)}
+/* ── SEGMENT:core · styles resume ── */
+footer{margin-top:64px}
+.foot{border-top:1px solid var(--rule);max-width:960px;margin:0 auto;display:flex;justify-content:space-between;gap:8px;padding:16px 40px;font-size:11px;color:var(--dim)}
+.herogrid{display:grid;grid-template-columns:minmax(0,56ch) 1fr;gap:56px;align-items:center}
+.herograph{display:grid;gap:14px}
+.verbs{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;border-top:1px solid var(--rule);margin-top:14px;padding:20px 0 8px}
+.verbs b{display:block;font:700 13.5px var(--mono);margin:12px 0 6px}
+.verbs span{font:12.5px/1.5 var(--sans);color:var(--muted)}
+.gov{border-top:1px solid var(--ink);margin-top:26px;padding-top:16px}
+.sechead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;gap:12px}
+.sechead b{font-size:13px}
+.sechead span{font:11.5px var(--sans);color:var(--dim);text-align:right}
+.chip{border:1px solid var(--rule);padding:2px 7px;font-size:10.5px;color:var(--muted);margin-left:6px}
+.snippet{margin-top:14px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+@media (max-width:560px){
+ .wrap{padding:0 20px}
+ .nav{padding:12px 20px;flex-wrap:wrap}
+ .brand .sub{display:none}
+ .navr{gap:10px;font-size:11.5px}
+ .h1{font-size:30px}
+ .verbs{grid-template-columns:1fr}
+ .docgrid{grid-template-columns:1fr;padding:24px 20px 40px}
+ .rail{position:static;display:flex;flex-wrap:wrap;gap:2px 14px;line-height:1.8;border-bottom:1px solid var(--rule);padding-bottom:10px}
+ .erow{grid-template-columns:1fr 1fr;grid-auto-rows:auto}
+ .foot{flex-direction:column;padding:14px 20px}
+ .ctas{flex-direction:column}
+ .herogrid{grid-template-columns:1fr}
+ .herograph{display:none}
+ .ctas .btn,.ctas .btn-ghost{text-align:center}
+}
+</style>
+</head>
+<body>
+<header>
+ <nav class="nav" aria-label="main">
+  <a class="brand" href="#/" aria-label="Rake — home">
+   <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.2" height="6.8" fill="currentColor"></rect><rect x="3" y="10" width="3.2" height="4" fill="currentColor"></rect><path d="M6.2 3.6 H9.6 A2.9 2.9 0 0 1 9.6 9.4 H6.2" fill="none" stroke="currentColor" stroke-width="3.2"></path><path d="M9 9.4 L12.8 14" fill="none" stroke="currentColor" stroke-width="3.2"></path></svg>
+   <b>RAKE</b><span class="sub">DNZN LABS</span>
+  </a>
+  <div class="navr">
+   <a class="navlink" id="nl-distros" href="#/distros">distros</a>
+   <a class="navlink" id="nl-docs" href="#/docs">docs</a>
+   <div class="ctl" id="themeCtl"><button id="themeBtn" aria-haspopup="menu" aria-expanded="false" title="theme" style="display:flex;align-items:center;gap:6px"><span id="themeIcon"></span></button><div class="menu" id="themeMenu" hidden role="menu"></div></div>
+   <div class="ctl" id="netCtl"><button id="netBtn" aria-haspopup="menu" aria-expanded="false" style="display:flex;align-items:center;gap:7px"><span id="netLabel">ethereum</span></button><div class="menu" id="netMenu" hidden role="menu"></div></div>
+   <div class="ctl wallet" id="walCtl"><button id="walBtn" aria-haspopup="menu" aria-expanded="false">connect</button><div class="menu" id="walMenu" hidden role="menu"></div></div>
+  </div>
+ </nav>
+</header>
+<main id="app"></main>
+<footer><div class="foot"><span>a public work by dnzn labs · v0.1</span><span>open source · no backends · a fully on-chain contracted dapp</span></div></footer>
+<script>
+'use strict';
+/* ---------- demo data (shape = Snapshot struct) ---------- */
+const A = {
+ OPS:'0x7A31d29Cb04511bE0a662020E7C4a5D2010a9e04',
+ VAULT:'0xC4b8e5D219aa04c17bF3902dD48CbA10Fe6612aF',
+ MSIG:'0x5Fc30bAe77D410f2C96eD1a84b52C09eEfa188B1',
+ ZFI:'0xDA07b1264F09aE58C33Da410dD5cE9b1a67031c5',
+ AUD:'0x81bD44C1e09bE7aa04c17bF3902dD48CbA1004Ee',
+ D1:'0x1d2F4b8E0aC410dD5CE9b1A67f2e8C3b90d1a3C9',
+ D2:'0x88Aa17bF3902dD48CbA10Fe66e5D219aa04c41bC',
+ D3:'0x9C77aE58C33Da410dD5cE9b1a670312640F9e2F0'
+};
+const NAMES = {[A.OPS]:'ops.wei',[A.VAULT]:'vault.wei',[A.MSIG]:'msig.wei',[A.ZFI]:'zfi.eth'};
+const HRS=3600e3, DAYS=24*HRS;
+const now0 = Date.now();
+const DISTROS = {
+ [A.D1]:{addr:A.D1,chains:['ethereum','base','arbitrum'],description:'dnzn labs fee distribution',owner:A.MSIG,ownerKind:'wallet',govUrl:'',about:'',delay:7*DAYS,tip:0,
+  table:[{account:A.OPS,bps:6000,name:'operations',note:'funds development and infrastructure'},{account:A.VAULT,bps:4000,name:'treasury',note:'long-term reserve'}],
+  pending:[{eta:now0+3*DAYS+14*HRS,kind:'table',table:[{account:A.OPS,bps:5500,name:'operations'},{account:A.VAULT,bps:3500,name:'treasury'},{account:A.AUD,bps:1000,name:'audits'}]}],
+  balances:[['ETH','1.2840'],['USDC','3,410.00']],
+  changes:[{v:'applied',w:'delay · 3d → 7d',t:'2026-06-30'},{v:'applied',w:'table · 70 / 30 → 60 / 40',t:'2026-05-12'},{v:'cancelled',w:'table · withdrawn by owner before landing',t:'2026-04-02'}],
+  activity:[{v:'in',w:'0.4110 ETH from 0x9C77…e2F0',t:'aug 19'},{v:'distributed',w:'2.0000 ETH → 2 beneficiaries · called by 0x44C1…9bE7',t:'aug 12'},{v:'escrowed',w:'0.1200 ETH → treasury — receiver reverted · anyone can release()',t:'aug 12'},{v:'released',w:'0.1200 ETH → treasury',t:'aug 14'}]},
+ [A.D2]:{addr:A.D2,chains:['base'],description:'rake distro dev fund',owner:A.MSIG,ownerKind:'wallet',govUrl:'',about:'',delay:48*HRS,tip:100,
+  table:[{account:A.OPS,bps:4500,name:'protocol dev',note:'core work, month to month'},{account:A.AUD,bps:3000,name:'audit fund',note:'pays the next review'},{account:A.VAULT,bps:2000,name:'maintainers',note:'split again downstream'},{account:A.ZFI,bps:500,name:'bounties',note:'good first issues'}],
+  pending:[{eta:now0-2*HRS,kind:'table',table:[{account:A.OPS,bps:5000,name:'protocol dev'},{account:A.AUD,bps:3000,name:'audit fund'},{account:A.VAULT,bps:2000,name:'maintainers'}]}],
+  balances:[['ETH','0.0912']],changes:[],activity:[{v:'in',w:'0.0912 ETH from 0x44C1…9bE7',t:'aug 21'}]},
+ [A.D3]:{addr:A.D3,chains:['ethereum'],description:'quicksplit test distro',owner:A.ZFI,ownerKind:'majeur dao',govUrl:'zfi.wei.is/dao',
+  about:'This distribution is owned by zFi Majeur DAO. Changes to the table are governed by membership voting; passed proposals execute directly against the contract.',delay:0,tip:50,
+  table:[{account:A.MSIG,bps:5000,name:'maintainers',note:'ops multisig'},{account:A.ZFI,bps:5000,name:'dao treasury',note:''}],
+  pending:[],balances:[['ETH','0.4110']],changes:[{v:'applied',w:'delay · 3d → 0 · removed its own timelock',t:'2026-06-30'}],activity:[]}
+};
+/* ---------- state ---------- */
+const S = { wallet:null, net:'ethereum', tab:'recent', sel:null, drawer:false, draft:null, embed:false };
+const store = {get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+function recents(){try{return JSON.parse(store.get('rake.recent')||'[]')}catch(e){return[]}}
+function addRecent(a){const r=recents().filter(x=>x!==a);r.unshift(a);store.set('rake.recent',JSON.stringify(r.slice(0,8)))}
+/* ---------- utils ---------- */
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const short = a=>a.slice(0,6)+'…'+a.slice(-4);
+const nameOf = a=>NAMES[a]||null;
+const addrLine = a=>esc(short(a))+(nameOf(a)?' · '+esc(nameOf(a)):'');
+function fmtDelay(ms){if(!ms)return 'none — applies instantly';const d=Math.floor(ms/DAYS),h=Math.round(ms%DAYS/HRS);return d?d+' day'+(d>1?'s':'')+(h?' '+h+'h':''):h+'h'}
+function fmtEta(eta){const ms=eta-Date.now();if(ms<=0)return null;const d=Math.floor(ms/DAYS),h=Math.floor(ms%DAYS/HRS),m=Math.floor(ms%HRS/6e4);return d?d+'d '+h+'h':(h?h+'h '+m+'m':m+'m')}
+function explorer(){return {ethereum:'etherscan',base:'basescan',arbitrum:'arbiscan','op mainnet':'optimistic.etherscan',sepolia:'sepolia.etherscan','base sepolia':'sepolia.basescan'}[S.net]||'etherscan'}
+/* ---------- bar builders ---------- */
+function barHTML(table, h, extra){
+ let rest=10000-table.reduce((s,b)=>s+b.bps,0), segs=table.map((b,i)=>'<div class="seg s'+(i%3)+'" style="flex:0 0 '+(b.bps/100)+'%" title="'+esc(b.name)+' '+(b.bps/100)+'%"></div>').join('');
+ if(rest>0)segs+='<div class="seg rest" style="flex:0 0 '+(rest/100)+'%" title="unassigned '+(rest/100)+'%"></div>';
+ return '<div class="bar" style="height:'+h+'px" '+(extra||'')+'>'+segs+'</div>';
+}
+function ticksHTML(table, opts){
+ opts=opts||{};let rest=10000-table.reduce((s,b)=>s+b.bps,0);
+ const cols=table.map(b=>'<div class="tick" style="flex:0 0 '+(b.bps/100)+'%"><b>'+(b.bps/100)+'%</b> <span class="nm">'+esc(b.name)+'</span>'+(opts.notes&&b.note?'<div class="nt">'+esc(b.note)+'</div>':'')+(opts.addr?'<div class="ad">'+addrLine(b.account)+'</div>':'')+'</div>').join('');
+ const restCol=rest>0?'<div class="tick" style="flex:0 0 '+(rest/100)+'%"><b class="dim">'+(rest/100)+'%</b></div>':'';
+ return '<div class="ticks">'+cols+restCol+'</div>';
+}
+function miniHTML(table){return '<span class="mini">'+table.map((b,i)=>'<span class="seg s'+(i%3)+'" style="flex:0 0 '+(b.bps/100)+'%"></span>').join('')+'</span>'}
+function pendingBar(table,h){const n=table.length,adj=((n-1)*3/n).toFixed(1);
+ return '<div class="pbar" style="height:'+h+'px">'+table.map(b=>'<div class="pseg" style="flex:0 0 calc('+(b.bps/100)+'% - '+adj+'px)"></div>').join('')+'</div>'+
+ '<div class="pticks">'+table.map(b=>'<div class="tick" style="flex:0 0 calc('+(b.bps/100)+'% - '+adj+'px);padding:6px 0 0 8px;font-size:11px"><b>'+(b.bps/100)+'%</b> <span class="nm">'+esc(b.name)+'</span></div>').join('')+'</div>'}
+function ledgerHTML(table){return '<div class="ledger">'+table.map(b=>'<div class="lrow"><div><span style="font-weight:700;font-size:13px">'+esc(b.name)+'</span>'+(b.note?'<span class="nt"> — '+esc(b.note)+'</span>':'')+'<div class="ad">'+addrLine(b.account)+'</div></div><div class="pct">'+(b.bps/100)+'%</div></div>').join('')+'</div>'}
+/* ---------- name resolution (demo) ---------- */
+function resolveName(v, cb){
+ v=v.trim();
+ if(/^0x[0-9a-fA-F]{40}$/.test(v))return cb({ok:true,addr:v});
+ if(/\.(eth|wei|gwei)$/.test(v)){
+  cb({busy:true});
+  setTimeout(()=>{ if(v==='down.wei')return cb({unreachable:true});
+   const hit=Object.keys(NAMES).find(a=>NAMES[a]===v);
+   cb(hit?{ok:true,addr:hit,name:v}:{notfound:true}); },600);
+  return;
+ }
+ cb(v?{invalid:true}:{});
+}
+/* ---------- header controls ---------- */
+const THEMES=[['light','<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" stroke="currentColor"><circle cx="6" cy="6" r="2.4" stroke="none"></circle><path d="M6 .8v1.7M6 9.5v1.7M.8 6h1.7M9.5 6h1.7" stroke-width="1.3"></path></svg>'],
+['dark','<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M7.8 1.2a4.9 4.9 0 1 0 3 8.1 5.4 5.4 0 0 1-3-8.1Z"></path></svg>'],
+['system','<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.4" fill="none" stroke="currentColor" stroke-width="1.3"></circle><path d="M6 1.6a4.4 4.4 0 0 1 0 8.8Z" fill="currentColor"></path></svg>']];
+function themeMode(){return document.documentElement.dataset.thememode||'system'}
+function applyTheme(m){document.documentElement.dataset.thememode=m;store.set('rake.theme',m);
+ const dark=m==='dark'||(m==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);
+ document.documentElement.dataset.theme=dark?'dark':'light';
+ $('#themeIcon').innerHTML=THEMES.find(t=>t[0]===m)[1];
+ $('#themeMenu').innerHTML=THEMES.map(t=>'<button class="mi'+(t[0]===m?' on':'')+'" role="menuitem" data-theme-pick="'+t[0]+'">'+t[1]+t[0]+(t[0]===m?'<span style="margin-left:auto">✓</span>':'')+'</button>').join('');
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(themeMode()==='system')applyTheme('system')});
+const NETS=['ethereum','base','arbitrum','op mainnet'], TESTNETS=['sepolia','base sepolia'];
+function buildNetMenu(){$('#netMenu').innerHTML=NETS.map(n=>'<button class="mi'+(n===S.net?' on':'')+'" role="menuitem" data-net="'+n+'">'+n+(n===S.net?'<span style="margin-left:auto">✓</span>':'')+'</button>').join('')+'<div class="mhead">testnets</div>'+TESTNETS.map(n=>'<button class="mi'+(n===S.net?' on':'')+'" role="menuitem" data-net="'+n+'">'+n+(n===S.net?'<span style="margin-left:auto">✓</span>':'')+'</button>').join('')}
+function buildWalMenu(){
+ if(!S.wallet){$('#walMenu').innerHTML='';return}
+ $('#walMenu').innerHTML='<button class="mi" data-wal="copy">copy address</button><button class="mi" data-wal="net">switch chain</button><button class="mi" data-wal="out">disconnect</button>';
+}
+function walletLabel(){$('#walBtn').textContent=S.wallet?(nameOf(S.wallet)||short(S.wallet)):'connect'}
+function closeMenus(){['themeMenu','netMenu','walMenu'].forEach(id=>{$('#'+id).hidden=true});['themeBtn','netBtn','walBtn'].forEach(id=>$('#'+id).setAttribute('aria-expanded','false'))}
+document.addEventListener('click',e=>{
+ const tb=e.target.closest('#themeBtn'),nb=e.target.closest('#netBtn'),wb=e.target.closest('#walBtn');
+ const tp=e.target.closest('[data-theme-pick]'),np=e.target.closest('[data-net]'),wp=e.target.closest('[data-wal]');
+ if(tp){applyTheme(tp.dataset.themePick);closeMenus();return}
+ if(np){S.net=np.dataset.net;$('#netLabel').textContent=S.net;buildNetMenu();closeMenus();render();return}
+ if(wp){ if(wp.dataset.wal==='copy'&&navigator.clipboard)navigator.clipboard.writeText(S.wallet).catch(()=>{});
+  if(wp.dataset.wal==='out'){S.wallet=null;walletLabel();buildWalMenu();if(S.tab!=='recent')S.tab='recent';render()}
+  if(wp.dataset.wal==='net'){closeMenus();$('#netMenu').hidden=false;$('#netBtn').setAttribute('aria-expanded','true');return}
+  closeMenus();return}
+ if(tb){const m=$('#themeMenu'),o=m.hidden;closeMenus();m.hidden=!o;tb.setAttribute('aria-expanded',String(o));return}
+ if(nb){const m=$('#netMenu'),o=m.hidden;closeMenus();m.hidden=!o;nb.setAttribute('aria-expanded',String(o));return}
+ if(wb){ if(!S.wallet){S.wallet=A.MSIG;walletLabel();buildWalMenu();S.tab='mine';render();return}
+  const m=$('#walMenu'),o=m.hidden;closeMenus();m.hidden=!o;wb.setAttribute('aria-expanded',String(o));return}
+ if(!e.target.closest('.ctl'))closeMenus();
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenus();if(S.drawer){S.drawer=false;render()}}});
+/* ---------- views ---------- */
+function eyebrowRow(d){
+ const others=d.chains.filter(c=>c!==S.net);
+ const on=d.chains.includes(S.net)?S.net:d.chains[0];
+ return '<div class="eyebrow" style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:10px"><span>'+on+' · '+esc(short(d.addr))+' · <a href="#/distros/'+d.addr+'" onclick="return false" style="border:none">'+explorer()+' ↗</a></span>'+(others.length?'<span class="dim">also on '+others.join(' · ')+'</span>':'')+(S.wallet===d.owner?'<span class="acc">you own this</span>':'')+'</div>';
+}
+function vLanding(){
+ const d=DISTROS[A.D1];
+ return '<div>'
+ +'<div class="wrap" style="padding-top:56px">'
+ +'<div class="herogrid"><div>'
+ +'<h1 class="h1">Protocol fee transparency.</h1>'
+ +'<p class="prose" style="margin:0 0 26px">Every app that takes a fee either tells you where it goes or doesn\'t, and checking means hours of chasing transactions. A distribution makes the fee an address: one contract, a published table of who gets what, and a delay on every configuration change so users have visibility before it lands. Governance integrates directly with Multisig Software vaults and Majeur DAO voting, or a plain wallet if that\'s what you run.</p>'
+ +'<div class="ctas" style="display:flex;gap:12px;margin-top:30px"><a class="btn" href="#/create" style="border-bottom:1px solid var(--ink)">Create a distribution</a></div>'
+ +'</div><div class="herograph" aria-hidden="true"><svg viewBox="0 0 400 382" style="width:100%;max-width:420px;justify-self:center;font-family:var(--mono)"><circle cx="200" cy="24" r="14" fill="none" stroke="var(--ink)" stroke-width="1.25"></circle><text x="200" y="28" text-anchor="middle" font-size="10" fill="var(--ink)">eoa</text><line x1="200" y1="38" x2="200" y2="68" stroke="var(--ink)" stroke-width="1.25"></line><path d="M200 72l-4 -8h8Z" fill="var(--ink)"></path><text x="208" y="58" font-size="10" fill="var(--dim)">eth / erc20</text><rect x="130" y="72" width="140" height="30" fill="none" stroke="var(--ink)" stroke-width="1.25"></rect><text x="200" y="91" text-anchor="middle" font-size="11" fill="var(--ink)">dapp</text><path d="M200 102 V118 H120 V132" fill="none" stroke="var(--ink)" stroke-width="1.25"></path><path d="M120 136l-4 -8h8Z" fill="var(--ink)"></path><path d="M200 102 V118 H280 V132" fill="none" stroke="var(--dim)" stroke-width="1.25"></path><path d="M280 136l-4 -8h8Z" fill="var(--dim)"></path><rect x="75" y="136" width="90" height="28" fill="none" stroke="var(--ink)" stroke-width="1.25"></rect><text x="120" y="154" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">% fee</text><rect x="235" y="136" width="90" height="28" fill="none" stroke="var(--dim)" stroke-width="1.25"></rect><text x="280" y="154" text-anchor="middle" font-size="11" fill="var(--dim)">% else</text><path d="M120 164 V184 H200 V200" fill="none" stroke="var(--ink)" stroke-width="1.25"></path><path d="M200 204l-4 -8h8Z" fill="var(--ink)"></path><rect x="110" y="204" width="180" height="44" fill="none" stroke="var(--ink)" stroke-width="1.25"></rect><text x="200" y="222" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--ink)">distribution</text><text x="200" y="237" text-anchor="middle" font-size="10" fill="var(--dim)">one address, any chain</text><path d="M200 248 V278 H73 V306" fill="none" stroke="var(--ink)" stroke-width="1.25"></path><path d="M73 310l-4 -8h8Z" fill="var(--ink)"></path><line x1="200" y1="248" x2="200" y2="306" stroke="var(--ink)" stroke-width="1.25"></line><path d="M200 310l-4 -8h8Z" fill="var(--ink)"></path><path d="M200 248 V278 H327 V306" fill="none" stroke="var(--ink)" stroke-width="1.25"></path><path d="M327 310l-4 -8h8Z" fill="var(--ink)"></path><text x="65" y="272" text-anchor="end" font-size="11" font-weight="700" fill="var(--ink)">60%</text><text x="208" y="272" font-size="11" font-weight="700" fill="var(--ink)">30%</text><text x="335" y="272" font-size="11" font-weight="700" fill="var(--ink)">10%</text><rect x="14" y="310" width="118" height="46" fill="none" stroke="var(--ink)" stroke-width="1.25"></rect><rect x="26" y="322" width="9" height="9" fill="var(--t1)"></rect><text x="41" y="331" font-size="11" fill="var(--ink)">operations</text><text x="26" y="346" font-size="10" fill="var(--dim)">0xA11c…04e1</text><rect x="141" y="310" width="118" height="46" fill="none" stroke="var(--ink)" stroke-width="1.25"></rect><rect x="153" y="322" width="9" height="9" fill="var(--t2)"></rect><text x="168" y="331" font-size="11" fill="var(--ink)">treasury</text><text x="153" y="346" font-size="10" fill="var(--dim)">0xB22d…f30A</text><rect x="268" y="310" width="118" height="46" fill="none" stroke="var(--ink)" stroke-width="1.25"></rect><rect x="280" y="322" width="9" height="9" fill="var(--t3)"></rect><text x="295" y="331" font-size="11" fill="var(--ink)">bounties</text><text x="280" y="346" font-size="10" fill="var(--dim)">0xC33e…9d5B</text><text x="200" y="374" text-anchor="middle" font-size="10" fill="var(--dim)">split defined by the distribution</text></svg></div></div>'
+ +'</div>'
+ +'<div class="wrap" style="border-top:1px solid var(--rule);margin-top:64px"><div class="eyebrow" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;padding:26px 0 10px"><span>live example · '+esc(d.description)+'</span><span class="dim">ethereum · '+short(d.addr)+' · <a href="#/distros/'+d.addr+'" style="border:none" class="acc">view →</a></span></div>'
+ +barHTML(d.table,72)
+ +ticksFull(d)+'<div style="height:26px"></div></div>'
+ +'<div class="wrap">'
+ +'<div style="margin:34px 0 0;max-width:460px"><div class="eyebrow" style="margin-bottom:8px">view a distribution</div>'
+ +'<div style="display:flex;gap:10px"><input id="loadIn" placeholder="0x… or a name" aria-label="address or name"><button class="btn-ghost" id="loadGo">view</button></div>'
+ +'<div class="res" id="loadRes">.eth / .wei / .gwei · opens its public page, like the example above</div></div>'
+ +'<h2 class="h2" style="margin-top:52px">How it works</h2>'
+ +'<div class="verbs">'
+ +'<div style="border-left:1px solid var(--rule);padding-left:14px"><div style="display:flex;justify-content:space-between;align-items:flex-start"><span style="font:600 10px var(--mono);letter-spacing:.09em;color:var(--dim)">01</span><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v6" stroke="var(--ink)" stroke-width="1.5" fill="none"></path><path d="M12 14l-4 -6h8Z" fill="var(--ink)"></path><path d="M4 13v8h16v-8" fill="none" stroke="var(--ink)" stroke-width="1.5"></path></svg></div><b>receive</b><span>ETH and ERC-20 funds accumulate at the address. Nothing moves on its own.</span><div style="font-size:10.5px;color:var(--dim);margin-top:8px;font-family:var(--mono)">anyone can send</div></div>'
+ +'<div style="border-left:1px solid var(--rule);padding-left:14px"><div style="display:flex;justify-content:space-between;align-items:flex-start"><span style="font:600 10px var(--mono);letter-spacing:.09em;color:var(--dim)">02</span><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="6" fill="none" stroke="var(--ink)" stroke-width="1.5"></rect><path d="M12 8v4M12 12H4.5v4M12 12h7.5v4M12 12v4" stroke="var(--ink)" stroke-width="1.25" fill="none"></path><rect x="1.5" y="17" width="6" height="4.5" fill="var(--t1)"></rect><rect x="9" y="17" width="6" height="4.5" fill="var(--t2)"></rect><rect x="16.5" y="17" width="6" height="4.5" fill="var(--t3)"></rect></svg></div><b>distribute</b><span>Splits the waiting balance across the table. Push, with escrow fallback.</span><div style="font-size:10.5px;color:var(--dim);margin-top:8px;font-family:var(--mono)">callable by anyone</div></div>'
+ +'<div style="border-left:1px solid var(--rule);padding-left:14px"><div style="display:flex;justify-content:space-between;align-items:flex-start"><span style="font:600 10px var(--mono);letter-spacing:.09em;color:var(--dim)">03</span><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="11" fill="none" stroke="var(--amber)" stroke-width="1.5"></rect><path d="M4 20.5h9" stroke="var(--amber)" stroke-width="2"></path></svg></div><b>queue</b><span>Configuration changes to the beneficiaries, owner, or delay are staged in public first.</span><div style="font-size:10.5px;color:var(--dim);margin-top:8px;font-family:var(--mono)">owner only · waits the delay</div></div>'
+ +'<div style="border-left:1px solid var(--rule);padding-left:14px"><div style="display:flex;justify-content:space-between;align-items:flex-start"><span style="font:600 10px var(--mono);letter-spacing:.09em;color:var(--dim)">04</span><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="16" height="12" fill="var(--ink)"></rect><path d="M8.5 12l2.5 2.5 4.5 -5" fill="none" stroke="var(--paper)" stroke-width="1.8"></path></svg></div><b>apply</b><span>Once the time lock passes, anyone can land the queued change.</span><div style="font-size:10.5px;color:var(--dim);margin-top:8px;font-family:var(--mono)">anyone · after the eta</div></div>'
+ +'</div></div>';
+}
+function ticksFull(d){
+ return '<div class="ticks">'+d.table.map((b,i)=>'<div class="tick" style="flex:0 0 '+(b.bps/100)+'%"><b style="font-size:15px">'+(b.bps/100)+'%</b> <span class="nm" style="font-size:12px;color:var(--ink)">'+esc(b.name)+'</span><div class="nt">'+esc(b.note||'')+'</div><div class="ad">'+addrLine(b.account)+'</div></div>').join('')+'</div>';
+}
+function listFor(tab){
+ const all=Object.values(DISTROS);
+ if(tab==='mine')return S.wallet?all.filter(d=>d.owner===S.wallet):[];
+ if(tab==='paid')return S.wallet?all.filter(d=>d.table.some(b=>b.account===S.wallet)):[];
+ return recents().map(a=>DISTROS[a]).filter(Boolean);
+}
+function vDistros(){
+ const tabs=[['mine','mine'],['paid','paid to me'],['recent','recent']];
+ const items=listFor(S.tab);
+ const sel=S.sel&&DISTROS[S.sel]?DISTROS[S.sel]:items[0]||null;
+ let h='<div class="wrap" style="padding-top:30px">';
+ h+='<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;border-bottom:1px solid var(--rule)"><div class="tabs" role="tablist" style="border-bottom:none">'+tabs.map(t=>{
+  const n=listFor(t[0]).length, dis=!S.wallet&&t[0]!=='recent';
+  return '<button class="tab'+(S.tab===t[0]?' on':'')+'" role="tab" data-tab="'+t[0]+'" '+(dis?'title="connect a wallet"':'')+'>'+t[1]+' <span class="dim">'+(dis?'—':n)+'</span></button>'}).join('')+'</div><a class="btn-ghost btn-sm" href="#/create" style="margin-bottom:8px">+ create</a></div>';
+ if(!S.wallet)h+='<div class="dim" style="font-size:11px;padding:10px 0 0">mine / paid to me need a wallet — <button class="mi" style="display:inline;padding:0;border-bottom:1px solid var(--ink)" onclick="document.getElementById(\'walBtn\').click()">connect</button></div>';
+ if(items.length)h+=items.map(d=>'<button class="list-row'+(sel&&d.addr===sel.addr?' on':'')+'" data-open="'+d.addr+'"><span><span style="font-weight:700;font-size:13px;'+(sel&&d.addr===sel.addr?'':'color:var(--muted)')+'">'+esc(d.description)+'</span><span style="display:block;font-size:11px;color:var(--dim);margin-top:3px">'+d.chains[0]+' · '+short(d.addr)+'</span></span>'+(d.pending.length?'<span class="dot" title="change queued"></span>':'<span></span>')+miniHTML(d.table)+'</button>').join('');
+ else h+='<div style="padding:20px 0 4px"><div class="prose mutd" style="font-size:13px">'+(S.tab==='recent'?'No distributions yet. Paste an address or a name, or create one.':'Nothing here for this wallet on '+esc(S.net)+'.')+'</div>'
+  +'<div style="display:flex;gap:10px;margin-top:12px;max-width:460px"><input id="loadIn" placeholder="0x… or a name"><button class="btn-ghost" id="loadGo">view</button></div><div class="res" id="loadRes"></div></div>';
+ h+= sel?detailHTML(sel):'';
+ h+='</div>';
+ return h;
+}
+function detailHTML(d){
+ const isOwner=S.wallet===d.owner;
+ let h='<div style="margin-top:36px">'+eyebrowRow(d);
+ h+='<h2 style="font:700 28px/1.2 var(--mono);letter-spacing:-.01em;margin:0 0 20px">'+esc(d.description)+'</h2>';
+ h+=barHTML(d.table,56)+ticksHTML(d.table,{})+(d.tip?'<div style="font-size:11px;color:var(--dim);margin-top:10px">before the split · tip <b style="color:var(--muted)">'+(d.tip/100)+'%</b> off incoming funds → <a href="#/distros/'+A.D1+'">dnzn labs fee distribution</a></div>':'')+'<div style="height:24px"></div>'+ledgerHTML(d.table);
+ d.pending.forEach((p,i)=>{
+  const left=fmtEta(p.eta);
+  h+='<div class="eyebrow amber" style="margin:26px 0 8px">change queued · '+(left?'lands in '+left:'ready — anyone can apply')+(isOwner?' · queued by you':'')+'</div>'
+  +pendingBar(p.table,32)
+  +'<div style="display:flex;align-items:center;gap:12px;margin-top:12px">'
+  +(left?(isOwner?'<button class="btn-ghost btn-sm" style="border-color:var(--amber);color:var(--amber)" data-cancel="'+i+'">cancel</button><span class="dim" style="font-size:11px">cancel is owner-only and immediate</span>':'<span class="btn-ghost btn-sm" style="border-color:var(--rule);color:var(--dim)">apply</span><span class="dim" style="font-size:11px">anyone can apply once the delay passes</span>')
+   :'<button class="btn btn-sm" data-apply="'+i+'">apply</button><span class="dim" style="font-size:11px">the delay has passed — anyone can land it'+(isOwner?' · <button style="color:var(--amber);border-bottom:1px solid var(--amber)" data-cancel="'+i+'">cancel</button>':'')+'</span>')
+  +'</div>';
+ });
+ h+='<div class="gov"><div class="sechead"><b>governance</b><span>configuration only — token movement is not governed</span></div>'
+ +'<div class="meta" style="border:none;padding:0 0 12px">'
+ +'<div><div class="k">owner</div><div class="v">'+(isOwner?'you · ':'')+addrLine(d.owner)+(d.ownerKind!=='wallet'?'<span class="chip">'+esc(d.ownerKind)+'</span>':'')+'</div></div>'
+ +'<div><div class="k">delay</div><div class="v'+(d.delay?'':' amber')+'">'+fmtDelay(d.delay)+'</div></div></div>';
+ if(d.about)h+='<div class="prose" style="font-size:13px;margin-bottom:8px">'+esc(d.about)+'</div>';
+ if(d.govUrl)h+='<div style="font-size:12px;color:var(--muted);margin-bottom:8px">governance ↗ '+esc(d.govUrl)+'</div>';
+ if(!d.delay)h+='<div style="font:12px var(--sans);color:var(--amber);margin:4px 0 8px">No delay on this contract: any owner call lands immediately. The claim above is the owner\'s own — verify the owner address yourself.</div>';
+ if(d.changes.length||d.pending.length){
+  h+='<div class="k eyebrow" style="font-size:10.5px;margin:12px 0 6px;color:var(--dim)">changes</div><div class="hist">';
+  d.pending.forEach(p=>{const left=fmtEta(p.eta);h+='<div class="hrow amber"><span style="font-weight:700">queued</span><span>new table · '+p.table.map(b=>b.bps/100).join(' / ')+(left?' — lands in '+left:' — ready')+'</span><span></span></div>'});
+  h+=d.changes.map(c=>'<div class="hrow"><span style="font-weight:700;color:var(--muted)">'+c.v+'</span><span class="mutd">'+esc(c.w)+'</span><span class="t">'+c.t+' · tx ↗</span></div>').join('')+'</div>';
+ }
+ h+='</div>';
+ h+='<div class="gov"><div class="sechead"><b>funds</b><span>moves by the table, permissionlessly — no approval involved</span></div>'
+ +'<div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap"><div><div class="k eyebrow" style="font-size:10.5px;color:var(--dim);margin-bottom:4px">waiting to distribute</div><div style="font-size:14px;font-weight:700;font-variant-numeric:tabular-nums">'+(d.balances.length?d.balances.map(b=>b[1]+' '+b[0]).join(' · '):'0')+'</div></div>'
+ +'<button class="btn-ghost btn-sm" data-distribute="1" '+(d.balances.length?'':'disabled')+'>distribute</button></div>'
+ +'<div class="help" style="margin-top:6px">anyone can call distribute() — the contract splits by the table above.</div>';
+ if(d.activity.length){h+='<div class="k eyebrow" style="font-size:10.5px;margin:14px 0 6px;color:var(--dim)">activity</div><div class="hist">'+d.activity.map(c=>'<div class="hrow"><span style="font-weight:700'+(c.v==='escrowed'?';color:var(--err)':(c.v==='in'?'':';color:var(--muted)'))+'">'+c.v+'</span><span class="mutd">'+esc(c.w)+'</span><span class="t">'+c.t+' · tx ↗</span></div>').join('')+'</div>'
+ +'<div class="help">both histories read event logs — they load after the snapshot and never block the table.</div>'}
+ h+='</div>';
+ h+='<div style="display:flex;gap:12px;border-top:1px solid var(--rule);margin-top:26px;padding:18px 0 8px;flex-wrap:wrap">'
+ +(isOwner?'<button class="btn" data-queue="1">Queue a change</button>':'')
+ +(isOwner?'<button class="btn-ghost" data-embed="1">Embed widget</button>':'')
+ +'</div>';
+ if(S.embed)h+='<div class="snippet"><div class="eyebrow" style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:8px"><span>embed — inherits the host\'s font and ink</span><button class="btn-ghost btn-sm" data-copysnip="1" style="text-transform:none;letter-spacing:0">copy</button></div><pre id="snipPre">&lt;script src="https://rake.distro/widget.js"&gt;&lt;/script&gt;\n&lt;div data-rake="'+d.addr+'" data-chain="1"&gt;&lt;/div&gt;</pre><div class="help">compact variant: data-variant="compact" · theme auto-picks by background, override data-theme="light|dark"</div></div>';
+ if(S.drawer&&isOwner)h+=drawerHTML(d);
+ return h+'</div>';
+}
+/* ---------- queue drawer ---------- */
+function draftTotal(rows){return rows.reduce((s,r)=>s+(parseFloat(r.pct)||0),0)}
+function drawerHTML(d){
+ const rows=S.draft.rows, total=draftTotal(rows), ok=Math.abs(total-100)<0.001&&rows.every(r=>r.name&&r.addr);
+ const table=rows.map(r=>({bps:Math.round((parseFloat(r.pct)||0)*100),name:r.name||'—',note:r.note,account:r.addr||'0x'}));
+ return '<div class="drawer" id="drawer"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px"><h3 style="font:700 20px var(--mono);letter-spacing:-.01em;margin:0">Queue a change</h3><span class="dim" style="font-size:12px">esc to close</span></div>'
+ +'<div class="prose mutd" style="font-size:12.5px;margin-bottom:20px">Queued changes wait in public for the delay. You can cancel any time before they land; anyone can apply after.</div>'
+ +'<div class="eyebrow" style="margin-bottom:8px">the table — live preview</div>'
+ +barHTML(table.filter(b=>b.bps>0),44,'id="liveBar"')
+ +'<div style="height:18px"></div>'
+ +'<div style="border-top:1px solid var(--ink)">'+rows.map((r,i)=>'<div class="erow">'
+  +'<input aria-label="name" data-dr="name" data-i="'+i+'" value="'+esc(r.name)+'" placeholder="name">'
+  +'<input aria-label="note" class="note-in" data-dr="note" data-i="'+i+'" value="'+esc(r.note)+'" placeholder="note (prose)">'
+  +'<div><input aria-label="address or name" data-dr="addr" data-i="'+i+'" value="'+esc(r.addr)+'" placeholder="0x… or name"><div class="res" data-res="'+i+'" style="font-size:10.5px">'+(r.addr&&nameOf(r.addr)?'→ '+esc(nameOf(r.addr)):'')+'</div></div>'
+  +'<input aria-label="percent" class="bps" data-dr="pct" data-i="'+i+'" value="'+esc(r.pct)+'" inputmode="decimal">'
+  +'<button class="rm" data-rm="'+i+'" title="remove">×</button></div>').join('')+'</div>'
+ +'<div class="sum"><button style="font-size:12px;color:var(--muted);border-bottom:1px solid var(--dim)" data-addrow="1">+ add a beneficiary</button>'
+ +'<span style="font-size:12.5px;color:'+(ok?'var(--t1)':'var(--err)')+'">'+rows.length+' beneficiar'+(rows.length===1?'y':'ies')+' · total <b>'+(+total.toFixed(2))+'%</b></span></div>'
+ +'<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:26px"><button class="btn" data-submitq="1" '+(ok?'':'disabled')+'>Queue (1 transaction)</button><span class="dim" style="font-size:12px">'+(ok?'public for '+fmtDelay(d.delay).replace(' — applies instantly','')+' · cancel any time before it lands':'total must equal 100%'+(rows.every(r=>r.name&&r.addr)?'':' · every row needs a name and address'))+' · <button style="border-bottom:1px solid var(--dim);color:var(--dim)" data-calldata="1">copy calldata</button></span></div>'
+ +'<div style="border-top:1px solid var(--ink);padding-top:16px"><div class="eyebrow" style="margin-bottom:10px">also queueable — each its own transaction</div>'
+ +[['name',d.description],['delay',fmtDelay(d.delay)],['owner',nameOf(d.owner)||short(d.owner)],['tip',((d.tip||0)/100)+'% — off the top, to dnzn labs']].map(x=>'<div style="display:grid;grid-template-columns:90px 1fr auto;gap:10px;align-items:center;font-size:12px;padding:7px 0"><span class="mutd">'+x[0]+'</span><input value="'+esc(x[1])+'" aria-label="'+x[0]+'"><button class="btn-ghost btn-sm">queue</button></div>').join('')
+ +'<div class="help">or <button style="color:var(--err);border-bottom:1px solid var(--err)">renounce</button> — transfer to nobody; the table can never change again.</div></div></div>';
+}
+function bindDrawer(d){
+ document.querySelectorAll('[data-dr]').forEach(inp=>{
+  inp.addEventListener('input',()=>{
+   const i=+inp.dataset.i,k=inp.dataset.dr;S.draft.rows[i][k]=inp.value;
+   if(k==='addr'){const rEl=document.querySelector('[data-res="'+i+'"]');resolveName(inp.value,r=>{if(!rEl)return;
+    rEl.textContent=r.busy?'resolving on mainnet…':r.ok?('→ '+short(r.addr)):r.notfound?'no such name on mainnet':r.unreachable?'mainnet didn\'t answer — retry, or paste a raw address':r.invalid?'not an address or a name':'';
+    rEl.style.color=r.notfound?'var(--err)':r.unreachable?'var(--amber)':'var(--muted)';
+    if(r.ok)S.draft.rows[i].addr=r.addr;updateLive(d);});}
+   updateLive(d);
+  });
+ });
+}
+function updateLive(d){
+ const rows=S.draft.rows,total=draftTotal(rows),ok=Math.abs(total-100)<0.001&&rows.every(r=>r.name&&r.addr);
+ const bar=$('#liveBar');
+ if(bar){const table=rows.filter(r=>(parseFloat(r.pct)||0)>0);let rest=100-total;
+  bar.innerHTML=table.map((r,i)=>'<div class="seg s'+(i%3)+'" style="flex:0 0 '+(parseFloat(r.pct)||0)+'%"></div>').join('')+(rest>0.001?'<div class="seg rest" style="flex:0 0 '+rest+'%"></div>':'');}
+ const sum=document.querySelector('.sum span');if(sum){sum.style.color=ok?'var(--t1)':'var(--err)';sum.innerHTML=rows.length+' beneficiar'+(rows.length===1?'y':'ies')+' · total <b>'+(+total.toFixed(2))+'%</b>'}
+ const btn=document.querySelector('[data-submitq]');if(btn){if(ok)btn.removeAttribute('disabled');else btn.setAttribute('disabled','')}
+}
+/* ---------- create ---------- */
+function vCreate(){
+ if(!S.draft||!S.draft.create)S.draft={create:true,step:1,desc:'',owner:S.wallet||'',ownerR:S.wallet?{ok:true,addr:S.wallet}:null,kind:'wallet',gov:'',about:'',delay:'7d',tip:100,
+  rows:[{name:'',note:'',addr:'',pct:''},{name:'',note:'',addr:'',pct:''}]};
+ const D=S.draft;
+ if(D.step===1){
+  return '<div class="wrap" style="padding-top:36px;padding-bottom:20px"><div class="eyebrow dim" style="margin-bottom:10px">create a distribution · 1 of 2</div>'
+  +'<h2 style="font:700 28px var(--mono);letter-spacing:-.01em;margin:0 0 30px">Who controls it, and how slowly.</h2>'
+  +'<div class="field"><div class="lab">name</div><input id="c-desc" value="'+esc(D.desc)+'" placeholder="e.g. dnzn labs distribution"><div class="help">The distribution\'s display name — stored on-chain (the contract\'s description field), shown everywhere it appears.</div></div>'
+  +'<div class="field"><div class="lab">owner</div><input id="c-owner" value="'+esc(D.owner?(nameOf(D.owner)||D.owner):'')+'" placeholder="0x… or a name"><div class="res" id="c-ownerres">'+(D.ownerR&&D.ownerR.ok?'→ '+short(D.ownerR.addr):'')+'</div><div class="help">Defaults to your connected wallet. Accepts .eth / .wei / .gwei.</div></div>'
+  +'<div class="field"><div class="lab">owner kind</div><div class="seg3">'+['wallet','multisig vault','majeur dao'].map(k=>'<button data-kind="'+k+'" class="'+(D.kind===k?'on':'')+'">'+k+'</button>').join('')+'</div><div class="help">Sets the submit route for future changes. Optional — a bare wallet is fine.</div></div>'
+  +'<div class="field"><div class="lab">governance url <span class="opt">· optional</span></div><input id="c-gov" value="'+esc(D.gov)+'" placeholder="where changes are decided"></div>'
+  +'<div class="field"><div class="lab">about <span class="opt">· optional, your own words</span></div><textarea id="c-about" rows="3" style="font-family:var(--sans);resize:vertical" placeholder="e.g. owned by xyz dao — changes governed via membership voting">'+esc(D.about)+'</textarea><div class="help">Shown on the public page under "governance".</div></div>'
+  +'<div class="field" style="max-width:160px"><div class="lab">delay</div><input id="c-delay" value="'+esc(D.delay)+'"><div class="help" style="width:520px;max-width:70vw">How long every future change waits in public. Accepts 7d, 48h, 0. Zero means changes apply instantly — flagged everywhere. Common when governance runs upstream.</div></div>'
+  +'<button class="btn" id="c-next">Next</button></div>';
+ }
+ const rows=D.rows,total=draftTotal(rows),ok=Math.abs(total-100)<0.001&&rows.every(r=>r.name&&r.addr);
+ const table=rows.filter(r=>(parseFloat(r.pct)||0)>0).map((r,i)=>({bps:Math.round((parseFloat(r.pct)||0)*100),name:r.name,note:'',account:r.addr||'0x'}));
+ return '<div class="wrap" style="max-width:900px;padding-top:36px;padding-bottom:20px"><div class="eyebrow dim" style="margin-bottom:10px;display:flex;gap:14px;align-items:baseline"><button id="c-back" class="eyebrow" style="color:var(--muted);border-bottom:1px solid var(--dim)">← back</button><span>create a distribution · 2 of 2</span></div>'
+ +'<h2 style="font:700 28px var(--mono);letter-spacing:-.01em;margin:0 0 26px">Who gets what.</h2>'
+ +barHTML(table,48,'id="liveBar"')+'<div style="height:22px"></div>'
+ +'<div style="border-top:1px solid var(--ink)">'+rows.map((r,i)=>'<div class="erow">'
+  +'<input data-dr="name" data-i="'+i+'" value="'+esc(r.name)+'" placeholder="name" aria-label="name">'
+  +'<input data-dr="note" data-i="'+i+'" class="note-in" value="'+esc(r.note)+'" placeholder="note (prose)" aria-label="note">'
+  +'<div><input data-dr="addr" data-i="'+i+'" value="'+esc(r.addr)+'" placeholder="0x… or name" aria-label="address"><div class="res" data-res="'+i+'" style="font-size:10.5px"></div></div>'
+  +'<input data-dr="pct" data-i="'+i+'" class="bps" value="'+esc(r.pct)+'" inputmode="decimal" aria-label="percent">'
+  +'<button class="rm" data-rm="'+i+'" title="remove">×</button></div>').join('')+'</div>'
+ +'<div class="sum"><button style="font-size:12px;color:var(--muted);border-bottom:1px solid var(--dim)" data-addrow="1">+ add a beneficiary</button><span style="font-size:12.5px;color:'+(ok?'var(--t1)':'var(--err)')+'">'+rows.length+' beneficiar'+(rows.length===1?'y':'ies')+' · total <b>'+(+total.toFixed(2))+'%</b></span></div>'
+ +'<div style="border-top:1px solid var(--rule);padding-top:18px"><div class="eyebrow" style="margin-bottom:8px">tip <span style="text-transform:none;color:var(--dim)">· optional — off the top, before your table</span></div><div class="seg3" style="max-width:280px">'+[0,50,100,200].map(t=>'<button data-tip="'+t+'" class="'+(D.tip===t?'on':'')+'">'+(t/100)+'%</button>').join('')+'</div><div class="help" style="max-width:520px">Rake Distro is free and takes no fee. A tip is a slice off incoming funds, routed to <a href="#/distros/'+A.D1+'">dnzn labs\' own distribution</a> before your table. Queue a change to adjust or zero it any time.</div></div>'
+ +'<div style="border-top:1px solid var(--rule);padding-top:20px"><div style="font-size:11.5px;color:var(--muted);margin-bottom:14px">will deploy to <span style="color:var(--ink)">'+short(A.D3).replace('9C77','A11c')+'</span> — deterministic, same address on every chain</div>'
+ +'<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap"><button class="btn" id="c-deploy" '+(ok?'':'disabled')+'>Deploy</button>'
+ +'<span style="font-size:12px;color:'+(ok?'var(--dim)':'var(--err)')+'">'+(ok?'one transaction per chain':(Math.abs(total-100)>=0.001?'total must equal 100% — '+(+Math.abs(100-total).toFixed(2))+'% '+(total<100?'unassigned':'over'):'every row needs a name and address'))+'</span>'
+ +'</div></div></div>';
+}
+/* ---------- docs ---------- */
+/* ═══ SEGMENT:docs — returned by DocsRenderer.html(); may use shared tokens/classes + esc() only ═══ */
+function figSeq(){
+ return '<svg class="fig" width="560" height="226" viewBox="0 0 560 226" style="font-family:var(--mono)" role="img" aria-label="token flow sequence diagram">'
+ +'<rect x="30" y="8" width="120" height="26" fill="none" stroke="var(--ink)" stroke-width="1.25"></rect><text x="90" y="25" text-anchor="middle" font-size="11.5" fill="var(--ink)">payer</text>'
+ +'<rect x="220" y="8" width="140" height="26" fill="none" stroke="var(--ink)" stroke-width="1.25"></rect><text x="290" y="25" text-anchor="middle" font-size="11.5" fill="var(--ink)">distribution</text>'
+ +'<rect x="410" y="8" width="120" height="26" fill="none" stroke="var(--ink)" stroke-width="1.25"></rect><text x="470" y="25" text-anchor="middle" font-size="11.5" fill="var(--ink)">beneficiary</text>'
+ +'<line x1="90" y1="34" x2="90" y2="196" stroke="var(--rule)" stroke-dasharray="3 3"></line><line x1="290" y1="34" x2="290" y2="196" stroke="var(--rule)" stroke-dasharray="3 3"></line><line x1="470" y1="34" x2="470" y2="196" stroke="var(--rule)" stroke-dasharray="3 3"></line>'
+ +'<text x="188" y="60" text-anchor="middle" font-size="10.5" fill="var(--muted)">send fee — eth / erc20</text><line x1="90" y1="68" x2="282" y2="68" stroke="var(--ink)" stroke-width="1.25"></line><path d="M286 68l-8 -4v8Z" fill="var(--ink)"></path>'
+ +'<text x="188" y="98" text-anchor="middle" font-size="10.5" fill="var(--muted)">distribute() — anyone may call</text><line x1="90" y1="106" x2="282" y2="106" stroke="var(--ink)" stroke-width="1.25"></line><path d="M286 106l-8 -4v8Z" fill="var(--ink)"></path>'
+ +'<text x="378" y="136" text-anchor="middle" font-size="10.5" fill="var(--muted)">push share — table order</text><line x1="290" y1="144" x2="462" y2="144" stroke="var(--ink)" stroke-width="1.25"></line><path d="M466 144l-8 -4v8Z" fill="var(--ink)"></path>'
+ +'<text x="378" y="172" text-anchor="middle" font-size="10.5" fill="var(--amber)">on revert: escrow · release() retries</text><line x1="290" y1="180" x2="462" y2="180" stroke="var(--amber)" stroke-width="1.25" stroke-dasharray="4 3"></line><path d="M466 180l-8 -4v8Z" fill="var(--amber)"></path>'
+ +'</svg><div class="cap">fig 1 · token flow — mermaid, rendered to inline svg at build</div>';
+}
+function figState(){
+ return '<svg class="fig" width="420" height="164" viewBox="0 0 420 164" style="font-family:var(--mono)" role="img" aria-label="timelock state diagram">'
+ +'<circle cx="26" cy="80" r="4" fill="var(--ink)"></circle>'
+ +'<text x="48" y="72" text-anchor="middle" font-size="10" fill="var(--muted)">queue</text><line x1="30" y1="80" x2="66" y2="80" stroke="var(--ink)" stroke-width="1.25"></line><path d="M70 80l-8 -4v8Z" fill="var(--ink)"></path>'
+ +'<rect x="70" y="63" width="92" height="34" fill="none" stroke="var(--amber)" stroke-width="1.5"></rect><text x="116" y="84" text-anchor="middle" font-size="11.5" fill="var(--amber)">queued</text>'
+ +'<path d="M162 72 H210 V38 H264" fill="none" stroke="var(--ink)" stroke-width="1.25"></path><path d="M268 38l-8 -4v8Z" fill="var(--ink)"></path><text x="260" y="28" text-anchor="end" font-size="10" fill="var(--muted)">delay elapses — anyone</text>'
+ +'<rect x="268" y="21" width="106" height="34" fill="var(--ink)"></rect><text x="321" y="42" text-anchor="middle" font-size="11.5" fill="var(--paper)">applied</text>'
+ +'<path d="M162 88 H210 V122 H264" fill="none" stroke="var(--dim)" stroke-width="1.25"></path><path d="M268 122l-8 -4v8Z" fill="var(--dim)"></path><text x="260" y="152" text-anchor="end" font-size="10" fill="var(--dim)">owner cancels — immediate</text>'
+ +'<rect x="268" y="105" width="106" height="34" fill="none" stroke="var(--dim)" stroke-width="1.25"></rect><text x="321" y="126" text-anchor="middle" font-size="11.5" fill="var(--dim)">cancelled</text>'
+ +'</svg><div class="cap">fig 2 · the timelock — every owner action passes through it</div>';
+}
+const SECTIONS=[['abstract','Abstract'],['motivation','Motivation'],['how','How it works'],['reference','Contract reference'],['table','The table'],['timelock','The timelock'],['escrow','Push, escrow, release'],['deploy','Deployment'],['widget','The widget'],['security','Security'],['source','Source'],['lineage','Lineage']];
+function vDocs(){
+ return '<div class="docgrid"><nav class="rail" aria-label="sections"><div class="eyebrow" style="font-size:10px;margin-bottom:6px;line-height:1.4">sections</div>'
+ +SECTIONS.map(s=>'<a href="#/docs" data-sec="'+s[0]+'">'+s[1].toLowerCase()+'</a>').join('')+'</nav>'
+ +'<article class="doc"><div class="eyebrow dim" style="margin-bottom:10px">docs · v0.1 draft · 2026-08</div><h1>Rake Distro</h1>'
+ +'<h2 id="s-abstract">Abstract</h2><p>A distribution is a contract address that splits whatever it receives across a published table of beneficiaries, denominated in basis points. Anyone can trigger the split; only the owner can change the table, and every change waits out a public delay before it takes effect. The table, its labels, and any queued changes are readable in one call, so any interface — including the one serving this page — renders them without an indexer.</p>'
+ +'<h2 id="s-motivation">Motivation</h2><p>Fees are suspicious by default: the paragraph explaining where they go can change silently. The incumbent answer grew into an on-chain banking product; integrators need the primitive underneath — one address, one table, one delay. Rake Distro is that primitive and nothing else. It takes no fee, has no admin keys, no upgrade path, and no dependency on any DNZN infrastructure.</p>'
+ +'<h2 id="s-how">How it works</h2><p>Four verbs cover the lifecycle. <b style="font-family:var(--mono);font-size:13.5px">receive</b> — tokens accumulate at the address; the receive path stays under the 2,300-gas stipend and never pushes. <b style="font-family:var(--mono);font-size:13.5px">distribute</b> — anyone splits the unreserved balance by the table. <b style="font-family:var(--mono);font-size:13.5px">queue</b> — the owner stages a change in public (contract: <code>propose(bytes)</code>). <b style="font-family:var(--mono);font-size:13.5px">apply</b> — anyone lands it after the delay. Pass-through behaviour is the payer calling <code>distribute</code> in the same transaction.</p>'
+ +figSeq()
+ +'<h2 id="s-reference">Contract reference</h2>'
+ +'<div style="display:grid;grid-template-columns:1.4fr .7fr 2fr;gap:12px;font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding-bottom:7px"><span>function</span><span>caller</span><span>effect</span></div>'
+ +'<div class="ftab">'
+ +[['distribute(token)','anyone','splits the unreserved balance by the table; failed pushes escrow'],
+   ['propose(action)','owner','queues a change — the UI verb "queue" · eta = now + delay'],
+   ['apply(action, nonce)','anyone','executes a queued action once its eta has passed'],
+   ['cancel(hash)','owner','withdraws a queued action; immediate'],
+   ['release(token, account)','anyone','retries an escrowed share'],
+   ['snapshot()','view','everything a renderer needs, in one call — the widget\'s whole data contract']].map(r=>'<div><span class="fn">'+r[0]+'</span><span class="who">'+r[1]+'</span><span class="fx">'+r[2]+'</span></div>').join('')+'</div>'
+ +'<div style="display:flex;gap:30px;margin:18px 0 22px;font-size:11.5px;flex-wrap:wrap"><div><div class="eyebrow" style="font-size:10.5px;color:var(--dim);margin-bottom:5px">events</div><div class="mutd" style="line-height:1.9">Received · Distributed · Escrowed · Released<br>Queued · Applied · Cancelled</div></div><div><div class="eyebrow" style="font-size:10.5px;color:var(--dim);margin-bottom:5px">errors</div><div class="mutd" style="line-height:1.9">NotOwner · BadTable · NotReady<br>NothingToDo · Locked</div></div></div>'
+ +'<div class="eyebrow" style="font-size:10.5px;color:var(--dim);margin-bottom:6px">the snapshot struct — verbatim; what the widget reads</div>'
+ +'<pre>struct Beneficiary { address account; uint96 bps; string name; string note; }\nstruct Pending     { bytes32 hash; uint256 eta; bytes action; }\nstruct Snapshot {\n    address owner; uint32 delay; uint32 nonce; string description;\n    Beneficiary[] table; Pending[] pending;\n}</pre>'
+ +'<h2 id="s-table">The table</h2><p>Shares are basis points and must sum to 10,000; the last recipient takes the integer remainder of each split, so there is no dust. The table is strictly ascending by address, which deduplicates for free — a consequence worth stating twice: "last" is by address order, not list order. Each row carries a <code>name</code> and <code>note</code> on-chain; interfaces may overlay resolved names, but the labels are the distribution\'s own.</p>'
+ +'<h2 id="s-timelock">The timelock</h2><p>Every owner action goes through one mechanism: <code>propose</code> → <code>queued[hash(action, nonce)] = eta</code> → permissionless <code>apply</code> → self-call to an <code>onlySelf</code> setter (<code>setBeneficiaries</code>, <code>setDescription</code>, <code>setDelay</code>, <code>transferOwnership</code>). No setter is reachable any other way — including the one that changes the delay itself. <code>cancel</code> is owner-only and immediate. <code>delay = 0</code> is allowed, executes inline, and is flagged in every interface. Renouncing transfers ownership to nobody: the table is provably frozen.</p>'
+ +figState()
+ +'<h2 id="s-escrow">Push, escrow, release</h2><p>Each share is pushed with a fixed gas allowance (<code>PUSH_GAS</code>). If a push fails, that share is escrowed for its beneficiary and the rest still go out; <code>release(token, account)</code> retries at any time, callable by anyone. A <code>reserved[token]</code> total keeps escrowed funds out of the next split. A beneficiary that needs more than the allowance on receive is always escrowed, never paid directly. Tokens that return nothing from <code>transfer</code> (mainnet USDT) are tolerated.</p>'
+ +'<h2 id="s-deploy">Deployment</h2><p>A factory deploys PUSH0 minimal-proxy clones via CREATE2 with a sender-bound salt, so an address can be computed — and funded — before it is deployed, and the same address can be claimed on every chain. Neither the factory nor the implementation can receive ETH; stray sends revert rather than lock. <code>init</code> is factory-only.</p>'
+ +'<div class="chains"><div style="font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);border:none"><span>chain</span><span>factory</span><span>status</span></div>'
+ +['ethereum','base','arbitrum','op mainnet','sepolia','base sepolia'].map(c=>'<div><span>'+c+'</span><span class="dim">—</span><span class="dim">not deployed</span></div>').join('')+'</div>'
+ +'<h2 id="s-widget">The widget</h2><p>A drop-in script renders any distribution next to the fee it explains. It reads <code>snapshot()</code> and nothing else — no logs, no indexer. Font comes from the host; ink from <code>currentColor</code>; rules and muted text are derived from it at reduced opacity. The only fixed colors are the bar\'s segment tints and the pending amber. Full and compact variants; loading and failure states degrade quietly without touching the host page.</p>'
+ +'<pre>&lt;script src="https://rake.distro/widget.js"&gt;&lt;/script&gt;\n&lt;div data-rake="0x1d2F…a3C9" data-chain="1"&gt;&lt;/div&gt;</pre>'
+ +'<h2 id="s-security">Security</h2><p>Trust model: the owner is trusted <em>over a delay</em>. The contract protects beneficiaries from surprise, not from the owner; what the owner is — EOA, multisig, DAO — is out of scope, though the interface surfaces it. Known limitations: fee-on-transfer tokens settle by balance, so per-beneficiary amounts can differ from <code>amount × bps / 10000</code>; a recipient consuming more than <code>PUSH_GAS</code> is always escrowed; contracts are immutable — bugs are mitigated by redeploy, never upgrade.</p>'
+ +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding-bottom:7px"><span>date</span><span>auditor</span><span>scope</span><span>findings</span></div>'
+ +'<div class="ftab" style="font-size:12px"><div style="grid-template-columns:1fr 1fr 1fr 1fr"><span class="dim">—</span><span class="dim">none yet — planned pre-launch</span><span class="dim">—</span><span class="dim">—</span></div></div>'
+ +'<p style="margin-top:14px">Report privately to security@dnzn.dev. No bounty program yet; serious reports are taken seriously.</p>'
+ +'<h2 id="s-source">Source</h2><p>MIT. Single-file contract, no imports, dense comments. The dapp you are reading is returned by a renderer contract\'s <code>html()</code> view and mirrored at dnzn.dev and IPFS; verify a clone by comparing its runtime bytecode against the factory\'s recorded implementation.</p>'
+ +'<h2 id="s-lineage">Lineage</h2><p>The timelock-as-<code>queued[hash]</code>, <code>onlySelf</code> configuration, PUSH0 clones, and sender-bound CREATE2 salt are lifted from multisig.software (Src Co / z0r0z), whose single-file, audit-first ethos this project inherits. Low-level patterns follow Solady. Splits defined the category this primitive returns to.</p>'
+ +'</article></div>';
+}
+/* ═══ SEGMENT:core resumes (Render) ═══ */
+/* ---------- router & render ---------- */
+function route(){const h=location.hash||'#/';
+ if(h.startsWith('#/distros/')){const a=decodeURIComponent(h.slice(10));if(DISTROS[a]){S.sel=a;addRecent(a)}return 'distros'}
+ if(h.startsWith('#/distros'))return 'distros';
+ if(h.startsWith('#/docs'))return 'docs';
+ if(h.startsWith('#/create'))return 'create';
+ return 'landing';
+}
+function render(goTop){
+ const r=route(),app=$('#app');
+ $('#nl-distros').classList.toggle('on',r==='distros');
+ $('#nl-docs').classList.toggle('on',r==='docs');
+ if(r==='landing')app.innerHTML=vLanding();
+ else if(r==='distros')app.innerHTML=vDistros();
+ else if(r==='docs')app.innerHTML=vDocs();
+ else if(r==='create')app.innerHTML=vCreate();
+ bindView(r);
+ if(goTop)window.scrollTo(0,0);
+}
+function bindLoad(){
+ const go=$('#loadGo'),inp=$('#loadIn'),res=$('#loadRes');
+ if(!go)return;
+ const run=()=>{const v=inp.value.trim();res.textContent='';res.style.color='var(--dim)';
+  resolveName(v,r=>{
+   if(r.busy){res.textContent='resolving on mainnet…';return}
+   if(r.ok){const hit=DISTROS[r.addr]?r.addr:(Object.keys(DISTROS).find(k=>k.toLowerCase()===String(r.addr).toLowerCase())||null);
+    if(hit){location.hash='#/distros/'+hit}else{res.textContent='could not read distribution '+short(r.addr)+' on '+S.net+' · retry';res.style.color='var(--err)'}return}
+   if(r.notfound){res.textContent='no such name on mainnet';res.style.color='var(--err)'}
+   else if(r.unreachable){res.textContent='mainnet didn\'t answer — retry, or paste a raw address';res.style.color='var(--amber)'}
+   else if(r.invalid){res.textContent='not an address or a name';res.style.color='var(--err)'}
+  })};
+ go.addEventListener('click',run);
+ inp.addEventListener('keydown',e=>{if(e.key==='Enter')run()});
+}
+function bindView(r){
+ bindLoad();
+ if(r==='distros'){
+  document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{const t=b.dataset.tab;if(!S.wallet&&t!=='recent')return;S.tab=t;S.sel=null;S.drawer=false;S.embed=false;render()}));
+  document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>{S.sel=b.dataset.open;S.drawer=false;S.embed=false;addRecent(S.sel);render()}));
+  const d=S.sel&&DISTROS[S.sel]?DISTROS[S.sel]:listFor(S.tab)[0];
+  if(!d)return;
+  document.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>{d.pending.splice(+b.dataset.cancel,1);d.changes.unshift({v:'cancelled',w:'table · withdrawn by owner before landing',t:'just now'});render()}));
+  document.querySelectorAll('[data-apply]').forEach(b=>b.addEventListener('click',()=>{const p=d.pending.splice(+b.dataset.apply,1)[0];if(p&&p.table)d.table=p.table.map(x=>({note:'',...x}));d.changes.unshift({v:'applied',w:'table · applied by '+(S.wallet?(nameOf(S.wallet)||short(S.wallet)):'anyone'),t:'just now'});render()}));
+  const dis=document.querySelector('[data-distribute]');
+  if(dis)dis.addEventListener('click',()=>{if(!d.balances.length)return;d.activity.unshift({v:'distributed',w:d.balances.map(b=>b[1]+' '+b[0]).join(' + ')+' → '+d.table.length+' beneficiaries · called by '+(S.wallet?(nameOf(S.wallet)||short(S.wallet)):'you'),t:'just now'});d.balances=[];render()});
+  const q=document.querySelector('[data-queue]');
+  if(q)q.addEventListener('click',()=>{S.drawer=true;S.draft={rows:d.table.map(b=>({name:b.name,note:b.note||'',addr:b.account,pct:String(b.bps/100)}))};render();const el=$('#drawer');if(el)el.tabIndex=-1,el.focus({preventScroll:false})});
+  const em=document.querySelector('[data-embed]');
+  if(em)em.addEventListener('click',()=>{S.embed=!S.embed;render()});
+  const cs=document.querySelector('[data-copysnip]');
+  if(cs)cs.addEventListener('click',()=>{const p=$('#snipPre');if(p&&navigator.clipboard)navigator.clipboard.writeText(p.textContent).catch(()=>{});cs.textContent='copied ✓';setTimeout(()=>{cs.textContent='copy'},1200)});
+  if(S.drawer){
+   bindDrawer(d);
+   document.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{S.draft.rows.splice(+b.dataset.rm,1);render()}));
+   const ar=document.querySelector('[data-addrow]');
+   if(ar)ar.addEventListener('click',()=>{S.draft.rows.push({name:'',note:'',addr:'',pct:''});render()});
+   const sq=document.querySelector('[data-submitq]');
+   if(sq)sq.addEventListener('click',()=>{if(sq.hasAttribute('disabled'))return;
+    d.pending.push({eta:Date.now()+d.delay,kind:'table',table:S.draft.rows.map(r=>({account:r.addr,bps:Math.round(parseFloat(r.pct)*100),name:r.name,note:r.note}))});
+    S.drawer=false;render()});
+   const cd=document.querySelector('[data-calldata]');
+   if(cd)cd.addEventListener('click',()=>{if(navigator.clipboard)navigator.clipboard.writeText('0x8f2a4c1e'+A.D1.slice(2)).catch(()=>{});cd.textContent='copied';setTimeout(()=>{cd.textContent='copy calldata'},1200)});
+  }
+ }
+ if(r==='create'){
+  const D=S.draft;
+  if(D.step===1){
+   const desc=$('#c-desc'),own=$('#c-owner'),gv=$('#c-gov'),ab=$('#c-about'),dl=$('#c-delay');
+   desc.addEventListener('input',()=>D.desc=desc.value);
+   gv.addEventListener('input',()=>D.gov=gv.value);
+   ab.addEventListener('input',()=>D.about=ab.value);
+   dl.addEventListener('input',()=>D.delay=dl.value);
+   own.addEventListener('input',()=>{const res=$('#c-ownerres');resolveName(own.value,x=>{D.ownerR=x;
+    res.textContent=x.busy?'resolving on mainnet…':x.ok?('→ '+short(x.addr)+(nameOf(x.addr)?' · resolved on mainnet':'')):x.notfound?'no such name on mainnet':x.unreachable?'mainnet didn\'t answer — retry, or paste a raw address':x.invalid?'not an address or a name':'';
+    res.style.color=x.notfound?'var(--err)':x.unreachable?'var(--amber)':'var(--muted)';});});
+   document.querySelectorAll('[data-kind]').forEach(b=>b.addEventListener('click',()=>{D.kind=b.dataset.kind;render()}));
+   $('#c-next').addEventListener('click',()=>{D.step=2;render()});
+  }else{
+   document.querySelectorAll('[data-dr]').forEach(inp=>inp.addEventListener('input',()=>{
+    const i=+inp.dataset.i;D.rows[i][inp.dataset.dr]=inp.value;
+    if(inp.dataset.dr==='addr'){const rEl=document.querySelector('[data-res="'+i+'"]');resolveName(inp.value,x=>{if(!rEl)return;
+     rEl.textContent=x.busy?'resolving…':x.ok?('→ '+short(x.addr)):x.notfound?'no such name':x.unreachable?'mainnet didn\'t answer':'';
+     rEl.style.color=x.notfound?'var(--err)':x.unreachable?'var(--amber)':'var(--muted)';
+     if(x.ok)D.rows[i].addr=x.addr;refreshCreate();});}
+    refreshCreate();}));
+   document.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{D.rows.splice(+b.dataset.rm,1);render()}));
+   const ar=document.querySelector('[data-addrow]');
+   if(ar)ar.addEventListener('click',()=>{D.rows.push({name:'',note:'',addr:'',pct:''});render()});
+   $('#c-back').addEventListener('click',()=>{D.step=1;render()});
+   document.querySelectorAll('[data-tip]').forEach(b=>b.addEventListener('click',()=>{D.tip=+b.dataset.tip;render()}));
+   const dep=$('#c-deploy');
+   if(dep)dep.addEventListener('click',()=>{if(dep.hasAttribute('disabled'))return;
+    const addr='0xA11c'+A.D3.slice(6);
+    let ms=0;const m=String(D.delay).trim().match(/^(\d+)\s*([dh]?)$/i);
+    if(m)ms=+m[1]*(m[2].toLowerCase()==='h'?HRS:DAYS);
+    DISTROS[addr]={addr,chains:[S.net],description:D.desc||'untitled',owner:(D.ownerR&&D.ownerR.addr)||S.wallet||A.MSIG,ownerKind:D.kind,govUrl:D.gov,about:D.about,delay:ms,tip:D.tip||0,
+     table:D.rows.map(r=>({account:r.addr,bps:Math.round(parseFloat(r.pct)*100),name:r.name,note:r.note})),
+     pending:[],balances:[],changes:[],activity:[]};
+    S.draft=null;S.sel=addr;S.tab=S.wallet?'mine':'recent';addRecent(addr);location.hash='#/distros/'+addr});
+   function refreshCreate(){
+    const rows=D.rows,total=draftTotal(rows),ok=Math.abs(total-100)<0.001&&rows.every(r=>r.name&&r.addr);
+    const bar=$('#liveBar');
+    if(bar){const t=rows.filter(r=>(parseFloat(r.pct)||0)>0);const rest=100-total;
+     bar.innerHTML=t.map((r,i)=>'<div class="seg s'+(i%3)+'" style="flex:0 0 '+(parseFloat(r.pct)||0)+'%"></div>').join('')+(rest>0.001?'<div class="seg rest" style="flex:0 0 '+rest+'%"></div>':'')}
+    const sum=document.querySelector('.sum span');
+    if(sum){sum.style.color=ok?'var(--t1)':'var(--err)';sum.innerHTML=rows.length+' beneficiar'+(rows.length===1?'y':'ies')+' · total <b>'+(+total.toFixed(2))+'%</b>'}
+    const dp=$('#c-deploy');if(dp){if(ok)dp.removeAttribute('disabled');else dp.setAttribute('disabled','')}
+    const msg=dp&&dp.nextElementSibling;
+    if(msg){msg.style.color=ok?'var(--dim)':'var(--err)';msg.textContent=ok?'one transaction per chain':(Math.abs(total-100)>=0.001?'total must equal 100% — '+(+Math.abs(100-total).toFixed(2))+'% '+(total<100?'unassigned':'over'):'every row needs a name and address')}
+   }
+  }
+ }
+ if(r==='docs'){
+  document.querySelectorAll('[data-sec]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();
+   const el=document.getElementById('s-'+a.dataset.sec);
+   if(el){const y=el.getBoundingClientRect().top+window.scrollY-16;window.scrollTo({top:y,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}}));
+ }
+}
+/* countdown refresh */
+setInterval(()=>{if(route()==='distros'&&!S.drawer)render()},60e3);
+window.addEventListener('hashchange',()=>{S.drawer=false;S.embed=false;if(route()!=='create')S.draft=null;render(true)});
+/* boot */
+applyTheme(themeMode());
+buildNetMenu();buildWalMenu();walletLabel();
+if(!recents().length)addRecent(A.D1);
+render(true);
+</script>
+</body>
+</html>

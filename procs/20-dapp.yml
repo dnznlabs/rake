@@ -1,0 +1,8 @@
+version: "0.5"
+
+processes:
+  app:
+    command: "serve --listen $APP_PORT app/dist"
+    depends_on:
+      deploy:
+        condition: process_completed_successfully

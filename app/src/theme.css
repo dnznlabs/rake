@@ -1,0 +1,51 @@
+/* DNZN Base v1. --accent is the project's one colour: change the hue (250 is a stand-in), nothing else. */
+:root{--paper:#FCFCFA;--ink:#161616;--muted:#6F6F6B;--dim:#A3A39E;--rule:#DCDCD7;--accent:oklch(.47 .09 250);--amber:#B8741A;--err:#B23A2E;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+html.dark{--paper:#111311;--ink:#ECECE6;--muted:#8A8A85;--dim:#5C5E5A;--rule:#2E302E;--accent:oklch(.58 .09 250);--amber:#CE9640;--err:#D06456}
+*{box-sizing:border-box}
+/* Set on html, not only body: below a short page the browser's own canvas shows, white in dark mode. */
+html{background:var(--paper);color-scheme:light}
+html.dark{color-scheme:dark}
+body{margin:0;background:var(--paper);color:var(--ink);font:13px var(--mono);font-variant-numeric:tabular-nums}
+a{color:inherit;text-decoration:none}a:hover{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.frame{max-width:960px;margin:0 auto;padding:0 24px;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+main{flex:1}
+nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--rule)}
+.lockup{display:flex;align-items:center;gap:10px;white-space:nowrap}.lockup b{font-size:14px;letter-spacing:.04em}.lockup small{font-size:10px;letter-spacing:.12em;color:var(--dim)}
+.navr{display:flex;align-items:center;gap:16px;font-size:12px}
+.navr a.on{font-weight:700;border-bottom:2px solid var(--ink);padding-bottom:2px}
+.anchor{position:relative}
+.pill{border:1px solid var(--rule);padding:6px 10px;display:inline-flex;align-items:center;gap:6px}.pill.ink{border-color:var(--ink);padding:6px 14px}
+.pill.warn{border-color:var(--amber);color:var(--amber)}
+.eyebrow{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:40px 0 12px}
+.eyebrow.amber{color:var(--amber)}.eyebrow.err{color:var(--err)}
+h1{font-size:28px;font-weight:700;letter-spacing:-.015em;margin:40px 0 8px}
+p.prose{font:15px/1.65 var(--sans);color:var(--muted);max-width:720px;margin:0 0 24px}
+.btn{background:var(--ink);color:var(--paper);padding:11px 20px;display:inline-block}
+.btn.sec{background:none;color:var(--ink);border:1px solid var(--ink);padding:10px 20px}
+.btn.off{background:none;color:var(--dim);border:1px solid var(--rule);padding:10px 20px;cursor:default}
+.ledger{border-top:1px solid var(--ink);max-width:640px}.ledger.log{border-top:0}
+.row{display:grid;grid-template-columns:1fr auto;gap:2px 20px;padding:12px 0;border-bottom:1px solid var(--rule);align-items:baseline}
+.row b{font-size:13px}.row .n{font-weight:700;font-size:20px}.row .sub{font-size:11.5px;color:var(--dim);margin-top:3px}
+.row.err .n{color:var(--err)}
+.actions{margin-top:24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.status{font:12px var(--sans);color:var(--muted)}.status.warn{color:var(--amber)}.status.bad{color:var(--err)}
+/* The signature element: the one place besides focus and link hover that carries the accent. */
+.sig{color:var(--accent)}
+footer{display:flex;justify-content:space-between;border-top:1px solid var(--rule);margin-top:64px;padding:16px 0 40px;font-size:11px;color:var(--dim)}
+.menu{position:absolute;right:0;top:36px;border:1px solid var(--ink);background:var(--paper);min-width:120px;font-size:12px;z-index:2}
+.menu div{padding:9px 12px}.menu div.k{color:var(--muted);font:12px/1.5 var(--sans)}#net-menu{min-width:220px}.menu div.on{background:var(--ink);color:var(--paper)}
+.menu div[data-a],.menu div[data-t]{cursor:pointer}
+.notice{font:15px/1.65 var(--sans);color:var(--muted);max-width:60ch;margin:40px 0}
+.notice a,.notice button{color:var(--ink);border-bottom:1px solid var(--ink)}
+.notice.err{color:var(--err)}
+.doc{max-width:760px}.doc h1{margin-top:0}.doc h2{font-size:18px;margin:56px 0 12px}
+.doc p{font:15px/1.65 var(--sans);color:var(--muted);margin:0 0 14px}.doc code{font:12.5px var(--mono);color:var(--ink)}
+.doc pre{font:12px/1.6 var(--mono);border:1px solid var(--rule);padding:12px 14px;overflow-x:auto;margin:0 0 14px}
+.scroll{overflow-x:auto;margin:0 0 14px}
+.dtab{width:100%;border-collapse:collapse;border-top:1px solid var(--ink);font-size:12.5px}
+.dtab th{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);text-align:left;padding:10px 16px 10px 0;border-bottom:1px solid var(--rule)}
+.dtab td{padding:11px 16px 11px 0;border-bottom:1px solid var(--rule);vertical-align:baseline;white-space:nowrap}
+.dtab a,.doc a{border-bottom:1px solid var(--rule)}
+@media (max-width:720px){.frame{padding:0 16px}.navr{gap:8px}.navr a{display:none}.netname{display:none}#net{padding:6px 8px}}
