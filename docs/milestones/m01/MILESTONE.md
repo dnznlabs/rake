@@ -102,7 +102,7 @@ The milestone's remaining checks become machine-enforced.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m01-t03 | `.gas-snapshot` committed, `forge snapshot --check` in CI, criterion 7 demonstrated on a clean clone, and `AGENTS.md` § Contracts updated for the two new contracts | not started |
+| [m01-t03](tasks/m01-t03/TASK.md) | `.gas-snapshot` committed, `forge snapshot --check` in CI, criterion 7 demonstrated on a clean clone, and `AGENTS.md` § Contracts updated for the two new contracts | not started — gated on t02's merge |
 
 ## One-way doors
 
