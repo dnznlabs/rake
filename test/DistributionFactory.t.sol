@@ -70,10 +70,14 @@ contract DistributionFactoryTest is Test {
         address mine = factory.create(OWNER, 0, "desc", t, aliceSalt);
         assertEq(Distribution(payable(mine)).owner(), OWNER);
 
-        // an open salt has no prefix to check, so it is first-come: bob takes one
+        // a zero prefix is nobody's prefix, so a salt carrying one is refused whoever sends it
         vm.prank(bob);
-        address open = factory.create(OTHER, 0, "desc", t, openSalt);
-        assertEq(Distribution(payable(open)).owner(), OTHER);
+        vm.expectRevert(DistributionFactory.SaltDoesNotStartWith.selector);
+        factory.create(OTHER, 0, "desc", t, openSalt);
+
+        vm.prank(alice);
+        vm.expectRevert(DistributionFactory.SaltDoesNotStartWith.selector);
+        factory.create(OTHER, 0, "desc", t, openSalt);
 
         // the used salt is spent, and the collision costs the whole gas limit before it says so
         vm.prank(alice);
