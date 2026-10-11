@@ -9,9 +9,16 @@ t02 — two contracts, a factory-only address list, and the snapshot rule. M01 c
 last task of the milestone.
 
 Written while t02 builds, against `main` at `8cb5dc4` on 2026-10-11, through `devbox run --` (forge
-`1.7.1-dev`, the nixpkgs build of 1.7.1). **Gate: t02 merged.** The snapshot has to be taken over the
-suite t02 leaves behind, so nothing here is committed until #9's PR is on `main`; re-run every
-measurement below on that `main` before trusting it.
+`1.7.1-dev`, the nixpkgs build of 1.7.1). **Gate: t02 merged** — it is: #11 merged 2026-10-11, `main`
+at `0bb0403`. Re-run every measurement below on that `main` before trusting it.
+
+> **Refreshed 2026-10-11 on `0bb0403`, after t02 merged.** The t03 acceptance criteria still fail there
+> — `git ls-files .gas-snapshot` prints nothing and `ci.yml` has no snapshot step — so the task stands.
+> The suite is now 36 tests (13 `AppTest`, 18 `DistributionTest`, 5 `DistributionFactoryTest`;
+> `CounterTest` went with `Counter`), and `forge snapshot --snap /tmp/x` writes 36 rows. Step 1's
+> "33 rows" and "32 lines" below are the pre-t02 figures and are kept as the record of what was measured;
+> expect 36 and 35. Step 4 gained one bullet from the t02 handoff (the `forge script` `Warning:` line).
+> No step changed otherwise.
 
 **Setup.** Branch `m01/t03-definition-of-done` off `main` after t02 merges. Hooks only, no `make init`
 (t02's setup step says why); verify `ls .git/hooks | grep -v sample` prints `pre-commit` and
@@ -119,6 +126,10 @@ add or amend, in the section's existing voice — one line each, no prose:
 - The existing line "`forge build` must print no `warning[` line" becomes "no `warning[` and no
   `Warning (` line" — the second is solc's format and CI greps for both since t01.
 - The placeholder page under `app/` reads the factory's `implementation()` until M02 replaces it.
+- `forge script` prints `Warning: Detected artifacts built from source files that no longer exist`
+  when `out/` still holds artifacts for a deleted source (t02 handoff, after `Counter` went). It is
+  `Warning:`, not solc's `Warning (` or lint's `warning[`, so neither CI grep sees it, and it clears
+  with one `forge build --force`. Not a build warning; do not widen the CI assertion for it.
 
 Rejected: a new section. The scaffold's § Contracts is where an agent looks; a second section about
 the same contracts is the kind of duplication the file warns against.
