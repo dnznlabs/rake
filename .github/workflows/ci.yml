@@ -40,6 +40,7 @@ jobs:
           # Proves the compile ran before asserting what it did not print.
           grep -q 'Compiler run successful' "$BUILD_LOG"
           ! grep -q 'warning\[' "$BUILD_LOG"
+          ! grep -q 'Warning (' "$BUILD_LOG"
 
       - name: fmt
         run: devbox run -- make fmt
