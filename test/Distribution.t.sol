@@ -21,7 +21,7 @@ contract DistributionTest is Test {
     Distribution internal impl;
     PlainSender internal sender;
 
-    /// @dev Feeds `_salt()`. Open salts, so every clone lands at an address nobody has to predict.
+    /// @dev Feeds `_salt()`'s low 12 bytes, so every clone lands at an address nobody has to predict.
     uint96 internal salts;
 
     address internal constant OWNER = address(0xB0B);
@@ -509,9 +509,10 @@ contract DistributionTest is Test {
         d = Distribution(payable(factory.create(OWNER, delay_, "desc", t, _salt())));
     }
 
-    /// @dev An open salt from a counter: a fresh address per call, and no prefix to prank around.
+    /// @dev Bound to this contract, which is what calls `create` in this suite, with a counter below
+    /// the prefix for a fresh address per call.
     function _salt() internal returns (bytes32) {
-        return bytes32(uint256(++salts));
+        return bytes32(uint256(uint160(address(this))) << 96) | bytes32(uint256(++salts));
     }
 
     function _send(Distribution d, uint256 amount) internal {
