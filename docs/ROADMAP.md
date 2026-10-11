@@ -55,7 +55,13 @@ Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which
    the DNZN distribution's own public page. Nothing in the widget — it renders on other people's pages.
 2. **No `url` or `about` fields.** Owners carry URLs inside `description`. Rejected: two more string
    fields, which widen the audit surface for copy.
-3. **Name.** `Rake` for the contracts and repo, "Rake Distro" as the product phrase.
+3. **Name.** `Rake` is the project and the repo; `Distribution` and `DistributionFactory` are the
+   contracts, in `src/Distribution.sol`; "Rake Distro" is the product phrase. Ruled 2026-10-11,
+   superseding the 2026-10-10 text "`Rake` for the contracts and repo", which disagreed with this
+   file's milestone table and the overview. The lineage names the type, not the project:
+   `Multisig.sol`, `Moloch.sol`, `SplitWallet`. Rejected: `Rake`/`RakeFactory` (a rake is the fee,
+   not the thing that splits it); `RakeDistribution` and `RakeDistro` (a prefix with nothing to
+   disambiguate on two contracts, and `Distro` is a product word that would land in the ABI).
 4. **Chains.** The overview's four mainnets are the M05 acceptance criterion; MegaETH and Robinhood
    Chain, which multisig.software also serves, are a stretch row in the same milestone. Same bytecode,
    same deployer; no `.mega` or `.base.eth` name resolution in v1.

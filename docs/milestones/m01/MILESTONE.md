@@ -62,13 +62,8 @@ pins (forge `1.7.1-dev`, which is the 1.7.1 release built by nixpkgs). Measured 
 
 ## Human-in-the-loop requirements
 
-- **A ruling on the contract names.** `ROADMAP.md` ruling 3 reads "`Rake` for the contracts and
-  repo"; the same file's milestone table and the overview call the primitive `Distribution`. The
-  plan defaults to `Distribution` and `DistributionFactory` in `src/Distribution.sol`, because the
-  roadmap table, the overview's artifact list and the prototype's docs page all use those names and
-  ruling 3 reads as naming the project, not the type. Rename cost is low until t02 lands and grows
-  after it: `make addresses` keys on the contract name and M02's build tokens are the names uppercased.
-  A different answer before t02 merges costs one rename; after M02 starts it costs UI rework too.
+- ~~A ruling on the contract names.~~ Resolved 2026-10-11: `Distribution` and `DistributionFactory`
+  in `src/Distribution.sol`, which is what the plan defaulted to. `ROADMAP.md` ruling 3 now says so.
 - Merging three docs PRs and three code PRs. Everything else in this milestone is local to anvil and
   needs no credential, funds or external action.
 
