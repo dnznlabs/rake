@@ -18,6 +18,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | not started |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | not started |
 | [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address; DNZN's own 60/40 distribution live under the Ops multisig with a 7-day delay; dapp mirrored and widget embedded in one DNZN app | not started |
+| [M06 — Owner integrations](milestones/m06/MILESTONE.md) | Optional, after mainnet. When the connected wallet is a member of the owner rather than the owner, route `propose`/`cancel` into the multisig vault's or Majeur DAO's own submit flow instead of copy-calldata. UI only; no contract change | not started |
 
 ## Order
 
@@ -27,6 +28,11 @@ is why the tip and label decisions below are gated on M01 starting, not on M05 s
 
 M03 follows M02 rather than M01 because the review covers the `App` host and the chunk upload as well
 as `Distribution`; reviewing before M02 means reviewing twice.
+
+**Same address, separate storage.** A distribution deployed to several chains is several contracts.
+Tables can drift and every owner action is queued once per chain. M02's acceptance criteria must show
+that drift rather than present one distribution; M03 must name the factory's byte-identical deploy
+through a deterministic deployer as the one-way door it is.
 
 **Cross-project gate.** `state-collection` M4 is gated on "the fee-splitting contract being ready".
 That gate is satisfiable before Rake M05: the factory uses CREATE2 with a sender-bound salt, so the
@@ -57,8 +63,8 @@ Each changes contract storage, and the contract cannot be changed after M05. Rec
 
 - Streaming, vesting, conditional recipients, cross-chain messaging, ERC-777, EIP-7702 self-init.
   Non-goals in the overview; not reopened.
-- Owner-kind submit routes (multisig custom action, Majeur proposal) and vault import. Designed as a
-  later phase; v1 ships "copy calldata" everywhere, per `design/HANDOFF.md`.
+- Owner-kind submit routes in v1. Designed as a later phase; v1 ships "copy calldata" everywhere, per
+  `design/HANDOFF.md`. Carried as the optional M06 above, decided 2026-10-10.
 - The `Render` / `DocsRenderer` / `WidgetRenderer` split and the 60 KB uncompressed budget. Superseded
   by the scaffold's single `App` with gzipped SSTORE2 chunks. Measured 2026-10-10: the prototype
   comment-stripped is 74.0 KB, gzipped 20.7 KB; the widget 5.6 KB, gzipped 2.5 KB. Re-run before citing.
