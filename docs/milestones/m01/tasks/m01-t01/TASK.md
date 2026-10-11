@@ -11,6 +11,18 @@ Every command and version below was run on this machine on 2026-10-11 against `m
 through `devbox run --` (forge `1.7.1-dev`, which is the nixpkgs build of the 1.7.1 release). Where a
 step rests on a fact that can go stale, the evidence is named inline; re-run it rather than quote it.
 
+> **Corrected 2026-10-11, after PR #6 was built against the version below.** Two names this plan fixed
+> could not exist: `apply` is a Solidity reserved keyword (solc 0.8.34: `Expected identifier but got
+> reserved keyword 'apply'`, reproduced by both the engineer and the architect), and forge 1.7.1 treats
+> any function whose name begins with `table` as a table test, so a public `table()` getter turned
+> `src/Distribution.sol` itself into a failing suite. The engineer shipped `applyQueued` and
+> `beneficiaries()`, declared in `HANDOFF.md`; the architect's review recommends keeping both, and this
+> text now says what was built. The merge of this correction is the ruling — if other names are wanted,
+> they are one edit until M02 starts decoding the ABI. Also corrected: the lint check in step 4 now
+> allows the one scoped `block-timestamp` disable a timelock needs, and the `onlySelf` row no longer
+> claims those four functions are all a queued action can reach. Lesson for the next plan: compile a
+> stub of any surface a plan fixes before fixing it.
+
 ## Plan
 
 ### Step 1 — solc 0.8.34, warning-free
@@ -144,11 +156,11 @@ them, so do not rename.
 | `distribute(address token)` | anyone, `nonReentrant` | `token == address(0)` is ETH. `amount = balance − reserved[token]`; `NothingToDo` if zero. For each row in table order: `share = bps * amount / 10_000`, except the last row, which takes `amount − paid`. Push each; a failed push adds `share` to `escrowed[token][account]` and `reserved[token]`, emits `Escrowed`, and the loop continues. Emit `Distributed(token, amount)`. |
 | `release(address token, address account)` | anyone, `nonReentrant` | `amount = escrowed[token][account]`; `NothingToDo` if zero. Zero it, subtract from `reserved`, push with the same cap; if the push fails, revert (state unwinds, the escrow stands). Emit `Released`. |
 | `propose(bytes calldata action) returns (bytes32 hash)` | owner | `NotOwner` otherwise. `n = ++nonce`; `hash = keccak256(abi.encode(action, n))`. If `delay == 0`: self-call `action` inline, bubble its revert, emit `Queued(hash, n, block.timestamp, action)` then `Applied(hash)`. Else `eta = block.timestamp + delay`, `queued[hash] = eta`, append `Pending(hash, eta, action)`, emit `Queued`. |
-| `apply(bytes calldata action, uint32 nonce_)` | anyone | Recompute `hash`; `eta = queued[hash]`; `NotReady(eta)` if `eta == 0` or `block.timestamp < eta`. Delete `queued[hash]`, remove the `Pending` (swap-and-pop through `_pendingIndex`), self-call `action`, bubble its revert — so a failing action leaves the hash queued, the atomic-retry behaviour the overview § 8 says we inherit. Emit `Applied`. |
+| `applyQueued(bytes calldata action, uint32 nonce_)` | anyone | Recompute `hash`; `eta = queued[hash]`; `NotReady(eta)` if `eta == 0` or `block.timestamp < eta`. Delete `queued[hash]`, remove the `Pending` (swap-and-pop through `_pendingIndex`), self-call `action`, bubble its revert — so a failing action leaves the hash queued, the atomic-retry behaviour the overview § 8 says we inherit. Emit `Applied`. |
 | `cancel(bytes32 hash)` | owner, immediate | `NothingToDo` if not queued. Delete and remove as above; emit `Cancelled`. |
-| `setBeneficiaries(Beneficiary[] calldata)`, `setDescription(string calldata)`, `setDelay(uint32)`, `transferOwnership(address)` | `onlySelf` | `Unauthorized` unless `msg.sender == address(this)`. These are the only four `onlySelf` functions, so `apply` can reach nothing else. `transferOwnership(address(0))` is renounce: no one can `propose` or `cancel` again, and the table is frozen. |
+| `setBeneficiaries(Beneficiary[] calldata)`, `setDescription(string calldata)`, `setDelay(uint32)`, `transferOwnership(address)` | `onlySelf` | `Unauthorized` unless `msg.sender == address(this)`. These are the only four `onlySelf` functions. The self-call in `applyQueued` can reach any external function, so what keeps anything else out of reach is each function's own guard — `init` requires `factory`, `propose` and `cancel` require `owner`, and the contract is neither. `transferOwnership(address(0))` is renounce: no one can `propose` or `cancel` again, and the table is frozen. |
 | `snapshot() returns (Snapshot memory)` | view | Owner, delay, nonce, description, the table, and every pending action in array order. |
-| `owner()`, `delay()`, `nonce()`, `description()`, `queued(bytes32)`, `reserved(address)`, `escrowed(address,address)`, `table() returns (Beneficiary[] memory)`, `pendingCount()` | view | Public getters; `snapshot()` is the one M02 reads. |
+| `owner()`, `delay()`, `nonce()`, `description()`, `queued(bytes32)`, `reserved(address)`, `escrowed(address,address)`, `beneficiaries() returns (Beneficiary[] memory)`, `pendingCount()` | view | Public getters; `snapshot()` is the one M02 reads. |
 
 **Table validation**, in `init` and `setBeneficiaries`, all `BadTable`: empty table; any `bps == 0`;
 `account` not strictly greater than the previous row's (so the first row must be above `address(0)`
@@ -169,7 +181,9 @@ Any address — `_table`, `_pending`, mappings — may be named differently in t
 surface, the struct layouts, the error and event names, and the rules in the table may not.
 
 **Check.** `devbox run -- forge build --force` as in step 1, and `devbox run -- forge lint` prints no
-finding for the new file. Both run before the tests exist; a surface that does not compile is the
+finding for the new file. The one exception is `block-timestamp` on the timelock's `block.timestamp < eta`,
+which `forge build` also prints inline: silence that single line with
+`// forge-lint: disable-next-line(block-timestamp)` and a comment, not with `exclude_lints` in `foundry.toml`. Both run before the tests exist; a surface that does not compile is the
 first thing to find.
 
 ### Step 5 — `test/Distribution.t.sol`
@@ -194,8 +208,8 @@ lists them:
 | `test_rounding_3333_3333_3334` | three rows 3,333 / 3,333 / 3,334 bps in ascending address order; send 10,000 wei, `distribute(address(0))`; then 10,001 wei and again | first split 3,333 / 3,333 / 3,334; second 3,333 / 3,333 / 3,335 — the highest address takes the remainder, contract balance 0 after each |
 | `test_escrowRevertingEthRecipientOthersPaid` | one beneficiary is a contract whose `receive` reverts; send ETH, distribute | the other rows are paid their share; `escrowed(0, bad)` and `reserved(0)` both equal the bad share; `Escrowed` emitted; contract balance equals the escrow |
 | `test_distributeReleaseDistributeKeepsReserved` | as above, then send more ETH and distribute again; then make the bad recipient accept and `release(0, bad)`; then distribute a third time | the second split divides only `balance − reserved`; after release `escrowed` and `reserved` are 0 and the recipient holds its share; the third split divides the whole balance; `Released` emitted |
-| `test_cancelThenApplyReverts` | `propose(setDescription)` with a 7-day delay; `cancel(hash)`; `vm.warp` past eta; `apply(action, nonce)` | `vm.expectRevert(abi.encodeWithSelector(NotReady.selector, 0))`; `snapshot().pending` is empty; `description` unchanged |
-| `test_setDelayZeroDoesNotShortcutQueued` | delay 7 days; propose A = `setBeneficiaries(newTable)`; propose B = `setDelay(0)` | B is queued with its own eta, not applied inline; A's eta is unchanged; before 7 days both `apply` calls revert `NotReady`; after 7 days both succeed; `delay()` is 0 only after B applies |
+| `test_cancelThenApplyReverts` | `propose(setDescription)` with a 7-day delay; `cancel(hash)`; `vm.warp` past eta; `applyQueued(action, nonce)` | `vm.expectRevert(abi.encodeWithSelector(NotReady.selector, 0))`; `snapshot().pending` is empty; `description` unchanged |
+| `test_setDelayZeroDoesNotShortcutQueued` | delay 7 days; propose A = `setBeneficiaries(newTable)`; propose B = `setDelay(0)` | B is queued with its own eta, not applied inline; A's eta is unchanged; before 7 days both `applyQueued` calls revert `NotReady`; after 7 days both succeed; `delay()` is 0 only after B applies |
 | `test_usdtStyleNoReturnToken` | a mock ERC-20 whose `transfer` returns no data; a second mock whose `transfer` returns `false`; distribute each | the no-return token pays every row; the false-returning token escrows every row and `reserved[token]` equals the contract's balance of it |
 | `test_reentrantRecipientIsEscrowed` | a beneficiary contract whose `receive` calls `distribute(address(0))`, and a variant that calls `release(0, self)` | both pushes fail, both are escrowed, the other rows are paid, and the contract's balance equals `reserved(0)` |
 
@@ -216,7 +230,7 @@ And these, which the surface above is not safe without:
 - `test_pendingIterable` — three proposals; cancel the second; `snapshot().pending` holds the first
   and third with their hashes, etas and action bytes, in that order.
 - `test_applyFailureKeepsQueued` — propose an action whose self-call reverts (a `setBeneficiaries`
-  with a bad table); after eta, `apply` reverts and `queued(hash)` is still the eta.
+  with a bad table); after eta, `applyQueued` reverts and `queued(hash)` is still the eta.
 - `test_renounceFreezes` — apply `transferOwnership(address(0))`; the former owner's `propose` and
   `cancel` revert `NotOwner`; `distribute` still works.
 - `test_nftTransferReverts` — an ERC-721 mock's `safeTransferFrom` to the clone reverts (no receiver
@@ -276,7 +290,7 @@ Each with the default you take if no answer arrives before it matters.
    the event is a convenience for M02's activity list, which can also read `Distributed`.
 3. **A cap on table length.** Overview § 6 asks whether `_set` should enforce one below `uint16`.
    Default: no cap; a few hundred rows is the practical ceiling by gas and M02 can say so.
-4. **`propose` validating the action's selector.** Default: no — a wrong action fails at `apply` and
+4. **`propose` validating the action's selector.** Default: no — a wrong action fails at `applyQueued` and
    stays queued, which is visible, and a selector whitelist is surface before the audit.
 5. **`release` when the retry fails.** Default: revert, leaving the escrow intact. Rejected:
    re-escrowing silently, which succeeds while nothing moved.
