@@ -13,8 +13,8 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 
 | Milestone | Goal | Status |
 |:----------|:-----|:-------|
-| [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | in progress — t01 (#6), t02 (#11) and t03 (#14) merged 2026-10-11, every criterion passing on `main`; closes when the decision-10 follow-up (#16) merges |
-| [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain | not started |
+| [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | done 2026-10-11 — t01 (#6), t02 (#11), t03 (#14) and the decision-10 follow-up (#24) merged; every criterion re-run and passing on `main` at `c292106` |
+| [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain | in progress — plan merged (#29) 2026-10-11; t01 assigned (#30) |
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | not started |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | not started |
 | [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; DNZN's own 60/40 distribution live under the Ops multisig with a 7-day delay; dapp mirrored and widget embedded in one DNZN app | not started |
@@ -113,7 +113,30 @@ Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which
 
     Code change: one comparison in `create` and the inverted assertion in `test_saltFrontRunningRejected`,
     plus the `.gas-snapshot` row and the `create` doc comment, which still describes open salts as
-    "claimable". Issued as a follow-up to `m01-t03`, before M02's create flow is written.
+    "claimable". Issued as a follow-up to `m01-t03`, before M02's create flow is written; landed as
+    [#24](https://github.com/dnznlabs/rake/pull/24) on 2026-10-11, closing M01.
+
+Ruled by Denizen on 2026-10-11, before M02 started, each on the issue linked and each as the
+recommended option.
+
+11. **`distribute` is shown to everyone.** Under the balance line, labelled that anyone can call it and
+    that it spends the caller's own gas. Ruled on [#26](https://github.com/dnznlabs/rake/issues/26).
+    Rejected: owner-and-beneficiaries only (hides that the function is permissionless, and a keeper
+    has to leave the dapp); hidden entirely (the dapp would show a balance it cannot settle). Closes
+    overview § 6 "Should `distribute` be surfaced to non-owners?". M02 `m02-t03` builds it.
+12. **The widget is served by `App` as a second on-chain document.** `App.request(["widget.js"])`
+    returns a second chunk set with `Content-Type: application/javascript`; `html()` stays the dapp;
+    `lock()` covers both. Ruled on [#27](https://github.com/dnznlabs/rake/issues/27). Rejected: a
+    second `App` instance (the contract changes anyway, plus a second owner, lock and address per
+    chain); off-chain only (the one piece strangers load would be the one piece not verifiable on
+    chain). Closes overview § 6 "Widget hosting" for the on-chain half; dnzn.dev and IPFS in M05 are
+    mirrors of it. M02 `m02-t05` builds it.
+13. **Name display priority is ENS → WNS → GNS, winner alone.** The ruling already made for
+    state-collection (PR #53 there), ported verbatim. Ruled on
+    [#28](https://github.com/dnznlabs/rake/issues/28). Supersedes `design/HANDOFF.md` § Demo → real
+    wiring and `DESIGN_HANDOFF.md` § 2.1, which say `.wei → .gwei → .eth`; the brainstorming folder is
+    frozen, so this entry is the correction. Rejected: the design order, which would show two DNZN
+    products different names for one address. Lands in `m02-t03`, exercised in M04.
 
 ## Findings carried forward
 
