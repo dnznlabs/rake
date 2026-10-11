@@ -96,7 +96,7 @@ A distribution reaches an address the same way on every chain, and `make serve` 
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m01-t02](tasks/m01-t02/TASK.md) | `DistributionFactory` in the same file: CREATE2, PUSH0 clones, sender-bound salt, `implementation` deployed in the constructor, `predict`; the two t02 tests of criterion 2 and the t01 suite re-pointed at `create`; `scripts/forge/Deploy.s.sol` deploys the factory and `Counter.sol` with its test and deploy go; criteria 3 and 6 | done — [#11](https://github.com/dnznlabs/rake/pull/11) merged 2026-10-11; [handoff](tasks/m01-t02/HANDOFF.md). Three open questions took their defaults, each pinned by a test; open salts (question 2) still wants a ruling before M02's create flow. One plan check corrected (`TASK.md` note) |
+| [m01-t02](tasks/m01-t02/TASK.md) | `DistributionFactory` in the same file: CREATE2, PUSH0 clones, sender-bound salt, `implementation` deployed in the constructor, `predict`; the two t02 tests of criterion 2 and the t01 suite re-pointed at `create`; `scripts/forge/Deploy.s.sol` deploys the factory and `Counter.sol` with its test and deploy go; criteria 3 and 6 | done — [#11](https://github.com/dnznlabs/rake/pull/11) merged 2026-10-11; [handoff](tasks/m01-t02/HANDOFF.md). Three open questions took their defaults, each pinned by a test; open salts (question 2) were then refused by `ROADMAP.md` decision 10 on 2026-10-11, code change issued as a t03 follow-up. One plan check corrected (`TASK.md` note) |
 
 ### Phase 3 — Definition of done
 

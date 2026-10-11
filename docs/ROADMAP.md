@@ -88,6 +88,32 @@ Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which
    this ruling. Rejected: `applyAction` and the reference's `executeQueued` (neither pairs with the
    `queued` mapping and the `Applied` event the way `applyQueued` does); a `table`-free rename of the
    struct field (M02 reads it, the design doc fixes it, and the collision is only on functions).
+10. **Sender-bound salts only; open salts are refused.** `create` accepts a salt only when its top 20
+    bytes equal `msg.sender`; a zero prefix reverts with `SaltDoesNotStartWith` like any other wrong
+    prefix. Ruled by Denizen on 2026-10-11 over Telegram, after `m01-t02` shipped the reference's
+    default (open salts allowed, pinned by `test_saltFrontRunningRejected`); supersedes that default and
+    the "Open salts are allowed" entry under § Findings carried forward. Rejected because a distribution's
+    address depends on the factory and the salt alone, so an open salt is first-come on every chain: a
+    distribution that is DNZN's on Ethereum could be deployed at the same address on Base by anyone,
+    with their owner and table, and the primitive's one promise is that an address means one thing
+    everywhere. Also rejected: keeping them and steering the dapp to sender-bound salts, which protects
+    nobody who calls the contract directly, and the direct caller is the squatter. Front-running a
+    `create` is also griefing, since a CREATE2 collision burns the whole gas limit (finding below).
+    What is given up: reproducing an address on a new chain from a *different* sender. Accepted
+    knowingly, with the operating rule it implies, which M03's runbook and M02's create flow both state:
+
+    - **The sender fixes the address; the owner does not enter it.** `create(owner, …, salt)` takes the
+      owner as a parameter, and the address is `predict(salt)` regardless of it. So one EOA calls
+      `create` on every chain with the same salt and passes the multisig as `owner` in that call. The
+      distribution is owned by the multisig from its first block on every chain, at one address, and no
+      ownership transfer is ever needed to deploy to the next chain.
+    - **Each chain is a separate contract.** Transferring ownership on one chain changes neither the
+      salt nor any other chain. The address is reproducible as long as the deploying EOA's key exists;
+      that key never needs to own anything, so it can be a cold key used only for `create`.
+
+    Code change: one comparison in `create` and the inverted assertion in `test_saltFrontRunningRejected`,
+    plus the `.gas-snapshot` row and the `create` doc comment, which still describes open salts as
+    "claimable". Issued as a follow-up to `m01-t03`, before M02's create flow is written.
 
 ## Findings carried forward
 
@@ -116,14 +142,13 @@ closes it; none is closed yet.
   (`HANDOFF.md` § Discoveries, confirming the architect's spike): `create` against a salt whose address
   already has code reports about 1.04 billion gas in the test harness, because CREATE2 consumes all
   forwarded gas before the factory's `DeploymentFailed` can fire. Unreachable by accident with a
-  sender-bound salt; reachable with an open (zero-prefixed) salt or a re-sent transaction. **M02**'s
-  create flow must `eth_getCode` `predict(salt)` and refuse to send when it is non-empty; **M03** states
-  it in `SECURITY.md`.
-- **Open salts are allowed, by default rather than by ruling.** `create` accepts a salt whose top 20
-  bytes are zero as well as one carrying `msg.sender`, so anyone can occupy an open salt first (t02
-  open question 2, default taken, pinned by `test_saltFrontRunningRejected`). Reversing it is one
-  branch and one inverted assertion, cheap until M02's create flow decides which salts it offers.
-  **M02** needs Denizen's ruling before that flow is written; after M05 it is immutable.
+  sender-bound salt; reachable with a re-sent transaction, and until decision 10 lands in code, with an
+  open (zero-prefixed) salt. **M02**'s create flow must `eth_getCode` `predict(salt)` and refuse to send
+  when it is non-empty; **M03** states it in `SECURITY.md`.
+- ~~**Open salts are allowed, by default rather than by ruling.**~~ Closed 2026-10-11 by decision 10:
+  refused. Kept for the record: `m01-t02` shipped `create` accepting a zero prefix as well as
+  `msg.sender` (t02 open question 2, default taken, pinned by `test_saltFrontRunningRejected`), and
+  flagged it as needing a ruling before M02's create flow.
 
 ## Not on the roadmap
 
