@@ -1,6 +1,6 @@
 # M02 — Dapp and widget on anvil
 
-Status: not started — plan proposed 2026-10-11, starts when M01 closes (#16 merged) · updated 2026-10-11
+Status: in progress — plan merged (#29) and M01 closed (#24) 2026-10-11; t01 assigned · updated 2026-10-11
 
 The design prototype (`brainstorming/design/rake-dapp.html`, `rake-widget.html`) rebuilt as the real
 dapp on DNZN Base v1: reading `snapshot()` from the chain, sending the six writes through the wallet,
@@ -56,7 +56,7 @@ rather than quote.
    `applyQueued` and `beneficiaries`), the four verbs, the timelock, push/escrow/release, deployment
    (chain table reading "not deployed"), the widget snippet, security (trust assumptions, how to
    report), source and lineage. Diagrams are the prototype's inline SVG, re-inked to theme tokens.
-7. **Widget.** Decision #27 taken as (a) unless ruled otherwise: `App.request(["widget.js"])` returns
+7. **Widget.** Per decision 12: `App.request(["widget.js"])` returns
    `200`, `Content-Type: application/javascript`, and a body byte-equal to `app/dist/widget.js`;
    `request([])` still returns the dapp; `forge test` covers both and the `lock()` paths. A host page
    served under `make serve` embeds `<div data-rake=… data-chain=… data-rpc=…>` and renders the featured
@@ -76,7 +76,7 @@ rather than quote.
 
 - Name resolution *exercised*. The ENS/WNS/GNS code lands in `m02-t03`, ported from state-collection's
   reference implementation, but anvil has no registries and the dapp has no network but the wallet's,
-  so it is first exercised on Sepolia in **M04**. Order of precedence is decision #28.
+  so it is first exercised on Sepolia in **M04**. Order of precedence is decision 13.
 - `paid to me` in the dashboard list. No event indexes beneficiaries, so it needs either a scan of
   every `Created` distribution's table (unbounded on mainnet) or an indexer, which overview § 2 goal 2
   rules out. v1 lists `recent` and `mine`; the gap is recorded for the overview, and a later milestone
@@ -92,15 +92,16 @@ rather than quote.
 
 ## Human-in-the-loop requirements
 
-Three rulings, each a `decision` issue in the five-line form, none gating `m02-t01`:
+Three rulings, each a `decision` issue in the five-line form. ~~None gating `m02-t01`.~~ All three
+ruled by Denizen on 2026-10-11 as the recommended option, before t01 started; recorded as
+`ROADMAP.md` decisions 11–13:
 
-- [#26](https://github.com/dnznlabs/rake/issues/26) — show `distribute` to non-owners? Recommend yes,
-  under the balance, labelled. Gates `m02-t03`.
-- [#27](https://github.com/dnznlabs/rake/issues/27) — widget served by `App` as a second document, or
-  off-chain only? Recommend `App`. Gates `m02-t05`.
-- [#28](https://github.com/dnznlabs/rake/issues/28) — name display priority: the state-collection ruling
-  (ENS, WNS, GNS) or the design handoff's (`.wei`, `.gwei`, `.eth`)? Recommend the existing ruling.
-  Gates one line of `m02-t03`.
+- [#26](https://github.com/dnznlabs/rake/issues/26) — `distribute` shown to everyone, under the balance,
+  labelled (decision 11). `m02-t03`.
+- [#27](https://github.com/dnznlabs/rake/issues/27) — widget served by `App` as `widget.js` (decision 12).
+  `m02-t05`.
+- [#28](https://github.com/dnznlabs/rake/issues/28) — ENS → WNS → GNS, the state-collection ruling
+  (decision 13). `m02-t03`.
 
 Merging five docs PRs and five code PRs. No credential, funds or external action: everything is anvil.
 
@@ -116,7 +117,7 @@ something worth rendering.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m02-t01](tasks/m02-t01/TASK.md) | General ABI codec in `eth.js` with cast-generated fixtures; the seed that creates the featured distribution on every dev chain with a chain-dependent table, a deposit and one pending change; `FEATURED_SALT` as a build token; criteria 1, 2 and the deploy half of 5 | not started |
+| [m02-t01](tasks/m02-t01/TASK.md) | General ABI codec in `eth.js` with cast-generated fixtures; the seed that creates the featured distribution on every dev chain with a chain-dependent table, a deposit and one pending change; `FEATURED_SALT` as a build token; criteria 1, 2 and the deploy half of 5 | assigned — plan merged (#29), issue [#30](https://github.com/dnznlabs/rake/issues/30) opened and handed off 2026-10-11, no gate |
 
 ### Phase 2 — Reading
 

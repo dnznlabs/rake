@@ -1,6 +1,6 @@
 # M01 — The contract
 
-Status: in progress — all three phases done and every criterion passing on `main`; one ruling follow-up ([#16](https://github.com/dnznlabs/rake/issues/16)) open before close · updated 2026-10-11
+Status: done — every criterion passing on `main` at `c292106`; the decision-10 follow-up ([#16](https://github.com/dnznlabs/rake/issues/16)) landed as [#24](https://github.com/dnznlabs/rake/pull/24) on 2026-10-11, 36 tests, gas rows down, nothing carried · updated 2026-10-11
 
 `Distribution` and its factory built from `brainstorming/PROJECT_OVERVIEW.md` § 5 under the
 rulings in [`ROADMAP.md`](../../ROADMAP.md) § Decisions, every test in the overview's definition of
@@ -114,8 +114,9 @@ The milestone's remaining checks become machine-enforced.
 **Follow-up outside the task table.** `ROADMAP.md` decision 10 (refuse open salts) was ruled after t02
 merged and is issued as [#16](https://github.com/dnznlabs/rake/issues/16), on `main` after #14. It
 changes one comparison in `create`, the inverted assertion in `test_saltFrontRunningRejected`, the
-test helper's salts, the doc comment and the `create` rows of `.gas-snapshot`. M01 closes when it
-merges: the milestone's goal is the contract under the rulings, and 10 is now one of them.
+test helper's salts, the doc comment and the `create` rows of `.gas-snapshot`. Merged as
+[#24](https://github.com/dnznlabs/rake/pull/24) at `a0c3d04`, reviewed once by the architect, which
+closed the milestone: its goal is the contract under the rulings, and 10 is one of them.
 
 ## Carried out of M01
 
