@@ -131,7 +131,7 @@ Every screen that reads: landing, list, detail, pending decode, histories, drift
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m02-t03 | Create flow (salt, predict, `eth_getCode` guard), propose panel for the four setters and renounce, `applyQueued`, `cancel`, `distribute` (per #26), `release` with the `false`-word rendering, copy-calldata for a vault signer, the payer-guidance line (#18), name resolution ported (per #28); criterion 4 | not started |
+| [m02-t03](tasks/m02-t03/TASK.md) | Create flow (salt, predict, `eth_getCode` guard), propose panel for the four setters and renounce, `applyQueued`, `cancel`, `distribute` (per #26), `release` with the `false`-word rendering, copy-calldata for a vault signer, the payer-guidance line (#18), name resolution ported (per #28); criterion 4 | planned — plan written 2026-10-11 while t02 builds; issue opens when t02 merges |
 
 ### Phase 4 — Docs and the widget
 
