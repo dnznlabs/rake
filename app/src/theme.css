@@ -1,6 +1,7 @@
-/* DNZN Base v1. --accent is the project's one colour: change the hue (250 is a stand-in), nothing else. */
-:root{--paper:#FCFCFA;--ink:#161616;--muted:#6F6F6B;--dim:#A3A39E;--rule:#DCDCD7;--accent:oklch(.47 .09 250);--amber:#B8741A;--err:#B23A2E;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-html.dark{--paper:#111311;--ink:#ECECE6;--muted:#8A8A85;--dim:#5C5E5A;--rule:#2E302E;--accent:oklch(.58 .09 250);--amber:#CE9640;--err:#D06456}
+/* DNZN Base v1. --accent is the project's one colour: change the hue (230 is baize, the card-table
+   felt), nothing else. */
+:root{--paper:#FCFCFA;--ink:#161616;--muted:#6F6F6B;--dim:#A3A39E;--rule:#DCDCD7;--accent:oklch(.47 .09 230);--amber:#B8741A;--err:#B23A2E;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+html.dark{--paper:#111311;--ink:#ECECE6;--muted:#8A8A85;--dim:#5C5E5A;--rule:#2E302E;--accent:oklch(.58 .09 230);--amber:#CE9640;--err:#D06456}
 *{box-sizing:border-box}
 /* Set on html, not only body: below a short page the browser's own canvas shows, white in dark mode. */
 html{background:var(--paper);color-scheme:light}
@@ -29,10 +30,66 @@ p.prose{font:15px/1.65 var(--sans);color:var(--muted);max-width:720px;margin:0 0
 .row{display:grid;grid-template-columns:1fr auto;gap:2px 20px;padding:12px 0;border-bottom:1px solid var(--rule);align-items:baseline}
 .row b{font-size:13px}.row .n{font-weight:700;font-size:20px}.row .sub{font-size:11.5px;color:var(--dim);margin-top:3px}
 .row.err .n{color:var(--err)}
+/* A beneficiary's note is prose; its name and percentage are data. */
+.row .nt{font:13px var(--sans);color:var(--muted)}
+.meta{display:flex;flex-wrap:wrap;gap:16px 40px;border-top:1px solid var(--rule);padding:16px 0;max-width:640px}
+.meta .k{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:4px}
+.meta .v{font-size:12.5px}.meta .v.amber{color:var(--amber)}
+.tabs{display:flex;gap:24px;font-size:12.5px;border-bottom:1px solid var(--rule);margin:40px 0 0}
+.tab{padding:0 2px 10px;color:var(--muted)}
+.tab.on{color:var(--ink);font-weight:700;border-bottom:2px solid var(--ink);margin-bottom:-1px}
+.list-row{display:grid;grid-template-columns:1fr auto auto;gap:4px 18px;align-items:center;padding:13px 0 13px 12px;border-bottom:1px solid var(--rule);width:100%;text-align:left;border-left:2px solid transparent}
+.list-row:hover{border-left-color:var(--dim)}
+.list-row b{font-size:13px}.list-row .sub{display:block;font-size:11px;color:var(--dim);margin-top:3px}
+.dot{width:8px;height:8px;background:var(--amber)}
+.hist{border-top:1px solid var(--rule);max-width:640px}
+.hrow{display:grid;grid-template-columns:92px 1fr auto;gap:14px;padding:9px 0;border-bottom:1px solid var(--rule);font-size:12px;align-items:center}
+.hrow b{font-weight:700;color:var(--muted)}.hrow.amber b{color:var(--amber)}.hrow.err b{color:var(--err)}
+.hrow .w{color:var(--muted)}.hrow .t{color:var(--dim);font-size:11px;white-space:nowrap}
+.verbs{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;border-top:1px solid var(--rule);margin-top:14px;padding:20px 0 8px}
+.verbs>div{border-left:1px solid var(--rule);padding-left:14px}
+.verbs i{font:600 10px var(--mono);letter-spacing:.09em;color:var(--dim);font-style:normal}
+.verbs b{display:block;font:700 13.5px var(--mono);margin:12px 0 6px}
+.verbs span{font:12.5px/1.5 var(--sans);color:var(--muted)}
+.verbs .who{display:block;font-size:10.5px;color:var(--dim);margin-top:8px}
+/* The one diagram that carries the accent: the split the distribute icon draws is the bar in miniature. */
+.verbs .t0{fill:var(--accent)}
+.verbs .t1{fill:color-mix(in oklab,var(--accent),var(--paper) 25%)}
+.verbs .t2{fill:color-mix(in oklab,var(--accent),var(--paper) 50%)}
+.verbs .q{color:var(--amber)}
+.verbs .chk{stroke:var(--paper)}
+.load{display:flex;gap:10px;max-width:460px}
+.load input{font:13px var(--mono);color:var(--ink);background:var(--paper);border:1px solid var(--rule);padding:10px 13px;width:100%}
+.load input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--ink)}
+.res{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}
+.sechead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-top:1px solid var(--ink);margin-top:26px;padding-top:16px;max-width:640px}
+.sechead b{font-size:13px}.sechead span{font:11.5px var(--sans);color:var(--dim);text-align:right}
 .actions{margin-top:24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
 .status{font:12px var(--sans);color:var(--muted)}.status.warn{color:var(--amber)}.status.bad{color:var(--err)}
-/* The signature element: the one place besides focus and link hover that carries the accent. */
-.sig{color:var(--accent)}
+/* The signature element: the rake bar, the one place besides focus and link hover that carries the
+   accent. The tints are the base's formula — t2 is the accent mixed 25% into paper, t3 50% — so one
+   hue declaration drives all three in both themes. flex-basis is the width, and its 250 ms is the
+   product's one motion. */
+.bar{display:flex;overflow:hidden;height:72px}
+.bar.sm{height:56px}
+.seg{flex:0 0 auto;transition:flex-basis .25s ease}
+.seg.s0{background:var(--accent)}
+.seg.s1{background:color-mix(in oklab,var(--accent),var(--paper) 25%)}
+.seg.s2{background:color-mix(in oklab,var(--accent),var(--paper) 50%)}
+.seg.rest{background:repeating-linear-gradient(45deg,var(--rule) 0 5px,transparent 5px 10px)}
+.mini{display:flex;height:6px;width:120px}
+/* Pending: the same table in amber outline, 3 px apart, so the two bars never read as one. The
+   segments shrink to pay for the gaps, which keeps their proportions and the widths declarative. */
+.bar.pending{gap:3px;height:32px}
+.bar.pending .seg{flex-shrink:1;background:none;border:1.5px solid var(--amber)}
+.ticks{display:flex;margin-top:0}
+.tick{border-left:1px solid var(--rule);padding:9px 12px 0 10px;min-width:0}
+.tick b{font-size:15px}
+.tick .nm{font-size:12px}
+.ticks.pending{gap:3px}
+.ticks.pending .tick{border-color:var(--amber);color:var(--amber);padding:6px 0 0 8px;font-size:11px}
+.ticks.pending .nm{opacity:.75}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 footer{display:flex;justify-content:space-between;border-top:1px solid var(--rule);margin-top:64px;padding:16px 0 40px;font-size:11px;color:var(--dim)}
 .menu{position:absolute;right:0;top:36px;border:1px solid var(--ink);background:var(--paper);min-width:120px;font-size:12px;z-index:2}
 .menu div{padding:9px 12px}.menu div.k{color:var(--muted);font:12px/1.5 var(--sans)}#net-menu{min-width:220px}.menu div.on{background:var(--ink);color:var(--paper)}
@@ -48,4 +105,4 @@ footer{display:flex;justify-content:space-between;border-top:1px solid var(--rul
 .dtab th{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);text-align:left;padding:10px 16px 10px 0;border-bottom:1px solid var(--rule)}
 .dtab td{padding:11px 16px 11px 0;border-bottom:1px solid var(--rule);vertical-align:baseline;white-space:nowrap}
 .dtab a,.doc a{border-bottom:1px solid var(--rule)}
-@media (max-width:720px){.frame{padding:0 16px}.navr{gap:8px}.navr a{display:none}.netname{display:none}#net{padding:6px 8px}}
+@media (max-width:720px){.frame{padding:0 16px}.navr{gap:8px}.navr a{display:none}.netname{display:none}#net{padding:6px 8px}.verbs{grid-template-columns:1fr}}
