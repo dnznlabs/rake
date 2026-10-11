@@ -93,9 +93,15 @@ plan's.
 - **`vm.revertToState` reverts state, not the calling frame's memory**, which is what makes the
   two-chain test possible at all: values captured before the revert survive it while every account
   goes back. Not documented in the cheatcode's natspec.
-- **solady's `predictDeterministicAddress_PUSH0` returns an address with dirty upper 96 bits** (its own
-  natspec says so), and `assertEq` against it passes anyway under this project's `via_ir = true`, which
-  cleans on use. A legacy-pipeline project comparing it the same way could see a false mismatch.
+- **solady's `predictDeterministicAddress_PUSH0` documents dirty upper 96 bits, and comparing it with
+  `assertEq` is safe regardless of the pipeline.** Corrected after review: this bullet first claimed
+  the comparison passed only because of `via_ir = true`. It does not depend on that. Solidity cleans an
+  `address` before `==` and before ABI-encoding it into `vm.assertEq`, so the warning is for assembly
+  consumers reading the word directly. Measured both ways on `ec98cc0`:
+  `FOUNDRY_VIA_IR=false forge test --match-test test_create2AddressStableAcrossChains --force` compiles
+  on the legacy pipeline and passes at gas 5,104,090, against 4,527,183 under the project's via-IR
+  default — found by Lakos in review and re-run here before this edit landed. The cross-check in
+  `test_create2AddressStableAcrossChains` therefore rests on nothing but the clone's init code.
 - **`forge script` prints `Warning: Detected artifacts built from source files that no longer exist`**
   naming `src/Counter.sol` and `test/Counter.t.sol` while `out/` still holds their artifacts. It is
   `Warning:`, not `Warning (`, so neither the plan's greps nor CI's two assertions can see it, and it
