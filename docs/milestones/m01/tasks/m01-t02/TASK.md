@@ -15,6 +15,15 @@ factory surface in step 1 and the first three tests in step 2 were compiled and 
 toolchain before this plan was written — build warning-free, `forge lint` and `forge fmt --check`
 clean, 3 passed — so the surface is known to exist. The stub is not in the repo; write your own.
 
+> **Corrected 2026-10-11, after PR #11 was built against the version below.** One verification command
+> in step 1's check and acceptance criterion 3 could never pass on the pinned toolchain: forge 1.7.1
+> pretty-prints `inspect … abi --json`, so the bytes are `"name": "create"` with a space and the plan's
+> `grep -oE '"name":"create"'` matches nothing — run as written it reads as a missing surface. The
+> engineer substituted `jq` for the names and `cast sig` for `create`'s canonical signature (declared
+> as deviation 1 in `HANDOFF.md`), which is stronger than what was asked, and this text now says that.
+> Nothing about the contract changed. Lesson for the next plan: run every check command against the
+> stub, not only the build — a check that was never seen to pass has not been shown to check anything.
+
 **Setup.** Branch `m01/t02-factory-dev-chain` off `main`. A worktree of an existing clone inherits
 its hooks; a fresh clone gets them with `devbox run -- pre-commit install --install-hooks`, which
 installs both stages because `.pre-commit-config.yaml:1` sets `default_install_hook_types: [pre-commit,
@@ -113,12 +122,16 @@ calldata.
 ```bash
 devbox run -- forge build --force 2>&1 | tee /tmp/build.log | grep -E 'Compiler run successful!$'
 ! grep -E 'Warning \(|warning\[' /tmp/build.log
-devbox run -- forge inspect DistributionFactory abi --json | grep -oE '"name":"(create|predict|implementation|Created|DeploymentFailed|SaltDoesNotStartWith)"' | sort -u
+devbox run -- bash -c 'forge inspect DistributionFactory abi --json | jq -r ".[]|\"\\(.type) \\(.name)\"" | sort'
+devbox run -- cast sig "create(address,uint32,string,(address,uint96,string,string)[],bytes32)"
 devbox run -- forge lint
 ```
 
-Six names; lint prints nothing for the new contract. `forge lint` is run through 1.7.1, never the
-host's 1.8.1, which lints differently (t01 handoff).
+Six lines — `error DeploymentFailed`, `error SaltDoesNotStartWith`, `event Created`, `function create`,
+`function implementation`, `function predict` — and `cast sig` prints `0xf0f469ff`, which must equal
+`create`'s selector in that ABI (`jq '.[]|select(.name=="create")'` has no selector field; compare
+against `forge inspect DistributionFactory methods`). Lint prints nothing for the new contract.
+`forge lint` is run through 1.7.1, never the host's 1.8.1, which lints differently (t01 handoff).
 
 ### Step 2 — tests
 
@@ -247,9 +260,10 @@ M01 criteria 3 and 6, the t02 rows of 2, and the task's own, in the order to run
   the five in step 2, `test_create2AddressStableAcrossChains` and `test_saltFrontRunningRejected`
   among them; `devbox run -- forge test` reports `0 failed`.
 - `devbox run -- forge inspect Distribution abi --json` still shows `snapshot()` exactly as M01
-  criterion 3 says; `forge inspect DistributionFactory abi --json` shows
-  `create(address,uint32,string,(address,uint96,string,string)[],bytes32)`, `predict(bytes32)`,
-  `implementation()`, `Created`, `DeploymentFailed`, `SaltDoesNotStartWith`.
+  criterion 3 says; `forge inspect DistributionFactory abi --json | jq -r '.[]|"\(.type) \(.name)"'`
+  lists exactly `create`, `predict`, `implementation`, `Created`, `DeploymentFailed`,
+  `SaltDoesNotStartWith`, and `create`'s selector equals
+  `cast sig "create(address,uint32,string,(address,uint96,string,string)[],bytes32)"` → `0xf0f469ff`.
 - Step 5's script: `make addresses` lists `DistributionFactory` with no `(no code …)` note and does not
   list `Counter`; `implementation()` returns an address with non-empty code.
 - `git ls-files src/Counter.sol test/Counter.t.sol` prints nothing; `git grep -n Counter -- src test
