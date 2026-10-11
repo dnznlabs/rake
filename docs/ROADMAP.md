@@ -1,6 +1,6 @@
 # Rake · roadmap
 
-Proposed 2026-10-10 · not yet approved
+Proposed 2026-10-10 · approved 2026-10-11 (PR #1)
 
 A fee-splitting primitive: one address per distribution, an on-chain table of beneficiaries, a
 public delay on every owner action, and a dapp and widget served from the chain. The spec is
