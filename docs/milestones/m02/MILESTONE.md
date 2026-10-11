@@ -1,6 +1,6 @@
 # M02 — Dapp and widget on anvil
 
-Status: in progress — plan merged (#29) and M01 closed (#24) 2026-10-11; t01 assigned · updated 2026-10-11
+Status: in progress — t01 done, t02 assigned · updated 2026-10-11
 
 The design prototype (`brainstorming/design/rake-dapp.html`, `rake-widget.html`) rebuilt as the real
 dapp on DNZN Base v1: reading `snapshot()` from the chain, sending the six writes through the wallet,
@@ -117,7 +117,7 @@ something worth rendering.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m02-t01](tasks/m02-t01/TASK.md) | General ABI codec in `eth.js` with cast-generated fixtures; the seed that creates the featured distribution on every dev chain with a chain-dependent table, a deposit and one pending change; `FEATURED_SALT` as a build token; criteria 1, 2 and the deploy half of 5 | assigned — plan merged (#29), issue [#30](https://github.com/dnznlabs/rake/issues/30) opened and handed off 2026-10-11, no gate |
+| [m02-t01](tasks/m02-t01/TASK.md) | General ABI codec in `eth.js` with cast-generated fixtures; the seed that creates the featured distribution on every dev chain with a chain-dependent table, a deposit and one pending change; `FEATURED_SALT` as a build token; criteria 1, 2 and the deploy half of 5 | done — [#33](https://github.com/dnznlabs/rake/pull/33) merged 2026-10-11 at `1a642f4`; carried [#34](https://github.com/dnznlabs/rake/issues/34), [#35](https://github.com/dnznlabs/rake/issues/35) |
 
 ### Phase 2 — Reading
 
@@ -125,7 +125,7 @@ Every screen that reads: landing, list, detail, pending decode, histories, drift
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m02-t02](tasks/m02-t02/TASK.md) | The prototype's shell on the scaffold's provider code, rulings 1, 2, 7, 8 and 9 applied; `#/`, `#/distros`, `#/distros/<addr>`; pending actions decoded; `Queued`/`Applied`/`Cancelled` and `Received`/`Distributed`/`Escrowed`/`Released` histories loaded after the snapshot; criteria 3 and 5 | planned — plan written 2026-10-11 while t01 builds; issue opens when t01 merges |
+| [m02-t02](tasks/m02-t02/TASK.md) | The prototype's shell on the scaffold's provider code, rulings 1, 2, 7, 8 and 9 applied; `#/`, `#/distros`, `#/distros/<addr>`; pending actions decoded; `Queued`/`Applied`/`Cancelled` and `Received`/`Distributed`/`Escrowed`/`Released` histories loaded after the snapshot; criteria 3 and 5 | assigned — plan merged (#32), issue [#36](https://github.com/dnznlabs/rake/issues/36) opened and handed off 2026-10-11, no gate |
 
 ### Phase 3 — Writing
 
