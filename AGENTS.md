@@ -18,15 +18,29 @@
 ## Contracts and the dev chain
 
 - `src/` contracts, `test/*.t.sol` their tests, `scripts/forge/` forge scripts (`script` in `foundry.toml`).
+- `src/Distribution.sol` holds both contracts: `Distribution`, the primitive, and `DistributionFactory`,
+  which deploys the implementation in its constructor and creates PUSH0 clones through CREATE2. The ABI
+  is fixed by `docs/ROADMAP.md` decisions 3 and 9; a rename is a roadmap change, not an edit.
 - `mk/*.mk` hold the make targets, included in name order; `procs/*.yml` the `make serve` processes,
   merged in name order. `build`, `test`, `fmt`, `clean` and `deploy` are double-colon targets, so
   extend one by adding a recipe in a new numbered file rather than editing an existing one.
 - `make serve` starts anvil and runs `make deploy`: every `scripts/forge/Deploy*.s.sol`, in name order.
 - Addresses are read from `broadcast/*/<chain>/run-latest.json`, never hard-coded. `make addresses`
   prints them and flags any with no code on the chain.
+- `make addresses` lists `App` and `DistributionFactory`. The implementation is created inside the
+  factory's constructor and is not a `CREATE` transaction in the broadcast log; read it with
+  `cast call <factory> "implementation()(address)"`.
+- The placeholder page under `app/` reads the factory's `implementation()` until M02 replaces it.
 - `lib/` are submodules pinned to a tag. `forge install` would move them.
 - The toolchain is pinned in `devbox.json`; run forge through devbox. `forge build` must print no
-  `warning[` line, and lint findings differ across foundry versions.
+  `warning[` and no `Warning (` line, and lint findings differ across foundry versions.
+- `.gas-snapshot` is tracked and CI runs `forge snapshot --check` with no tolerance. Regenerate with
+  `devbox run -- forge snapshot` after any change to `src/` or `test/`, through devbox only — the
+  host's forge gives different numbers. To look without writing, `--diff` or `--snap /tmp/x`.
+- `forge script` prints `Warning: Detected artifacts built from source files that no longer exist`
+  when `out/` still holds artifacts for a deleted source (t02 handoff, after `Counter` went). It is
+  `Warning:`, not solc's `Warning (` or lint's `warning[`, so neither CI grep sees it, and it clears
+  with one `forge build --force`. Not a build warning; do not widen the CI assertion for it.
 
 <!-- fragment: dapp -->
 ## The dapp

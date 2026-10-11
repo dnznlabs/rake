@@ -48,6 +48,9 @@ jobs:
       - name: test
         run: devbox run -- make test
 
+      - name: gas snapshot
+        run: devbox run -- forge snapshot --check
+
       - name: working tree clean
         shell: bash
         run: |
