@@ -269,9 +269,8 @@ removing `Counter.sol`, `make serve` (t02). `.gas-snapshot` and the CI snapshot 
 
 Each with the default you take if no answer arrives before it matters.
 
-1. **Contract name.** `ROADMAP.md` ruling 3 says "`Rake` for the contracts"; the roadmap table and the
-   overview say `Distribution`. Default: `Distribution` in `src/Distribution.sol`. Raised in
-   [M01 § Human-in-the-loop requirements](../../MILESTONE.md#human-in-the-loop-requirements); a rename before t02 is one edit.
+1. **Contract name.** Closed 2026-10-11: `Distribution` in `src/Distribution.sol`, the default, now
+   `ROADMAP.md` ruling 3. Nothing to decide in `HANDOFF.md`.
 2. **`Received` in `receive()`.** Default: emit it. If `test_receiveUnderStipend` fails with the event
    in place, drop the event, keep the test, and say so in `HANDOFF.md` — the stipend is the contract,
    the event is a convenience for M02's activity list, which can also read `Distributed`.
