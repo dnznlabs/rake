@@ -303,13 +303,15 @@ contract DistributionFactory {
     address public immutable implementation = address(new Distribution{salt: bytes32(0)}());
 
     /// @notice Deploy and initialise a clone at `predict(salt)`.
-    /// @param salt Its top 20 bytes must be zero or `msg.sender`. `msg.value` rides the CREATE2, so a
+    /// @param salt Its top 20 bytes must equal `msg.sender`. `msg.value` rides the CREATE2, so a
     /// deposit lands in the clone without a `Received` log.
     /// @dev Three properties the dapp has to know about this address:
     /// 1. It depends on this factory and `salt` only — not on the owner, delay, description or table.
-    ///    So an *open* salt (zero top 20 bytes) is first-come: whoever sends first fixes the table
-    ///    that lives at that address. That is what makes the overview's pre-funded address workflow
-    ///    work, and why the UI defaults to a sender-bound salt and labels an open one as claimable.
+    ///    So the sender fixes the address; the owner does not enter it. One EOA calls `create` with
+    ///    the same salt on every chain and passes the vault as `owner_`, and the clone is owned by
+    ///    that vault from its first block at one address, with no ownership transfer ever needed.
+    ///    Each chain is a separate contract: transferring ownership on one changes neither the salt
+    ///    nor any other chain, so the deploying key never needs to own anything.
     /// 2. A second `create` with a used salt burns the whole gas limit before `DeploymentFailed`: a
     ///    CREATE2 collision consumes every unit forwarded to it. Read `predict(salt)` with
     ///    `eth_getCode` first and refuse a non-empty answer.
@@ -325,7 +327,7 @@ contract DistributionFactory {
     ) external payable returns (address distribution) {
         address impl = implementation;
         uint256 prefix = uint256(salt) >> 96;
-        if (prefix != 0 && prefix != uint256(uint160(msg.sender))) revert SaltDoesNotStartWith();
+        if (prefix != uint256(uint160(msg.sender))) revert SaltDoesNotStartWith();
 
         // The PUSH0 minimal-proxy init code, byte for byte as solady's `LibClone.initCode_PUSH0`
         // writes it. The two `mstore`s at 0x24 overlap the free memory pointer and restore it.
