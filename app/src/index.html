@@ -20,7 +20,10 @@
    and replacing those two files reskins the app without touching this one.
    Addresses and the chain are substituted by app/build.mjs; a deployed contract's token is its name,
    uppercased, between double underscores. DEV-fenced blocks are stripped unless the build is --dev. */
-const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTRIBUTIONFACTORY__' };
+/* `featuredSalt` is the dev chain's seeded distribution, as a salt and never as an address: the
+   address is `factory.predict(salt)`, which the page reads at boot rather than carrying a token per
+   chain. Unused until t02 renders it. */
+const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTRIBUTIONFACTORY__', featuredSalt: '__FEATURED_SALT__' };
 const CONTRACTS = [['DistributionFactory', CFG.factory]];
 const CHAINS = { 1: 'mainnet', 11155111: 'sepolia', 31337: 'anvil' };
 const EXPLORER = { 1: 'https://etherscan.io', 11155111: 'https://sepolia.etherscan.io' };

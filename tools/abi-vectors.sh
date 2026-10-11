@@ -53,7 +53,8 @@ write snapshot.return "$("$CAST" abi-encode \
   "f((address,uint32,uint32,string,${BENEFICIARY}[],${PENDING}[]))" \
   "($A1,604800,1,\"DNZN fees\",[($A2,6000,\"ops\",\"operations\"),($A3,4000,\"treasury\",\"\")],[(0x1111111111111111111111111111111111111111111111111111111111111111,1760000000,$set_beneficiaries)])")"
 
-# Every selector the dapp sends or decodes. `name 0xselector` lines, sorted so the file is stable.
+# Every selector the dapp sends or decodes, as `signature 0xselector` lines in the order below, so
+# the file is byte-stable across runs and a diff names the case that moved.
 sigs=(
   "create(address,uint32,string,${BENEFICIARY}[],bytes32)"
   "predict(bytes32)"
