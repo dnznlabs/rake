@@ -67,7 +67,11 @@ Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which
    one-row table forwarding 100% to the successor; the delay applies and the money follows. M02's UI
    renders a one-beneficiary table whose address answers `snapshot()` as "superseded by". Rejected: a
    `successor` field and setter, which can disagree with where funds go.
-7. **Footer.** `work no. 001`, as `state-collection` does (`work no. 003`), not the "a public work by
+7. **Single owner; signers get the admin view.** No multi-owner in the contract: a multisig or DAO
+   is the owner, and its members route `propose`/`cancel` through it. The M02 dapp shows the owner
+   view to a connected wallet that is the owner, or a signer of an owning vault (probe `isOwner(address)`,
+   failing soft), with writes as copy-calldata in v1. `apply` and `distribute` stay direct.
+8. **Footer.** `work no. 001`, as `state-collection` does (`work no. 003`), not the "a public work by
    dnzn labs" line the scaffold's `layout.html` and the design prototype carry. M02 fixes the slot.
 
 ## Not on the roadmap
