@@ -17,7 +17,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 | [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain | not started |
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | not started |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | not started |
-| [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address; DNZN's own 60/40 distribution live under the Ops multisig with a 7-day delay; dapp mirrored and widget embedded in one DNZN app | not started |
+| [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; DNZN's own 60/40 distribution live under the Ops multisig with a 7-day delay; dapp mirrored and widget embedded in one DNZN app | not started |
 | [M06 — Owner integrations](milestones/m06/MILESTONE.md) | Optional, after mainnet. When the connected wallet is a member of the owner rather than the owner, route `propose`/`cancel` into the multisig vault's or Majeur DAO's own submit flow instead of copy-calldata. UI only; no contract change | not started |
 
 ## Order
@@ -56,7 +56,18 @@ Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which
 2. **No `url` or `about` fields.** Owners carry URLs inside `description`. Rejected: two more string
    fields, which widen the audit surface for copy.
 3. **Name.** `Rake` for the contracts and repo, "Rake Distro" as the product phrase.
-4. **Footer.** `work no. 001`, as `state-collection` does (`work no. 003`), not the "a public work by
+4. **Chains.** The overview's four mainnets are the M05 acceptance criterion; MegaETH and Robinhood
+   Chain, which multisig.software also serves, are a stretch row in the same milestone. Same bytecode,
+   same deployer; no `.mega` or `.base.eth` name resolution in v1.
+5. **The primitive is not upgradeable; `App` is, until `lock()`.** A distribution is pinned to the
+   factory that made it. A new significant version is a new factory, and old distributions run
+   unchanged forever. Rejected: a movable implementation pointer for new creates only, because the
+   clone address depends on the implementation and versions would break same-address-everywhere.
+6. **Supersession is a re-table, not a field.** An owner migrating to a new version proposes a
+   one-row table forwarding 100% to the successor; the delay applies and the money follows. M02's UI
+   renders a one-beneficiary table whose address answers `snapshot()` as "superseded by". Rejected: a
+   `successor` field and setter, which can disagree with where funds go.
+7. **Footer.** `work no. 001`, as `state-collection` does (`work no. 003`), not the "a public work by
    dnzn labs" line the scaffold's `layout.html` and the design prototype carry. M02 fixes the slot.
 
 ## Not on the roadmap
