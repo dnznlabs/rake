@@ -60,7 +60,7 @@ pins (forge `1.7.1-dev`, which is the 1.7.1 release built by nixpkgs). Measured 
 - Any network other than anvil — M04.
 - `App.lock()`, and a branch protection rule on `main` — ruled out in `ROADMAP.md`.
 
-## Needs the human
+## Human-in-the-loop requirements
 
 - **A ruling on the contract names.** `ROADMAP.md` ruling 3 reads "`Rake` for the contracts and
   repo"; the same file's milestone table and the overview call the primitive `Distribution`. The
