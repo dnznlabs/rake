@@ -54,7 +54,10 @@ rather than quote.
 ## Out of scope
 
 - The dapp and the widget, and any change under `app/` or to `App.sol` beyond compiling it under the
-  new solc — M02.
+  new solc — M02. One exception, measured 2026-10-11: `app/build.mjs` refuses a bundle with an
+  unresolved token and the scaffold's placeholder page reads `__COUNTER__`, so t02 swaps that page's
+  `Counter` rows for the factory when `Counter` goes — otherwise `make deploy`, and with it
+  `make serve`, stops working. Nothing else under `app/` moves before M02.
 - The `PUSH_GAS` measurement against a multisig.software clone and a Safe (overview § 6). M01 ships the
   draft constant `100_000`, labelled as a draft; M03 closes the measurement, before anything is
   deployed. The independent review and `SECURITY.md` — M03.
@@ -91,7 +94,7 @@ A distribution reaches an address the same way on every chain, and `make serve` 
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m01-t02 | `DistributionFactory` in the same file: CREATE2, PUSH0 clones, sender-bound salt, `implementation` deployed in the constructor; the two t02 tests of criterion 2; `scripts/forge/Deploy.s.sol` deploys the factory and `Counter.sol` with its test and deploy go; criteria 3 and 6 | not started |
+| [m01-t02](tasks/m01-t02/TASK.md) | `DistributionFactory` in the same file: CREATE2, PUSH0 clones, sender-bound salt, `implementation` deployed in the constructor, `predict`; the two t02 tests of criterion 2 and the t01 suite re-pointed at `create`; `scripts/forge/Deploy.s.sol` deploys the factory and `Counter.sol` with its test and deploy go; criteria 3 and 6 | not started |
 
 ### Phase 3 — Definition of done
 
