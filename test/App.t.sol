@@ -101,10 +101,7 @@ contract AppTest is Test {
         assertEq(app.version(), "v0.1");
     }
 
-    uint256 private _perturb;
-
     function test_onlyOwner() public {
-        _perturb = 1;
         vm.expectRevert();
         app.addChunk("a");
     }
