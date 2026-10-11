@@ -41,23 +41,23 @@ hardcode it after M03 and ship before Rake is on mainnet, which is exactly the w
 names in § 8. Confirm in M03 by predicting the address from the runbook; do not make `state-collection`
 wait for M05.
 
-## Decisions needed before M01 starts
+## Decisions
 
-Each changes contract storage, and the contract cannot be changed after M05. Recommendation first.
+Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which cannot change after M05.
 
-1. **Tip.** The overview says "no fee taken by Rake Distro itself, free forever"; the design handoff
-   adds a `tip` field, default 100 bps, recipient hardcoded to DNZN's distribution. **Recommend no tip
-   field in the contract.** If DNZN wants a default cut, the create flow pre-fills a DNZN row in the
-   table at 1%, removable like any other row; disclosure then comes from the table itself, and the
-   contract keeps the promise the copy makes. Rejected: the hardcoded field, because it bakes a DNZN
-   address into an immutable public primitive and contradicts goal 5 (no dependency on DNZN
-   infrastructure). Cost of the recommendation: the tip is one row among others rather than "off the
-   top", and the widget footer line in design turn 10 goes.
-2. **Governance `url` and `about`.** Design wants them; the contract has `description` only.
-   **Recommend deferring to a later version**, carrying any URL inside `description` by convention.
-   Rejected: two more string fields now, because they widen the audit surface for copy.
-3. **Name.** `Rake` for the contracts and repo, "Rake Distro" as the product phrase. The repo already
-   decided the first half.
+1. **No tip in the contract.** Supersedes design turn 10 and `design/HANDOFF.md` § contract flags
+   (`tip` field, 100 bps default, DNZN recipient hardcoded). Rejected because it bakes a DNZN address
+   into an immutable public primitive and contradicts goal 5. Also rejected: a pre-filled 1% DNZN row
+   in the create flow (presumptive), a `donate(message)` function or per-distribution tips config (storage
+   and surface before the audit). Sending ETH to a distribution already is a tip to it. What remains,
+   as M02 UI items in DNZN's own dapp and nowhere else: a quiet "tip the authors" line on the
+   post-create screen, any amount, separate transaction, nothing pre-filled; and the footer linking to
+   the DNZN distribution's own public page. Nothing in the widget — it renders on other people's pages.
+2. **No `url` or `about` fields.** Owners carry URLs inside `description`. Rejected: two more string
+   fields, which widen the audit surface for copy.
+3. **Name.** `Rake` for the contracts and repo, "Rake Distro" as the product phrase.
+4. **Footer.** `work no. 001`, as `state-collection` does (`work no. 003`), not the "a public work by
+   dnzn labs" line the scaffold's `layout.html` and the design prototype carry. M02 fixes the slot.
 
 ## Not on the roadmap
 
