@@ -13,7 +13,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 
 | Milestone | Goal | Status |
 |:----------|:-----|:-------|
-| [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | in progress — t01 (#6) and t02 (#11) merged 2026-10-11; t03 assigned |
+| [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | in progress — t01 (#6), t02 (#11) and t03 (#14) merged 2026-10-11, every criterion passing on `main`; closes when the decision-10 follow-up (#16) merges |
 | [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain | not started |
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | not started |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | not started |
@@ -118,7 +118,8 @@ Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
-closes it; none is closed yet.
+closes it; none is closed yet. Since 2026-10-11 each also has a `carried` issue, labelled with the
+milestone that first acts on it, and the issue list is the queue — this section is the record.
 
 - **The 2,300-gas stipend holds only while the implementation is warm.** Overview § 5 says `receive()`
   "stays under a 2,300-gas stipend". Measured in `m01-t01` (`HANDOFF.md` § Discoveries): the leanest
@@ -130,21 +131,36 @@ closes it; none is closed yet.
   Not constructible in a forge 1.7.1 unit test (`vm.cool` does not re-cool, `vm.etch` leaves its target
   warm), so `test_receiveUnderStipend` proves the warm path only. **M03** states it in `SECURITY.md` and
   decides whether to document or design around it; **M02** says it in the dapp's guidance for payers.
+  Issue [#18](https://github.com/dnznlabs/rake/issues/18).
 - **`reserved` assumes a balance that never falls on its own.** `distribute` computes
   `balance − reserved[token]` unchecked; a token whose balance can decrease between calls (rebasing
   down, inbound fee) leaves `reserved` above the balance and `distribute` reverts on underflow until
-  someone tops it up. Noted in the t01 review; **M03** dispositions it.
+  someone tops it up. Noted in the t01 review; **M03** dispositions it. Issue
+  [#19](https://github.com/dnznlabs/rake/issues/19).
 - **`release` against a `false`-returning token bubbles the bare `false` word** as revert data, not a
   reason. Correct under t01's open question 5 and opaque to a reader; **M02** renders it as "retry
-  failed", **M03** decides whether a named error is worth the surface.
+  failed", **M03** decides whether a named error is worth the surface. Issue
+  [#20](https://github.com/dnznlabs/rake/issues/20).
 - **ERC-777-style token callbacks are covered by `nonReentrant` but untested.** One test in **M03**.
+  Issue [#21](https://github.com/dnznlabs/rake/issues/21).
 - **A CREATE2 collision costs the whole gas limit, not a cheap revert.** Measured in `m01-t02`
   (`HANDOFF.md` § Discoveries, confirming the architect's spike): `create` against a salt whose address
   already has code reports about 1.04 billion gas in the test harness, because CREATE2 consumes all
   forwarded gas before the factory's `DeploymentFailed` can fire. Unreachable by accident with a
   sender-bound salt; reachable with a re-sent transaction, and until decision 10 lands in code, with an
   open (zero-prefixed) salt. **M02**'s create flow must `eth_getCode` `predict(salt)` and refuse to send
-  when it is non-empty; **M03** states it in `SECURITY.md`.
+  when it is non-empty; **M03** states it in `SECURITY.md`. Issue
+  [#22](https://github.com/dnznlabs/rake/issues/22).
+- **Under decision 10 the deploying EOA's key is the address.** Raised by Elanik on reading the ruling,
+  2026-10-11: reproducing a distribution's address on a further chain needs a `create` from the same
+  sender, so losing that key is unrecoverable in a way losing an owner key is not — ownership moves per
+  chain, the address never does. **M03**'s runbook names the key as a protected artefact, says the
+  consequence in one sentence, and does the `create` on every expected chain while the key is live.
+  Issue [#23](https://github.com/dnznlabs/rake/issues/23).
+- **`forge lint` poisons the build cache**, so a following `forge snapshot --check` can exit 0 having
+  skipped an edited file's whole suite. Found in `m01-t03` (`HANDOFF.md` § Discoveries), reproduced in
+  review. Toolchain, not rake; CI cannot reach it. Closed by one ordering rule in `AGENTS.md`
+  § Contracts. Issue [#17](https://github.com/dnznlabs/rake/issues/17).
 - ~~**Open salts are allowed, by default rather than by ruling.**~~ Closed 2026-10-11 by decision 10:
   refused. Kept for the record: `m01-t02` shipped `create` accepting a zero prefix as well as
   `msg.sender` (t02 open question 2, default taken, pinned by `test_saltFrontRunningRejected`), and

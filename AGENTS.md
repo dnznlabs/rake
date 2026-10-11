@@ -41,6 +41,11 @@
   when `out/` still holds artifacts for a deleted source (t02 handoff, after `Counter` went). It is
   `Warning:`, not solc's `Warning (` or lint's `warning[`, so neither CI grep sees it, and it clears
   with one `forge build --force`. Not a build warning; do not widen the CI assertion for it.
+- Run `forge build --force` immediately before any test count or `forge snapshot --check`, and never
+  script `forge lint` ahead of either. After `forge lint` compiles an edited file, the cache records it
+  as built without writing its artifact, and the next `forge test`/`forge snapshot` silently drops that
+  file's whole suite — `--check` then exits 0 on code it never ran (t03 handoff: 23 tests counted of
+  36). CI is unaffected because it builds from a clean checkout.
 
 <!-- fragment: dapp -->
 ## The dapp

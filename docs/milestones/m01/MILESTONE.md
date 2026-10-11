@@ -1,8 +1,8 @@
 # M01 — The contract
 
-Status: in progress — phases 1 and 2 done, phase 3 next · updated 2026-10-11
+Status: in progress — all three phases done and every criterion passing on `main`; one ruling follow-up ([#16](https://github.com/dnznlabs/rake/issues/16)) open before close · updated 2026-10-11
 
-`Distribution` and its factory built from `brainstorming/PROJECT_OVERVIEW.md` § 5 under the eight
+`Distribution` and its factory built from `brainstorming/PROJECT_OVERVIEW.md` § 5 under the
 rulings in [`ROADMAP.md`](../../ROADMAP.md) § Decisions, every test in the overview's definition of
 done (§ 10) passing, a gas snapshot committed, and the factory deployed into `make serve` so M02 has a
 chain to read. It comes first because it is the only immutable thing on the roadmap: everything M02
@@ -16,8 +16,12 @@ pins (forge `1.7.1-dev`, which is the 1.7.1 release built by nixpkgs). Measured 
 merged (`main` at `0548391`, same day):** 1, 3 and 4 pass, 2 passes for its seven t01 rows, and 7 holds
 for `forge build --force` and `forge test`; 5 and 6 and the rest of 2 and 7 are t02 and t03. **After
 t02 merged (`main` at `0bb0403`, same day):** 1, 2 (all nine rows), 3, 4 and 6 pass; 7 holds for
-`forge build --force`, `forge test` and `make deploy`; 5, and 7 for `forge snapshot`, are t03. Re-run
-rather than quote.
+`forge build --force`, `forge test` and `make deploy`; 5, and 7 for `forge snapshot`, are t03. **After
+t03 merged (`main` at `c292106`, same day):** all seven pass, re-run by the architect at close-out — 36
+tests, 0 failed; both warning greps 0; the struct as criterion 3 lists it; `make fmt` and `forge lint`
+silent; `forge snapshot --check` exit 0 with the CI step at `ci.yml:51`; criterion 6 against a
+throwaway anvil on `:8599` (`App` and `DistributionFactory`, implementation code 16,615 hex chars);
+tree clean after all four commands. Re-run rather than quote.
 
 1. `grep '^solc' foundry.toml` prints `solc = "0.8.34"`, and `forge build --force 2>&1` prints
    `Compiler run successful!` with no line matching `Warning (` and none matching `warning[`. Today:
@@ -72,8 +76,9 @@ rather than quote.
 
 - ~~A ruling on the contract names.~~ Resolved 2026-10-11: `Distribution` and `DistributionFactory`
   in `src/Distribution.sol`, which is what the plan defaulted to. `ROADMAP.md` ruling 3 now says so.
-- Merging three docs PRs and three code PRs. Everything else in this milestone is local to anvil and
-  needs no credential, funds or external action.
+- Merging the docs PRs and three code PRs, plus the one follow-up PR for
+  [#16](https://github.com/dnznlabs/rake/issues/16). Everything else in this milestone is local to
+  anvil and needs no credential, funds or external action.
 
 ## Phases
 
@@ -104,7 +109,25 @@ The milestone's remaining checks become machine-enforced.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m01-t03](tasks/m01-t03/TASK.md) | `.gas-snapshot` committed, `forge snapshot --check` in CI, criterion 7 demonstrated on a clean clone, and `AGENTS.md` § Contracts updated for the two new contracts | assigned — plan merged (#10), gate met by #11, issue open |
+| [m01-t03](tasks/m01-t03/TASK.md) | `.gas-snapshot` committed, `forge snapshot --check` in CI, criterion 7 demonstrated on a clean clone, and `AGENTS.md` § Contracts updated for the two new contracts | done — [#14](https://github.com/dnznlabs/rake/pull/14) merged 2026-10-11; [handoff](tasks/m01-t03/HANDOFF.md). Both open questions took their defaults. One toolchain discovery carried as [#17](https://github.com/dnznlabs/rake/issues/17) |
+
+**Follow-up outside the task table.** `ROADMAP.md` decision 10 (refuse open salts) was ruled after t02
+merged and is issued as [#16](https://github.com/dnznlabs/rake/issues/16), on `main` after #14. It
+changes one comparison in `create`, the inverted assertion in `test_saltFrontRunningRejected`, the
+test helper's salts, the doc comment and the `create` rows of `.gas-snapshot`. M01 closes when it
+merges: the milestone's goal is the contract under the rulings, and 10 is now one of them.
+
+## Carried out of M01
+
+Opened under the loop's carrying rule (`agents` `roles/architect.md` § Carrying forward), each
+labelled `carried` and the milestone that first acts on it. None is labelled `m01`, so none holds the
+close. **M02:** [#18](https://github.com/dnznlabs/rake/issues/18) stipend guidance for payers,
+[#20](https://github.com/dnznlabs/rake/issues/20) render a `false`-word revert from `release`,
+[#22](https://github.com/dnznlabs/rake/issues/22) `eth_getCode` guard before `create`. **M03:**
+[#17](https://github.com/dnznlabs/rake/issues/17) lint-order rule (closed by this PR's `AGENTS.md`
+line if Denizen merges it as written), [#19](https://github.com/dnznlabs/rake/issues/19) `reserved`
+underflow, [#21](https://github.com/dnznlabs/rake/issues/21) ERC-777 callback test,
+[#23](https://github.com/dnznlabs/rake/issues/23) the deploying key is the address.
 
 ## One-way doors
 
