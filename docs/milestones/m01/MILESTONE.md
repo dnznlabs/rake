@@ -1,6 +1,6 @@
 # M01 — The contract
 
-Status: in progress — phase 1 done, phase 2 next · updated 2026-10-11
+Status: in progress — phases 1 and 2 done, phase 3 next · updated 2026-10-11
 
 `Distribution` and its factory built from `brainstorming/PROJECT_OVERVIEW.md` § 5 under the eight
 rulings in [`ROADMAP.md`](../../ROADMAP.md) § Decisions, every test in the overview's definition of
@@ -14,7 +14,9 @@ Every command runs from the repo root through `devbox run --`; versions are the 
 pins (forge `1.7.1-dev`, which is the 1.7.1 release built by nixpkgs). Measured against `main` at
 `948e776` on 2026-10-11: criteria 1–6 all fail today, which is what makes them criteria. **After t01
 merged (`main` at `0548391`, same day):** 1, 3 and 4 pass, 2 passes for its seven t01 rows, and 7 holds
-for `forge build --force` and `forge test`; 5 and 6 and the rest of 2 and 7 are t02 and t03. Re-run
+for `forge build --force` and `forge test`; 5 and 6 and the rest of 2 and 7 are t02 and t03. **After
+t02 merged (`main` at `0bb0403`, same day):** 1, 2 (all nine rows), 3, 4 and 6 pass; 7 holds for
+`forge build --force`, `forge test` and `make deploy`; 5, and 7 for `forge snapshot`, are t03. Re-run
 rather than quote.
 
 1. `grep '^solc' foundry.toml` prints `solc = "0.8.34"`, and `forge build --force 2>&1` prints
@@ -94,7 +96,7 @@ A distribution reaches an address the same way on every chain, and `make serve` 
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m01-t02](tasks/m01-t02/TASK.md) | `DistributionFactory` in the same file: CREATE2, PUSH0 clones, sender-bound salt, `implementation` deployed in the constructor, `predict`; the two t02 tests of criterion 2 and the t01 suite re-pointed at `create`; `scripts/forge/Deploy.s.sol` deploys the factory and `Counter.sol` with its test and deploy go; criteria 3 and 6 | not started |
+| [m01-t02](tasks/m01-t02/TASK.md) | `DistributionFactory` in the same file: CREATE2, PUSH0 clones, sender-bound salt, `implementation` deployed in the constructor, `predict`; the two t02 tests of criterion 2 and the t01 suite re-pointed at `create`; `scripts/forge/Deploy.s.sol` deploys the factory and `Counter.sol` with its test and deploy go; criteria 3 and 6 | done — [#11](https://github.com/dnznlabs/rake/pull/11) merged 2026-10-11; [handoff](tasks/m01-t02/HANDOFF.md). Three open questions took their defaults, each pinned by a test; open salts (question 2) still wants a ruling before M02's create flow. One plan check corrected (`TASK.md` note) |
 
 ### Phase 3 — Definition of done
 
@@ -102,7 +104,7 @@ The milestone's remaining checks become machine-enforced.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m01-t03](tasks/m01-t03/TASK.md) | `.gas-snapshot` committed, `forge snapshot --check` in CI, criterion 7 demonstrated on a clean clone, and `AGENTS.md` § Contracts updated for the two new contracts | not started — gated on t02's merge |
+| [m01-t03](tasks/m01-t03/TASK.md) | `.gas-snapshot` committed, `forge snapshot --check` in CI, criterion 7 demonstrated on a clean clone, and `AGENTS.md` § Contracts updated for the two new contracts | assigned — plan merged (#10), gate met by #11, issue open |
 
 ## One-way doors
 

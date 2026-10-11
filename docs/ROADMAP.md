@@ -13,7 +13,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 
 | Milestone | Goal | Status |
 |:----------|:-----|:-------|
-| [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | in progress — t01 merged 2026-10-11 (#6) |
+| [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | in progress — t01 (#6) and t02 (#11) merged 2026-10-11; t03 assigned |
 | [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain | not started |
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | not started |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | not started |
@@ -112,6 +112,18 @@ closes it; none is closed yet.
   reason. Correct under t01's open question 5 and opaque to a reader; **M02** renders it as "retry
   failed", **M03** decides whether a named error is worth the surface.
 - **ERC-777-style token callbacks are covered by `nonReentrant` but untested.** One test in **M03**.
+- **A CREATE2 collision costs the whole gas limit, not a cheap revert.** Measured in `m01-t02`
+  (`HANDOFF.md` § Discoveries, confirming the architect's spike): `create` against a salt whose address
+  already has code reports about 1.04 billion gas in the test harness, because CREATE2 consumes all
+  forwarded gas before the factory's `DeploymentFailed` can fire. Unreachable by accident with a
+  sender-bound salt; reachable with an open (zero-prefixed) salt or a re-sent transaction. **M02**'s
+  create flow must `eth_getCode` `predict(salt)` and refuse to send when it is non-empty; **M03** states
+  it in `SECURITY.md`.
+- **Open salts are allowed, by default rather than by ruling.** `create` accepts a salt whose top 20
+  bytes are zero as well as one carrying `msg.sender`, so anyone can occupy an open salt first (t02
+  open question 2, default taken, pinned by `test_saltFrontRunningRejected`). Reversing it is one
+  branch and one inverted assertion, cheap until M02's create flow decides which salts it offers.
+  **M02** needs Denizen's ruling before that flow is written; after M05 it is immutable.
 
 ## Not on the roadmap
 
