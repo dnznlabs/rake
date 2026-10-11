@@ -3,8 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {LibClone} from "solady/utils/LibClone.sol";
-import {Distribution} from "../src/Distribution.sol";
+import {Distribution, DistributionFactory} from "../src/Distribution.sol";
 import {
     MockERC20,
     MockERC721,
@@ -14,12 +13,16 @@ import {
     RevertingReceiver
 } from "./mocks/Mocks.sol";
 
-/// @dev Every case runs against a PUSH0 clone of a single implementation, because `receive()` rejects
-/// ETH on the implementation and `init` is callable only by whoever deployed it. t02 replaces
-/// `_clone` with `factory.create(...)`; nothing else here should need to move.
+/// @dev Every case runs against a clone the factory deployed, because `receive()` rejects ETH on the
+/// implementation and `init` is callable only by whoever deployed it. The factory is the only way to
+/// reach a live clone; `impl` is the implementation it holds.
 contract DistributionTest is Test {
+    DistributionFactory internal factory;
     Distribution internal impl;
     PlainSender internal sender;
+
+    /// @dev Feeds `_salt()`. Open salts, so every clone lands at an address nobody has to predict.
+    uint96 internal salts;
 
     address internal constant OWNER = address(0xB0B);
     address internal constant STRANGER = address(0x5EE);
@@ -30,7 +33,8 @@ contract DistributionTest is Test {
     uint32 internal constant WEEK = 7 days;
 
     function setUp() public {
-        impl = new Distribution();
+        factory = new DistributionFactory();
+        impl = Distribution(payable(factory.implementation()));
         sender = new PlainSender();
         vm.deal(address(sender), 1000 ether);
     }
@@ -219,15 +223,17 @@ contract DistributionTest is Test {
     }
 
     function test_reentrantRecipientIsEscrowed() public {
-        // Arrange — the mocks need the clone's address, so init comes after they exist.
-        Distribution d = Distribution(payable(LibClone.clone_PUSH0(address(impl))));
+        // Arrange — the mocks need the clone's address before it exists, so the salt is picked first.
+        bytes32 salt = _salt();
+        Distribution d = Distribution(payable(factory.predict(salt)));
         ReentrantDistributor viaDistribute = new ReentrantDistributor(d);
         ReentrantReleaser viaRelease = new ReentrantReleaser(d);
         Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](3);
         t[0] = _row(address(viaDistribute), 3000);
         t[1] = _row(address(viaRelease), 3000);
         t[2] = _row(A, 4000);
-        d.init(OWNER, 0, "desc", _asc(t));
+        address created = factory.create(OWNER, 0, "desc", _asc(t), salt);
+        assertEq(created, address(d), "the clone landed where predict() said it would");
         _send(d, 10_000);
 
         // Act
@@ -271,8 +277,8 @@ contract DistributionTest is Test {
     }
 
     function test_initOnlyFactoryAndOnce() public {
-        // Arrange
-        Distribution d = Distribution(payable(LibClone.clone_PUSH0(address(impl))));
+        // Arrange — `create` is the only path to a live clone, and it inits on the way.
+        Distribution d = _deploy(0, _defaultTable());
         Distribution.Beneficiary[] memory t = _defaultTable();
 
         // Act / assert
@@ -280,7 +286,7 @@ contract DistributionTest is Test {
         vm.expectRevert(Distribution.Unauthorized.selector);
         d.init(OWNER, 0, "desc", t);
 
-        d.init(OWNER, 0, "desc", t);
+        vm.prank(address(factory));
         vm.expectRevert(Distribution.Unauthorized.selector);
         d.init(OWNER, 0, "desc", t);
     }
@@ -500,8 +506,12 @@ contract DistributionTest is Test {
     }
 
     function _deploy(uint32 delay_, Distribution.Beneficiary[] memory t) internal returns (Distribution d) {
-        d = Distribution(payable(LibClone.clone_PUSH0(address(impl))));
-        d.init(OWNER, delay_, "desc", t);
+        d = Distribution(payable(factory.create(OWNER, delay_, "desc", t, _salt())));
+    }
+
+    /// @dev An open salt from a counter: a fresh address per call, and no prefix to prank around.
+    function _salt() internal returns (bytes32) {
+        return bytes32(uint256(++salts));
     }
 
     function _send(Distribution d, uint256 amount) internal {
@@ -509,9 +519,9 @@ contract DistributionTest is Test {
     }
 
     function _expectBadInit(Distribution.Beneficiary[] memory t) internal {
-        Distribution d = Distribution(payable(LibClone.clone_PUSH0(address(impl))));
+        bytes32 salt = _salt();
         vm.expectRevert(Distribution.BadTable.selector);
-        d.init(OWNER, 0, "desc", t);
+        factory.create(OWNER, 0, "desc", t, salt);
     }
 
     function _expectBadSet(Distribution d, Distribution.Beneficiary[] memory t) internal {

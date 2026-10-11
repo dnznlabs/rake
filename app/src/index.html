@@ -20,8 +20,8 @@
    and replacing those two files reskins the app without touching this one.
    Addresses and the chain are substituted by app/build.mjs; a deployed contract's token is its name,
    uppercased, between double underscores. DEV-fenced blocks are stripped unless the build is --dev. */
-const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', counter: '__COUNTER__' };
-const CONTRACTS = [['Counter', CFG.counter]];
+const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTRIBUTIONFACTORY__' };
+const CONTRACTS = [['DistributionFactory', CFG.factory]];
 const CHAINS = { 1: 'mainnet', 11155111: 'sepolia', 31337: 'anvil' };
 const EXPLORER = { 1: 'https://etherscan.io', 11155111: 'https://sepolia.etherscan.io' };
 /*DEV*/
@@ -107,13 +107,13 @@ function who() {
 }
 
 /* ---- state ---------------------------------------------------------------------------------- */
-const S = { number: null, loaded: false, error: null };
+const S = { implementation: null, loaded: false, error: null };
 async function load() {
   CHAIN = parseInt(await P.request({ method: 'eth_chainId' }), 16);
   // The same address on another network is another contract, or none: do not read it.
   if (wrongChain()) return;
-  const [n] = await call(CFG.counter, 'number()', [], ['uint256']);
-  S.number = n; S.loaded = true;
+  const [i] = await call(CFG.factory, 'implementation()', [], ['address']);
+  S.implementation = i; S.loaded = true;
 }
 
 /* ---- views ---------------------------------------------------------------------------------- */
@@ -121,36 +121,8 @@ const V = document.getElementById('view');
 const ledgerRow = (k, sub, n, cls) => `<div class="row${cls ? ' ' + cls : ''}"><div><b>${k}</b>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="n">${n}</div></div>`;
 
 function home() {
-  V.innerHTML = `<div class="eyebrow">counter · ${cname(CFG.chainId)}</div>
-  <div class="ledger">${ledgerRow('number', `Counter at ${ext('address', CFG.counter, short(CFG.counter))}`, `<span class="sig">${S.number}</span>`)}</div>
-  <div class="ledger log" id="log"></div>
-  <div class="actions"><button class="btn" id="go">${ACC ? 'increment' : 'connect to increment'}</button><span class="status" id="st"></span></div>`;
-  document.getElementById('go').onclick = ACC ? increment : connect;
-}
-
-async function increment() {
-  const go = document.getElementById('go'), st = document.getElementById('st'), log = document.getElementById('log');
-  const say = (t, cls) => { st.textContent = t; st.className = 'status' + (cls ? ' ' + cls : ''); };
-  go.disabled = true; go.className = 'btn off';
-  say('confirm in your wallet', 'warn');
-  let hash;
-  try { hash = await send(CFG.counter, 'increment()', []); }
-  catch (e) { say('not sent: ' + ((e && e.message) || 'rejected'), 'bad'); go.disabled = false; go.className = 'btn'; return; }
-  say('sent · waiting for the block');
-  log.innerHTML = ledgerRow('increment', ext('tx', hash, short(hash)), 'sent');
-  let rc = await waitReceipt(hash, POLL_MS);
-  while (!rc) {
-    say(`still pending after ${POLL_MS / 1000}s${POLL_ERR ? ' · last poll errored: ' + (POLL_ERR.message || POLL_ERR) : ''}`, 'warn');
-    go.disabled = false; go.className = 'btn sec'; go.textContent = 'keep waiting';
-    await new Promise(r => { go.onclick = r; });
-    go.disabled = true; go.className = 'btn off';
-    say('sent · waiting for the block');
-    rc = await waitReceipt(hash, POLL_MS);
-  }
-  if (rc.status !== '0x1') { log.innerHTML = ledgerRow('increment', `block ${parseInt(rc.blockNumber, 16)}`, 'reverted', 'err'); say(''); go.disabled = false; go.className = 'btn'; go.textContent = 'increment'; go.onclick = increment; return; }
-  try { await load(); } catch (e) {}
-  home();
-  document.getElementById('log').innerHTML = ledgerRow('increment', `${ext('tx', hash, short(hash))} · block ${parseInt(rc.blockNumber, 16)}`, 'ok');
+  V.innerHTML = `<div class="eyebrow">factory · ${cname(CFG.chainId)}</div>
+  <div class="ledger">${ledgerRow('implementation', `DistributionFactory at ${ext('address', CFG.factory, short(CFG.factory))}`, `<span class="sig">${ext('address', S.implementation, short(S.implementation))}</span>`)}</div>`;
 }
 
 function docs() {
@@ -161,7 +133,7 @@ function docs() {
   <h2>Contracts</h2>
   <div class="scroll"><table class="dtab"><tr><th>contract</th><th>address</th></tr>${rows}</table></div>
   <h2>Verify it yourself</h2>
-  <pre>cast call ${CFG.counter} "number()(uint256)" --rpc-url $RPC</pre>
+  <pre>cast call ${CFG.factory} "implementation()(address)" --rpc-url $RPC</pre>
   </div>`;
 }
 
@@ -173,7 +145,7 @@ function route() {
   if (h === '#/docs') { docs(); scrollTo(0, 0); return; }
   if (!P) { V.innerHTML = `<div class="notice">No wallet found. Open this page in a browser with a wallet.</div>`; return; }
   if (wrongChain()) { V.innerHTML = `<div class="notice">Your wallet is on ${cname(CHAIN)}. This app lives on ${cname(CFG.chainId)}. <button id="sw">Switch network</button>.</div>`; document.getElementById('sw').onclick = switchChain; return; }
-  if (S.error) { V.innerHTML = `<div class="notice err">could not read the contract at ${CFG.counter}: ${S.error}</div>`; return; }
+  if (S.error) { V.innerHTML = `<div class="notice err">could not read the contract at ${CFG.factory}: ${S.error}</div>`; return; }
   if (!S.loaded) return;
   home();
   scrollTo(0, 0);

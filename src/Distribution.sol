@@ -288,3 +288,74 @@ contract Distribution {
         }
     }
 }
+
+/// @notice Deploys `Distribution` clones to an address that depends on this factory and a salt alone.
+/// @dev No `receive` and no `fallback`, so ETH sent to the factory itself reverts; the implementation
+/// rejects it too. Clones are PUSH0 minimal proxies placed with CREATE2, so the same factory reaches
+/// the same clone address on every chain.
+contract DistributionFactory {
+    event Created(address indexed distribution, address indexed owner);
+
+    error DeploymentFailed();
+    error SaltDoesNotStartWith();
+
+    /// @dev Deployed by the factory, so `Distribution.factory` is this contract on every clone.
+    address public immutable implementation = address(new Distribution{salt: bytes32(0)}());
+
+    /// @notice Deploy and initialise a clone at `predict(salt)`.
+    /// @param salt Its top 20 bytes must be zero or `msg.sender`. `msg.value` rides the CREATE2, so a
+    /// deposit lands in the clone without a `Received` log.
+    /// @dev Three properties the dapp has to know about this address:
+    /// 1. It depends on this factory and `salt` only — not on the owner, delay, description or table.
+    ///    So an *open* salt (zero top 20 bytes) is first-come: whoever sends first fixes the table
+    ///    that lives at that address. That is what makes the overview's pre-funded address workflow
+    ///    work, and why the UI defaults to a sender-bound salt and labels an open one as claimable.
+    /// 2. A second `create` with a used salt burns the whole gas limit before `DeploymentFailed`: a
+    ///    CREATE2 collision consumes every unit forwarded to it. Read `predict(salt)` with
+    ///    `eth_getCode` first and refuse a non-empty answer.
+    /// 3. Same-address-everywhere is this factory's address, not a clone's claim on its own. The
+    ///    factory is nonce-addressed where it is deployed; a byte-identical deploy through a
+    ///    deterministic deployer is a later milestone's one-way door.
+    function create(
+        address owner_,
+        uint32 delay_,
+        string calldata description_,
+        Distribution.Beneficiary[] calldata table_,
+        bytes32 salt
+    ) external payable returns (address distribution) {
+        address impl = implementation;
+        uint256 prefix = uint256(salt) >> 96;
+        if (prefix != 0 && prefix != uint256(uint160(msg.sender))) revert SaltDoesNotStartWith();
+
+        // The PUSH0 minimal-proxy init code, byte for byte as solady's `LibClone.initCode_PUSH0`
+        // writes it. The two `mstore`s at 0x24 overlap the free memory pointer and restore it.
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            distribution := create2(callvalue(), 0x0e, 0x36, salt)
+            if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }
+            mstore(0x24, 0)
+        }
+        Distribution(payable(distribution)).init(owner_, delay_, description_, table_);
+        emit Created(distribution, owner_);
+    }
+
+    /// @notice The address `create(..., salt)` would reach.
+    /// @dev No prefix check: the dapp predicts before it knows who will send.
+    function predict(bytes32 salt) external view returns (address) {
+        address impl = implementation;
+        bytes32 initCodeHash;
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }
+        return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+    }
+}
