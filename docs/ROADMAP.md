@@ -14,7 +14,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 | Milestone | Goal | Status |
 |:----------|:-----|:-------|
 | [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | done 2026-10-11 — t01 (#6), t02 (#11), t03 (#14) and the decision-10 follow-up (#24) merged; every criterion re-run and passing on `main` at `c292106` |
-| [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain | in progress — plan merged (#29) 2026-10-11; t01 assigned (#30) |
+| [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain, and Denizen has ironed out the experience against it | in progress — plan merged (#29) 2026-10-11; t01 done (#33), t02 assigned (#36); Phase 5 added 2026-10-11 |
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | not started |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | not started |
 | [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; DNZN's own 60/40 distribution live under the Ops multisig with a 7-day delay; dapp mirrored and widget embedded in one DNZN app | not started |
@@ -28,6 +28,12 @@ is why the tip and label decisions below are gated on M01 starting, not on M05 s
 
 M03 follows M02 rather than M01 because the review covers the `App` host and the chunk upload as well
 as `Distribution`; reviewing before M02 means reviewing twice.
+
+**M02 ends on Denizen, not on a check.** Its last phase is a free-form pass over the dapp and widget
+by Denizen on anvil — the same shape as `state-collection` M1 Phase 5 — open-ended, closed by his
+signoff (decision 14). It sits before M03 for the same reason M03 sits after M02: a UI change made
+after the review is a second review, and a contract change made after it is a third. Nothing in M03
+starts until the signoff line is dated.
 
 **Same address, separate storage.** A distribution deployed to several chains is several contracts.
 Tables can drift and every owner action is queued once per chain. M02's acceptance criteria must show
@@ -137,6 +143,18 @@ recommended option.
     wiring and `DESIGN_HANDOFF.md` § 2.1, which say `.wei → .gwei → .eth`; the brainstorming folder is
     frozen, so this entry is the correction. Rejected: the design order, which would show two DNZN
     products different names for one address. Lands in `m02-t03`, exercised in M04.
+14. **A free-form UI/UX tweak phase, driven by Denizen, closes M02.** Asked for by Denizen on
+    2026-10-11 ("before testnets, maybe before hardening"); placed as M02 Phase 5 on Lakos's
+    recommendation, confirmed by the merge of the PR that added it. Options: (a) last phase of M02,
+    before M03 — chosen, because every change it produces is then inside the review's scope rather
+    than after it, and anvil is where a change costs least; (b) its own milestone between M02 and M03
+    — rejected as ceremony, it has no acceptance criteria but a signoff; (c) inside M03 — rejected,
+    the review would read moving code; (d) after M03, before M04 — rejected, each tweak that reaches
+    `src/` or `App` re-opens the review. Shape is `state-collection` M1 Phase 5 verbatim: he executes
+    it himself outside the agent loop, opens PRs reviewed here, files anything he wants handed off as
+    a task row; anything is fair game with the bill priced per item; closed by a dated signoff
+    (M02 criterion 10). Rejected: closing on an empty task table — the same proposal `state-collection`
+    overruled on 2026-09-17.
 
 ## Findings carried forward
 
