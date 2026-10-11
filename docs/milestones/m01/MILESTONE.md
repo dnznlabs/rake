@@ -1,6 +1,6 @@
 # M01 — The contract
 
-Status: not started · updated 2026-10-11
+Status: in progress — phase 1 done, phase 2 next · updated 2026-10-11
 
 `Distribution` and its factory built from `brainstorming/PROJECT_OVERVIEW.md` § 5 under the eight
 rulings in [`ROADMAP.md`](../../ROADMAP.md) § Decisions, every test in the overview's definition of
@@ -12,7 +12,10 @@ renders is the `snapshot()` struct, so the struct has to be final before a line 
 
 Every command runs from the repo root through `devbox run --`; versions are the ones `devbox.json`
 pins (forge `1.7.1-dev`, which is the 1.7.1 release built by nixpkgs). Measured against `main` at
-`948e776` on 2026-10-11: criteria 1–6 all fail today, which is what makes them criteria.
+`948e776` on 2026-10-11: criteria 1–6 all fail today, which is what makes them criteria. **After t01
+merged (`main` at `0548391`, same day):** 1, 3 and 4 pass, 2 passes for its seven t01 rows, and 7 holds
+for `forge build --force` and `forge test`; 5 and 6 and the rest of 2 and 7 are t02 and t03. Re-run
+rather than quote.
 
 1. `grep '^solc' foundry.toml` prints `solc = "0.8.34"`, and `forge build --force 2>&1` prints
    `Compiler run successful!` with no line matching `Warning (` and none matching `warning[`. Today:
@@ -80,7 +83,7 @@ through a test-side clone so the factory can follow without the core moving.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m01-t01](tasks/m01-t01/TASK.md) | solc 0.8.34 pinned warning-free, `foundry.lock` tracked, CI catching compiler warnings; `src/Distribution.sol` with the seven t01 tests of criterion 2 plus the table, timelock, stipend and implementation-guard tests | not started |
+| [m01-t01](tasks/m01-t01/TASK.md) | solc 0.8.34 pinned warning-free, `foundry.lock` tracked, CI catching compiler warnings; `src/Distribution.sol` with the seven t01 tests of criterion 2 plus the table, timelock, stipend and implementation-guard tests | done — [#6](https://github.com/dnznlabs/rake/pull/6) merged 2026-10-11; [handoff](tasks/m01-t01/HANDOFF.md). Two ABI names changed from the plan (`ROADMAP.md` decision 9); one spec claim amended (`ROADMAP.md` § Findings carried forward) |
 
 ### Phase 2 — Factory and the dev chain
 
@@ -101,6 +104,7 @@ The milestone's remaining checks become machine-enforced.
 ## One-way doors
 
 None that cannot be undone: nothing leaves anvil. One sticky door, named so it is paid for knowingly —
-**merging t01 fixes the `snapshot()` ABI that M02 is built against.** It stays changeable until M02
-starts; after that every struct change is UI rework as well. The factory's byte-identical deploy
+**merging t01 fixes the `snapshot()` ABI that M02 is built against.** Walked through on 2026-10-11 with
+#6; the struct is as criterion 3 says. It stays changeable until M02 starts; after that every struct
+change is UI rework as well. The factory's byte-identical deploy
 through a deterministic deployer is the real one-way door, and it belongs to M03 and M05, not here.

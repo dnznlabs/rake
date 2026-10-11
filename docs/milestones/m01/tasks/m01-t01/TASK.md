@@ -16,9 +16,9 @@ step rests on a fact that can go stale, the evidence is named inline; re-run it 
 > reserved keyword 'apply'`, reproduced by both the engineer and the architect), and forge 1.7.1 treats
 > any function whose name begins with `table` as a table test, so a public `table()` getter turned
 > `src/Distribution.sol` itself into a failing suite. The engineer shipped `applyQueued` and
-> `beneficiaries()`, declared in `HANDOFF.md`; the architect's review recommends keeping both, and this
-> text now says what was built. The merge of this correction is the ruling — if other names are wanted,
-> they are one edit until M02 starts decoding the ABI. Also corrected: the lint check in step 4 now
+> `beneficiaries()`, declared in `HANDOFF.md`; the architect's review recommended keeping both, and
+> Denizen merged PR #6 with them on 2026-10-11 — that merge is the ruling, recorded as `ROADMAP.md`
+> decision 9, and this text now says what was built. Also corrected: the lint check in step 4 now
 > allows the one scoped `block-timestamp` disable a timelock needs, and the `onlySelf` row no longer
 > claims those four functions are all a queued action can reach. Lesson for the next plan: compile a
 > stub of any surface a plan fixes before fixing it.
