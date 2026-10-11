@@ -58,7 +58,17 @@
 ## The dapp
 
 - `app/src/index.html` is the dapp: no dependencies, no network but the wallet's EIP-1193 provider.
-  The build inlines `eth.js` (keccak and the ABI subset), `theme.css` and `layout.html` into it.
+  The build inlines `eth.js` (keccak and the ABI subset), `model.js`, `theme.css` and `layout.html`
+  into it.
+- `app/src/model.js` is everything that needs no DOM and no provider: `pct`, `countdown`,
+  `decodePending`, `supersededBy`, `salt` and the `snapshot()` type string `SNAPSHOT_T`. It is tested
+  under node in `test/model.test.mjs` and inlined unchanged, so it reads an ambient `Eth` rather than
+  importing one — the build inlines `eth.js` first, and the test puts `Eth` on `globalThis`. A helper
+  that needs either the DOM or the chain belongs in `index.html`, not here.
+- Besides a contract's address, `app/build.mjs` substitutes `__<NAME>_BLOCK__` with the block that
+  contract was created in, read from the broadcast log's receipts. A log scan needs a `fromBlock`, and
+  genesis is not one on a chain with a history: `__DISTRIBUTIONFACTORY_BLOCK__` is where the dapp's
+  `Created` scan starts.
 - `theme.css` and `layout.html` are the whole look. The script styles nothing: it emits classes and
   looks up ids, and state is a class (`warn`, `bad`, `err`, `on`), never an inline style.
 - `app/build.mjs` inlines `/*@inline file@*/`, substitutes every `__NAME__` token, strips the
