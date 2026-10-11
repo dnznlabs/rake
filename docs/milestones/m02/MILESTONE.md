@@ -124,7 +124,7 @@ Every screen that reads: landing, list, detail, pending decode, histories, drift
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m02-t02 | The prototype's shell on the scaffold's provider code, rulings 1, 2, 7, 8 and 9 applied; `#/`, `#/distros`, `#/distros/<addr>`; pending actions decoded; `Queued`/`Applied`/`Cancelled` and `Received`/`Distributed`/`Escrowed`/`Released` histories loaded after the snapshot; criteria 3 and 5 | not started |
+| [m02-t02](tasks/m02-t02/TASK.md) | The prototype's shell on the scaffold's provider code, rulings 1, 2, 7, 8 and 9 applied; `#/`, `#/distros`, `#/distros/<addr>`; pending actions decoded; `Queued`/`Applied`/`Cancelled` and `Received`/`Distributed`/`Escrowed`/`Released` histories loaded after the snapshot; criteria 3 and 5 | planned — plan written 2026-10-11 while t01 builds; issue opens when t01 merges |
 
 ### Phase 3 — Writing
 
