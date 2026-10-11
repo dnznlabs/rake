@@ -15,11 +15,14 @@ factory surface in step 1 and the first three tests in step 2 were compiled and 
 toolchain before this plan was written — build warning-free, `forge lint` and `forge fmt --check`
 clean, 3 passed — so the surface is known to exist. The stub is not in the repo; write your own.
 
-**Setup.** Branch `m01/t02-factory-dev-chain` off `main`. After any fresh clone run
-`devbox run -- bash ../shared/scripts/init.sh` and verify `ls .git/hooks | grep -v sample` prints
-`pre-commit` and `post-commit`. `rake` carries a `.planning/` directory that `make init` creates;
-`roles/README.md` would read that as a GSD project, and it is not one — nothing in this loop is written
-there.
+**Setup.** Branch `m01/t02-factory-dev-chain` off `main`. A worktree of an existing clone inherits
+its hooks; a fresh clone gets them with `devbox run -- pre-commit install --install-hooks`, which
+installs both stages because `.pre-commit-config.yaml:1` sets `default_install_hook_types: [pre-commit,
+post-commit]`. Verify with `ls .git/hooks | grep -v sample` → `pre-commit`, `post-commit`. **Do not
+run `make init` (`init.sh`) on `rake`:** measured 2026-10-11 by both of us, it creates and bind-mounts
+a `.planning/` directory unconditionally, and `roles/README.md:3` makes that directory the test for a
+GSD project, which `rake` is not. Both trees carried one and both have been unmounted and removed.
+That `init.sh` does this is a `shared` defect for Denizen, not something to work around here.
 
 ## Plan
 
