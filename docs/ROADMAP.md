@@ -13,7 +13,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 
 | Milestone | Goal | Status |
 |:----------|:-----|:-------|
-| [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | not started |
+| [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | in progress — t01 merged 2026-10-11 (#6) |
 | [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain | not started |
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | not started |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | not started |
@@ -76,9 +76,42 @@ Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which
 7. **Single owner; signers get the admin view.** No multi-owner in the contract: a multisig or DAO
    is the owner, and its members route `propose`/`cancel` through it. The M02 dapp shows the owner
    view to a connected wallet that is the owner, or a signer of an owning vault (probe `isOwner(address)`,
-   failing soft), with writes as copy-calldata in v1. `apply` and `distribute` stay direct.
+   failing soft), with writes as copy-calldata in v1. `applyQueued` and `distribute` stay direct.
 8. **Footer.** `work no. 001`, as `state-collection` does (`work no. 003`), not the "a public work by
    dnzn labs" line the scaffold's `layout.html` and the design prototype carry. M02 fixes the slot.
+9. **Two ABI names differ from the design vocabulary.** The function that runs a queued action is
+   `applyQueued(bytes,uint32)`, and the table getter is `beneficiaries()`; the `Snapshot.table` field
+   keeps its name. Ruled by Denizen merging PR #6 on 2026-10-11, after `m01-t01` found the planned names
+   impossible: `apply` is a Solidity reserved keyword, and forge treats any `table`-prefixed function as
+   a table test, which made the contract itself a failing suite. Supersedes `apply` and `table()` in
+   `design/HANDOFF.md` § Vocabulary map and in the t01 plan as first merged; M02 decodes the names in
+   this ruling. Rejected: `applyAction` and the reference's `executeQueued` (neither pairs with the
+   `queued` mapping and the `Applied` event the way `applyQueued` does); a `table`-free rename of the
+   struct field (M02 reads it, the design doc fixes it, and the collision is only on functions).
+
+## Findings carried forward
+
+Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
+closes it; none is closed yet.
+
+- **The 2,300-gas stipend holds only while the implementation is warm.** Overview § 5 says `receive()`
+  "stays under a 2,300-gas stipend". Measured in `m01-t01` (`HANDOFF.md` § Discoveries): the leanest
+  `receive()` on a clone costs 1,662 gas with the `Received` event and 250 without, but a clone's
+  `DELEGATECALL` to a *cold* implementation adds 2,600 on its own, so the cold path needs about 2,750 and
+  no `receive()` body can rescue it. Unreachable from a wallet (a top-level transfer forwards the whole
+  gas limit) and from another `Distribution` (it pushes with `PUSH_GAS`); reachable only from a contract
+  paying in with `.transfer()`/`.send()` in a transaction that has not yet touched the implementation.
+  Not constructible in a forge 1.7.1 unit test (`vm.cool` does not re-cool, `vm.etch` leaves its target
+  warm), so `test_receiveUnderStipend` proves the warm path only. **M03** states it in `SECURITY.md` and
+  decides whether to document or design around it; **M02** says it in the dapp's guidance for payers.
+- **`reserved` assumes a balance that never falls on its own.** `distribute` computes
+  `balance − reserved[token]` unchecked; a token whose balance can decrease between calls (rebasing
+  down, inbound fee) leaves `reserved` above the balance and `distribute` reverts on underflow until
+  someone tops it up. Noted in the t01 review; **M03** dispositions it.
+- **`release` against a `false`-returning token bubbles the bare `false` word** as revert data, not a
+  reason. Correct under t01's open question 5 and opaque to a reader; **M02** renders it as "retry
+  failed", **M03** decides whether a named error is worth the surface.
+- **ERC-777-style token callbacks are covered by `nonReentrant` but untested.** One test in **M03**.
 
 ## Not on the roadmap
 
