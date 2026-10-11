@@ -1,0 +1,290 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
+
+/// @notice A sink that splits what it receives between a fixed table of beneficiaries, escrows the
+/// shares it cannot push, and puts every change to itself behind one timelock.
+/// @dev Deployed once as an implementation and used through PUSH0 clones. `factory` and `self` live
+/// in the implementation's bytecode, so a clone reads the implementation's deployer and the
+/// implementation's own address — which is how the implementation rejects ETH while a clone accepts it.
+contract Distribution {
+    struct Beneficiary {
+        address account;
+        uint96 bps;
+        string name;
+        string note;
+    }
+
+    struct Pending {
+        bytes32 hash;
+        uint256 eta;
+        bytes action;
+    }
+
+    struct Snapshot {
+        address owner;
+        uint32 delay;
+        uint32 nonce;
+        string description;
+        Beneficiary[] table;
+        Pending[] pending;
+    }
+
+    event Received(address indexed from, uint256 amount);
+    event Distributed(address indexed token, uint256 amount);
+    event Escrowed(address indexed token, address indexed account, uint256 amount);
+    event Released(address indexed token, address indexed account, uint256 amount);
+    event Queued(bytes32 indexed hash, uint32 nonce, uint256 eta, bytes action);
+    event Applied(bytes32 indexed hash);
+    event Cancelled(bytes32 indexed hash);
+
+    error NotOwner();
+    error BadTable();
+    error NotReady(uint256 eta);
+    error NothingToDo();
+    error Locked();
+    error Unauthorized();
+
+    /// @dev Draft from PROJECT_OVERVIEW § 6; M03 measures it against a real multisig and a Safe.
+    uint256 private constant PUSH_GAS = 100_000;
+    uint256 private constant BPS_TOTAL = 10_000;
+    bytes4 private constant TRANSFER = 0xa9059cbb;
+    bytes4 private constant BALANCE_OF = 0x70a08231;
+
+    address public owner;
+    uint32 public delay;
+    uint32 public nonce;
+    string public description;
+
+    /// @dev Stored in the order given, which table validation forces to be ascending by account.
+    Beneficiary[] private _table;
+    Pending[] private _pending;
+    /// @dev 1-based index into `_pending`; 0 means absent.
+    mapping(bytes32 => uint256) private _pendingIndex;
+
+    /// @notice Queued action hash to the timestamp it becomes applicable.
+    mapping(bytes32 => uint256) public queued;
+    /// @notice Token (0 for ETH) to the total this contract holds on behalf of failed pushes.
+    mapping(address => uint256) public reserved;
+    /// @notice Token (0 for ETH) to account to the amount escrowed for it.
+    mapping(address => mapping(address => uint256)) public escrowed;
+
+    bool private transient locked;
+
+    address private immutable factory;
+    address private immutable self;
+
+    constructor() {
+        factory = msg.sender;
+        self = address(this);
+    }
+
+    modifier nonReentrant() {
+        if (locked) revert Locked();
+        locked = true;
+        _;
+        locked = false;
+    }
+
+    /// @dev The timelock reaches state only through a self-call, so every mutator is `onlySelf`.
+    modifier onlySelf() {
+        if (msg.sender != address(this)) revert Unauthorized();
+        _;
+    }
+
+    /// @notice Initialise a clone. Callable once, by whoever deployed the implementation.
+    function init(address owner_, uint32 delay_, string calldata description_, Beneficiary[] calldata table_)
+        external
+        payable
+    {
+        if (msg.sender != factory || _table.length != 0) revert Unauthorized();
+        owner = owner_;
+        delay = delay_;
+        description = description_;
+        _set(table_);
+    }
+
+    /// @dev Must run under a 2,300-gas `transfer` stipend, so it does nothing but the guard and the log.
+    receive() external payable {
+        if (address(this) == self) revert Unauthorized();
+        emit Received(msg.sender, msg.value);
+    }
+
+    /// @notice Split everything not already escrowed between the table, in table order.
+    /// @param token The ERC-20 to split, or `address(0)` for ETH.
+    function distribute(address token) external nonReentrant {
+        uint256 amount = _balance(token) - reserved[token];
+        if (amount == 0) revert NothingToDo();
+
+        uint256 n = _table.length;
+        uint256 paid;
+        for (uint256 i; i < n; ++i) {
+            Beneficiary storage b = _table[i];
+            // The last row takes the remainder, so the shares always sum to `amount`.
+            uint256 share = i + 1 == n ? amount - paid : (uint256(b.bps) * amount) / BPS_TOTAL;
+            paid += share;
+            address account = b.account;
+            (bool ok,) = _push(token, account, share);
+            if (!ok) {
+                escrowed[token][account] += share;
+                reserved[token] += share;
+                emit Escrowed(token, account, share);
+            }
+        }
+        emit Distributed(token, amount);
+    }
+
+    /// @notice Retry the escrowed amount for one account. Reverts if the retry fails, leaving the escrow.
+    function release(address token, address account) external nonReentrant {
+        uint256 amount = escrowed[token][account];
+        if (amount == 0) revert NothingToDo();
+
+        escrowed[token][account] = 0;
+        reserved[token] -= amount;
+        (bool ok, bytes memory data) = _push(token, account, amount);
+        if (!ok) _bubble(data);
+        emit Released(token, account, amount);
+    }
+
+    /// @notice Queue a self-call, or run it now when `delay` is zero.
+    /// @param action Calldata for one of this contract's `onlySelf` functions.
+    function propose(bytes calldata action) external returns (bytes32 hash) {
+        if (msg.sender != owner) revert NotOwner();
+
+        uint32 n = ++nonce;
+        hash = keccak256(abi.encode(action, n));
+        uint32 d = delay;
+        if (d == 0) {
+            emit Queued(hash, n, block.timestamp, action);
+            _selfCall(action);
+            emit Applied(hash);
+        } else {
+            uint256 eta = block.timestamp + d;
+            queued[hash] = eta;
+            _pendingIndex[hash] = _pending.length + 1;
+            _pending.push(Pending({hash: hash, eta: eta, action: action}));
+            emit Queued(hash, n, eta, action);
+        }
+    }
+
+    /// @notice Run a queued action once its eta has passed. A failing action stays queued for a retry.
+    function applyQueued(bytes calldata action, uint32 nonce_) external {
+        bytes32 hash = keccak256(abi.encode(action, nonce_));
+        uint256 eta = queued[hash];
+        // A timelock is a timestamp comparison; a validator's few seconds of drift is not the threat.
+        // forge-lint: disable-next-line(block-timestamp)
+        if (eta == 0 || block.timestamp < eta) revert NotReady(eta);
+
+        delete queued[hash];
+        _remove(hash);
+        _selfCall(action);
+        emit Applied(hash);
+    }
+
+    /// @notice Drop a queued action. Immediate: the delay guards applying, not cancelling.
+    function cancel(bytes32 hash) external {
+        if (msg.sender != owner) revert NotOwner();
+        if (queued[hash] == 0) revert NothingToDo();
+
+        delete queued[hash];
+        _remove(hash);
+        emit Cancelled(hash);
+    }
+
+    function setBeneficiaries(Beneficiary[] calldata table_) external onlySelf {
+        _set(table_);
+    }
+
+    function setDescription(string calldata description_) external onlySelf {
+        description = description_;
+    }
+
+    function setDelay(uint32 delay_) external onlySelf {
+        delay = delay_;
+    }
+
+    /// @notice `address(0)` renounces: nothing can be proposed or cancelled again.
+    function transferOwnership(address owner_) external onlySelf {
+        owner = owner_;
+    }
+
+    /// @notice Everything a reader needs in one call.
+    function snapshot() external view returns (Snapshot memory) {
+        return Snapshot({
+            owner: owner, delay: delay, nonce: nonce, description: description, table: _table, pending: _pending
+        });
+    }
+
+    /// @dev Not `table()`: forge reserves the `table` prefix for table tests and fails the suite.
+    function beneficiaries() external view returns (Beneficiary[] memory) {
+        return _table;
+    }
+
+    function pendingCount() external view returns (uint256) {
+        return _pending.length;
+    }
+
+    /// @dev Ascending accounts make duplicates impossible and keep the first row above `address(0)`.
+    function _set(Beneficiary[] calldata table_) private {
+        uint256 n = table_.length;
+        if (n == 0) revert BadTable();
+
+        delete _table;
+        uint256 sum;
+        address prev;
+        for (uint256 i; i < n; ++i) {
+            Beneficiary calldata b = table_[i];
+            if (b.bps == 0 || b.account <= prev) revert BadTable();
+            prev = b.account;
+            sum += b.bps;
+            _table.push(b);
+        }
+        if (sum != BPS_TOTAL) revert BadTable();
+    }
+
+    /// @dev Swap-and-pop, so `_pending` stays iterable and the surviving order is stable otherwise.
+    function _remove(bytes32 hash) private {
+        uint256 i = _pendingIndex[hash];
+        if (i == 0) return;
+
+        uint256 last = _pending.length;
+        if (i != last) {
+            Pending storage moved = _pending[last - 1];
+            _pending[i - 1] = moved;
+            _pendingIndex[moved.hash] = i;
+        }
+        _pending.pop();
+        delete _pendingIndex[hash];
+    }
+
+    function _selfCall(bytes calldata action) private {
+        (bool ok, bytes memory data) = address(this).call(action);
+        if (!ok) _bubble(data);
+    }
+
+    /// @dev A token with no code returns nothing here, which does not decode — so it fails.
+    function _balance(address token) private view returns (uint256) {
+        if (token == address(0)) return address(this).balance;
+
+        (bool ok, bytes memory data) = token.staticcall(abi.encodeWithSelector(BALANCE_OF, address(this)));
+        if (!ok) _bubble(data);
+        return abi.decode(data, (uint256));
+    }
+
+    /// @dev ETH is capped so one hostile recipient cannot burn the whole distribution; an ERC-20 push
+    /// is bounded by the token. A no-return token (mainnet USDT) counts as success; anything else must
+    /// answer with a non-zero word, decoded as a `uint256` so hostile return data cannot revert here.
+    function _push(address token, address to, uint256 amount) private returns (bool ok, bytes memory data) {
+        if (token == address(0)) {
+            (ok, data) = to.call{value: amount, gas: PUSH_GAS}("");
+            return (ok, data);
+        }
+        (ok, data) = token.call(abi.encodeWithSelector(TRANSFER, to, amount));
+        ok = ok && (data.length == 0 || (data.length >= 32 && abi.decode(data, (uint256)) == 1));
+    }
+
+    function _bubble(bytes memory data) private pure {
+        assembly ("memory-safe") {
+            revert(add(data, 0x20), mload(data))
+        }
+    }
+}
