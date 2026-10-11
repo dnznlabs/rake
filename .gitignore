@@ -11,6 +11,8 @@ out/
 # Dev-chain broadcast logs are throwaway; real-network ones are the deployment record.
 !/broadcast
 /broadcast/*/31337/
+# A second anvil on 31338 is how the dev chains' same-address property is checked.
+/broadcast/*/31338/
 /broadcast/**/dry-run/
 .env
 .env.*

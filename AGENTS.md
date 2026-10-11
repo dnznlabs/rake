@@ -30,6 +30,13 @@
 - `make addresses` lists `App` and `DistributionFactory`. The implementation is created inside the
   factory's constructor and is not a `CREATE` transaction in the broadcast log; read it with
   `cast call <factory> "implementation()(address)"`.
+- `scripts/forge/Seed.s.sol` creates the *featured* distribution every dev chain carries: a two-row
+  table, a 1 ETH deposit and one queued change. It is not a `Deploy*.s.sol` — that loop runs with no
+  environment, and the seed needs `FACTORY`. `mk/15-seed.mk` runs it between the deploy and the dapp
+  build and owns `FEATURED_SALT`, whose top 20 bytes are `SENDER` as decision 10 requires. The salt is
+  the only build token; the address is `predict(salt)`, which the page reads at boot, so the same salt
+  gives the same address on every chain while the table differs by `block.chainid`. A salt that already
+  has code is left alone rather than re-created (#22).
 - The placeholder page under `app/` reads the factory's `implementation()` until M02 replaces it.
 - `lib/` are submodules pinned to a tag. `forge install` would move them.
 - The toolchain is pinned in `devbox.json`; run forge through devbox. `forge build` must print no
@@ -62,6 +69,11 @@
   sends without a wallet. `make dapp-nodev` is the bundle that ships.
 - Every `<script>` stays inline and attribute-free: `src`, `type="module"`, `defer` and `async` are
   refused by the build (`app/inline-scripts.mjs`), because contract hosting breaks on them silently.
+- `tools/abi-vectors.sh` writes `test/fixtures/abi/` from `cast`, which is the oracle `test/abi.test.mjs`
+  asserts `eth.js` against — an encoder compared with itself proves nothing. Regenerate with
+  `devbox run -- tools/abi-vectors.sh` and commit what it writes; never hand-edit a `.hex` file or
+  `selectors.txt`. The script is idempotent, so a second run leaves the tree clean, and CI never runs
+  cast through node.
 - The build minifier strips leading whitespace on every line, template literals included.
 - gzip output depends on the node build's zlib. Build through devbox when the bytes matter.
 - Node tests are `test/*.test.mjs`.

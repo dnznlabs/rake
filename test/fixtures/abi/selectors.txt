@@ -1,0 +1,17 @@
+create(address,uint32,string,(address,uint96,string,string)[],bytes32) 0xf0f469ff
+predict(bytes32) 0x0e787cce
+implementation() 0x5c60da1b
+snapshot() 0x9711715a
+beneficiaries() 0x1d29bd5a
+propose(bytes) 0x37558af5
+applyQueued(bytes,uint32) 0xcb313c17
+cancel(bytes32) 0xc4d252f5
+distribute(address) 0x63453ae1
+release(address,address) 0x48b75044
+setBeneficiaries((address,uint96,string,string)[]) 0x8868f490
+setDescription(string) 0x90c3f38f
+setDelay(uint32) 0x10348665
+transferOwnership(address) 0xf2fde38b
+reserved(address) 0xda9425e2
+escrowed(address,address) 0x13126902
+isOwner(address) 0x2f54bf6e
