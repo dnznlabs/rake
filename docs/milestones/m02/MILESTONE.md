@@ -1,6 +1,6 @@
 # M02 — Dapp and widget on anvil
 
-Status: in progress — t01 done, t02 assigned · updated 2026-10-11
+Status: in progress — t01 done, t02 assigned, Phase 5 added · updated 2026-10-11
 
 The design prototype (`brainstorming/design/rake-dapp.html`, `rake-widget.html`) rebuilt as the real
 dapp on DNZN Base v1: reading `snapshot()` from the chain, sending the six writes through the wallet,
@@ -9,6 +9,11 @@ document. It comes second because every view renders the `snapshot()` struct M01
 M03 because the review in M03 covers `App` and the chunk upload as well as `Distribution` — reviewing
 before the dapp exists means reviewing twice. Everything here stays on anvil; a wallet browser and a
 `web3://` gateway are M04's acceptance, not this milestone's.
+
+It ends on Denizen, not on a check: once the five tasks are merged, he drives the anvil deployment
+himself and irons out the experience until he is done finding things (Phase 5, criterion 10, roadmap
+decision 14). M03's review starts after that signoff, so it reads what the tweaks produced rather
+than what they replaced.
 
 ## Acceptance criteria
 
@@ -71,6 +76,15 @@ rather than quote.
    silent; `forge snapshot --check` exit 0; `git status --porcelain` empty after `forge build --force`,
    `forge test`, `forge snapshot`, `make deploy` and the 31338 deploy of criterion 5;
    `grep -rnE '\btip\b|govUrl|about:|ownerKind' app/src` prints nothing (decisions 1, 2, 7).
+10. **Signoff.** Phase 5 is closed by Denizen's written signoff, dated, recorded in this file. **This is
+    the one criterion in M02 that is not a measurement**, and it is deliberate: the phase it closes is a
+    subjective pass over the experience, so no command can settle it. The check is that the signoff
+    line exists and is dated — not that anyone agrees with it. Criteria 8 and 9 are re-run against the
+    code he signs off, and the result is recorded under this line; any other criterion whose inputs
+    Phase 5 touched is re-run with them (see Phase 5 § Consequences). Same rule as `state-collection`
+    M1 AC 10, decided there on 2026-09-17 over a proposal to close on an empty task table.
+
+    _Not yet signed off._
 
 ## Out of scope
 
@@ -87,7 +101,8 @@ rather than quote.
 - `SECURITY.md`, the payer-guidance *disposition* (#18 — M02 writes the one line, M03 decides), the
   named `release` error (#20's second half), `PUSH_GAS`, a beneficiaries cap — **M03**.
 - `App.lock()`; a branch protection rule — ruled out in `ROADMAP.md`.
-- Any change to `src/Distribution.sol`. The struct is frozen the day this milestone starts.
+- Any change to `src/Distribution.sol` **by tasks t01–t05**. The struct is frozen the day this
+  milestone starts. Phase 5 is the exception, priced per item: see its § Consequences.
 - Mirroring at dnzn.dev or IPFS, and a published widget URL — **M05**.
 
 ## Human-in-the-loop requirements
@@ -105,10 +120,17 @@ ruled by Denizen on 2026-10-11 as the recommended option, before t01 started; re
 
 Merging five docs PRs and five code PRs. No credential, funds or external action: everything is anvil.
 
+**All of Phase 5.** He drives it, executes it in Claude Code and signs it off (criterion 10); review
+here is the only agent participation unless he hands a specific item over. A wallet browser against
+anvil needs the same three MetaMask settings `state-collection` needed — custom network
+`http://127.0.0.1:8545` chain ID `31337`, anvil key 0 imported, "Allow access to file URLs" on if he
+opens the chain's document over `file://` — each of which presents as "No wallet found." when wrong.
+
 ## Phases
 
-In order; each phase's criteria are the next one's preconditions. One task per phase except the last,
-whose two tasks are independent of each other.
+In order; each phase's criteria are the next one's preconditions. One task per phase except Phase 4,
+whose two tasks are independent of each other. Phase 5 runs last and is open-ended — it ends on
+Denizen's signoff (criterion 10), not on a check.
 
 ### Phase 1 — Data layer
 
@@ -142,9 +164,62 @@ Independent of each other; the widget waits on #27, the docs page does not.
 | m02-t04 | `#/docs` from the prototype's docs segment against the real ABI; criterion 6; criterion 8 measured and recorded | not started |
 | m02-t05 | `App` serves `widget.js` as a second chunk set (per #27), `Chunks.s.sol` uploads both, the widget reads `snapshot()` through `data-rpc` or the host's `window.ethereum`, host page under `make serve`; criterion 7; criterion 9 | not started |
 
+### Phase 5 — dapp and widget refinement
+
+Last phase of M02, after t05 merges. Denizen drives the anvil deployment, finds what is wrong with the
+experience — dapp, widget, docs page — and irons it out. A loop, not a fixed list: it runs as long as
+he is still finding things, and his signoff closes it (criterion 10). Added 2026-10-11 at his request,
+after `state-collection` M1 Phase 5 showed the shape works; roadmap decision 14 records why it sits
+here and not in M03 or before M04.
+
+**He executes this phase himself**, in Claude Code, outside the agent loop, opening PRs for review
+here. Elanik is not in this phase by default — anything Denizen does want handed off gets filed as a
+row below and assigned explicitly. Lakos reviews each PR against the criteria it touches and keeps the
+table below current.
+
+Scope is decided per item, not fenced in advance: **anything is fair game**, `app/` or `src/`, and
+what a change is allowed to touch is settled when it is filed. What that costs is under
+"Consequences" below — it is a real cost, not a reason to narrow the rule.
+
+| Task | Goal | Status |
+|:-----|:-----|:-------|
+
+#### Consequences of "anything is fair game" at end of M02
+
+Not objections. These are the bills that come due if a Phase 5 change reaches past `app/src`, and they
+should be priced when the item is filed rather than discovered at review.
+
+1. **Any change to `app/` invalidates criterion 8.** The chunks `App` serves are uploaded from the
+   built bundle, so `html()` is stale the moment the dapp changes, and `widget.js` the moment the widget
+   does. Re-chunking is `make deploy`; criterion 8's sha256 and byte counts are re-recorded, and
+   criterion 7's size budget re-checked if the widget moved.
+2. **A change under `src/` re-opens M01's evidence, and the amount depends on the file.**
+   `forge snapshot --check` fails until the snapshot is regenerated — by design, that is the check
+   working. A change to `App.sol` or `Chunks.s.sol` re-opens criteria 7 and 8 only. A change to
+   `Distribution.sol` that leaves the `snapshot()` struct and the external ABI alone re-runs M01's suite
+   and criterion 6's function table. **A change to the `snapshot()` struct is the sticky door from
+   § One-way doors**: it re-opens the codec fixtures (criterion 1), every read (3, 5) and write (4),
+   the docs struct (6) and the widget (7) — in effect t01 through t05 — and it is the one item that
+   should be refused unless the struct is wrong, not merely inconvenient.
+3. **A tweak that contradicts a ruling is a ruling first.** Decisions 1, 2, 6, 7, 9, 11, 12 and 13
+   fix what the dapp shows and how; criterion 9's grep enforces three of them. A Phase 5 item that
+   wants the opposite supersedes the decision in `ROADMAP.md` before the code lands, in the five-line
+   form, so the record and the dapp never disagree.
+4. **CI is the safety net, with one gap.** `.github/workflows/ci.yml` (read 2026-10-11 at `25baad7`)
+   gates every PR on a warning-free, lint-free build, `make fmt`, `make test` — `forge test` plus
+   `node --test` against the cast-generated fixtures — `forge snapshot --check` and a clean tree, so a
+   Phase 5 PR cannot quietly break the contract or the codec no matter how wide its scope. What CI does
+   **not** check is the chain document: nothing runs `make deploy` and `make chain-doc` against the
+   build, so criterion 8 is re-run by hand at signoff (criterion 10), not caught per PR. That is why
+   "anything is fair game" is affordable, and why consequence 1 is a manual step.
+5. **M03, M04 and M05 wait.** The roadmap is strictly sequential and this phase is open-ended, so the
+   security review starts when Denizen signs off and not before — and reads the code he signed off.
+   That is the point of the placement, not a side effect.
+
 ## One-way doors
 
 None that leaves anvil. One sticky door, the mirror of M01's: **starting `m02-t02` fixes the
 `snapshot()` ABI for good.** Until then a struct change is a contract edit; after it, every struct
-change is UI rework as well, and M03's review reads the pair. `App` stays unlockable throughout;
-nothing here calls `lock()`.
+change is UI rework as well, and M03's review reads the pair. Phase 5 does not reopen that door: it
+may touch `src/`, but a struct change there costs t01–t05 over again (Phase 5 § Consequences 2).
+`App` stays unlockable throughout; nothing here calls `lock()`.
