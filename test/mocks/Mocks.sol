@@ -92,6 +92,21 @@ contract MockERC20 {
     }
 }
 
+/// @notice Enough of a multisig to answer the dapp's owner probe: `isOwner(address)` is the one call
+/// decision 7 makes, and a distribution owned by this contract renders the owner view with
+/// copy-calldata for every signer it names.
+contract MockVault {
+    address public immutable signer;
+
+    constructor(address signer_) {
+        signer = signer_;
+    }
+
+    function isOwner(address account) external view returns (bool) {
+        return account == signer;
+    }
+}
+
 interface IERC721Receiver {
     function onERC721Received(address operator, address from, uint256 id, bytes calldata data) external returns (bytes4);
 }
