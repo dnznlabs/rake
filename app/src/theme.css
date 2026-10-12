@@ -26,6 +26,17 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0
 .eyebrow.amber{color:var(--amber)}.eyebrow.err{color:var(--err)}
 h1{font-size:28px;font-weight:700;letter-spacing:-.015em;margin:40px 0 8px}
 p.prose{font:15px/1.65 var(--sans);color:var(--muted);max-width:720px;margin:0 0 24px}
+/* The hero is two columns, roughly the prototype's 60/40: the claim, the paragraph and the CTAs on the
+   left, the fee path on the right. The paragraph keeps a readable measure because its column gives it
+   one, which is why nothing here fights p.prose's max-width. One column under 720px. */
+.hero{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:48px;align-items:center}
+.hero>div:first-child{align-self:start}
+.herograph{display:flex;justify-content:center}
+.herograph svg{width:100%;max-width:340px;font-family:var(--mono)}
+/* The diagram speaks in the same three voices the page does: ink for the path the funds take, dim for
+   everything beside it, amber for anything queued. */
+.herograph .d{color:var(--dim)}
+.herograph .q{color:var(--amber)}
 .btn{background:var(--ink);color:var(--paper);padding:11px 20px;display:inline-block}
 .btn.sec{background:none;color:var(--ink);border:1px solid var(--ink);padding:10px 20px}
 .btn.off{background:none;color:var(--dim);border:1px solid var(--rule);padding:10px 20px;cursor:default}
@@ -59,10 +70,12 @@ p.prose{font:15px/1.65 var(--sans);color:var(--muted);max-width:720px;margin:0 0
 .verbs b{display:block;font:700 13.5px var(--mono);margin:12px 0 6px}
 .verbs span{font:12.5px/1.5 var(--sans);color:var(--muted)}
 .verbs .who{display:block;font-size:10.5px;color:var(--dim);margin-top:8px}
-/* The one diagram that carries the accent: the split the distribute icon draws is the bar in miniature. */
-.verbs .t0{fill:var(--accent)}
-.verbs .t1{fill:color-mix(in oklab,var(--accent),var(--paper) 25%)}
-.verbs .t2{fill:color-mix(in oklab,var(--accent),var(--paper) 50%)}
+/* The only places besides the bar that carry the accent: the split the distribute icon draws and the
+   hero's three beneficiaries are both the bar in miniature, so they take its three tints and one hue
+   declaration still drives every one of them in both themes. */
+.verbs .t0,.herograph .t0{fill:var(--accent)}
+.verbs .t1,.herograph .t1{fill:color-mix(in oklab,var(--accent),var(--paper) 25%)}
+.verbs .t2,.herograph .t2{fill:color-mix(in oklab,var(--accent),var(--paper) 50%)}
 .verbs .q{color:var(--amber)}
 .verbs .chk{stroke:var(--paper)}
 .load{display:flex;gap:10px}
@@ -114,8 +127,8 @@ footer{display:flex;justify-content:space-between;border-top:1px solid var(--rul
 .dtab a,.doc a{border-bottom:1px solid var(--rule)}
 /* Small widths. The nav's two links stay: a header whose only destinations vanish on a phone is a
    header with no navigation, so the row pays for them in gap and type size instead. The network pill
-   drops its name, as before. */
-@media (max-width:720px){.frame{padding:0 16px}.navr{gap:10px;font-size:11px}.netname{display:none}#net{padding:6px 8px}.verbs{grid-template-columns:1fr}}
+   drops its name and the diagram goes under the prose. */
+@media (max-width:720px){.frame{padding:0 16px}.navr{gap:10px;font-size:11px}.netname{display:none}#net{padding:6px 8px}.verbs{grid-template-columns:1fr}.hero{grid-template-columns:1fr;gap:16px}}
 /* Narrower still. The sub-label goes, not the links: the Brand Sheet draws the nav lockup both ways
    (mark + RAKE, and mark + RAKE + DNZN LABS), so the short one is the sanctioned reduction and the two
    destinations are not. 65 px of sub-label is what buys the row down to 320. */
