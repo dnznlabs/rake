@@ -153,7 +153,7 @@ Every screen that reads: landing, list, detail, pending decode, histories, drift
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m02-t03](tasks/m02-t03/TASK.md) | Create flow (salt, predict, `eth_getCode` guard), propose panel for the four setters and renounce, `applyQueued`, `cancel`, `distribute` (per #26), `release` with the `false`-word rendering, copy-calldata for a vault signer, the payer-guidance line (#18), name resolution ported (per #28); criterion 4 | assigned — plan merged (#39), issue [#49](https://github.com/dnznlabs/rake/issues/49) opened and handed off 2026-10-12, no gate |
+| [m02-t03](tasks/m02-t03/TASK.md) | Create flow (salt, predict, `eth_getCode` guard), propose panel for the four setters and renounce, `applyQueued`, `cancel`, `distribute` (per #26), `release` with the `false`-word rendering, copy-calldata for a vault signer, the payer-guidance line (#18), name resolution ported (per #28); criterion 4 | assigned — plan merged (#39), issue [#46](https://github.com/dnznlabs/rake/issues/46) opened and handed off 2026-10-12, no gate |
 
 ### Phase 4 — Docs and the widget
 
