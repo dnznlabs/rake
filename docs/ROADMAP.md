@@ -59,6 +59,10 @@ Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which
    as M02 UI items in DNZN's own dapp and nowhere else: a quiet "tip the authors" line on the
    post-create screen, any amount, separate transaction, nothing pre-filled; and the footer linking to
    the DNZN distribution's own public page. Nothing in the widget — it renders on other people's pages.
+   **Addendum 2026-10-11 ([#38](https://github.com/dnznlabs/rake/issues/38)):** both UI items move
+   from M02 to M05, where the DNZN distribution has an address. Reached by default when m02-t03's
+   issue opened with no ruling; options were defer (chosen), a build token with no value on any M02
+   chain, or loosening criterion 9's grep. M02 criterion 9 stays as written.
 2. **No `url` or `about` fields.** Owners carry URLs inside `description`. Rejected: two more string
    fields, which widen the audit surface for copy.
 3. **Name.** `Rake` is the project and the repo; `Distribution` and `DistributionFactory` are the

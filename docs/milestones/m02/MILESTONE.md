@@ -1,6 +1,6 @@
 # M02 — Dapp and widget on anvil
 
-Status: in progress — t01 done, t02 assigned, Phase 5 added · updated 2026-10-11
+Status: in progress — t01, t02 done, t03 assigned, Phase 5 added · updated 2026-10-11
 
 The design prototype (`brainstorming/design/rake-dapp.html`, `rake-widget.html`) rebuilt as the real
 dapp on DNZN Base v1: reading `snapshot()` from the chain, sending the six writes through the wallet,
@@ -147,13 +147,13 @@ Every screen that reads: landing, list, detail, pending decode, histories, drift
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m02-t02](tasks/m02-t02/TASK.md) | The prototype's shell on the scaffold's provider code, rulings 1, 2, 7, 8 and 9 applied; `#/`, `#/distros`, `#/distros/<addr>`; pending actions decoded; `Queued`/`Applied`/`Cancelled` and `Received`/`Distributed`/`Escrowed`/`Released` histories loaded after the snapshot; criteria 3 and 5 | assigned — plan merged (#32), issue [#36](https://github.com/dnznlabs/rake/issues/36) opened and handed off 2026-10-11, no gate |
+| [m02-t02](tasks/m02-t02/TASK.md) | The prototype's shell on the scaffold's provider code, rulings 1, 2, 7, 8 and 9 applied; `#/`, `#/distros`, `#/distros/<addr>`; pending actions decoded; `Queued`/`Applied`/`Cancelled` and `Received`/`Distributed`/`Escrowed`/`Released` histories loaded after the snapshot; criteria 3 and 5 | done — [#40](https://github.com/dnznlabs/rake/pull/40) merged 2026-10-11 at `5caf1f3`, approved at `3e846f5` and re-approved at `d456312` after Denizen's six review items; carried [#41](https://github.com/dnznlabs/rake/issues/41), [#42](https://github.com/dnznlabs/rake/issues/42), [#43](https://github.com/dnznlabs/rake/issues/43) |
 
 ### Phase 3 — Writing
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m02-t03](tasks/m02-t03/TASK.md) | Create flow (salt, predict, `eth_getCode` guard), propose panel for the four setters and renounce, `applyQueued`, `cancel`, `distribute` (per #26), `release` with the `false`-word rendering, copy-calldata for a vault signer, the payer-guidance line (#18), name resolution ported (per #28); criterion 4 | planned — plan written 2026-10-11 while t02 builds; issue opens when t02 merges |
+| [m02-t03](tasks/m02-t03/TASK.md) | Create flow (salt, predict, `eth_getCode` guard), propose panel for the four setters and renounce, `applyQueued`, `cancel`, `distribute` (per #26), `release` with the `false`-word rendering, copy-calldata for a vault signer, the payer-guidance line (#18), name resolution ported (per #28); criterion 4 | assigned — plan merged ([#39](https://github.com/dnznlabs/rake/pull/39)), issue [#46](https://github.com/dnznlabs/rake/issues/46) opened and handed off 2026-10-11, no gate; #38 defaulted to M05 when it opened |
 
 ### Phase 4 — Docs and the widget
 
