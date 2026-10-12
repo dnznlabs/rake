@@ -1,6 +1,6 @@
 # m02-t03 — handoff
 
-PR: #<n> · Branch: `m02/t03-writing` · 2026-10-11
+PR: #52 · Branch: `m02/t03-writing` · 2026-10-11
 
 Every write the contract offers can now be sent from the dev build, and all of them go down one path.
 `tx(to, sig, args, {value, label})` does an `eth_call` on exactly the transaction it is about to send,
@@ -278,6 +278,18 @@ the architect most needs before t04 is scoped.
   already applied or cancelled, which is what a stale page reaches. Rendering it as a countdown would
   have said "the delay has not passed — ready to apply". It reads *that change is not queued here — it
   has already been applied or cancelled*; the future-eta branch is unchanged and unit-tested.
+- **Step 6's "before it, the preflight returns `NotReady(eta)`" is unreachable from the page, by
+  design.** The plan's check asks for the pre-eta preflight to answer `NotReady(eta)` and render the
+  countdown rather than the raw error. The page never gets there: before the eta the apply button is
+  disabled, carries no `data-send` and has no handler, so there is nothing to preflight — forcing a
+  click does nothing at all. That is the behaviour step 6 asks for two sentences earlier (the button
+  "stays disabled, rather than guessing"), so the two halves of the check cannot both hold, and the
+  disabled one is the right one: a preflight before the eta would be a wasted round trip to learn
+  something `countdown` already knows locally. **So the future-eta countdown branch is unit-tested
+  only, never demonstrated through the page**, and the `NotReady` the page does reach is the eta-`0`
+  stale race above. Nothing in § The three states claims otherwise, but the plan's sentence reads as
+  satisfied unless this says plainly that it was not, and could not be. Noted for the TASK.md
+  correction at close-out.
 - **`namehash` lives in `model.js`, not beside the rest of the ported names block.** The plan says
   port state-collection `224–279` verbatim, and also unit-test `namehash` against EIP-137's vectors;
   `test/model.test.mjs` tests `model.js`. `namehash` is pure, so it moved; `ensName`, `regName`,
