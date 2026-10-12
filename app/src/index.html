@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PROJECT</title>
+<title>RAKE</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23317E9F'%3E%3Crect x='3' y='2' width='3.2' height='6.8'/%3E%3Crect x='3' y='10' width='3.2' height='4'/%3E%3Cpath d='M6.2 3.6 H9.6 A2.9 2.9 0 0 1 9.6 9.4 H6.2' fill='none' stroke='%23317E9F' stroke-width='3.2'/%3E%3Cpath d='M9 9.4 L12.8 14' fill='none' stroke='%23317E9F' stroke-width='3.2'/%3E%3C/svg%3E">
 <script>(function(){var t=localStorage.getItem('theme')||'system';var d=t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.className=d?'dark':'';})();</script>
 <style>
 /*@inline theme.css@*/
@@ -16,21 +17,27 @@
 /*@inline eth.js@*/
 </script>
 <script>
+/*@inline model.js@*/
+</script>
+<script>
 /* Everything this script draws is styled by class alone: theme.css and layout.html are the design,
    and replacing those two files reskins the app without touching this one.
    Addresses and the chain are substituted by app/build.mjs; a deployed contract's token is its name,
    uppercased, between double underscores. DEV-fenced blocks are stripped unless the build is --dev. */
 /* `featuredSalt` is the dev chain's seeded distribution, as a salt and never as an address: the
    address is `factory.predict(salt)`, which the page reads at boot rather than carrying a token per
-   chain. Unused until t02 renders it. */
-const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTRIBUTIONFACTORY__', featuredSalt: '__FEATURED_SALT__' };
+   chain. `factoryBlock` is the block the factory was created in, so a `Created` scan never starts at
+   genesis on a real chain. */
+const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTRIBUTIONFACTORY__', factoryBlock: '__DISTRIBUTIONFACTORY_BLOCK__', featuredSalt: '__FEATURED_SALT__' };
 const CONTRACTS = [['DistributionFactory', CFG.factory]];
-const CHAINS = { 1: 'mainnet', 11155111: 'sepolia', 31337: 'anvil' };
-const EXPLORER = { 1: 'https://etherscan.io', 11155111: 'https://sepolia.etherscan.io' };
+const CHAINS = { 1: 'mainnet', 10: 'op mainnet', 8453: 'base', 42161: 'arbitrum', 11155111: 'sepolia', 84532: 'base sepolia', 31337: 'anvil', 31338: 'anvil-b' };
+/* A dev chain has no explorer, so `ext()` prints plain text with the full value in the title. */
+const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.io', 8453: 'https://basescan.org', 42161: 'https://arbiscan.io', 11155111: 'https://sepolia.etherscan.io', 84532: 'https://sepolia.basescan.org' };
+const ZERO = '0x' + '0'.repeat(40);
 /*DEV*/
 const Q = new URLSearchParams(location.search);
 /*DEV*/
-document.getElementById('ver').textContent = CFG.version;
+document.getElementById('ver').textContent = `dnzn labs · ${CFG.version}`;
 
 /* ---- provider ------------------------------------------------------------------------------ */
 let P = null, ACC = null, CHAIN = null;
@@ -86,12 +93,28 @@ async function waitReceipt(hash, ms) {
   }
   return null;
 }
+// An event topic is the whole keccak of the signature, not the four-byte selector a call carries.
+const topic = sig => '0x' + Eth.keccak(Eth.utf8(sig));
+const word = a => '0x' + Eth.pad(a);
+const logs = (address, topics, fromBlock) => P.request({ method: 'eth_getLogs', params: [{ address, topics, fromBlock, toBlock: 'latest' }] });
+
+/* ---- text ---------------------------------------------------------------------------------- */
+// Descriptions, names and notes are whatever the chain was given, so every one of them is escaped.
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const short = a => a ? a.slice(0, 6) + '…' + a.slice(-4) : '';
 const cname = id => CHAINS[id] || 'chain ' + id;
 const wrongChain = () => !!CHAIN && String(CHAIN) !== String(CFG.chainId);
+// Four decimals, truncated: this is a balance to read, not an amount to settle against.
+const amt = w => { const s = (BigInt(w) / 100000000000000n).toString().padStart(5, '0'); return s.slice(0, -4) + '.' + s.slice(-4); };
+const secs = () => Math.floor(Date.now() / 1000);
+const isAddr = v => /^0x[0-9a-fA-F]{40}$/.test(v);
 // Every address and tx hash the page prints goes through here: a link where the chain has an
 // explorer, plain text with the full value in the title elsewhere.
 const ext = (kind, v, text) => EXPLORER[CFG.chainId] ? `<a href="${EXPLORER[CFG.chainId]}/${kind}/${v}" target="_blank" rel="noopener" title="${v}">${text}</a>` : `<span title="${v}">${text}</span>`;
+// localStorage throws in a sandboxed frame, so every access is guarded and a failure means no history.
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const recents = () => { try { const r = JSON.parse(store.get('rake.recent') || '[]'); return Array.isArray(r) ? r.filter(isAddr) : []; } catch (e) { return []; } };
+const addRecent = a => store.set('rake.recent', JSON.stringify([a, ...recents().filter(x => x !== a)].slice(0, 8)));
 
 /* ---- header --------------------------------------------------------------------------------- */
 function who() {
@@ -109,23 +132,269 @@ function who() {
   pill.title = wrong ? `expected ${cname(CFG.chainId)}` : '';
 }
 
-/* ---- state ---------------------------------------------------------------------------------- */
-const S = { implementation: null, loaded: false, error: null };
+/* ---- reading the chain ---------------------------------------------------------------------- */
+const S = { featured: null, loaded: false, error: null, tab: 'recent' };
 async function load() {
   CHAIN = parseInt(await P.request({ method: 'eth_chainId' }), 16);
   // The same address on another network is another contract, or none: do not read it.
   if (wrongChain()) return;
-  const [i] = await call(CFG.factory, 'implementation()', [], ['address']);
-  S.implementation = i; S.loaded = true;
+  // Read once at boot: the featured distribution is a salt in the build, never an address.
+  const [a] = await call(CFG.factory, 'predict(bytes32)', [CFG.featuredSalt], ['address']);
+  S.featured = a; S.loaded = true;
+}
+
+/* One distribution, in three reads: code first, so an address with nothing on it is "could not read"
+   rather than a decode error; then the snapshot; then the two numbers behind "waiting to distribute".
+   ETH only in v1 — a token balance needs a token list, which the chain does not carry. */
+async function loadDistro(addr) {
+  const code = await P.request({ method: 'eth_getCode', params: [addr, 'latest'] });
+  if (!code || code === '0x') return { addr, missing: true };
+  const [snap] = Eth.dec([Model.SNAPSHOT_T], await P.request({ method: 'eth_call', params: [{ to: addr, data: Eth.enc('snapshot()', []) }, 'latest'] }));
+  const [reserved, balance] = await Promise.all([
+    call(addr, 'reserved(address)', [ZERO], ['uint256']),
+    P.request({ method: 'eth_getBalance', params: [addr, 'latest'] }),
+  ]);
+  const [owner, delay, nonce, description, table, pending] = snap;
+  const waiting = BigInt(balance) - reserved[0];
+  return { addr, owner, delay, nonce, description, table, pending, waiting: waiting > 0n ? waiting : 0n };
+}
+
+/* The histories, as two log queries with their topic0s OR'd. `from` is the distribution's own first
+   block when the `Created` scan found it, else the factory's — never genesis. */
+const CHANGE_EVENTS = [['Queued(bytes32,uint32,uint256,bytes)', 'queued'], ['Applied(bytes32)', 'applied'], ['Cancelled(bytes32)', 'cancelled']];
+const FUND_EVENTS = [['Received(address,uint256)', 'in'], ['Distributed(address,uint256)', 'distributed'], ['Escrowed(address,address,uint256)', 'escrowed'], ['Released(address,address,uint256)', 'released']];
+/* Filled by the `Created` scan: a distribution's own first block, which is a better `fromBlock` than
+   the factory's for anything created long after it. */
+const FIRST = new Map();
+const KINDS = new Map([...CHANGE_EVENTS, ...FUND_EVENTS].map(([sig, kind]) => [topic(sig), kind]));
+async function history(addr, from) {
+  const pick = set => logs(addr, [set.map(([sig]) => topic(sig))], from);
+  const [changes, funds] = await Promise.all([pick(CHANGE_EVENTS), pick(FUND_EVENTS)]);
+  return { changes: changes.map(entry).sort(newest), funds: funds.map(entry).sort(newest) };
+}
+const newest = (a, b) => b.block - a.block || b.index - a.index;
+/* One log as the line it prints. An unknown topic0 cannot reach here: the query asked for these. */
+function entry(log) {
+  const kind = KINDS.get(log.topics[0]), block = parseInt(log.blockNumber, 16), index = parseInt(log.logIndex, 16);
+  const at = t => Eth.dec(['address'], log.topics[t])[0];
+  let what = '';
+  if (kind === 'queued') {
+    const [nonce, eta, action] = Eth.dec(['uint32', 'uint256', 'bytes'], log.data);
+    what = `${describe(Model.decodePending(action))} · nonce ${nonce} · ${Model.countdown(eta, secs())}`;
+  } else if (kind === 'applied' || kind === 'cancelled') {
+    what = short(log.topics[1]);
+  } else if (kind === 'in') {
+    what = `${amt(log.data)} ETH from ${esc(short(at(1)))}`;
+  } else if (kind === 'distributed') {
+    what = `${amt(log.data)} ${token(at(1))} by the table`;
+  } else {
+    what = `${amt(log.data)} ${token(at(1))} · ${esc(short(at(2)))}`;
+  }
+  return { kind, block, index, what };
+}
+const token = a => a === ZERO ? 'ETH' : short(a);
+/* A decoded pending action as one line, named by the setter it calls. `setBeneficiaries` is also
+   drawn as a second bar; the other three say everything they do here. */
+function describe(p) {
+  if (p.kind === 'setBeneficiaries') return `${p.kind} · new table · ${p.table.map(b => Model.pct(b[1])).join(' / ')}`;
+  if (p.kind === 'setDescription') return `${p.kind} · new name · ${esc(p.description)}`;
+  if (p.kind === 'setDelay') return `${p.kind} · new delay · ${delayText(p.delay)}`;
+  if (p.kind === 'transferOwnership') return p.owner === ZERO ? `${p.kind} · renounced · nothing can be proposed again` : `${p.kind} · new owner · ${esc(short(p.owner))}`;
+  return 'unknown action · selector ' + esc(p.selector);
+}
+const delayText = d => Number(d) === 0 ? 'none — changes apply instantly' : Number(d) % 86400 === 0 ? Number(d) / 86400 + 'd' : Math.round(Number(d) / 3600) + 'h';
+
+/* ---- the bar, the ledger, the lines ---------------------------------------------------------- */
+const V = document.getElementById('view');
+const basis = bps => (Number(bps) / 100) + '%';
+const rest = table => 10000 - table.reduce((s, b) => s + Number(b[1]), 0);
+/* The signature element. Three tints cycle, so a fourth row restarts at the first; an unassigned
+   remainder (which a valid table never has) is hatched rather than dropped. */
+function bar(table, opts) {
+  const o = opts || {};
+  const segs = table.map((b, i) => `<div class="seg s${i % 3}" style="flex-basis:${basis(b[1])}" title="${esc(b[2])} ${Model.pct(b[1])}"></div>`);
+  const left = rest(table);
+  if (left > 0) segs.push(`<div class="seg rest" style="flex-basis:${basis(left)}" title="unassigned ${Model.pct(left)}"></div>`);
+  return `<div class="bar${o.pending ? ' pending' : o.small ? ' sm' : ''}">${segs.join('')}</div>`;
+}
+/* The bar's own labels: the share and the name, aligned under the segment. Notes and addresses are
+   the ledger's job, so the two readings of one table do not repeat each other. */
+function ticks(table, opts) {
+  const o = opts || {};
+  const cols = table.map(b => `<div class="tick" style="flex-basis:${basis(b[1])}"><b>${Model.pct(b[1])}</b> <span class="nm">${esc(b[2])}</span></div>`);
+  const left = rest(table);
+  if (left > 0 && !o.pending) cols.push(`<div class="tick" style="flex-basis:${basis(left)}"><b>${Model.pct(left)}</b></div>`);
+  return `<div class="ticks${o.pending ? ' pending' : ''}">${cols.join('')}</div>`;
+}
+const mini = table => `<span class="mini">${table.map((b, i) => `<span class="seg s${i % 3}" style="flex-basis:${basis(b[1])}"></span>`).join('')}</span>`;
+const ledger = table => `<div class="ledger">${table.map(b => row(`${esc(b[2])}${b[3] ? `<span class="nt"> — ${esc(b[3])}</span>` : ''}`, ext('address', b[0], esc(short(b[0]))), Model.pct(b[1]))).join('')}</div>`;
+const row = (k, sub, n, cls) => `<div class="row${cls ? ' ' + cls : ''}"><div><b>${k}</b>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="n">${n}</div></div>`;
+const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow${e.kind === 'escrowed' ? ' err' : e.kind === 'queued' ? ' amber' : ''}"><b>${e.kind}</b><span class="w">${e.what}</span><span class="t">block ${e.block}</span></div>`).join('')}</div>`;
+const eyebrow = (text, cls) => `<div class="eyebrow${cls ? ' ' + cls : ''}">${text}</div>`;
+const notice = (text, cls) => `<div class="notice${cls ? ' ' + cls : ''}">${text}</div>`;
+const unreadable = addr => notice(`could not read a distribution at ${esc(short(addr))} on ${cname(CFG.chainId)} — nothing is deployed there.`, 'err');
+
+/* Owner, delay and the balance behind `distribute`. Writing it is t03; reading it is this task. */
+const meta = d => `<div class="meta"><div><div class="k">owner</div><div class="v">${d.owner === ZERO ? 'renounced' : ext('address', d.owner, esc(short(d.owner)))}${ACC && d.owner.toLowerCase() === ACC.toLowerCase() ? ' · you' : ''}</div></div>`
+  + `<div><div class="k">delay</div><div class="v${Number(d.delay) ? '' : ' amber'}">${delayText(d.delay)}</div></div>`
+  + `<div><div class="k">waiting to distribute</div><div class="v">${amt(d.waiting)} ETH</div></div></div>`;
+
+/* The pending block: a queued table as a second bar in the pending style, the other three setters as
+   one line each, an action this build does not know as its selector. */
+function pendingBlock(d) {
+  return d.pending.map(p => {
+    const decoded = Model.decodePending(p[2]);
+    const head = eyebrow(`change queued · ${Model.countdown(p[1], secs())}`, 'amber') + `<div class="status warn">${describe(decoded)}</div>`;
+    return decoded.kind === 'setBeneficiaries' ? head + bar(decoded.table, { pending: true }) + ticks(decoded.table, { pending: true }) : head;
+  }).join('');
 }
 
 /* ---- views ---------------------------------------------------------------------------------- */
-const V = document.getElementById('view');
-const ledgerRow = (k, sub, n, cls) => `<div class="row${cls ? ' ' + cls : ''}"><div><b>${k}</b>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="n">${n}</div></div>`;
+/* Every view is async, and the hash can move while one is reading. A render whose token is stale
+   drops its own paint rather than overwriting the view the user asked for next. */
+let TOKEN = 0;
+const stale = t => t !== TOKEN;
 
-function home() {
-  V.innerHTML = `<div class="eyebrow">factory · ${cname(CFG.chainId)}</div>
-  <div class="ledger">${ledgerRow('implementation', `DistributionFactory at ${ext('address', CFG.factory, short(CFG.factory))}`, `<span class="sig">${ext('address', S.implementation, short(S.implementation))}</span>`)}</div>`;
+function distroBody(d) {
+  return bar(d.table, { small: true }) + ticks(d.table, {}) + ledger(d.table) + pendingBlock(d) + meta(d);
+}
+
+async function landing() {
+  V.innerHTML = `<div class="hero"><div>
+  <h1>Protocol fee transparency.</h1>
+  <p class="prose">Every app that takes a fee either tells you where it goes or doesn't, and checking means hours of chasing transactions. A distribution makes the fee an address: one contract, a published table of who gets what, and a delay on every configuration change so users have visibility before it lands.</p>
+  <div class="actions"><a class="btn" href="#/create">Create a distribution</a><a class="btn sec" href="#/docs#widget">Get the widget</a></div>
+  </div><div class="herograph">${FEEPATH}</div></div>
+  <div id="featured">${notice('reading the featured distribution…')}</div>
+  <div class="sechead"><b>view a distribution</b></div>
+  <div class="load"><input id="load-in" placeholder="0x… or a name" aria-label="address or name"><button class="btn sec" id="load-go">view</button></div>
+  <div class="res" id="load-res"></div>
+  <div class="sechead"><b>how it works</b><span>four verbs, and who can call each</span></div>
+  <div class="verbs">
+  ${verb('01', ICON.receive, 'receive', 'ETH and ERC-20 funds accumulate at the address. Nothing moves on its own.', 'anyone can send')}
+  ${verb('02', ICON.distribute, 'distribute', 'Splits the waiting balance across the table. Push, with escrow fallback.', 'callable by anyone')}
+  ${verb('03', ICON.queue, 'queue', 'Changes to the beneficiaries, owner or delay are staged in public first.', 'owner only · waits the delay')}
+  ${verb('04', ICON.apply, 'apply', 'Once the time lock passes, anyone can land the queued change.', 'anyone · after the eta')}
+  </div>`;
+  loadField();
+  const t = TOKEN, slot = document.getElementById('featured');
+  const d = await loadDistro(S.featured);
+  if (stale(t)) return;
+  if (d.missing) { slot.innerHTML = unreadable(S.featured); return; }
+  slot.innerHTML = `<div class="sechead"><b>live example · ${esc(d.description)}</b><span>${cname(CFG.chainId)} · ${esc(short(d.addr))} · <a href="#/distros/${d.addr}">view →</a></span></div>`
+    + distroBody(d);
+}
+const verb = (n, icon, name, what, callers) => `<div><i>${n}</i>${icon}<b>${name}</b><span>${what}</span><span class="who">${callers}</span></div>`;
+const ICON = {
+  receive: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M12 2v6" stroke-width="1.5"/><path d="M12 14l-4 -6h8Z" fill="currentColor" stroke="none"/><path d="M4 13v8h16v-8" stroke-width="1.5"/></svg>',
+  distribute: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="8" y="2" width="8" height="6" stroke-width="1.5"/><path d="M12 8v4M12 12H4.5v4M12 12h7.5v4M12 12v4" stroke-width="1.25"/><rect class="t0" x="1.5" y="17" width="6" height="4.5" stroke="none"/><rect class="t1" x="9" y="17" width="6" height="4.5" stroke="none"/><rect class="t2" x="16.5" y="17" width="6" height="4.5" stroke="none"/></svg>',
+  queue: '<svg class="q" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="4" y="5" width="16" height="11" stroke-width="1.5"/><path d="M4 20.5h9" stroke-width="2"/></svg>',
+  apply: '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="16" height="12" fill="currentColor"/><path class="chk" d="M8.5 12l2.5 2.5 4.5 -5" fill="none" stroke-width="1.8"/></svg>',
+};
+/* The fee path: the prototype's hero diagram, carrying the three things the contract actually promises
+   — funds arrive at one address, a published table splits them, and a change to that table has to queue
+   and wait the delay first. The prototype's addresses under the beneficiary boxes are dropped: at this
+   size they were three lines of hex nobody can check, and the live example below prints the real ones.
+   Classes rather than colours, as everywhere else: `d` is dim, `q` is amber, and t0/t1/t2 are the bar's
+   three tints, so theme.css still owns every colour and the hue moves in one place. */
+const FEEPATH = '<svg viewBox="0 0 400 356" fill="currentColor" aria-hidden="true">'
+  + '<circle cx="200" cy="22" r="13" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="200" y="26" text-anchor="middle" font-size="10">eoa</text>'
+  + '<line x1="200" y1="35" x2="200" y2="54" stroke="currentColor" stroke-width="1.25"/><path d="M200 62l-4 -8h8Z"/><text class="d" x="208" y="52" font-size="10">eth / erc20</text>'
+  + '<rect x="130" y="62" width="140" height="28" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="200" y="80" text-anchor="middle" font-size="11">dapp</text>'
+  + '<path d="M200 90 V106 H120 V116" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M120 124l-4 -8h8Z"/>'
+  + '<rect x="75" y="124" width="90" height="26" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="120" y="141" text-anchor="middle" font-size="11" font-weight="700">% fee</text>'
+  + '<g class="d"><path d="M200 90 V106 H280 V116" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M280 124l-4 -8h8Z"/><rect x="235" y="124" width="90" height="26" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="280" y="141" text-anchor="middle" font-size="11">% else</text></g>'
+  + '<path d="M120 150 V170 H200 V182" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M200 190l-4 -8h8Z"/>'
+  + '<rect x="110" y="190" width="180" height="58" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="200" y="210" text-anchor="middle" font-size="11.5" font-weight="700">distribution</text>'
+  + '<text class="d" x="200" y="225" text-anchor="middle" font-size="10">one address, any chain</text><text class="q" x="200" y="241" text-anchor="middle" font-size="9.5">changes wait the delay</text>'
+  + '<path d="M200 248 V278 H73 V294" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M73 302l-4 -8h8Z"/>'
+  + '<path d="M200 248 V294" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M200 302l-4 -8h8Z"/>'
+  + '<path d="M200 248 V278 H327 V294" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M327 302l-4 -8h8Z"/>'
+  + '<text x="65" y="272" text-anchor="end" font-size="11" font-weight="700">60%</text><text x="208" y="272" font-size="11" font-weight="700">30%</text><text x="335" y="272" font-size="11" font-weight="700">10%</text>'
+  + '<rect x="14" y="302" width="118" height="32" fill="none" stroke="currentColor" stroke-width="1.25"/><rect class="t0" x="26" y="313" width="9" height="9"/><text x="41" y="322" font-size="11">operations</text>'
+  + '<rect x="141" y="302" width="118" height="32" fill="none" stroke="currentColor" stroke-width="1.25"/><rect class="t1" x="153" y="313" width="9" height="9"/><text x="168" y="322" font-size="11">treasury</text>'
+  + '<rect x="268" y="302" width="118" height="32" fill="none" stroke="currentColor" stroke-width="1.25"/><rect class="t2" x="280" y="313" width="9" height="9"/><text x="295" y="322" font-size="11">bounties</text>'
+  + '<text class="d" x="200" y="352" text-anchor="middle" font-size="10">split defined by the published table</text></svg>';
+/* The field takes an address today. A name needs a registry, which arrives with the write screens. */
+function loadField() {
+  const input = document.getElementById('load-in'), res = document.getElementById('load-res'), go = document.getElementById('load-go');
+  if (!input) return;
+  const submit = () => {
+    const v = input.value.trim();
+    if (isAddr(v)) { res.textContent = ''; location.hash = '#/distros/' + v; return; }
+    res.textContent = v ? 'name resolution arrives with t03' : '';
+  };
+  go.onclick = submit;
+  input.onkeydown = e => { if (e.key === 'Enter') submit(); };
+}
+
+async function detail(addr) {
+  V.innerHTML = notice(`reading ${esc(short(addr))}…`);
+  const t = TOKEN;
+  const d = await loadDistro(addr);
+  if (stale(t)) return;
+  if (d.missing) { V.innerHTML = unreadable(addr); return; }
+  addRecent(d.addr);
+  // Decision 6: a one-row table at 100% is a forward to a successor, so that successor is named first.
+  const next = Model.supersededBy(d.table);
+  const heir = next ? await loadDistro(next) : null;
+  if (stale(t)) return;
+  V.innerHTML = eyebrow(`${esc(short(d.addr))} · ${cname(CFG.chainId)} · ${ext('address', d.addr, 'explorer')}`)
+    + `<h1>${esc(d.description)}</h1>`
+    + (next ? `<div class="status warn">superseded by ${heir.missing ? esc(short(next)) : `<a href="#/distros/${next}">${esc(heir.description)}</a>`} — this table forwards everything it receives.</div>` : '')
+    + distroBody(d)
+    + `<div class="sechead"><b>changes</b><span>every configuration change this contract has seen</span></div><div id="h-changes">${notice('loading…')}</div>`
+    + `<div class="sechead"><b>activity</b><span>funds in, and every split and escrow since</span></div><div id="h-funds">${notice('loading…')}</div>`;
+  // Progressive, and after the paint above: a slow or failed logs call never holds back the table.
+  const from = FIRST.get(d.addr) || CFG.factoryBlock;
+  history(addr, from).then(h => {
+    if (stale(t)) return;
+    document.getElementById('h-changes').innerHTML = h.changes.length ? histRows(h.changes) : notice('no change has been queued yet.');
+    document.getElementById('h-funds').innerHTML = h.funds.length ? histRows(h.funds) : notice('nothing has arrived at this address yet.');
+  }).catch(() => {
+    if (stale(t)) return;
+    for (const id of ['h-changes', 'h-funds']) document.getElementById(id).innerHTML = notice('history unavailable', 'err');
+  });
+}
+
+/* `mine` is the factory's `Created` logs with the connected account in the owner topic, each hit
+   confirmed against `snapshot().owner` — ownership can have moved since the log was written. */
+async function mine() {
+  const found = await logs(CFG.factory, [topic('Created(address,address)'), null, word(ACC)], CFG.factoryBlock);
+  const addrs = found.map(l => { const a = Eth.dec(['address'], l.topics[1])[0]; FIRST.set(a, l.blockNumber); return a; });
+  const rows = await Promise.all(addrs.map(async a => {
+    const d = await loadDistro(a);
+    return !d.missing && d.owner.toLowerCase() === ACC.toLowerCase() ? d : null;
+  }));
+  return rows.filter(Boolean);
+}
+
+async function list() {
+  const tabs = [['recent', 'recent'], ['mine', 'mine']];
+  if (!ACC) S.tab = 'recent';
+  V.innerHTML = eyebrow('distributions')
+    + `<div class="tabs">${tabs.map(([k, label]) => `<button class="tab${S.tab === k ? ' on' : ''}" data-tab="${k}"${!ACC && k !== 'recent' ? ' disabled title="connect a wallet"' : ''}>${label}</button>`).join('')}</div>`
+    + `<div id="rows">${notice('reading…')}</div>`;
+  V.querySelectorAll('[data-tab]').forEach(b => { b.onclick = () => { S.tab = b.dataset.tab; list(); }; });
+  const t = TOKEN, slot = document.getElementById('rows');
+  let items = [], failed = false;
+  try {
+    if (S.tab === 'mine') items = await mine();
+    else items = (await Promise.all(recents().map(loadDistro))).filter(d => !d.missing);
+  } catch (e) { failed = true; }
+  if (stale(t)) return;
+  if (failed) { slot.innerHTML = notice('could not read the list from this chain.', 'err'); return; }
+  if (!items.length) {
+    slot.innerHTML = notice(S.tab === 'mine'
+      ? `nothing on ${cname(CFG.chainId)} is owned by ${esc(short(ACC))}.`
+      : 'no distribution opened yet. Paste an address below, or create one.')
+      + (ACC ? '' : notice('<b>mine</b> needs a connected wallet.'))
+      + `<div class="load"><input id="load-in" placeholder="0x… or a name" aria-label="address or name"><button class="btn sec" id="load-go">view</button></div><div class="res" id="load-res"></div>`;
+    loadField();
+    return;
+  }
+  slot.innerHTML = items.map(d => `<a class="list-row" href="#/distros/${d.addr}"><span><b>${esc(d.description)}</b><span class="sub">${cname(CFG.chainId)} · ${esc(short(d.addr))}</span></span>`
+    + `${d.pending.length ? '<span class="dot" title="change queued"></span>' : '<span></span>'}${mini(d.table)}</a>`).join('');
 }
 
 function docs() {
@@ -143,15 +412,20 @@ function docs() {
 /* ---- routing · theme ------------------------------------------------------------------------ */
 function route() {
   const h = location.hash || '#/';
-  document.getElementById('nav-home').className = h === '#/' ? 'on' : '';
+  TOKEN++;
+  document.getElementById('nav-distros').className = h.startsWith('#/distros') ? 'on' : '';
   document.getElementById('nav-docs').className = h === '#/docs' ? 'on' : '';
   if (h === '#/docs') { docs(); scrollTo(0, 0); return; }
-  if (!P) { V.innerHTML = `<div class="notice">No wallet found. Open this page in a browser with a wallet.</div>`; return; }
-  if (wrongChain()) { V.innerHTML = `<div class="notice">Your wallet is on ${cname(CHAIN)}. This app lives on ${cname(CFG.chainId)}. <button id="sw">Switch network</button>.</div>`; document.getElementById('sw').onclick = switchChain; return; }
-  if (S.error) { V.innerHTML = `<div class="notice err">could not read the contract at ${CFG.factory}: ${S.error}</div>`; return; }
+  if (!P) { V.innerHTML = notice('No wallet found. Open this page in a browser with a wallet.'); return; }
+  if (wrongChain()) { V.innerHTML = notice(`Your wallet is on ${cname(CHAIN)}. This app lives on ${cname(CFG.chainId)}. <button id="sw">Switch network</button>.`); document.getElementById('sw').onclick = switchChain; return; }
+  if (S.error) { V.innerHTML = notice(`could not read the factory at ${CFG.factory}: ${esc(S.error)}`, 'err'); return; }
   if (!S.loaded) return;
-  home();
   scrollTo(0, 0);
+  if (h === '#/create') { V.innerHTML = notice('the create flow arrives in the next task'); return; }
+  const at = h.match(/^#\/distros\/(0x[0-9a-fA-F]{40})$/);
+  if (at) { detail(Eth.checksum(at[1])); return; }
+  if (h.startsWith('#/distros')) { list(); return; }
+  landing();
 }
 addEventListener('hashchange', route);
 const tb = document.getElementById('theme-btn'), tm = document.getElementById('theme-menu'), wm = document.getElementById('who-menu'), nm = document.getElementById('net-menu');

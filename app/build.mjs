@@ -20,15 +20,24 @@ const flag = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 ? argv[
 const dev = argv.includes('--dev');
 const chain = flag('chain', '31337');
 
+/* A contract's address, and the block it was created in as `<NAME>_BLOCK`: a log scan needs a
+   `fromBlock`, and genesis is not one on a chain with a history. */
 function deployed() {
   const out = {}, dir = join(root, 'broadcast');
   if (!existsSync(dir)) return out;
   for (const script of readdirSync(dir).sort()) {
     const file = join(dir, script, chain, 'run-latest.json');
     if (!existsSync(file)) continue;
-    for (const t of JSON.parse(readFileSync(file, 'utf8')).transactions) {
+    const log = JSON.parse(readFileSync(file, 'utf8'));
+    /* Matched by hash rather than by index: the receipt order is forge's, not this file's contract. */
+    const blocks = new Map((log.receipts || []).map(r => [r.transactionHash, r.blockNumber]));
+    for (const t of log.transactions) {
+      if (t.transactionType !== 'CREATE' || !t.contractName) continue;
+      const name = t.contractName.toUpperCase();
       /* Checksummed: the log is lowercase, and the same address two ways gzips to two sizes. */
-      if (t.transactionType === 'CREATE' && t.contractName) out[t.contractName.toUpperCase()] = Eth.checksum(t.contractAddress);
+      out[name] = Eth.checksum(t.contractAddress);
+      const block = blocks.get(t.hash);
+      if (block != null) out[`${name}_BLOCK`] = '0x' + BigInt(block).toString(16);
     }
   }
   return out;

@@ -58,13 +58,28 @@
 ## The dapp
 
 - `app/src/index.html` is the dapp: no dependencies, no network but the wallet's EIP-1193 provider.
-  The build inlines `eth.js` (keccak and the ABI subset), `theme.css` and `layout.html` into it.
+  The build inlines `eth.js` (keccak and the ABI subset), `model.js`, `theme.css` and `layout.html`
+  into it.
+- `app/src/model.js` is everything that needs no DOM and no provider: `pct`, `countdown`,
+  `decodePending`, `supersededBy`, `salt` and the `snapshot()` type string `SNAPSHOT_T`. It is tested
+  under node in `test/model.test.mjs` and inlined unchanged, so it reads an ambient `Eth` rather than
+  importing one — the build inlines `eth.js` first, and the test puts `Eth` on `globalThis`. A helper
+  that needs either the DOM or the chain belongs in `index.html`, not here.
+- Besides a contract's address, `app/build.mjs` substitutes `__<NAME>_BLOCK__` with the block that
+  contract was created in, read from the broadcast log's receipts. A log scan needs a `fromBlock`, and
+  genesis is not one on a chain with a history: `__DISTRIBUTIONFACTORY_BLOCK__` is where the dapp's
+  `Created` scan starts.
 - `theme.css` and `layout.html` are the whole look. The script styles nothing: it emits classes and
-  looks up ids, and state is a class (`warn`, `bad`, `err`, `on`), never an inline style.
+  looks up ids, and state is a class (`warn`, `bad`, `err`, `on`), never an inline style. The one
+  colour outside `theme.css` is the favicon's: it is a `data:` URI in `<head>`, with no page to
+  inherit `currentColor` from, so it carries the accent frozen as a hex. Move the accent's hue and
+  move that hex — `theme.css` names the coupling where the hue is set.
 - `app/build.mjs` inlines `/*@inline file@*/`, substitutes every `__NAME__` token, strips the
   `/*DEV*/` fences unless `--dev`, minifies, and writes `app/dist/` (gitignored). It refuses to emit a
   bundle with an unresolved token, comments included. A deployed contract's token is its name,
-  uppercased, between double underscores.
+  uppercased, between double underscores. The minifier drops `/* */` blocks and `//` lines, so a
+  comment in any of the four inlined files costs the bundle nothing — but it does not know
+  `<!-- -->`, which would ship. There is no HTML comment in `app/src` for that reason.
 - `make dapp` is the dev build `make serve` hosts on :3000; `?rpc=<url>&from=<address>` reads and
   sends without a wallet. `make dapp-nodev` is the bundle that ships.
 - Every `<script>` stays inline and attribute-free: `src`, `type="module"`, `defer` and `async` are
