@@ -150,14 +150,22 @@ test('revertMessage names every custom error the write screens can provoke', () 
   ]);
 });
 
+/* `applyQueued` reverts `NotReady(eta)` for two different things — `eta == 0` is an entry that is not
+   queued at all, which is what a stale page clicking a change someone else already applied gets. */
 test('NotReady carries its eta as the countdown, not as the raw error', () => {
   const now = 1760000000;
   // cast sig "NotReady(uint256)" · Distribution.sol:42 — the eta is its one argument.
-  const data = '0x5a997526' + Eth.pad(now + 3 * 86400 + 14 * 3600);
+  const got = [
+    revertMessage('0x5a997526' + Eth.pad(now + 3 * 86400 + 14 * 3600), now),
+    revertMessage('0x5a997526' + Eth.pad(now + 90), now),
+    revertMessage('0x5a997526' + Eth.pad(0), now),
+  ];
 
-  const got = [revertMessage(data, now), revertMessage('0x5a997526' + Eth.pad(now - 1), now)];
-
-  assert.deepEqual(got, ['the delay has not passed — 3d 14h', 'the delay has not passed — ready to apply']);
+  assert.deepEqual(got, [
+    'the delay has not passed — 3d 14h',
+    'the delay has not passed — 1m',
+    'that change is not queued here — it has already been applied or cancelled',
+  ]);
 });
 
 test('a bare 32-byte word is the token refusing, and reads as retry failed', () => {

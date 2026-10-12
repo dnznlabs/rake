@@ -78,10 +78,59 @@ p.prose{font:15px/1.65 var(--sans);color:var(--muted);max-width:720px;margin:0 0
 .verbs .t2,.herograph .t2{fill:color-mix(in oklab,var(--accent),var(--paper) 50%)}
 .verbs .q{color:var(--amber)}
 .verbs .chk{stroke:var(--paper)}
+/* Every control the page takes a value through is this one control: a hairline box on the paper, the
+   accent only on focus. The write screens use it in two shapes — a labelled field, and a row of the
+   table editor — and nothing else about them is new. */
+input,textarea{font:13px var(--mono);color:var(--ink);background:var(--paper);border:1px solid var(--rule);padding:10px 13px;width:100%}
+input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--ink)}
+input.narrow{max-width:160px}
 .load{display:flex;gap:10px}
-.load input{font:13px var(--mono);color:var(--ink);background:var(--paper);border:1px solid var(--rule);padding:10px 13px;width:100%}
-.load input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--ink)}
 .res{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}
+.field{margin:0 0 26px;max-width:720px}
+.field .lab{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+.field .opt{text-transform:none;letter-spacing:0;color:var(--dim)}
+.two{display:flex;gap:40px;flex-wrap:wrap}
+.help{font:12px/1.55 var(--sans);color:var(--dim);margin-top:6px;max-width:60ch}
+.help code{font:11.5px var(--mono);color:var(--muted)}
+.help .btn{margin:0 2px}
+/* A button that is a sentence's own word, not a control beside it. */
+.link{color:var(--muted);border-bottom:1px solid var(--dim)}
+.link:hover{color:var(--ink)}
+/* The table editor, in create step 2 and in the drawer: four fields and a remove, on the frame's
+   measure, so the live bar above lines up with the columns under it. */
+.erows{border-top:1px solid var(--ink)}
+.erow{display:grid;grid-template-columns:1fr 1.4fr 1.6fr 76px 24px;gap:10px;align-items:start;padding:10px 0;border-bottom:1px solid var(--rule)}
+.erow .bps{text-align:right;font-weight:700;font-size:15px}
+.erow .rm{color:var(--dim);font-size:15px;justify-self:end;padding:8px 0}
+.erow .rm:hover{color:var(--err)}
+.erow .res{min-height:14px;font-size:10.5px;margin-top:4px}
+.sum{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:12px 0 0;font-size:12.5px}
+.sum .ok{color:var(--accent)}
+.sum .bad{color:var(--err)}
+/* A write and the one sentence that qualifies it, on a line: every send, copy, cancel and apply. */
+.acts{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 0}
+.btn.sm,.btn.sec.sm,.btn.off.sm{padding:7px 14px;font-size:12px}
+.btn[disabled]{background:none;color:var(--dim);border:1px solid var(--rule);cursor:default}
+/* The drawer is a panel in the flow, not an overlay: the page behind it is the thing being changed,
+   and it stays readable while a change is written. */
+.drawer{border:1px solid var(--ink);padding:0 20px 20px;margin:8px 0 26px}
+.dhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:18px 0 4px}
+.dhead h2{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0}
+.drawer .prose{font:12.5px/1.6 var(--sans);color:var(--muted);margin:0 0 18px;max-width:60ch}
+.drawer .eyebrow{margin:26px 0 10px}
+.qrows{border-top:1px solid var(--rule)}
+.qrow{display:grid;grid-template-columns:76px 1fr auto;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--rule)}
+.qrow .lab{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.qrow .res{margin-top:4px;min-height:0}
+/* The funds rows are the ledger's grid with a control on the end, so a balance and a beneficiary read
+   as the same kind of line. */
+.frow{display:grid;grid-template-columns:1fr auto auto;gap:2px 20px;padding:12px 0;border-bottom:1px solid var(--rule);align-items:center}
+.frow b{font-size:13px}
+.frow .n{font-weight:700;font-size:20px}
+.frow .sub{font:11.5px var(--sans);color:var(--dim);margin-top:3px}
+.frow.err .n{color:var(--err)}
+/* The clipboard's fallback: calldata reachable by hand when the API is absent or refused. */
+.cd{font-size:11px;word-break:break-all;margin-top:8px}
 .sechead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-top:1px solid var(--ink);margin-top:26px;padding-top:16px}
 .sechead b{font-size:13px}.sechead span{font:11.5px var(--sans);color:var(--dim);text-align:right}
 .actions{margin-top:24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
@@ -128,7 +177,14 @@ footer{display:flex;justify-content:space-between;border-top:1px solid var(--rul
 /* Small widths. The nav's two links stay: a header whose only destinations vanish on a phone is a
    header with no navigation, so the row pays for them in gap and type size instead. The network pill
    drops its name and the diagram goes under the prose. */
-@media (max-width:720px){.frame{padding:0 16px}.navr{gap:10px;font-size:11px}.netname{display:none}#net{padding:6px 8px}.verbs{grid-template-columns:1fr}.hero{grid-template-columns:1fr;gap:16px}}
+/* The editor's row is the one grid that cannot narrow: four fields side by side need the width. It
+   becomes three rows instead — name and share together, because they are read together — rather than
+   four shrunken columns. */
+@media (max-width:720px){.frame{padding:0 16px}.navr{gap:10px;font-size:11px}.netname{display:none}#net{padding:6px 8px}.verbs{grid-template-columns:1fr}.hero{grid-template-columns:1fr;gap:16px}.two{gap:20px}
+.erow{grid-template-columns:1fr 72px 24px;row-gap:8px}
+.erow>:nth-child(1){grid-area:1/1}.erow>:nth-child(4){grid-area:1/2}.erow>:nth-child(5){grid-area:1/3}
+.erow>:nth-child(2){grid-area:2/1/auto/-1}.erow>:nth-child(3){grid-area:3/1/auto/-1}
+.qrow{grid-template-columns:70px 1fr;row-gap:8px}.qrow>:nth-child(3){grid-column:2}}
 /* Narrower still. The sub-label goes, not the links: the Brand Sheet draws the nav lockup both ways
    (mark + RAKE, and mark + RAKE + DNZN LABS), so the short one is the sanctioned reduction and the two
    destinations are not. 65 px of sub-label is what buys the row down to 320. */

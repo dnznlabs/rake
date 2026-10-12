@@ -60,7 +60,15 @@ const Model = (() => {
   const ERRORS = {
     '0x30cd7471': () => 'only the owner can do that',                                     // NotOwner()
     '0x40da0647': () => 'the table must total 100%, every share above zero, ascending by address', // BadTable()
-    '0x5a997526': (d, now) => `the delay has not passed — ${countdown(Eth.dec(['uint256'], d.slice(10))[0], now)}`, // NotReady(uint256)
+    /* NotReady(uint256) covers two conditions: `eta == 0` is "never queued, or already applied or
+       cancelled", and a non-zero eta in the future is the delay still running. A countdown is only an
+       answer to the second, so the zero is read as what it is. */
+    '0x5a997526': (d, now) => {
+      const eta = Eth.dec(['uint256'], d.slice(10))[0];
+      return eta === 0n
+        ? 'that change is not queued here — it has already been applied or cancelled'
+        : `the delay has not passed — ${countdown(eta, now)}`;
+    },
     '0x5c52a868': () => 'nothing to do — there is nothing waiting here',                   // NothingToDo()
     '0x0f2e5b6c': () => 'locked — another call on this contract is still running',         // Locked()
     '0x82b42900': () => 'this contract will not take that call',                           // Unauthorized()

@@ -89,6 +89,24 @@
   `devbox run -- tools/abi-vectors.sh` and commit what it writes; never hand-edit a `.hex` file or
   `selectors.txt`. The script is idempotent, so a second run leaves the tree clean, and CI never runs
   cast through node.
+- Every write goes through `tx(to, sig, args, {value, label})`: an `eth_call` preflight on exactly the
+  transaction about to be sent, then `eth_sendTransaction`, then `waitReceipt`, then the receipt's
+  `status`. A revert is therefore a sentence before anything is paid for, and `Model.revertMessage`
+  turns the bytes into it — the eight custom errors by selector, a bare 32-byte word as `retry failed`
+  (that is the `false` a token returned, bubbled with no selector in front of it), no bytes as
+  `reverted`. The bytes themselves sit at `error.data` for the dev `rpcProvider`, which throws the
+  JSON-RPC error object, and at `error.data.data` for a MetaMask-class wallet, so both are read.
+  `create` is the one write with no preflight: a second `create` on a used salt burns the whole gas
+  limit before `DeploymentFailed`, so the page reads `eth_getCode` on the predicted address and
+  refuses instead. Every countdown, and the gate on `apply`, measures against the chain's latest block
+  timestamp rather than the browser's clock: `applyQueued` compares `block.timestamp`, and on a dev
+  chain that has been moved forward the two are days apart.
+- `make fixtures` adds the two distributions the write screens need and `make deploy` does not: an
+  *escrow demo* at salt 2, holding half of 1 ETH and half of 100 of a token that reports failure, both
+  escrowed against a receiver that refuses ETH until told not to; and a *vault demo* at salt 3, owned
+  by a `MockVault` that answers `isOwner` for anvil account 3. It is a hand-run step after
+  `make deploy` and never part of it, and it is idempotent: both salts are read with `eth_getCode`
+  first, so a second run broadcasts nothing.
 - The build minifier strips leading whitespace on every line, template literals included.
 - gzip output depends on the node build's zlib. Build through devbox when the bytes matter.
 - Node tests are `test/*.test.mjs`.
