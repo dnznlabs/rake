@@ -16,6 +16,8 @@ const Model = (() => {
     ['transferOwnership(address)', 'transferOwnership', 'owner'],
   ];
   const DAY = 86400, HOUR = 3600, MINUTE = 60;
+  const UNITS = { d: DAY, h: HOUR, m: MINUTE, s: 1 };
+  const WEI = 10n ** 18n;
 
   /** Basis points as a percentage with no trailing zeros: 6000 → `60%`, 3333 → `33.33%`. */
   function pct(bps) {
@@ -52,6 +54,62 @@ const Model = (() => {
     return '0x' + String(sender).replace(/^0x/, '').toLowerCase() + BigInt(n).toString(16).padStart(24, '0');
   }
 
-  return { SNAPSHOT_T, pct, countdown, decodePending, supersededBy, salt };
+  /* Every custom error a write from this page can provoke, by the selector `cast sig` gives it. The
+     value is what the page says instead of the four bytes; `NotReady` is the only one carrying data,
+     and its eta reads as the same countdown the pending block already prints. */
+  const ERRORS = {
+    '0x30cd7471': () => 'only the owner can do that',                                     // NotOwner()
+    '0x40da0647': () => 'the table must total 100%, every share above zero, ascending by address', // BadTable()
+    '0x5a997526': (d, now) => `the delay has not passed — ${countdown(Eth.dec(['uint256'], d.slice(10))[0], now)}`, // NotReady(uint256)
+    '0x5c52a868': () => 'nothing to do — there is nothing waiting here',                   // NothingToDo()
+    '0x0f2e5b6c': () => 'locked — another call on this contract is still running',         // Locked()
+    '0x82b42900': () => 'this contract will not take that call',                           // Unauthorized()
+    '0x30116425': () => 'a distribution already exists at that address',                   // DeploymentFailed()
+    '0x0c4549ef': () => 'that salt belongs to another wallet',                             // SaltDoesNotStartWith()
+  };
+
+  /** Revert bytes as the one line the page shows. `now` is seconds, for `NotReady`'s countdown. */
+  function revertMessage(data, now) {
+    const d = String(data == null ? '' : data);
+    if (!d || d === '0x') return 'reverted';
+    // #20: `release` bubbles the token's own `false` word — 32 bytes, no selector in front of them.
+    if (d.length === 66) return 'retry failed';
+    const known = ERRORS[d.slice(0, 10).toLowerCase()];
+    return known ? known(d, now) : `reverted (${d.slice(0, 10)})`;
+  }
+
+  /** The editor's rows as the tuple array `Eth.enc` takes: percent to bps, and ascending by account
+     because `BadTable` rejects every other order. The rows themselves are never reordered — the hint
+     under the submit says which order is sent. */
+  function tableFrom(rows) {
+    return rows.map(r => [r.addr, Math.round((parseFloat(r.pct) || 0) * 100), r.name, r.note || ''])
+      .sort((a, b) => (BigInt(a[0]) < BigInt(b[0]) ? -1 : BigInt(a[0]) > BigInt(b[0]) ? 1 : 0));
+  }
+
+  /** A delay as the field takes it — `7d`, `48h`, `30m`, or bare seconds — or null. Zero is legal. */
+  function parseDelay(text) {
+    const m = /^(\d+)\s*(d|h|m|s)?$/i.exec(String(text == null ? '' : text).trim());
+    return m ? Number(m[1]) * UNITS[(m[2] || 's').toLowerCase()] : null;
+  }
+
+  /** A decimal amount of ETH as wei. An empty field is `0n`: the deposit is optional. Null is "not a
+     number", which the field reports rather than sending. */
+  function wei(text) {
+    const s = String(text == null ? '' : text).trim();
+    if (!s) return 0n;
+    if (!/^\d+(\.\d+)?$/.test(s)) return null;
+    const [whole, frac = ''] = s.split('.');
+    if (frac.length > 18) return null;
+    return BigInt(whole) * WEI + BigInt((frac + '0'.repeat(18)).slice(0, 18));
+  }
+
+  /** EIP-137 namehash, over eth.js's own keccak. */
+  function namehash(name) {
+    let node = '0'.repeat(64);
+    if (name) for (const label of String(name).split('.').reverse()) node = Eth.keccak(Eth.hexBytes(node + Eth.keccak(Eth.utf8(label))));
+    return '0x' + node;
+  }
+
+  return { SNAPSHOT_T, pct, countdown, decodePending, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash };
 })();
 export default Model;
