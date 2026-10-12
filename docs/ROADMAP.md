@@ -59,6 +59,10 @@ Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which
    as M02 UI items in DNZN's own dapp and nowhere else: a quiet "tip the authors" line on the
    post-create screen, any amount, separate transaction, nothing pre-filled; and the footer linking to
    the DNZN distribution's own public page. Nothing in the widget — it renders on other people's pages.
+   **Addendum 2026-10-11 ([#38](https://github.com/dnznlabs/rake/issues/38)):** both UI items move
+   from M02 to M05, where the DNZN distribution has an address. Reached by default when m02-t03's
+   issue opened with no ruling; options were defer (chosen), a build token with no value on any M02
+   chain, or loosening criterion 9's grep. M02 criterion 9 stays as written.
 2. **No `url` or `about` fields.** Owners carry URLs inside `description`. Rejected: two more string
    fields, which widen the audit surface for copy.
 3. **Name.** `Rake` is the project and the repo; `Distribution` and `DistributionFactory` are the
@@ -85,6 +89,10 @@ Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which
    failing soft), with writes as copy-calldata in v1. `applyQueued` and `distribute` stay direct.
 8. **Footer.** `work no. 001`, as `state-collection` does (`work no. 003`), not the "a public work by
    dnzn labs" line the scaffold's `layout.html` and the design prototype carry. M02 fixes the slot.
+   **Amended 2026-10-11 in the #40 review:** the right side is the version span alone — the `docs`
+   link `state-collection` carries there is redundant with the header nav and is dropped. The slot
+   decision 1 reserves for the DNZN distribution's own page stays reserved; that address exists after
+   M03. Supersedes "footer exactly as state-collection's" in the m02-t02 plan, step 2.
 9. **Two ABI names differ from the design vocabulary.** The function that runs a queued action is
    `applyQueued(bytes,uint32)`, and the table getter is `beneficiaries()`; the `Snapshot.table` field
    keeps its name. Ruled by Denizen merging PR #6 on 2026-10-11, after `m01-t01` found the planned names
@@ -155,6 +163,15 @@ recommended option.
     a task row; anything is fair game with the bill priced per item; closed by a dated signoff
     (M02 criterion 10). Rejected: closing on an empty task table — the same proposal `state-collection`
     overruled on 2026-09-17.
+15. **The landing carries the prototype's fee-path diagram.** Ruled by Denizen in the #40 review on
+    2026-10-11 ("it added visual clarity"), answering [#44](https://github.com/dnznlabs/rake/issues/44)
+    before its default would have left it out; landed in t02 rather than t04, so the recommendation's
+    timing is superseded and its substance kept. Not the prototype's SVG verbatim: the three beneficiary
+    swatches take the bar's tints through classes so one hue drives them, the hex addresses under the
+    boxes are dropped, and the distribution box gains the amber `changes wait the delay` line, so the
+    picture states all three of the contract's promises. Shown under 720 px as a single column, not
+    hidden as the prototype did. Cost measured in the t02 handoff: +916 gzipped bytes, dapp at
+    14,254 gzipped, one chunk, 9,746 bytes of head-room before a second — re-measured in t04.
 
 ## Findings carried forward
 
