@@ -59,6 +59,11 @@ Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which
    as M02 UI items in DNZN's own dapp and nowhere else: a quiet "tip the authors" line on the
    post-create screen, any amount, separate transaction, nothing pre-filled; and the footer linking to
    the DNZN distribution's own public page. Nothing in the widget — it renders on other people's pages.
+   **Addendum 2026-10-12 ([#38](https://github.com/dnznlabs/rake/issues/38), closed on its default):**
+   both lines ship in **M05**, not M02 — no DNZN distribution exists on anvil, and as worded the tip
+   line fails M02 criterion 9's grep. Rejected: a `__DNZN_DISTRIBUTION__` build token with no value on
+   any M02 chain, and loosening the grep to `tip:`, which stops catching the prototype's selector.
+   M05's plan picks both up.
 2. **No `url` or `about` fields.** Owners carry URLs inside `description`. Rejected: two more string
    fields, which widen the audit surface for copy.
 3. **Name.** `Rake` is the project and the repo; `Distribution` and `DistributionFactory` are the
