@@ -1,5 +1,8 @@
 /* DNZN Base v1. --accent is the project's one colour: change the hue (230 is baize, the card-table
-   felt), nothing else. */
+   felt), nothing else. One copy of it lives outside this file: the favicon in `index.html`'s <head> is
+   a data URI, so it has no page to inherit from and carries the accent frozen at #317E9F — oklch(.56
+   .09 230), the same hue and chroma at the lightness between the two themes', which is what reads on
+   light and dark browser chrome alike (4.55:1 on white, 4.62:1 on black). Move the hue, move that hex. */
 :root{--paper:#FCFCFA;--ink:#161616;--muted:#6F6F6B;--dim:#A3A39E;--rule:#DCDCD7;--accent:oklch(.47 .09 230);--amber:#B8741A;--err:#B23A2E;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 html.dark{--paper:#111311;--ink:#ECECE6;--muted:#8A8A85;--dim:#5C5E5A;--rule:#2E302E;--accent:oklch(.58 .09 230);--amber:#CE9640;--err:#D06456}
 *{box-sizing:border-box}
