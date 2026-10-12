@@ -63,6 +63,9 @@ and record the difference in the handoff. Criterion 4 fails entirely on that bas
    branch in `test/model.test.mjs`, including the bare `false` word
    `0x0000000000000000000000000000000000000000000000000000000000000000`. Check: the test enumerates the
    selectors with `cast sig` in a comment beside each, matching `test/fixtures/abi/selectors.txt`.
+   *Correction 2026-10-11 (t03 handoff § Deviations):* `selectors.txt` carries function selectors
+   only — 17 lines, no errors — so the eight error selectors are verified against their declarations
+   in `src/Distribution.sol` (lines 40–45 and 299–300), not against that file.
 3. **The table editor, once.** One component for create step 2 and the propose drawer, from the
    prototype's `data-dr` rows (`docs/brainstorming/design/rake-dapp.html:408–425, 462–476`): name,
    note, address (or a name — step 8), percentage; remove per row; add row; the live bar from t02's
@@ -114,6 +117,12 @@ and record the difference in the handoff. Criterion 4 fails entirely on that bas
    verified on anvil 2026-10-11; the plain decimal form is accepted). Check: after time travel, apply
    lands with `status 0x1` and `snapshot()` shows the seed's 70/30 table; before it, the preflight
    returns `NotReady(eta)` and the message carries the countdown, not the raw error.
+   *Two corrections 2026-10-11 (t03 handoff § Three reconciliations and § Deviations):* (1) "70/30"
+   is the seed's non-anvil branch — `Seed.s.sol:56` sets `ops = block.chainid == 31337 ? 6000 : 7000`
+   and the revision is `10_000 - ops`, so on 31337 the applied table is **40/60**; (2) the pre-eta
+   preflight is unreachable, by this step's own earlier sentence: before the eta the apply button is
+   disabled with no handler, so nothing is preflighted and the `NotReady(eta)` countdown branch is
+   unit-tested only. The `NotReady` the page does reach is eta `0`, the stale-page race.
 7. **Distribute, release, and the payer line.** Under the balance line for everyone: `distribute` for
    ETH, labelled "anyone can call distribute() — the contract splits by the table above; you pay the
    gas" (decision 11), disabled when `balance − reserved[token]` is zero. Tokens shown are ETH plus
