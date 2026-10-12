@@ -79,7 +79,6 @@ async function disconnect() {
   ACC = null; who(); route();
 }
 const call = async (to, sig, args, types) => Eth.dec(types, await P.request({ method: 'eth_call', params: [{ to, data: Eth.enc(sig, args) }, 'latest'] }));
-const send = (to, sig, args, value) => P.request({ method: 'eth_sendTransaction', params: [{ from: ACC, to, data: Eth.enc(sig, args), ...(value ? { value: '0x' + value.toString(16) } : {}) }] });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // A deadline, not a failure: a timed-out transaction may still land. POLL_ERR tells a dead RPC from a slow block.
 const POLL_MS = 120000;
@@ -93,6 +92,53 @@ async function waitReceipt(hash, ms) {
   }
   return null;
 }
+/* ---- one write ------------------------------------------------------------------------------ */
+/* Every write this page sends goes through here, so they all behave alike: preflight with `eth_call`
+   on exactly the transaction about to be sent — a revert is then a sentence, not a failed transaction
+   the user paid for — then send, then wait for the receipt and read its status. `label` is what the
+   status line calls the write; the line itself is `#txs`, which every view that writes puts in place. */
+const txSay = (label, text, cls) => { const el = document.getElementById('txs'); if (el) el.innerHTML = `<div class="status${cls ? ' ' + cls : ''}">${label} · ${text}</div>`; };
+async function tx(to, sig, args, opts) {
+  const o = opts || {}, label = o.label || sig.slice(0, sig.indexOf('('));
+  const params = { from: ACC, to, data: Eth.enc(sig, args), ...(o.value ? { value: '0x' + BigInt(o.value).toString(16) } : {}) };
+  txSay(label, 'checking the call against the chain…');
+  try { await P.request({ method: 'eth_call', params: [params, 'latest'] }); }
+  catch (e) { const text = txError(e); txSay(label, text, 'bad'); return { ok: false, stage: 'preflight', text }; }
+  let hash;
+  try { hash = await P.request({ method: 'eth_sendTransaction', params: [params] }); }
+  catch (e) { const text = txError(e); txSay(label, text, 'bad'); return { ok: false, stage: 'send', text }; }
+  txSay(label, `sent · waiting for the block · ${ext('tx', hash, short(hash))}`);
+  // A deadline, not a failure: a timed-out transaction may still land, so nothing here says it did not.
+  const rc = await waitReceipt(hash, POLL_MS);
+  if (!rc) {
+    const text = `no receipt after ${POLL_MS / 1000}s — it may still land${POLL_ERR ? ` · last poll errored: ${esc(POLL_ERR.message || String(POLL_ERR))}` : ''}`;
+    txSay(label, `${text} · ${ext('tx', hash, short(hash))}`, 'warn');
+    return { ok: false, stage: 'pending', hash, text };
+  }
+  if (rc.status !== '0x1') { txSay(label, `reverted · ${ext('tx', hash, short(hash))}`, 'bad'); return { ok: false, stage: 'reverted', hash, text: 'reverted' }; }
+  txSay(label, `landed in block ${parseInt(rc.blockNumber, 16)} · ${ext('tx', hash, short(hash))}`);
+  return { ok: true, hash, receipt: rc };
+}
+/* Where the revert bytes sit depends on the provider, and the page has to read both shapes. The dev
+   `rpcProvider` throws the JSON-RPC `error` object itself, so they are at `error.data` — measured on
+   anvil 2026-10-11, where `eth_call` answers a non-owner `cancel` with
+   `{"code":3,"message":"execution reverted: custom error 0x30cd7471","data":"0x30cd7471"}`. A
+   MetaMask-class wallet wraps the same object one deeper. 4001 is the user, not the chain. */
+function txError(e) {
+  if (e && e.code === 4001) return 'rejected in wallet';
+  const d = typeof (e && e.data) === 'string' ? e.data : e && e.data && e.data.data;
+  return esc(Model.revertMessage(d, secs()));
+}
+/* `navigator.clipboard` is missing on an insecure origin and can be refused on a secure one, so the
+   calldata is never only in the clipboard: the fallback is a textarea, selected, for a manual copy. */
+async function copyCalldata(data, slot) {
+  try { await navigator.clipboard.writeText(data); slot.innerHTML = `<div class="status">copied · ${data.length / 2 - 1} bytes</div>`; return; }
+  catch (e) {}
+  slot.innerHTML = `<textarea class="cd" readonly rows="3" aria-label="calldata">${esc(data)}</textarea><div class="status">clipboard refused — select all and copy</div>`;
+  const ta = slot.querySelector('textarea');
+  ta.focus(); ta.select();
+}
+
 // An event topic is the whole keccak of the signature, not the four-byte selector a call carries.
 const topic = sig => '0x' + Eth.keccak(Eth.utf8(sig));
 const word = a => '0x' + Eth.pad(a);
@@ -106,15 +152,124 @@ const cname = id => CHAINS[id] || 'chain ' + id;
 const wrongChain = () => !!CHAIN && String(CHAIN) !== String(CFG.chainId);
 // Four decimals, truncated: this is a balance to read, not an amount to settle against.
 const amt = w => { const s = (BigInt(w) / 100000000000000n).toString().padStart(5, '0'); return s.slice(0, -4) + '.' + s.slice(-4); };
-const secs = () => Math.floor(Date.now() / 1000);
+/* The clock a timelock is compared against is the chain's, not the browser's: `applyQueued` tests
+   `block.timestamp`. On a real chain the two agree to within a block; on a dev chain that has been
+   moved forward they do not, and a countdown read from the wrong one keeps `apply` disabled on an
+   entry the chain would accept — or offers it on one it would refuse. So the page anchors to the
+   latest block's timestamp and ticks forward from there, and falls back to the browser only before
+   the first block has been read. */
+let CLOCK = null;
+const secs = () => CLOCK ? CLOCK.t + Math.floor((Date.now() - CLOCK.at) / 1000) : Math.floor(Date.now() / 1000);
+async function readClock() {
+  const b = await P.request({ method: 'eth_getBlockByNumber', params: ['latest', false] });
+  CLOCK = { t: parseInt(b.timestamp, 16), at: Date.now() };
+}
 const isAddr = v => /^0x[0-9a-fA-F]{40}$/.test(v);
 // Every address and tx hash the page prints goes through here: a link where the chain has an
-// explorer, plain text with the full value in the title elsewhere.
-const ext = (kind, v, text) => EXPLORER[CFG.chainId] ? `<a href="${EXPLORER[CFG.chainId]}/${kind}/${v}" target="_blank" rel="noopener" title="${v}">${text}</a>` : `<span title="${v}">${text}</span>`;
+// explorer, plain text with the full value in the title elsewhere. An address also carries its own
+// value in `data-addr`, which is what lets `nameSweep` replace the ones that have a name in place.
+const ext = (kind, v, text) => {
+  const known = kind === 'address' ? NAMED.get(String(v).toLowerCase()) : null;
+  const body = known ? esc(known) : text, mark = kind === 'address' ? ` data-addr="${v}"` : '';
+  return EXPLORER[CFG.chainId]
+    ? `<a href="${EXPLORER[CFG.chainId]}/${kind}/${v}" target="_blank" rel="noopener" title="${v}"${mark}>${body}</a>`
+    : `<span title="${v}"${mark}>${body}</span>`;
+};
 // localStorage throws in a sandboxed frame, so every access is guarded and a failure means no history.
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 const recents = () => { try { const r = JSON.parse(store.get('rake.recent') || '[]'); return Array.isArray(r) ? r.filter(isAddr) : []; } catch (e) { return []; } };
 const addRecent = a => store.set('rake.recent', JSON.stringify([a, ...recents().filter(x => x !== a)].slice(0, 8)));
+
+/* ---- names ---------------------------------------------------------------------------------- */
+/* Ported from state-collection `app/src/index.html:224-279`, which took it from its own
+   `tools/names-probe.mjs` — the reference implementation and the oracle, not re-derived here. GNS and
+   WNS answer the same selectors with the same semantics and differ only by address, so they are one
+   path; ENS is the other.
+
+   This array's order IS the priority order, and it is decision 13: ENS → WNS → GNS, winner alone, no
+   ambiguity marker. Reordering it changes which name a colliding address shows, so it is a product
+   decision and not a style edit. Nothing here is exercised on a dev chain: anvil has no registries,
+   and M04 is where this meets one (decision 13). */
+const NAMES = [
+  { id: 'ens', at: '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e' },
+  { id: 'wns', at: '0x0000000000696760E15f265e828DB644A0c242EB' },
+  { id: 'gns', at: '0x9D51D507BC7264d4fE8Ad1cf7Fe191933A0a81d6' },
+];
+const NAMED = new Map();                 // lowercased address → name or null; a reconnect costs nothing
+const same = (a, b) => a && b && String(a).toLowerCase() === String(b).toLowerCase();
+/* A reverse record is a claim by whoever set it until the forward record agrees, so every name this
+   page shows is forward-confirmed. Printing someone else's name is the only failure worse than
+   printing a short address. Both paths return null rather than an unconfirmed name. */
+async function ensName(acc) {
+  const at = NAMES[0].at, node = Model.namehash(acc.slice(2).toLowerCase() + '.addr.reverse');
+  const [res] = await call(at, 'resolver(bytes32)', [node], ['address']);
+  if (res === ZERO) return null;
+  const [name] = await call(res, 'name(bytes32)', [node], ['string']);
+  if (!name) return null;
+  const f = Model.namehash(name);
+  const [fres] = await call(at, 'resolver(bytes32)', [f], ['address']);
+  if (fres === ZERO) return null;        // offchain / CCIP-read names land here by design
+  const [owner] = await call(fres, 'addr(bytes32)', [f], ['address']);
+  return same(owner, acc) ? name : null;
+}
+async function regName(reg, acc) {
+  const [name] = await call(reg.at, 'reverseResolve(address)', [acc], ['string']);
+  if (!name) return null;                // an absent record and an address with no code both decode to ''
+  // computeId(string) is the one call that cannot go through Eth.enc: Eth.pad does BigInt(v) on every
+  // argument and throws on a string. Hand-built, as the probe builds it.
+  const u = Eth.utf8(name), body = [...u].map(x => x.toString(16).padStart(2, '0')).join('');
+  const data = '0x' + Eth.sel('computeId(string)') + Eth.pad(32) + Eth.pad(u.length) + body.padEnd(Math.ceil(u.length / 32) * 64, '0');
+  const [id] = Eth.dec(['uint256'], await P.request({ method: 'eth_call', params: [{ to: reg.at, data }, 'latest'] }));
+  const [owner] = await call(reg.at, 'resolve(uint256)', [id], ['address']);
+  return same(owner, acc) ? name : null;
+}
+/* `call` goes through `P`, so this reads whichever chain the WALLET is on — CHAIN, not CFG.chainId.
+   Only mainnet and Sepolia can answer, and anvil must spend no round trips. A registry absent from a
+   chain returns 0x, which the string decode already reads as "no record", so no per-chain table. */
+async function resolveName(acc) {
+  if (CHAIN !== 1 && CHAIN !== 11155111) return null;
+  for (const reg of NAMES) {
+    try { const n = reg.id === 'ens' ? await ensName(acc) : await regName(reg, acc); if (n) return n; } catch (e) {}
+  }
+  return null;
+}
+/* Reverse display, in place. Every address the page printed went through `ext`, which marked it, so
+   one pass after the paint replaces the ones that have a name without re-rendering anything and
+   without any view having to know that names exist. On anvil `resolveName` returns before it asks. */
+async function nameSweep() {
+  const marked = [...document.querySelectorAll('[data-addr]')];
+  const fresh = [...new Set(marked.map(n => n.dataset.addr.toLowerCase()))].filter(a => !NAMED.has(a));
+  await Promise.all(fresh.map(async a => { NAMED.set(a, null); NAMED.set(a, await resolveName(a)); }));
+  for (const n of marked) { const name = NAMED.get(n.dataset.addr.toLowerCase()); if (name) n.textContent = name; }
+}
+/* Forward (name → address), for every field that takes one: the ENS registry's own resolver, then its
+   `addr`, under the same gate. Elsewhere it answers null and the field says where names work. */
+async function resolveAddr(name) {
+  if (CHAIN !== 1 && CHAIN !== 11155111) return null;
+  try {
+    const node = Model.namehash(String(name).trim().toLowerCase());
+    const [res] = await call(NAMES[0].at, 'resolver(bytes32)', [node], ['address']);
+    if (res === ZERO) return null;
+    const [a] = await call(res, 'addr(bytes32)', [node], ['address']);
+    return a === ZERO ? null : a;
+  } catch (e) { return null; }
+}
+/* One address field, wherever one appears: a raw address stands, a name is looked up where a registry
+   can answer, and anywhere else the field says so rather than silently failing. Returns the address or
+   null, and writes the field's own one-line state into `res`. */
+async function addrField(value, res) {
+  const v = String(value || '').trim();
+  if (isAddr(v)) { if (res) res.textContent = ''; return Eth.checksum(v); }
+  if (!v) { if (res) res.textContent = ''; return null; }
+  if (CHAIN !== 1 && CHAIN !== 11155111) { if (res) res.textContent = 'names resolve on mainnet and Sepolia'; return null; }
+  if (res) res.textContent = 'resolving…';
+  const a = await resolveAddr(v);
+  if (res) res.textContent = a ? '→ ' + short(a) : 'no such name';
+  return a;
+}
+/* Every progressive fill goes through here, so a line that arrives after the first paint gets its
+   reverse names too without each caller remembering to ask. */
+function fill(id, html) { const el = document.getElementById(id); if (el) { el.innerHTML = html; nameSweep(); } }
 
 /* ---- header --------------------------------------------------------------------------------- */
 function who() {
@@ -138,6 +293,7 @@ async function load() {
   CHAIN = parseInt(await P.request({ method: 'eth_chainId' }), 16);
   // The same address on another network is another contract, or none: do not read it.
   if (wrongChain()) return;
+  await readClock();
   // Read once at boot: the featured distribution is a salt in the build, never an address.
   const [a] = await call(CFG.factory, 'predict(bytes32)', [CFG.featuredSalt], ['address']);
   S.featured = a; S.loaded = true;
@@ -177,20 +333,27 @@ const newest = (a, b) => b.block - a.block || b.index - a.index;
 function entry(log) {
   const kind = KINDS.get(log.topics[0]), block = parseInt(log.blockNumber, 16), index = parseInt(log.logIndex, 16);
   const at = t => Eth.dec(['address'], log.topics[t])[0];
-  let what = '';
+  const e = { kind, block, index, what: '' };
   if (kind === 'queued') {
     const [nonce, eta, action] = Eth.dec(['uint32', 'uint256', 'bytes'], log.data);
-    what = `${describe(Model.decodePending(action))} · nonce ${nonce} · ${Model.countdown(eta, secs())}`;
+    // The `uint32 nonce` `applyQueued` takes: `snapshot()`'s struct does not carry it, this log does.
+    e.hash = log.topics[1]; e.nonce = Number(nonce);
+    e.what = `${describe(Model.decodePending(action))} · nonce ${nonce} · ${Model.countdown(eta, secs())}`;
   } else if (kind === 'applied' || kind === 'cancelled') {
-    what = short(log.topics[1]);
+    e.hash = log.topics[1];
+    e.what = short(log.topics[1]);
   } else if (kind === 'in') {
-    what = `${amt(log.data)} ETH from ${esc(short(at(1)))}`;
+    e.what = `${amt(log.data)} ETH from ${esc(short(at(1)))}`;
   } else if (kind === 'distributed') {
-    what = `${amt(log.data)} ${token(at(1))} by the table`;
+    e.token = at(1);
+    e.what = `${amt(log.data)} ${token(e.token)} by the table`;
   } else {
-    what = `${amt(log.data)} ${token(at(1))} · ${esc(short(at(2)))}`;
+    // `Escrowed` and `Released` both index the token then the account, which is the token list and the
+    // escrow list the funds block reads: nothing on chain carries either one.
+    e.token = at(1); e.account = at(2);
+    e.what = `${amt(log.data)} ${token(e.token)} · ${esc(short(e.account))}`;
   }
-  return { kind, block, index, what };
+  return e;
 }
 const token = a => a === ZERO ? 'ETH' : short(a);
 /* A decoded pending action as one line, named by the setter it calls. `setBeneficiaries` is also
@@ -240,13 +403,141 @@ const meta = d => `<div class="meta"><div><div class="k">owner</div><div class="
   + `<div><div class="k">waiting to distribute</div><div class="v">${amt(d.waiting)} ETH</div></div></div>`;
 
 /* The pending block: a queued table as a second bar in the pending style, the other three setters as
-   one line each, an action this build does not know as its selector. */
-function pendingBlock(d) {
-  return d.pending.map(p => {
+   one line each, an action this build does not know as its selector. With `acts`, each row also
+   carries what can be done to it — which is the detail page only; the landing is a reading. */
+function pendingBlock(d, acts) {
+  return d.pending.map((p, i) => {
     const decoded = Model.decodePending(p[2]);
     const head = eyebrow(`change queued · ${Model.countdown(p[1], secs())}`, 'amber') + `<div class="status warn">${describe(decoded)}</div>`;
-    return decoded.kind === 'setBeneficiaries' ? head + bar(decoded.table, { pending: true }) + ticks(decoded.table, { pending: true }) : head;
+    const body = decoded.kind === 'setBeneficiaries' ? bar(decoded.table, { pending: true }) + ticks(decoded.table, { pending: true }) : '';
+    return head + body + (acts ? pendingActs(d, p, i) : '');
   }).join('');
+}
+/* `cancel(bytes32)` takes the hash straight from the struct, and is the owner's and immediate — the
+   delay guards applying, not cancelling. `applyQueued(bytes,uint32)` also needs the nonce, which the
+   struct does not carry and that entry's `Queued` log does. Until the log has arrived the apply button
+   says which reading it is waiting on and stays disabled: a guessed nonce is a different hash, and
+   would revert `NotReady(0)`. */
+function pendingActs(d, p, i) {
+  const nonce = DS.nonces ? DS.nonces.get(p[0]) : undefined;
+  const apply = nonce === undefined
+    ? `<button class="btn off sm" disabled>apply</button><span class="status${DS.failed ? ' bad' : ''}">`
+      + `${DS.failed ? 'history unavailable — apply needs the queue log' : 'reading the queue log — apply needs the nonce it carries'}</span>`
+    : Model.countdown(p[1], secs()) === 'ready to apply'
+      ? sctl(`apply:${i}`, 'apply', { to: d.addr, sig: 'applyQueued(bytes,uint32)', args: () => [p[2], nonce], label: 'applyQueued' })
+        + '<span class="status">the delay has passed — anyone can land it</span>'
+      : '<button class="btn off sm" disabled>apply</button><span class="status">anyone can apply once the delay passes</span>';
+  const cancel = VIEW === 'visitor' ? ''
+    : wctl(`cancel:${i}`, 'cancel', { to: d.addr, sig: 'cancel(bytes32)', args: () => [p[0]], label: 'cancel' })
+      + '<span class="status">cancel is owner-only and immediate</span>';
+  return `<div class="acts">${cancel}${apply}</div>`;
+}
+
+/* ---- the table editor ------------------------------------------------------------------------ */
+/* One component, twice: create's step 2 and the propose drawer are the same rows, the same live bar,
+   the same sum line and the same one-line reason the submit is disabled. The rows live on whichever
+   draft the caller owns, so an editor never holds state of its own. */
+const EMPTY_ROW = () => ({ name: '', note: '', addr: '', pct: '' });
+const SET_BENEFICIARIES = 'setBeneficiaries((address,uint96,string,string)[])';
+const rowsFrom = table => table.map(b => ({ name: b[2], note: b[3], addr: b[0], pct: String(Number(b[1]) / 100) }));
+/* The live bar draws the rows in the order they are on screen, with no address: `bar` and `ticks` read
+   the share and the name only, and a half-typed address must not stop the preview from painting. */
+const barRows = rows => rows.filter(r => (parseFloat(r.pct) || 0) > 0).map(r => [ZERO, Math.round((parseFloat(r.pct) || 0) * 100), r.name, r.note]);
+const pctTotal = rows => rows.reduce((s, r) => s + (parseFloat(r.pct) || 0), 0);
+/* Valid means the contract will take it. The first two refusals are the prototype's; the third is
+   here because `propose` does not validate the action it queues — a table with a duplicate account or
+   a zero share queues happily and then reverts `BadTable` on apply, where it stays stuck for the
+   whole delay with only a cancel to clear it. The sort is stated rather than performed on screen:
+   silently reordering a table someone is typing is worse than saying which order it goes in. */
+function editorState(rows) {
+  const total = pctTotal(rows), off = Math.round((100 - total) * 100) / 100;
+  if (Math.abs(off) >= 0.005) return { ok: false, total, why: `total must equal 100% — ${Math.abs(off)}% ${off > 0 ? 'unassigned' : 'over'}` };
+  if (!rows.every(r => r.name.trim() && isAddr(r.addr))) return { ok: false, total, why: 'every row needs a name and address' };
+  const seen = new Set(rows.map(r => r.addr.toLowerCase()));
+  if (seen.size !== rows.length) return { ok: false, total, why: 'two rows cannot share an address — the contract refuses that table' };
+  if (rows.some(r => Math.round((parseFloat(r.pct) || 0) * 100) === 0)) return { ok: false, total, why: 'every row needs a share above zero — the contract refuses that table' };
+  return { ok: true, total, why: 'sent ascending by address — the only order the contract accepts' };
+}
+function editorHTML(rows) {
+  return `<div id="ed-bar"></div><div class="erows">`
+    + rows.map((r, i) => `<div class="erow">`
+      + `<input aria-label="name" data-ed="name" data-i="${i}" value="${esc(r.name)}" placeholder="name">`
+      + `<input aria-label="note" class="note-in" data-ed="note" data-i="${i}" value="${esc(r.note)}" placeholder="note (prose)">`
+      + `<div><input aria-label="address or name" data-ed="addr" data-i="${i}" value="${esc(r.addr)}" placeholder="0x… or a name"><div class="res" data-edres="${i}"></div></div>`
+      + `<input aria-label="percent" class="bps" data-ed="pct" data-i="${i}" value="${esc(r.pct)}" inputmode="decimal">`
+      + `<button class="rm" data-edrm="${i}" title="remove" aria-label="remove this row">×</button></div>`).join('')
+    + `</div><div class="sum"><button class="link" data-edadd="1">+ add a beneficiary</button><span id="ed-sum"></span></div>`;
+}
+/* Typing repaints the bar and the sum, never the rows: an input the caret is in must not be replaced.
+   Adding or removing a row changes the row count, so that goes back through the caller's `redraw`. */
+function editorPaint(rows) {
+  const st = editorState(rows), preview = barRows(rows);
+  const el = document.getElementById('ed-bar');
+  if (el) el.innerHTML = bar(preview, {}) + ticks(preview, {});
+  const sum = document.getElementById('ed-sum');
+  if (sum) { sum.className = st.ok ? 'ok' : 'bad'; sum.innerHTML = `${rows.length} beneficiar${rows.length === 1 ? 'y' : 'ies'} · total <b>${+st.total.toFixed(2)}%</b>`; }
+  return st;
+}
+function editorBind(rows, redraw, after) {
+  V.querySelectorAll('[data-ed]').forEach(inp => {
+    inp.oninput = () => { rows[+inp.dataset.i][inp.dataset.ed] = inp.value; after(editorPaint(rows)); };
+    // The name lookup waits for the field to be left: one request per address, not one per keystroke.
+    if (inp.dataset.ed === 'addr') inp.onchange = async () => {
+      const a = await addrField(inp.value, V.querySelector(`[data-edres="${inp.dataset.i}"]`));
+      if (a) { rows[+inp.dataset.i].addr = a; inp.value = a; }
+      after(editorPaint(rows));
+    };
+  });
+  V.querySelectorAll('[data-edrm]').forEach(b => { b.onclick = () => { if (rows.length > 1) { rows.splice(+b.dataset.edrm, 1); redraw(); } }; });
+  const add = V.querySelector('[data-edadd]');
+  if (add) add.onclick = () => { rows.push(EMPTY_ROW()); redraw(); };
+  after(editorPaint(rows));
+}
+
+/* ---- the writes, and who may send them ------------------------------------------------------- */
+/* Every write a view offers is registered here under the key its button carries, with its arguments
+   as a thunk so an input is read when the button is pressed and not when it was drawn. Two kinds:
+   `wctl` is owner-gated, and in the vault view decision 7 turns it into calldata to copy rather than
+   a transaction this page could not sign; `sctl` is permissionless — `distribute`, `release` and
+   `applyQueued` are anyone's, whoever the owner is — and always sends. */
+const WRITES = new Map();
+let VIEW = 'visitor';
+function wctl(key, label, w) {
+  WRITES.set(key, w);
+  return VIEW === 'vault'
+    ? `<button class="btn sec sm" data-copy="${key}">copy calldata for your vault</button>`
+    : `<button class="btn sm" data-send="${key}">${label}</button>`;
+}
+function sctl(key, label, w, off) {
+  WRITES.set(key, w);
+  return off ? `<button class="btn off sm" disabled>${label}</button>` : `<button class="btn sm" data-send="${key}">${label}</button>`;
+}
+/* One handler for all of them. After a write lands the view is read again from the chain rather than
+   patched from the receipt: the page's claim about the contract should come from the contract. */
+function bindWrites(reload) {
+  const all = () => V.querySelectorAll('[data-send],[data-copy]');
+  V.querySelectorAll('[data-send]').forEach(b => {
+    b.onclick = async () => {
+      const w = WRITES.get(b.dataset.send);
+      if (!w || (w.confirm && !confirm(w.confirm))) return;
+      let args;
+      try { args = w.args(); } catch (e) { txSay(w.label, esc(e.message || String(e)), 'bad'); return; }
+      if (!args) return;
+      all().forEach(x => { x.disabled = true; });
+      const r = await tx(w.to, w.sig, args, { value: w.value && w.value(), label: w.label });
+      if (r.ok) reload(); else all().forEach(x => { x.disabled = false; });
+    };
+  });
+  V.querySelectorAll('[data-copy]').forEach(b => {
+    b.onclick = () => {
+      const w = WRITES.get(b.dataset.copy);
+      if (!w) return;
+      let args;
+      try { args = w.args(); } catch (e) { txSay(w.label, esc(e.message || String(e)), 'bad'); return; }
+      if (!args) return;
+      copyCalldata(Eth.enc(w.sig, args), document.getElementById('txs'));
+    };
+  });
 }
 
 /* ---- views ---------------------------------------------------------------------------------- */
@@ -281,8 +572,8 @@ async function landing() {
   const d = await loadDistro(S.featured);
   if (stale(t)) return;
   if (d.missing) { slot.innerHTML = unreadable(S.featured); return; }
-  slot.innerHTML = `<div class="sechead"><b>live example · ${esc(d.description)}</b><span>${cname(CFG.chainId)} · ${esc(short(d.addr))} · <a href="#/distros/${d.addr}">view →</a></span></div>`
-    + distroBody(d);
+  fill('featured', `<div class="sechead"><b>live example · ${esc(d.description)}</b><span>${cname(CFG.chainId)} · ${esc(short(d.addr))} · <a href="#/distros/${d.addr}">view →</a></span></div>`
+    + distroBody(d));
 }
 const verb = (n, icon, name, what, callers) => `<div><i>${n}</i>${icon}<b>${name}</b><span>${what}</span><span class="who">${callers}</span></div>`;
 const ICON = {
@@ -315,46 +606,326 @@ const FEEPATH = '<svg viewBox="0 0 400 356" fill="currentColor" aria-hidden="tru
   + '<rect x="141" y="302" width="118" height="32" fill="none" stroke="currentColor" stroke-width="1.25"/><rect class="t1" x="153" y="313" width="9" height="9"/><text x="168" y="322" font-size="11">treasury</text>'
   + '<rect x="268" y="302" width="118" height="32" fill="none" stroke="currentColor" stroke-width="1.25"/><rect class="t2" x="280" y="313" width="9" height="9"/><text x="295" y="322" font-size="11">bounties</text>'
   + '<text class="d" x="200" y="352" text-anchor="middle" font-size="10">split defined by the published table</text></svg>';
-/* The field takes an address today. A name needs a registry, which arrives with the write screens. */
+/* The field takes an address, or a name wherever a registry can answer one; `addrField` writes which
+   of those it did under the input. */
 function loadField() {
   const input = document.getElementById('load-in'), res = document.getElementById('load-res'), go = document.getElementById('load-go');
   if (!input) return;
-  const submit = () => {
-    const v = input.value.trim();
-    if (isAddr(v)) { res.textContent = ''; location.hash = '#/distros/' + v; return; }
-    res.textContent = v ? 'name resolution arrives with t03' : '';
+  const submit = async () => {
+    const a = await addrField(input.value, res);
+    if (a) { res.textContent = ''; location.hash = '#/distros/' + a; }
   };
   go.onclick = submit;
   input.onkeydown = e => { if (e.key === 'Enter') submit(); };
 }
 
+/* ---- one distribution ------------------------------------------------------------------------ */
+/* What one load of `#/distros/<addr>` knows. `nonces` arrives with the logs rather than the snapshot,
+   which is why the apply buttons are drawn twice: once disabled, once able. */
+let DS = { d: null, next: null, heir: null, nonces: null, failed: false };
+let PROPOSE = null, DRAWER = false;
+const bindAll = () => bindWrites(() => detail(DS.d.addr));
+
+/* Decision 7: who this page is for is decided once per load. The owner's own account sends directly;
+   a contract owner that answers `isOwner(ACC)` gets the same view with every owner write rendered as
+   calldata to copy; anything else is a visitor. The probe is a raw `eth_call` rather than `call()`,
+   because an EOA owner has no code and answers `0x` — which has to read as "not a vault", and so does
+   a revert from a contract that has no such function. */
+async function ownerView(d) {
+  if (!ACC || d.owner === ZERO) return 'visitor';
+  if (same(ACC, d.owner)) return 'owner';
+  try {
+    const r = await P.request({ method: 'eth_call', params: [{ to: d.owner, data: Eth.enc('isOwner(address)', [ACC]) }, 'latest'] });
+    return r && r !== '0x' && BigInt(r) === 1n ? 'vault' : 'visitor';
+  } catch (e) { return 'visitor'; }
+}
+
 async function detail(addr) {
-  V.innerHTML = notice(`reading ${esc(short(addr))}…`);
   const t = TOKEN;
-  const d = await loadDistro(addr);
+  if (!DS.d || DS.d.addr !== addr) { V.innerHTML = notice(`reading ${esc(short(addr))}…`); PROPOSE = null; DRAWER = false; }
+  // The clock is read again here, not only at boot: every countdown on this page is measured against
+  // it, and a write that lands moves the chain's.
+  const [d] = await Promise.all([loadDistro(addr), readClock()]);
   if (stale(t)) return;
   if (d.missing) { V.innerHTML = unreadable(addr); return; }
   addRecent(d.addr);
   // Decision 6: a one-row table at 100% is a forward to a successor, so that successor is named first.
   const next = Model.supersededBy(d.table);
-  const heir = next ? await loadDistro(next) : null;
+  const [heir, view] = await Promise.all([next ? loadDistro(next) : null, ownerView(d)]);
   if (stale(t)) return;
+  DS = { d, next, heir, nonces: null, failed: false };
+  VIEW = view;
+  WRITES.clear();
+  paintDetail();
+  // Progressive, and after the paint above: a slow or failed logs call never holds back the table. The
+  // apply nonces, the token list and the escrow rows all come out of it, so all three say so until it
+  // lands rather than reading as absence.
+  const from = FIRST.get(d.addr) || CFG.factoryBlock;
+  history(addr, from).then(async h => {
+    if (stale(t)) return;
+    DS.nonces = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.nonce]));
+    fill('h-changes', h.changes.length ? histRows(h.changes) : notice('no change has been queued yet.'));
+    fill('h-funds', h.funds.length ? histRows(h.funds) : notice('nothing has arrived at this address yet.'));
+    fill('pending', pendingBlock(d, true));
+    const f = await readFunds(d, h.funds);
+    if (stale(t)) return;
+    fill('funds', fundsHTML(d, f));
+    bindAll();
+  }).catch(() => {
+    if (stale(t)) return;
+    DS.failed = true;
+    for (const id of ['h-changes', 'h-funds']) fill(id, notice('history unavailable', 'err'));
+    fill('pending', pendingBlock(d, true));
+    fill('funds', notice('history unavailable — the token list and the escrow rows are read from the logs.', 'err'));
+    bindAll();
+  });
+}
+
+function paintDetail() {
+  const d = DS.d, next = DS.next, heir = DS.heir;
   V.innerHTML = eyebrow(`${esc(short(d.addr))} · ${cname(CFG.chainId)} · ${ext('address', d.addr, 'explorer')}`)
     + `<h1>${esc(d.description)}</h1>`
     + (next ? `<div class="status warn">superseded by ${heir.missing ? esc(short(next)) : `<a href="#/distros/${next}">${esc(heir.description)}</a>`} — this table forwards everything it receives.</div>` : '')
-    + distroBody(d)
+    + bar(d.table, { small: true }) + ticks(d.table, {}) + ledger(d.table)
+    + `<div id="pending">${pendingBlock(d, true)}</div>`
+    + meta(d)
+    + '<div id="txs"></div>'
+    + ownerBar(d)
+    + (DRAWER ? drawerHTML(d) : '')
+    + `<div class="sechead"><b>funds</b><span>moves by the table, permissionlessly — no approval involved</span></div><div id="funds">${notice('reading the balances and the escrow…')}</div>`
     + `<div class="sechead"><b>changes</b><span>every configuration change this contract has seen</span></div><div id="h-changes">${notice('loading…')}</div>`
     + `<div class="sechead"><b>activity</b><span>funds in, and every split and escrow since</span></div><div id="h-funds">${notice('loading…')}</div>`;
-  // Progressive, and after the paint above: a slow or failed logs call never holds back the table.
-  const from = FIRST.get(d.addr) || CFG.factoryBlock;
-  history(addr, from).then(h => {
-    if (stale(t)) return;
-    document.getElementById('h-changes').innerHTML = h.changes.length ? histRows(h.changes) : notice('no change has been queued yet.');
-    document.getElementById('h-funds').innerHTML = h.funds.length ? histRows(h.funds) : notice('nothing has arrived at this address yet.');
-  }).catch(() => {
-    if (stale(t)) return;
-    for (const id of ['h-changes', 'h-funds']) document.getElementById(id).innerHTML = notice('history unavailable', 'err');
+  const q = document.getElementById('queue');
+  if (q) q.onclick = () => { DRAWER = !DRAWER; if (DRAWER && !PROPOSE) PROPOSE = { rows: rowsFrom(d.table) }; paintDetail(); };
+  if (DRAWER) bindDrawer(d);
+  bindAll();
+  nameSweep();
+}
+
+/* The owner's one control, in both owner views. The drawer is the same either way: in the vault view
+   the writes inside it are calldata rather than transactions, and that is the whole difference. */
+function ownerBar(d) {
+  if (VIEW === 'visitor') return '';
+  return '<div class="actions">'
+    + `<button class="btn" id="queue">${DRAWER ? 'Close' : 'Queue a change'}</button>`
+    + `<span class="status">${VIEW === 'vault'
+      ? `you are a signer on ${ext('address', d.owner, esc(short(d.owner)))}, which owns this distribution — every change below is calldata to submit through it`
+      : 'you own this distribution'}</span></div>`;
+}
+
+/* The prototype's "Queue a change" (`rake-dapp.html:408-425`), less the four rows it carried that this
+   product does not: the owner-kind segmented control, the governance link and the free-text blurb,
+   dropped by decisions 1, 2 and 7, and the author's-cut row, which is #38 and deferred to M05.
+   Five writes, each its own transaction, every one of them `propose(bytes)` around one setter. An
+   argument thunk that throws is how a field reports itself unusable: the message lands on the status
+   line and nothing is sent. */
+function drawerHTML(d) {
+  const D = PROPOSE;
+  const prop = (key, label, name, sig, args) => wctl(key, label, {
+    to: d.addr, sig: 'propose(bytes)', label: 'propose ' + name, args: () => [Eth.enc(sig, args())],
   });
+  const qrow = (k, input, ctl) => `<div class="qrow"><span class="lab">${k}</span><div>${input}</div><div>${ctl}</div></div>`;
+  const val = id => document.getElementById(id).value;
+  return '<div class="drawer">'
+    + '<div class="dhead"><h2>Queue a change</h2><button class="link" id="dclose">close</button></div>'
+    + `<p class="prose">Queued changes wait in public for ${delayText(d.delay)}. The owner can cancel any time before one lands; anyone can apply after.</p>`
+    + eyebrow('the table — live preview')
+    + editorHTML(D.rows)
+    + `<div class="acts">${prop('table', 'Queue (1 transaction)', 'setBeneficiaries', SET_BENEFICIARIES, () => {
+      const st = editorState(D.rows);
+      if (!st.ok) throw new Error(st.why);
+      return [Model.tableFrom(D.rows)];
+    })}<span class="status" id="ed-why"></span></div>`
+    + eyebrow('also queueable — each its own transaction')
+    + '<div class="qrows">'
+    + qrow('name', `<input id="q-desc" aria-label="name" value="${esc(d.description)}">`,
+      prop('desc', 'queue', 'setDescription', 'setDescription(string)', () => [val('q-desc')]))
+    + qrow('delay', `<input id="q-delay" aria-label="delay" value="${Number(d.delay) ? esc(delayText(d.delay)) : '0'}"><div class="res">7d, 48h or 0</div>`,
+      prop('delay', 'queue', 'setDelay', 'setDelay(uint32)', () => {
+        const s = Model.parseDelay(val('q-delay'));
+        if (s === null) throw new Error('delay takes 7d, 48h, 30m or a number of seconds');
+        return [s];
+      }))
+    + qrow('owner', `<input id="q-owner" aria-label="owner" value="${esc(d.owner)}"><div class="res" id="q-ownerres"></div>`,
+      prop('owner', 'queue', 'transferOwnership', 'transferOwnership(address)', () => {
+        const v = val('q-owner').trim();
+        if (!isAddr(v)) throw new Error('owner takes an address — a name resolves on mainnet and Sepolia');
+        return [Eth.checksum(v)];
+      }))
+    + '</div>'
+    + `<div class="help">or ${wctl('renounce', 'renounce', {
+      to: d.addr, sig: 'propose(bytes)', label: 'propose renounce',
+      confirm: 'Transfer ownership to nobody. The table can never change again. Queue it?',
+      args: () => [Eth.enc('transferOwnership(address)', [ZERO])],
+    })} — transfer to nobody; the table can never change again.</div>`
+    + '</div>';
+}
+function bindDrawer(d) {
+  const close = document.getElementById('dclose');
+  if (close) close.onclick = () => { DRAWER = false; paintDetail(); };
+  const own = document.getElementById('q-owner');
+  if (own) own.onchange = async () => { const a = await addrField(own.value, document.getElementById('q-ownerres')); if (a) own.value = a; };
+  editorBind(PROPOSE.rows, () => paintDetail(), st => {
+    const why = document.getElementById('ed-why');
+    if (why) { why.className = 'status' + (st.ok ? '' : ' bad'); why.textContent = st.why; }
+    const btn = V.querySelector('[data-send="table"],[data-copy="table"]');
+    if (btn) btn.disabled = !st.ok;
+  });
+}
+
+/* Funds, for everyone. `distribute` is permissionless (decision 11, #26) and so is `release`, so both
+   sit under the balance in every view, including a visitor's. The token list is the chain's own: ETH,
+   plus every token that has appeared in a `Distributed` or an `Escrowed` log — which is the answer to
+   t02's deferred question about where a token list comes from, since nothing on chain carries one. */
+async function readFunds(d, funds) {
+  const tokens = [ZERO, ...new Set(funds.filter(e => e.token && e.token !== ZERO).map(e => e.token))];
+  const rows = await Promise.all(tokens.map(async tk => {
+    const [reserved] = await call(d.addr, 'reserved(address)', [tk], ['uint256']);
+    const held = tk === ZERO
+      ? BigInt(await P.request({ method: 'eth_getBalance', params: [d.addr, 'latest'] }))
+      : (await call(tk, 'balanceOf(address)', [d.addr], ['uint256']))[0];
+    const waiting = held - reserved;
+    return { tk, reserved, waiting: waiting > 0n ? waiting : 0n };
+  }));
+  /* Every `(token, account)` an `Escrowed` log ever named, read back from the mapping: a released row
+     reads zero and is dropped, so this is the escrow as it stands rather than as it happened. */
+  const pairs = [...new Set(funds.filter(e => e.kind === 'escrowed').map(e => e.token + ' ' + e.account))];
+  const escrows = await Promise.all(pairs.map(async k => {
+    const [tk, ac] = k.split(' ');
+    const [held] = await call(d.addr, 'escrowed(address,address)', [tk, ac], ['uint256']);
+    return { tk, ac, held };
+  }));
+  return { rows, escrows: escrows.filter(e => e.held > 0n) };
+}
+const frow = (k, sub, n, ctl, cls) => `<div class="frow${cls ? ' ' + cls : ''}"><div><b>${k}</b>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="n">${n}</div><div class="c">${ctl}</div></div>`;
+function fundsHTML(d, f) {
+  const rows = f.rows.map(r => frow(
+    r.tk === ZERO ? 'ETH' : ext('address', r.tk, esc(short(r.tk))),
+    r.reserved > 0n ? `waiting to distribute · ${amt(r.reserved)} held in escrow` : 'waiting to distribute',
+    amt(r.waiting),
+    sctl(`dist:${r.tk}`, 'distribute', { to: d.addr, sig: 'distribute(address)', args: () => [r.tk], label: `distribute ${token(r.tk)}` }, r.waiting === 0n),
+  )).join('');
+  const escrows = f.escrows.map(e => frow(
+    `escrowed · ${esc(token(e.tk))}`,
+    `${ext('address', e.ac, esc(short(e.ac)))} — the push failed, so this share waits here`,
+    amt(e.held),
+    sctl(`rel:${e.tk}:${e.ac}`, 'release', { to: d.addr, sig: 'release(address,address)', args: () => [e.tk, e.ac], label: 'release' }),
+    'err',
+  )).join('');
+  return `<div class="ledger">${rows}${escrows}</div>`
+    + '<div class="help">anyone can call distribute() — the contract splits by the table above; you pay the gas.</div>'
+    // #18, in the dapp's guidance for payers, as the ruling says M02 should state it.
+    + '<div class="help">Paying in from a contract with <code>.transfer()</code> or <code>.send()</code> can fail when the implementation is cold: the 2,300-gas stipend does not cover a clone\'s delegatecall to a cold implementation. Pay in with <code>call</code> and gas.</div>';
+}
+
+/* ---- create ---------------------------------------------------------------------------------- */
+/* DESIGN_HANDOFF § 3.4's two steps, and none of the four controls the prototype's own create carried
+   beside them — the owner-kind segmented control, the governance link, the free-text blurb and the
+   author's-cut selector. Decisions 1, 2 and 7 dropped the first three; the fourth is #38's, deferred
+   to M05. The draft survives a step change and a repaint; a landed create clears it. */
+let DRAFT = null;
+const newDraft = () => ({ step: 1, desc: '', owner: ACC || '', delay: '7d', deposit: '', n: '1', rows: [EMPTY_ROW(), EMPTY_ROW()], predicted: null, taken: false, salt: null });
+const field = (lab, input, help) => `<div class="field"><div class="lab">${lab}</div>${input}<div class="help">${help}</div></div>`;
+
+function createView() {
+  if (!ACC) { V.innerHTML = notice('Connect a wallet to create a distribution: a salt carries the sender in its top 20 bytes (decision 10), so the address cannot be predicted without one.'); return; }
+  if (!DRAFT) DRAFT = newDraft();
+  if (!DRAFT.owner) DRAFT.owner = ACC;
+  WRITES.clear();
+  VIEW = 'owner';
+  if (DRAFT.step === 1) createOne(); else createTwo();
+}
+
+function createOne() {
+  const D = DRAFT;
+  V.innerHTML = eyebrow('create a distribution · 1 of 2')
+    + '<h1>Who controls it, and how slowly.</h1>'
+    + field('name', `<input id="c-desc" aria-label="name" value="${esc(D.desc)}" placeholder="e.g. dnzn labs distribution">`,
+      "The distribution's display name, stored on chain as its description — shown everywhere it appears.")
+    + field('owner', `<input id="c-owner" aria-label="owner" value="${esc(D.owner)}" placeholder="0x… or a name"><div class="res" id="c-ownerres"></div>`,
+      'Defaults to the connected wallet. A vault address here owns the distribution from its first block, and the salt stays yours (decision 10).')
+    + field('delay', `<input id="c-delay" class="narrow" aria-label="delay" value="${esc(D.delay)}">`,
+      'How long every future change waits in public. Accepts 7d, 48h, 0. Zero means changes apply instantly, and is flagged everywhere it shows.')
+    + '<div class="actions"><button class="btn" id="c-next">Next</button><span class="status" id="c-why"></span></div>';
+  const desc = document.getElementById('c-desc'), own = document.getElementById('c-owner'), del = document.getElementById('c-delay');
+  const why = document.getElementById('c-why'), next = document.getElementById('c-next');
+  const check = () => {
+    D.desc = desc.value; D.owner = own.value.trim(); D.delay = del.value;
+    const secs_ = Model.parseDelay(D.delay);
+    const bad = !D.desc.trim() ? 'the distribution needs a name'
+      : !isAddr(D.owner) ? 'owner takes an address — a name resolves on mainnet and Sepolia'
+        : secs_ === null ? 'delay takes 7d, 48h, 30m or a number of seconds' : null;
+    next.disabled = !!bad;
+    why.className = 'status' + (bad ? ' bad' : secs_ === 0 ? ' warn' : '');
+    why.textContent = bad || (secs_ === 0 ? 'no delay: every change applies the moment it is proposed' : '');
+    return !bad;
+  };
+  [desc, own, del].forEach(i => { i.oninput = check; });
+  own.onchange = async () => { const a = await addrField(own.value, document.getElementById('c-ownerres')); if (a) own.value = a; check(); };
+  next.onclick = () => { if (check()) { D.step = 2; createTwo(); } };
+  check();
+}
+
+function createTwo() {
+  const D = DRAFT;
+  V.innerHTML = '<div class="eyebrow"><button class="link" id="c-back">← back</button> · create a distribution · 2 of 2</div>'
+    + '<h1>Who gets what.</h1>'
+    + editorHTML(D.rows)
+    + '<div class="two">'
+    + field('deposit <span class="opt">· optional</span>', `<input id="c-dep" class="narrow" aria-label="deposit" value="${esc(D.deposit)}" placeholder="0" inputmode="decimal">`,
+      'ETH sent with the create. `create` is payable and the value rides the CREATE2 into the clone, so a deposit arrives without a Received log.')
+    + field('salt #', `<input id="c-n" class="narrow" type="number" min="1" step="1" aria-label="salt number" value="${esc(D.n)}">`,
+      'The index in your salt. Its top 20 bytes are your own address (decision 10), so this is the only part you choose — and it alone fixes the address, on every chain.')
+    + '</div>'
+    + `<div id="c-predict">${notice('reading the address this would deploy to…')}</div>`
+    + '<div class="actions"><button class="btn" id="c-deploy" disabled>Deploy</button><span class="status" id="c-why"></span></div>'
+    + '<div id="txs"></div>';
+  document.getElementById('c-back').onclick = () => { D.step = 1; createOne(); };
+  const dep = document.getElementById('c-dep'), n = document.getElementById('c-n');
+  dep.oninput = () => { D.deposit = dep.value; paintCreate(); };
+  n.oninput = () => { D.n = n.value; createPredict(); };
+  document.getElementById('c-deploy').onclick = async () => {
+    const btn = document.getElementById('c-deploy');
+    btn.disabled = true;
+    const r = await tx(CFG.factory, 'create(address,uint32,string,(address,uint96,string,string)[],bytes32)',
+      [D.owner, Model.parseDelay(D.delay), D.desc, Model.tableFrom(D.rows), D.salt],
+      { value: Model.wei(D.deposit), label: 'create' });
+    if (r.ok) { const to = D.predicted; DRAFT = null; location.hash = '#/distros/' + to; return; }
+    paintCreate();
+  };
+  editorBind(D.rows, createTwo, paintCreate);
+  createPredict();
+}
+
+/* The address, read before the button is live. #22: a second `create` on a used salt burns the whole
+   gas limit before `DeploymentFailed`, so this page refuses on `eth_getCode` and sends nothing at
+   all — that one is not a revert to preflight, it is a transaction not worth making. */
+async function createPredict() {
+  const D = DRAFT, t = TOKEN, slot = document.getElementById('c-predict');
+  D.predicted = null; D.taken = false; D.salt = null;
+  const n = Number(D.n);
+  if (!Number.isInteger(n) || n < 1) { slot.innerHTML = notice('salt # is a whole number, 1 or more.', 'err'); paintCreate(); return; }
+  paintCreate();
+  const salt = Model.salt(ACC, n);
+  const [addr] = await call(CFG.factory, 'predict(bytes32)', [salt], ['address']);
+  const code = await P.request({ method: 'eth_getCode', params: [addr, 'latest'] });
+  if (stale(t) || Number(D.n) !== n) return;
+  D.salt = salt; D.predicted = addr; D.taken = !!code && code !== '0x';
+  slot.innerHTML = `<div class="status">will deploy to ${ext('address', addr, esc(addr))} — same address on every chain for this wallet</div>`;
+  nameSweep();
+  paintCreate();
+}
+function paintCreate(st) {
+  const D = DRAFT, s = st || editorState(D.rows), deposit = Model.wei(D.deposit);
+  const btn = document.getElementById('c-deploy'), why = document.getElementById('c-why');
+  if (!btn || !why) return;
+  const bad = !s.ok ? s.why
+    : deposit === null ? 'deposit takes an amount of ETH, or nothing'
+      : !D.predicted ? 'reading the address this would deploy to…'
+        : D.taken ? `a distribution already exists at this address for salt #${D.n}` : null;
+  btn.disabled = !!bad;
+  why.className = 'status' + (bad ? ' bad' : '');
+  why.textContent = bad || s.why;
 }
 
 /* `mine` is the factory's `Created` logs with the connected account in the owner topic, each hit
@@ -393,8 +964,8 @@ async function list() {
     loadField();
     return;
   }
-  slot.innerHTML = items.map(d => `<a class="list-row" href="#/distros/${d.addr}"><span><b>${esc(d.description)}</b><span class="sub">${cname(CFG.chainId)} · ${esc(short(d.addr))}</span></span>`
-    + `${d.pending.length ? '<span class="dot" title="change queued"></span>' : '<span></span>'}${mini(d.table)}</a>`).join('');
+  fill('rows', items.map(d => `<a class="list-row" href="#/distros/${d.addr}"><span><b>${esc(d.description)}</b><span class="sub">${cname(CFG.chainId)} · ${esc(short(d.addr))}</span></span>`
+    + `${d.pending.length ? '<span class="dot" title="change queued"></span>' : '<span></span>'}${mini(d.table)}</a>`).join(''));
 }
 
 function docs() {
@@ -421,7 +992,7 @@ function route() {
   if (S.error) { V.innerHTML = notice(`could not read the factory at ${CFG.factory}: ${esc(S.error)}`, 'err'); return; }
   if (!S.loaded) return;
   scrollTo(0, 0);
-  if (h === '#/create') { V.innerHTML = notice('the create flow arrives in the next task'); return; }
+  if (h === '#/create') { createView(); return; }
   const at = h.match(/^#\/distros\/(0x[0-9a-fA-F]{40})$/);
   if (at) { detail(Eth.checksum(at[1])); return; }
   if (h.startsWith('#/distros')) { list(); return; }
