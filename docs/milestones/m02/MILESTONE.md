@@ -1,6 +1,6 @@
 # M02 — Dapp and widget on anvil
 
-Status: in progress — t01, t02 done, t03 assigned, Phase 5 added · updated 2026-10-11
+Status: in progress — t01, t02, t03 done, t04 planned, Phase 5 added · updated 2026-10-11
 
 The design prototype (`brainstorming/design/rake-dapp.html`, `rake-widget.html`) rebuilt as the real
 dapp on DNZN Base v1: reading `snapshot()` from the chain, sending the six writes through the wallet,
@@ -30,8 +30,12 @@ rather than quote.
    `setBeneficiaries((address,uint96,string,string)[])`, `propose(bytes)`, `applyQueued(bytes,uint32)`,
    and the decode of a `snapshot()` return carrying two beneficiaries and one pending action, are
    byte-equal to cast's. Today: no such test, no such directory.
-2. **Seeded chain.** `make serve` (or `process-compose -f procs/10-chain.yml up -t=false` without a
-   TTY) leaves a *featured* distribution at `cast call <factory> "predict(bytes32)(address)" $FEATURED_SALT`,
+2. **Seeded chain.** `make serve` (or, without a TTY,
+   `ANVIL_PORT=8545 APP_PORT=3000 process-compose -f procs/10-chain.yml up -t=false` — corrected
+   2026-10-11 for [#34](https://github.com/dnznlabs/rake/issues/34): the two ports are exported by
+   `mk/10-forge.mk` and `mk/20-dapp.mk`, so only `make` supplies them, and the bare command fails on
+   `--port`; the corrected form verified on `:8599`/`:3099` the same day) leaves a *featured*
+   distribution at `cast call <factory> "predict(bytes32)(address)" $FEATURED_SALT`,
    whose `snapshot()` shows a two-row table, a non-zero delay and exactly one pending action, with
    `cast balance` of it above zero. `FEATURED_SALT` is one build token, never an address: the dapp
    computes the address through `predict`.
@@ -69,7 +73,13 @@ rather than quote.
    pending states. `wc -c app/dist/widget.js` is at most 10,240 bytes (design budget), recorded.
 8. **End to end from the chain.** After `make deploy`, `make chain-doc` prints a sha256 equal to
    `sha256sum app/dist/index.html` from `make dapp-nodev`; `chunkCount()` and `html()` bytes are
-   recorded in the handoff. Measured 2026-10-11 as the starting point: prototype 75,876 bytes raw,
+   recorded in the handoff. *Corrected 2026-10-11:* for a gzipped document `html()` returns the
+   bootstrap wrapper, so the hash `make chain-doc` prints today is the wrapper's (31,393 bytes,
+   `5fd594d4…` on one chunk), not the page's (`c4de9156…`); the equality holds for the wrapper's
+   base64 payload inflated — measured byte-equal the same day. The criterion is met when the
+   **inflated** document's sha256 equals `sha256sum app/dist/index.html`, and `make dapp-nodev` is run
+   *after* `make deploy`, which rebuilds the dev bundle last. `m02-t04` teaches `tools/chain-doc.mjs`
+   to print that hash. Measured 2026-10-11 as the starting point: prototype 75,876 bytes raw,
    74,252 stripped, 20,680 gzipped; the state-collection dapp ships at 56,773 raw / 19,672 gzipped in
    one chunk. The real dapp is expected to need two chunks at most — an estimate, re-measured here.
 9. **Clean.** `forge build --force` prints no `Warning (` or `warning[`; `forge lint` and `make fmt`
@@ -147,13 +157,13 @@ Every screen that reads: landing, list, detail, pending decode, histories, drift
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m02-t02](tasks/m02-t02/TASK.md) | The prototype's shell on the scaffold's provider code, rulings 1, 2, 7, 8 and 9 applied; `#/`, `#/distros`, `#/distros/<addr>`; pending actions decoded; `Queued`/`Applied`/`Cancelled` and `Received`/`Distributed`/`Escrowed`/`Released` histories loaded after the snapshot; criteria 3 and 5 | done — [#40](https://github.com/dnznlabs/rake/pull/40) merged 2026-10-11 at `5caf1f3`, approved at `3e846f5` and re-approved at `d456312` after Denizen's six review items; carried [#41](https://github.com/dnznlabs/rake/issues/41), [#42](https://github.com/dnznlabs/rake/issues/42), [#43](https://github.com/dnznlabs/rake/issues/43) |
+| [m02-t02](tasks/m02-t02/TASK.md) | The prototype's shell on the scaffold's provider code, rulings 1, 2, 7, 8 and 9 applied; `#/`, `#/distros`, `#/distros/<addr>`; pending actions decoded; `Queued`/`Applied`/`Cancelled` and `Received`/`Distributed`/`Escrowed`/`Released` histories loaded after the snapshot; criteria 3 and 5 | done — [#40](https://github.com/dnznlabs/rake/pull/40) merged 2026-10-11 at `5caf1f3`, approved at `3e846f5` and re-approved at `d456312` after Denizen's six review items; carried [#41](https://github.com/dnznlabs/rake/issues/41), [#42](https://github.com/dnznlabs/rake/issues/42), [#43](https://github.com/dnznlabs/rake/issues/43), [#50](https://github.com/dnznlabs/rake/issues/50), [design-base#2](https://github.com/dnznlabs/design-base/issues/2), [state-collection#69](https://github.com/dnznlabs/state-collection/issues/69) |
 
 ### Phase 3 — Writing
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m02-t03](tasks/m02-t03/TASK.md) | Create flow (salt, predict, `eth_getCode` guard), propose panel for the four setters and renounce, `applyQueued`, `cancel`, `distribute` (per #26), `release` with the `false`-word rendering, copy-calldata for a vault signer, the payer-guidance line (#18), name resolution ported (per #28); criterion 4 | assigned — plan merged ([#39](https://github.com/dnznlabs/rake/pull/39)), issue [#46](https://github.com/dnznlabs/rake/issues/46) opened and handed off 2026-10-11, no gate; #38 defaulted to M05 when it opened |
+| [m02-t03](tasks/m02-t03/TASK.md) | Create flow (salt, predict, `eth_getCode` guard), propose panel for the four setters and renounce, `applyQueued`, `cancel`, `distribute` (per #26), `release` with the `false`-word rendering, copy-calldata for a vault signer, the payer-guidance line (#18), name resolution ported (per #28); criterion 4 | done — [#52](https://github.com/dnznlabs/rake/pull/52) merged 2026-10-11 at `66c77e5`, approved at `9173145`, re-approved at `2ebd2fd`; carried [#53](https://github.com/dnznlabs/rake/issues/53), [#54](https://github.com/dnznlabs/rake/issues/54), [#55](https://github.com/dnznlabs/rake/issues/55) |
 
 ### Phase 4 — Docs and the widget
 
@@ -161,7 +171,7 @@ Independent of each other; the widget waits on #27, the docs page does not.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m02-t04 | `#/docs` from the prototype's docs segment against the real ABI; criterion 6; criterion 8 measured and recorded | not started |
+| [m02-t04](tasks/m02-t04/TASK.md) | `#/docs` from the prototype's docs segment against the real ABI; criterion 6; criterion 8 measured and recorded, with the second chunk served for the first time (#53 decided in the plan) | planned — plan written 2026-10-11, not yet merged |
 | m02-t05 | `App` serves `widget.js` as a second chunk set (per #27), `Chunks.s.sol` uploads both, the widget reads `snapshot()` through `data-rpc` or the host's `window.ethereum`, host page under `make serve`; criterion 7; criterion 9 | not started |
 
 ### Phase 5 — dapp and widget refinement
