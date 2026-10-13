@@ -172,9 +172,12 @@ footer{display:flex;justify-content:space-between;border-top:1px solid var(--rul
 .scroll{overflow-x:auto;margin:0 0 14px}
 /* The docs page: one column of prose with a sticky section rail beside it. The rail's links are
    ordinary page links, so `a:hover` and the focus ring already cover them; only the article's
-   underline (.doc a) has to be kept off them. */
+   underline (.doc a) has to be kept off them. The rail is the page's second <nav>, and the header's
+   rule above is on the bare element, so the three properties it sets for a header — the flex row, the
+   padding and the bottom rule — are undone here rather than scoped there: theme.css is the base's,
+   and a second nav is a pattern the base does not have yet. */
 .docgrid{display:grid;grid-template-columns:150px minmax(0,1fr);gap:40px}
-.rail{align-self:start;position:sticky;top:20px;font-size:11.5px;line-height:2.05;color:var(--muted)}
+.rail{display:block;padding:0;border-bottom:0;align-self:start;position:sticky;top:20px;font-size:11.5px;line-height:2.05;color:var(--muted)}
 .rail .eyebrow{font-size:10px;margin:0 0 6px}
 .rail a{display:block}
 /* The function, event and error lists are one grid rather than a .dtab table: their last column is a
