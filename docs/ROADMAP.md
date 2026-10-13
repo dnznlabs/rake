@@ -14,7 +14,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 | Milestone | Goal | Status |
 |:----------|:-----|:-------|
 | [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | done 2026-10-11 — t01 (#6), t02 (#11), t03 (#14) and the decision-10 follow-up (#24) merged; every criterion re-run and passing on `main` at `c292106` |
-| [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain, and Denizen has ironed out the experience against it | in progress — plan merged (#29) 2026-10-11; t01 (#33), t02 (#40), t03 (#52) done, t04 planned; Phase 5 added 2026-10-11 |
+| [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain, and Denizen has ironed out the experience against it | in progress — plan merged (#29) 2026-10-11; t01 (#33), t02 (#40), t03 (#52) done, t04 assigned ([#58](https://github.com/dnznlabs/rake/issues/58)); Phase 5 added 2026-10-11 |
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | not started |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | not started |
 | [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; DNZN's own 60/40 distribution live under the Ops multisig with a 7-day delay; dapp mirrored and widget embedded in one DNZN app | not started |
@@ -172,6 +172,15 @@ recommended option.
     picture states all three of the contract's promises. Shown under 720 px as a single column, not
     hidden as the prototype did. Cost measured in the t02 handoff: +916 gzipped bytes, dapp at
     14,254 gzipped, one chunk, 9,746 bytes of head-room before a second — re-measured in t04.
+16. **The table editor refuses tables the contract will refuse.** Ruled by Denizen on 2026-10-12
+    ("Select Option 1"), closing [#55](https://github.com/dnznlabs/rake/issues/55), the t03 handoff's
+    open question. The editor blocks duplicate accounts and zero shares and disables submit, as m02-t03
+    shipped it (#52); the cost accepted is that the page encodes two of `_set`'s rules, so a future
+    change to `_set` makes the editor wrong until it is updated, and M03's review reads the pair.
+    Rejected: letting the table through, which lands a `propose` whose every `applyQueued` reverts
+    `BadTable` and that only `cancel` clears after the delay ([#54](https://github.com/dnznlabs/rake/issues/54),
+    M03's); and preflighting `applyQueued` at propose time, impossible because the entry does not
+    exist yet.
 
 ## Findings carried forward
 
