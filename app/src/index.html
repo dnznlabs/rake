@@ -968,25 +968,172 @@ async function list() {
     + `${d.pending.length ? '<span class="dot" title="change queued"></span>' : '<span></span>'}${mini(d.table)}</a>`).join(''));
 }
 
+/* ---- docs ------------------------------------------------------------------------------------ */
+/* DESIGN_HANDOFF § 3.3's twelve sections, in its order, with the ids the rail links to. */
+const SECTIONS = [['abstract', 'Abstract'], ['motivation', 'Motivation'], ['how', 'How it works'], ['reference', 'Contract reference'], ['table', 'The table'], ['timelock', 'The timelock'], ['escrow', 'Push, escrow, release'], ['deploy', 'Deployment'], ['widget', 'The widget'], ['security', 'Security'], ['source', 'Source'], ['lineage', 'Lineage']];
+/* Every external function of `Distribution`, as `forge inspect Distribution abi` prints them: the
+   reference is a list the ABI can be diffed against, not prose that drifts from it. Held as data for
+   that reason — `test/docs.test.mjs` and M02 criterion 6's script both read these three consts. */
+const DOCS_FNS = [
+  ['distribute(address token)', 'anyone', 'splits the balance that is not escrowed across the table, in table order; a push that fails is escrowed instead'],
+  ['release(address token, address account)', 'anyone', 'retries one escrowed share; a retry that fails reverts and the share stays escrowed'],
+  ['propose(bytes action)', 'owner', 'queues a self-call at now + delay, or runs it inline when the delay is zero'],
+  ['applyQueued(bytes action, uint32 nonce)', 'anyone', 'runs a queued action once its eta has passed; an action that reverts stays queued'],
+  ['cancel(bytes32 hash)', 'owner', 'drops a queued action, immediately — the delay guards applying, not cancelling'],
+  ['setBeneficiaries(Beneficiary[] table)', 'self', 'replaces the table; reachable only as a queued action'],
+  ['setDescription(string description)', 'self', 'replaces the label; reachable only as a queued action'],
+  ['setDelay(uint32 delay)', 'self', 'changes the delay, through the delay in force'],
+  ['transferOwnership(address owner)', 'self', 'hands over, or renounces by passing the zero address'],
+  ['init(address owner, uint32 delay, string description, Beneficiary[] table)', 'factory', 'initialises a clone, once, as part of the create transaction'],
+  ['snapshot()', 'view', 'owner, delay, nonce, description, table and pending in one call'],
+  ['beneficiaries()', 'view', 'the table as stored, which is ascending by account'],
+  ['pendingCount()', 'view', 'how many actions are queued'],
+  ['queued(bytes32 hash)', 'view', 'the eta of a queued action; zero means no such action'],
+  ['escrowed(address token, address account)', 'view', 'what is held for one account after a push failed'],
+  ['reserved(address token)', 'view', 'everything escrowed for a token, which the next split leaves alone'],
+  ['owner()', 'view', 'who may propose and cancel; the zero address means renounced'],
+  ['delay()', 'view', 'seconds every proposal waits before it can be applied'],
+  ['nonce()', 'view', 'proposals made so far; it is hashed into every queued action'],
+  ['description()', 'view', 'the label the distribution carries for itself'],
+];
+const DOCS_EVENTS = [
+  ['Received(address indexed from, uint256 amount)', 'receive', 'ETH arrived; the ERC-20 path has no hook and emits nothing'],
+  ['Distributed(address indexed token, uint256 amount)', 'distribute', 'a split completed, for the amount it moved'],
+  ['Escrowed(address indexed token, address indexed account, uint256 amount)', 'distribute', 'a push failed, so that share is held for its account'],
+  ['Released(address indexed token, address indexed account, uint256 amount)', 'release', 'an escrowed share was retried and paid'],
+  ['Queued(bytes32 indexed hash, uint32 nonce, uint256 eta, bytes action)', 'propose', 'an action was staged, with its calldata in the log'],
+  ['Applied(bytes32 indexed hash)', 'applyQueued, propose', 'the action ran — from propose when the delay is zero'],
+  ['Cancelled(bytes32 indexed hash)', 'cancel', 'the owner withdrew a queued action'],
+];
+const DOCS_ERRORS = [
+  ['NotOwner()', 'propose, cancel', 'the caller is not the owner'],
+  ['BadTable()', 'init, setBeneficiaries', 'empty, not ascending by account, a zero share, or shares that do not sum to 10,000'],
+  ['NotReady(uint256 eta)', 'applyQueued', 'nothing is queued under that hash, or its eta has not passed'],
+  ['NothingToDo()', 'distribute, release, cancel', 'there is nothing to split, retry or withdraw'],
+  ['Locked()', 'distribute, release', 're-entered while a push was still in flight'],
+  ['Unauthorized()', 'init, the setters, receive', 'not the factory, not a self-call, or ETH sent to the implementation itself'],
+];
+const DOCS_FACTORY = [
+  ['create(address owner, uint32 delay, string description, Beneficiary[] table, bytes32 salt)', 'anyone', 'deploys and initialises a clone at predict(salt); payable, and the value rides the CREATE2'],
+  ['predict(bytes32 salt)', 'view', 'the address create would reach, before it is deployed'],
+  ['implementation()', 'view', 'the Distribution every clone delegates to'],
+  ['Created(address indexed distribution, address indexed owner)', 'event', 'a clone was deployed'],
+  ['DeploymentFailed()', 'error', 'the CREATE2 found code at that address — after burning the gas'],
+  ['SaltDoesNotStartWith()', 'error', 'the salt\'s top 20 bytes are not the sender'],
+];
+/* One source line with \n in it, because the minifier strips leading whitespace from every source
+   line, <pre> included — so an indented block here would ship flattened. Verbatim from
+   src/Distribution.sol:10-30; test/docs.test.mjs fails when the contract and this string disagree. */
+const DOCS_STRUCT = 'struct Beneficiary {\n    address account;\n    uint96 bps;\n    string name;\n    string note;\n}\n\nstruct Pending {\n    bytes32 hash;\n    uint256 eta;\n    bytes action;\n}\n\nstruct Snapshot {\n    address owner;\n    uint32 delay;\n    uint32 nonce;\n    string description;\n    Beneficiary[] table;\n    Pending[] pending;\n}';
+const ftab = (head, rows) => `<div class="ftab"><div class="h">${head.map(h => `<span>${h}</span>`).join('')}</div>`
+  + rows.map(r => `<div><span class="fn">${esc(r[0])}</span><span class="who">${esc(r[1])}</span><span class="fx">${esc(r[2])}</span></div>`).join('') + '</div>';
+/* The two figures DESIGN_HANDOFF § 3.3 asks for, hand-drawn rather than rendered from Mermaid: there
+   is no Mermaid in the bundle and none at build time either, so the caption says what shipped. Colour
+   comes through classes on currentColor, as the landing's FEEPATH does, so theme.css owns every one. */
+const figSeq = () => '<svg class="fig" width="560" height="226" viewBox="0 0 560 226" fill="currentColor" role="img" aria-label="sequence diagram: a payer funds the distribution, anyone distributes, each share is pushed or escrowed">'
+  + '<rect x="30" y="8" width="120" height="26" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="90" y="25" text-anchor="middle" font-size="11.5">payer</text>'
+  + '<rect x="220" y="8" width="140" height="26" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="290" y="25" text-anchor="middle" font-size="11.5">distribution</text>'
+  + '<rect x="410" y="8" width="120" height="26" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="470" y="25" text-anchor="middle" font-size="11.5">beneficiary</text>'
+  + '<g class="r" stroke="currentColor" stroke-dasharray="3 3"><line x1="90" y1="34" x2="90" y2="196"/><line x1="290" y1="34" x2="290" y2="196"/><line x1="470" y1="34" x2="470" y2="196"/></g>'
+  + '<text class="m" x="188" y="60" text-anchor="middle" font-size="10.5">send fee — eth / erc20</text><line x1="90" y1="68" x2="282" y2="68" stroke="currentColor" stroke-width="1.25"/><path d="M286 68l-8 -4v8Z"/>'
+  + '<text class="m" x="188" y="98" text-anchor="middle" font-size="10.5">distribute() — anyone may call</text><line x1="90" y1="106" x2="282" y2="106" stroke="currentColor" stroke-width="1.25"/><path d="M286 106l-8 -4v8Z"/>'
+  + '<text class="m" x="378" y="136" text-anchor="middle" font-size="10.5">push share — table order</text><line x1="290" y1="144" x2="462" y2="144" stroke="currentColor" stroke-width="1.25"/><path d="M466 144l-8 -4v8Z"/>'
+  + '<g class="q"><text x="378" y="172" text-anchor="middle" font-size="10.5">on revert: escrow · release() retries</text><line x1="290" y1="180" x2="462" y2="180" stroke="currentColor" stroke-width="1.25" stroke-dasharray="4 3"/><path d="M466 180l-8 -4v8Z"/></g>'
+  + '</svg><div class="cap">fig 1 · token flow — rendered to inline svg</div>';
+const figState = () => '<svg class="fig" width="420" height="164" viewBox="0 0 420 164" fill="currentColor" role="img" aria-label="state diagram: a queued action becomes applied once the delay elapses, or cancelled by the owner">'
+  + '<circle cx="26" cy="80" r="4"/>'
+  + '<text class="m" x="48" y="72" text-anchor="middle" font-size="10">queue</text><line x1="30" y1="80" x2="66" y2="80" stroke="currentColor" stroke-width="1.25"/><path d="M70 80l-8 -4v8Z"/>'
+  + '<g class="q"><rect x="70" y="63" width="92" height="34" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="116" y="84" text-anchor="middle" font-size="11.5">queued</text></g>'
+  + '<path d="M162 72 H210 V38 H264" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M268 38l-8 -4v8Z"/><text class="m" x="260" y="28" text-anchor="end" font-size="10">delay elapses — anyone</text>'
+  + '<rect x="268" y="21" width="106" height="34"/><text class="pa" x="321" y="42" text-anchor="middle" font-size="11.5">applied</text>'
+  + '<g class="d"><path d="M162 88 H210 V122 H264" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M268 122l-8 -4v8Z"/><text x="260" y="152" text-anchor="end" font-size="10">owner cancels — immediate</text>'
+  + '<rect x="268" y="105" width="106" height="34" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="321" y="126" text-anchor="middle" font-size="11.5">cancelled</text></g>'
+  + '</svg><div class="cap">fig 2 · the timelock — every owner action passes through it</div>';
+/* The six chains M05 deploys to, and the dev chain's own row when that is what is being read, so a
+   local anvil shows the factory `make addresses` prints rather than six dashes. */
+const DOCS_CHAINS = ['ethereum', 'base', 'arbitrum', 'op mainnet', 'sepolia', 'base sepolia'];
+const chainRows = () => {
+  const dev = ['31337', '31338'].includes(String(CFG.chainId));
+  return DOCS_CHAINS.map(c => `<tr><td>${c}</td><td class="dim">—</td><td class="dim">not deployed</td></tr>`).join('')
+    + (dev ? `<tr><td>${cname(CFG.chainId)}</td><td>${ext('address', CFG.factory, esc(CFG.factory))}</td><td>dev chain</td></tr>` : '');
+};
 function docs() {
-  const rows = CONTRACTS.map(([name, a]) => `<tr><td><b>${name}</b></td><td>${ext('address', a, a)}</td></tr>`).join('');
-  V.innerHTML = `<div class="doc"><div class="eyebrow"><a href="#/">home</a> // docs</div>
-  <h1>How it works</h1>
-  <p>This page talks to nothing but your wallet. Every value it shows is read from ${cname(CFG.chainId)} through the wallet's own connection.</p>
-  <h2>Contracts</h2>
-  <div class="scroll"><table class="dtab"><tr><th>contract</th><th>address</th></tr>${rows}</table></div>
-  <h2>Verify it yourself</h2>
-  <pre>cast call ${CFG.factory} "implementation()(address)" --rpc-url $RPC</pre>
-  </div>`;
+  V.innerHTML = `<div class="docgrid"><nav class="rail" aria-label="sections">${eyebrow('sections')}`
+  + SECTIONS.map(s => `<a href="#/docs#${s[0]}">${s[1].toLowerCase()}</a>`).join('') + `</nav>
+  <article class="doc">${eyebrow(`docs · ${CFG.version} draft`)}<h1>Rake Distro</h1>
+
+  <h2 id="s-abstract">Abstract</h2>
+  <p>A distribution is a contract address that splits whatever it receives across a published table of beneficiaries, denominated in basis points. Anyone can trigger a split; only the owner can propose a change to the table, and every change waits out a public delay before anyone can apply it. The table, its labels and any queued change come back from one <code>snapshot()</code> call, so an interface — including the one serving this page — renders them with no indexer.</p>
+
+  <h2 id="s-motivation">Motivation</h2>
+  <p>A fee is suspicious by default: the paragraph explaining where it goes can change silently, and checking means chasing transactions. The incumbent answer grew into an on-chain banking product, while an integrator needs the primitive underneath — one address, one table, one delay. Rake Distro is that primitive and nothing else. It takes no cut of what passes through it, there is no key over a distribution but its own owner's, and there is no upgrade path: a clone is pinned to the implementation that the factory which made it holds.</p>
+
+  <h2 id="s-how">How it works</h2>
+  <p>Four verbs cover the lifecycle. <code>receive</code> — ETH and ERC-20 funds accumulate at the address and nothing moves on its own. <code>distribute</code> — anyone splits the balance that is not escrowed, by the table. <code>queue</code> — the owner stages a change in public, as <code>propose(bytes)</code>. <code>apply</code> — anyone lands it after the delay, as <code>applyQueued(bytes,uint32)</code>. Pass-through behaviour is the payer calling <code>distribute</code> in the same transaction.</p>
+  <p>The receive path does nothing but a guard and a log, and still has to be paid for: a clone's delegatecall to a <em>cold</em> implementation costs more than the 2,300-gas stipend on its own. Paying in from a contract with <code>.transfer()</code> or <code>.send()</code> can therefore fail. Pay in with <code>call</code> and gas.</p>
+  ${figSeq()}
+
+  <h2 id="s-reference">Contract reference</h2>
+  <p>Every external function of <code>Distribution</code>. <b>self</b> means the function is reachable only as a queued action — the contract calling itself — and <b>factory</b> that only the factory may call it. The factory's own surface is under <a href="#/docs#deploy">deployment</a>.</p>
+  ${ftab(['function', 'caller', 'effect'], DOCS_FNS)}
+  ${eyebrow('events')}${ftab(['event', 'emitted by', 'when'], DOCS_EVENTS)}
+  ${eyebrow('errors')}${ftab(['error', 'thrown by', 'when'], DOCS_ERRORS)}
+  ${eyebrow('the snapshot struct — verbatim, and what the widget reads')}
+  <pre>${DOCS_STRUCT}</pre>
+
+  <h2 id="s-table">The table</h2>
+  <p>Shares are basis points and must sum to 10,000, or the table is refused. The last row takes the integer remainder of each split, so nothing is left as dust. Accounts must be strictly ascending, which deduplicates for free and keeps the first row above the zero address — and which makes one sentence worth saying twice: <em>last</em> is by address order, not the order the rows were written in. A row with a zero share is refused as well. Every row carries a <code>name</code> and a <code>note</code> on chain; an interface may overlay a name it resolved elsewhere, but the labels are the distribution's own.</p>
+
+  <h2 id="s-timelock">The timelock</h2>
+  <p>Every owner action goes through one mechanism. <code>propose</code> stores <code>queued[keccak256(abi.encode(action, nonce))] = eta</code>; a permissionless <code>applyQueued</code> then self-calls one of the four setters — <code>setBeneficiaries</code>, <code>setDescription</code>, <code>setDelay</code>, <code>transferOwnership</code>. No setter is reachable any other way, including the one that changes the delay itself. <code>cancel</code> is the owner's and is immediate. A delay of zero is allowed: <code>propose</code> runs the action inline and logs <code>Queued</code> and <code>Applied</code> in one transaction, which every interface flags. An action that reverts stays queued, because the deletes roll back with it, and can be retried or cancelled. Renouncing — transferring ownership to the zero address — leaves nothing that can propose or cancel again, so the table is provably frozen.</p>
+  ${figState()}
+
+  <h2 id="s-escrow">Push, escrow, release</h2>
+  <p>An ETH share is pushed with a fixed gas allowance, <code>PUSH_GAS</code>, which is 100,000; an ERC-20 push is bounded by the token rather than by that constant. When a push fails, that share is escrowed for its beneficiary and the rest still go out; <code>release(token, account)</code> retries at any time and anyone may call it, though a retry that fails reverts and leaves the escrow where it was. A <code>reserved[token]</code> total keeps escrowed funds out of the next split. A receiver that needs more than the allowance is therefore always escrowed, never paid directly. A token that returns nothing from <code>transfer</code> — mainnet USDT — counts as success; anything else has to answer with a word equal to one.</p>
+
+  <h2 id="s-deploy">Deployment</h2>
+  <p>A factory deploys PUSH0 minimal-proxy clones with CREATE2. The salt is sender-bound: its top 20 bytes must equal <code>msg.sender</code>, and <code>create</code> reverts otherwise. Two operating rules follow. <b>The sender fixes the address and the owner does not enter it</b> — one key calls <code>create</code> with the same salt on each chain and passes the vault as the owner, so the distribution is owned by that vault from its first block, at one address, with no ownership transfer ever needed. <b>Each chain is a separate contract</b> — transferring ownership on one changes neither the salt nor any other chain, so the deploying key never needs to own anything.</p>
+  <p><code>predict(salt)</code> returns the address before it is deployed, so it can be funded first, and ETH sent with <code>create</code> rides the CREATE2 into the clone without a <code>Received</code> log. <code>init</code> is factory-only. Neither the factory nor the implementation can receive ETH: a stray send reverts rather than locking. One warning worth the sentence — a second <code>create</code> on a salt that already has code consumes the whole gas limit before <code>DeploymentFailed</code> can fire, so read the code at <code>predict(salt)</code> first and refuse a non-empty answer, which is what this dapp's create screen does. The clone address depends on the factory and the salt alone; the factory is nonce-addressed where it is deployed, so one factory address across chains is a later milestone's deployment, not a property of a clone.</p>
+  ${ftab(['factory', 'caller', 'effect'], DOCS_FACTORY)}
+  <div class="scroll"><table class="dtab"><tr><th>chain</th><th>factory</th><th>status</th></tr>${chainRows()}</table></div>
+
+  <h2 id="s-widget">The widget</h2>
+  <p>A drop-in script renders any distribution next to the fee it explains. It reads <code>snapshot()</code> and nothing else — no logs, no indexer. The font comes from the host page and the ink from <code>currentColor</code>; rules and muted text are derived from it at reduced opacity. The only fixed colours are the bar's segment tints and the pending amber. There is a full variant and a compact one, and both loading and failure degrade quietly without touching the host page.</p>
+  <pre>&lt;script src="widget.js"&gt;&lt;/script&gt;\n&lt;div data-rake="0x…" data-chain="1"&gt;&lt;/div&gt;</pre>
+  <p>The path is root-relative because the same contract that serves this page serves the script, under whichever gateway you are reading it through. A mirror URL arrives with M05.</p>
+
+  <h2 id="s-security">Security</h2>
+  <p>The owner is trusted <em>over a delay</em>. The contract protects beneficiaries from surprise, not from the owner; what the owner is — an EOA, a multisig, a DAO — is outside the contract's scope, though this interface surfaces it.</p>
+  <div class="scroll"><table class="dtab"><tr><th>date</th><th>auditor</th><th>scope</th><th>findings</th></tr><tr><td class="dim">—</td><td class="dim">none yet — planned pre-launch</td><td class="dim">—</td><td class="dim">—</td></tr></table></div>
+  <p>Known limitations, as the contract stands. A fee-on-transfer token settles by balance, so what a beneficiary receives can differ from <code>amount × bps / 10000</code>. <code>PUSH_GAS</code> is 100,000, so a receiver that needs more on receive is always escrowed rather than paid. The 2,300-gas stipend does not cover a clone's delegatecall to a <em>cold</em> implementation, so a contract paying in with <code>.transfer()</code> or <code>.send()</code> can fail. The contracts are immutable: a bug is mitigated by redeploying, never by upgrading.</p>
+  <p>Report privately through the repository's <a href="https://github.com/dnznlabs/rake/security/advisories/new" target="_blank" rel="noopener">advisory form</a>. There is no bounty programme yet; serious reports are taken seriously.</p>
+
+  <h2 id="s-source">Source</h2>
+  <p>MIT, by the SPDX header on every file. Both contracts are one file, the primitive has no imports, and the comments are dense: <a href="https://github.com/dnznlabs/rake" target="_blank" rel="noopener">github.com/dnznlabs/rake</a>. The page you are reading is what a renderer contract's <code>html()</code> view returns.</p>
+  <p>Verify a deployment in two calls. The first is the factory's own implementation; the second is a clone's runtime code, which is solady's PUSH0 minimal proxy with that implementation's address inside it.</p>
+  <pre>cast call ${CFG.factory} "implementation()(address)" --rpc-url $RPC\ncast code &lt;clone&gt; --rpc-url $RPC\n# 0x5f5f365f5f37365f73&lt;implementation&gt;5af43d5f5f3e6029573d5ffd5b3d5ff3</pre>
+
+  <h2 id="s-lineage">Lineage</h2>
+  <p>The timelock as <code>queued[hash]</code>, the <code>onlySelf</code> configuration, PUSH0 clones and the sender-bound CREATE2 salt are lifted from multisig.software (Src Co / z0r0z), whose single-file, audit-first ethos this project inherits. The low-level patterns follow Solady. Splits defined the category this primitive returns to.</p>
+  </article></div>`;
 }
 
 /* ---- routing · theme ------------------------------------------------------------------------ */
+/* `#/docs#<section>` scrolls to the matching `s-<section>` heading after the page is painted. The
+   browser cannot do it: the hash's own fragment is `/docs#<section>`, which is no element's id, and
+   the headings do not exist until docs() has run. */
+function docScroll(h) {
+  const el = h[6] === '#' ? document.getElementById('s-' + h.slice(7)) : null;
+  if (el) el.scrollIntoView(); else scrollTo(0, 0);
+}
 function route() {
   const h = location.hash || '#/';
   TOKEN++;
   document.getElementById('nav-distros').className = h.startsWith('#/distros') ? 'on' : '';
-  document.getElementById('nav-docs').className = h === '#/docs' ? 'on' : '';
-  if (h === '#/docs') { docs(); scrollTo(0, 0); return; }
+  document.getElementById('nav-docs').className = h.startsWith('#/docs') ? 'on' : '';
+  /* Matched by prefix and painted before every check below it: the docs read with no wallet and on
+     the wrong chain, which is most of the ways a stranger arrives at them. */
+  if (h.startsWith('#/docs')) { docs(); docScroll(h); return; }
   if (!P) { V.innerHTML = notice('No wallet found. Open this page in a browser with a wallet.'); return; }
   if (wrongChain()) { V.innerHTML = notice(`Your wallet is on ${cname(CHAIN)}. This app lives on ${cname(CFG.chainId)}. <button id="sw">Switch network</button>.`); document.getElementById('sw').onclick = switchChain; return; }
   if (S.error) { V.innerHTML = notice(`could not read the factory at ${CFG.factory}: ${esc(S.error)}`, 'err'); return; }
