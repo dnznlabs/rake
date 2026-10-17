@@ -1,6 +1,6 @@
 # M02 — Dapp and widget on anvil
 
-Status: in progress — t01, t02, t03 done, t04 planned, Phase 5 added · updated 2026-10-11
+Status: in progress — t01, t02, t03 done, t04 assigned, Phase 5 added · updated 2026-10-13
 
 The design prototype (`brainstorming/design/rake-dapp.html`, `rake-widget.html`) rebuilt as the real
 dapp on DNZN Base v1: reading `snapshot()` from the chain, sending the six writes through the wallet,
@@ -171,7 +171,7 @@ Independent of each other; the widget waits on #27, the docs page does not.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m02-t04](tasks/m02-t04/TASK.md) | `#/docs` from the prototype's docs segment against the real ABI; criterion 6; criterion 8 measured and recorded, with the second chunk served for the first time (#53 decided in the plan) | planned — plan written 2026-10-11, not yet merged |
+| [m02-t04](tasks/m02-t04/TASK.md) | `#/docs` from the prototype's docs segment against the real ABI; criterion 6; criterion 8 measured and recorded, with the second chunk served for the first time (#53 decided in the plan) | assigned — plan merged [#56](https://github.com/dnznlabs/rake/pull/56) 2026-10-13 at `98f1b89`; task issue [#58](https://github.com/dnznlabs/rake/issues/58), no gate; the report line is [#57](https://github.com/dnznlabs/rake/issues/57), default option 1 |
 | m02-t05 | `App` serves `widget.js` as a second chunk set (per #27), `Chunks.s.sol` uploads both, the widget reads `snapshot()` through `data-rpc` or the host's `window.ethereum`, host page under `make serve`; criterion 7; criterion 9 | not started |
 
 ### Phase 5 — dapp and widget refinement

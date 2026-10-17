@@ -379,6 +379,8 @@ preferred, it is a three-line revert in `editorState`.
 
 **Record.** `ROADMAP.md` § Decisions if it is ruled; otherwise this handoff is the record.
 
+_Ruled 2026-10-12: option 1, as shipped — [#55](https://github.com/dnznlabs/rake/issues/55), `ROADMAP.md` decision 16._
+
 ## Browser verification
 
 The OpenClaw browser tool cannot reach this box's own dev server — no Chromium on it, and loopback is
