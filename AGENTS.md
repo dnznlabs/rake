@@ -107,6 +107,15 @@
   by a `MockVault` that answers `isOwner` for anvil account 3. It is a hand-run step after
   `make deploy` and never part of it, and it is idempotent: both salts are read with `eth_getCode`
   first, so a second run broadcasts nothing.
+- `#/docs` is the long page, and it matches by prefix so it paints before the wallet checks; the rail's
+  links are `#/docs#<section>` and `docScroll` reaches `id="s-<section>"` once `docs()` has painted.
+  It is written for the owner of a distribution (ROADMAP decision 17), not for a developer: the
+  contract's surface is `docs/REFERENCE.md`, which the page's last section links. The tables there are
+  data — `test/docs.test.mjs` fails when the struct block and `src/Distribution.sol` disagree by one
+  character, or when a function the selector fixture names is missing from the function table, and
+  M02 criterion 6's script diffs the three `Distribution` tables against `forge inspect`. A claim about
+  contract behaviour on the page is checked against `src/` before it ships; the landing CTA depends
+  on the `widget` section id.
 - The build minifier strips leading whitespace on every line, template literals included.
 - gzip output depends on the node build's zlib. Build through devbox when the bytes matter.
 - Node tests are `test/*.test.mjs`.
@@ -123,6 +132,14 @@
   To allow a `<script>` with attributes, change the bootstrap first and re-measure in a real wallet.
 - `make chain-doc` writes the document the chain returns to `out/chain/index.html` and hashes it.
   `cast call … "html()(string)"` does not produce it: cast escapes the string.
+- On a gzipped `App` that document is the bootstrap wrapper, not the page, so its `sha256` never equals
+  `app/dist/index.html`'s. `chain-doc` therefore also inflates the `atob` payload to
+  `out/chain/index.inflated.html` and prints `payload bytes`, `inflated bytes` and `inflated sha256`;
+  `inflated sha256` is the one to compare. An uncompressed `App` prints neither, since there is nothing
+  to inflate.
+- Take that comparison **after `make dapp-nodev`**: `make deploy` rebuilds the dev bundle last
+  (`mk/30-onchain.mk`), so `app/dist/index.html` straight after a deploy is the dev build and the two
+  hashes differ for that reason alone.
 - `lock()` is one-way.
 
 <!-- fragment: design-base -->

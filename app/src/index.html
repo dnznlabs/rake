@@ -968,25 +968,122 @@ async function list() {
     + `${d.pending.length ? '<span class="dot" title="change queued"></span>' : '<span></span>'}${mini(d.table)}</a>`).join(''));
 }
 
+/* ---- docs ------------------------------------------------------------------------------------ */
+/* Written for the owner of a distribution (ROADMAP decision 17): what it is, why, how, then the tasks.
+   The contract's own surface is docs/REFERENCE.md in the repo, and the last section points there. The
+   ids are what the rail and `#/docs#<section>` reach; the landing's CTA depends on `widget`. */
+const SECTIONS = [['what', 'What it is'], ['why', 'Why it exists'], ['how', 'How it works'], ['create', 'Creating one'], ['payin', 'Paying in'], ['payout', 'Paying out'], ['change', 'Changing it'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['developers', 'For developers']];
+const REPO = 'https://github.com/dnznlabs/rake';
+/* The two figures, hand-drawn rather than rendered from Mermaid: there is no Mermaid in the bundle and
+   none at build time either, so the caption says what shipped. Colour comes through classes on
+   currentColor, as the landing's FEEPATH does, so theme.css owns every one. */
+const figSeq = () => '<svg class="fig" width="560" height="226" viewBox="0 0 560 226" fill="currentColor" role="img" aria-label="sequence diagram: a payer funds the distribution, anyone distributes, each share is paid or held">'
+  + '<rect x="30" y="8" width="120" height="26" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="90" y="25" text-anchor="middle" font-size="11.5">payer</text>'
+  + '<rect x="220" y="8" width="140" height="26" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="290" y="25" text-anchor="middle" font-size="11.5">distribution</text>'
+  + '<rect x="410" y="8" width="120" height="26" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="470" y="25" text-anchor="middle" font-size="11.5">payee</text>'
+  + '<g class="r" stroke="currentColor" stroke-dasharray="3 3"><line x1="90" y1="34" x2="90" y2="196"/><line x1="290" y1="34" x2="290" y2="196"/><line x1="470" y1="34" x2="470" y2="196"/></g>'
+  + '<text class="m" x="188" y="60" text-anchor="middle" font-size="10.5">send the fee — eth / erc20</text><line x1="90" y1="68" x2="282" y2="68" stroke="currentColor" stroke-width="1.25"/><path d="M286 68l-8 -4v8Z"/>'
+  + '<text class="m" x="188" y="98" text-anchor="middle" font-size="10.5">distribute — anyone may</text><line x1="90" y1="106" x2="282" y2="106" stroke="currentColor" stroke-width="1.25"/><path d="M286 106l-8 -4v8Z"/>'
+  + '<text class="m" x="378" y="136" text-anchor="middle" font-size="10.5">pay each share — table order</text><line x1="290" y1="144" x2="462" y2="144" stroke="currentColor" stroke-width="1.25"/><path d="M466 144l-8 -4v8Z"/>'
+  + '<g class="q"><text x="378" y="172" text-anchor="middle" font-size="10.5">cannot receive: held · release retries</text><line x1="290" y1="180" x2="462" y2="180" stroke="currentColor" stroke-width="1.25" stroke-dasharray="4 3"/><path d="M466 180l-8 -4v8Z"/></g>'
+  + '</svg><div class="cap">fig 1 · a payment and a payout — rendered to inline svg</div>';
+const figState = () => '<svg class="fig" width="420" height="164" viewBox="0 0 420 164" fill="currentColor" role="img" aria-label="state diagram: a proposed change becomes applied once the delay elapses, or cancelled by the owner">'
+  + '<circle cx="26" cy="80" r="4"/>'
+  + '<text class="m" x="48" y="72" text-anchor="middle" font-size="10">propose</text><line x1="30" y1="80" x2="66" y2="80" stroke="currentColor" stroke-width="1.25"/><path d="M70 80l-8 -4v8Z"/>'
+  + '<g class="q"><rect x="70" y="63" width="92" height="34" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="116" y="84" text-anchor="middle" font-size="11.5">pending</text></g>'
+  + '<path d="M162 72 H210 V38 H264" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M268 38l-8 -4v8Z"/><text class="m" x="260" y="28" text-anchor="end" font-size="10">delay elapses — anyone applies</text>'
+  + '<rect x="268" y="21" width="106" height="34"/><text class="pa" x="321" y="42" text-anchor="middle" font-size="11.5">applied</text>'
+  + '<g class="d"><path d="M162 88 H210 V122 H264" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M268 122l-8 -4v8Z"/><text x="260" y="152" text-anchor="end" font-size="10">owner cancels — immediate</text>'
+  + '<rect x="268" y="105" width="106" height="34" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="321" y="126" text-anchor="middle" font-size="11.5">cancelled</text></g>'
+  + '</svg><div class="cap">fig 2 · every change takes this path, the owner\'s included</div>';
+/* The six chains M05 deploys to, and the dev chain's own row when that is what is being read, so a
+   local anvil shows the factory `make addresses` prints rather than six dashes. */
+const DOCS_CHAINS = ['ethereum', 'base', 'arbitrum', 'op mainnet', 'sepolia', 'base sepolia'];
+const chainRows = () => {
+  const dev = ['31337', '31338'].includes(String(CFG.chainId));
+  return DOCS_CHAINS.map(c => `<tr><td>${c}</td><td class="dim">—</td><td class="dim">not deployed</td></tr>`).join('')
+    + (dev ? `<tr><td>${cname(CFG.chainId)}</td><td>${ext('address', CFG.factory, esc(CFG.factory))}</td><td>dev chain</td></tr>` : '');
+};
 function docs() {
-  const rows = CONTRACTS.map(([name, a]) => `<tr><td><b>${name}</b></td><td>${ext('address', a, a)}</td></tr>`).join('');
-  V.innerHTML = `<div class="doc"><div class="eyebrow"><a href="#/">home</a> // docs</div>
-  <h1>How it works</h1>
-  <p>This page talks to nothing but your wallet. Every value it shows is read from ${cname(CFG.chainId)} through the wallet's own connection.</p>
-  <h2>Contracts</h2>
-  <div class="scroll"><table class="dtab"><tr><th>contract</th><th>address</th></tr>${rows}</table></div>
-  <h2>Verify it yourself</h2>
-  <pre>cast call ${CFG.factory} "implementation()(address)" --rpc-url $RPC</pre>
-  </div>`;
+  V.innerHTML = `<div class="docgrid"><nav class="rail" aria-label="sections">${eyebrow('sections')}`
+  + SECTIONS.map(s => `<a href="#/docs#${s[0]}">${s[1].toLowerCase()}</a>`).join('') + `</nav>
+  <article class="doc">${eyebrow(`docs · ${CFG.version} draft`)}<h1>Distributions</h1>
+
+  <h2 id="s-what">What it is</h2>
+  <p>A distribution is a contract that splits whatever it receives between a list of addresses. The list, the share of each address, a name and a note for each row, and the owner are stored on chain. Anyone can read them and anyone can trigger a payout. Only the owner can change the list, and every change waits a set delay before it takes effect.</p>
+
+  <h2 id="s-why">Why it exists</h2>
+  <p>A fee is easy to charge and hard to explain. Where it goes is usually a sentence on a website, and that sentence can change at any time. A distribution puts the answer on chain. The split is public, the owner is public, and a change to the split is visible for the whole delay before it lands. A payer can check it and a payee can rely on it.</p>
+  <p>The contract takes no cut, has no admin key other than the owner's, and cannot be upgraded.</p>
+
+  <h2 id="s-how">How it works</h2>
+  <p>Funds arrive at the address and sit there. When someone calls <code>distribute</code>, the balance is split by the table and sent to each row. If a payee cannot receive its share, the share is held in the contract for that payee and can be released later.</p>
+  ${figSeq()}
+  <p>The owner changes the table, the description, the delay or the owner by proposing the change. After the delay, anyone can apply it. Before that, the owner can cancel it.</p>
+  ${figState()}
+
+  <h2 id="s-create">Creating one</h2>
+  <p>You choose an owner, a delay and a table.</p>
+  <p>The owner is the address that can propose and cancel changes. The create screen fills in your wallet. A multisig or a DAO can own a distribution.</p>
+  <p>The delay is how long a change waits before it can be applied. The create screen starts at seven days. Zero is allowed, and a distribution with no delay is marked as such wherever it is shown.</p>
+  <p>The table is one row per address, with a share in percent, a name and a note. The shares must add up to 100. No row can have a zero share and no address can appear twice. When a payout does not divide evenly, the row with the highest address gets the remainder.</p>
+  <p>The address of the distribution is shown before you deploy, so it can go into a contract or an invoice first. ETH sent with the create transaction goes into the distribution.</p>
+
+  <h2 id="s-payin">Paying in</h2>
+  <p>Send ETH or any ERC-20 token to the address. Nothing is paid out until someone calls <code>distribute</code>.</p>
+  <p>A contract that pays in must send ETH with <code>call</code> and enough gas. <code>transfer</code> and <code>send</code> forward a 2,300-gas stipend only, and receiving into a clone whose implementation is cold costs more than that, so the payment fails.</p>
+
+  <h2 id="s-payout">Paying out</h2>
+  <p>Anyone can call <code>distribute</code>, and the caller pays the gas. One call pays out one token; ETH counts as a token. Each row is paid in table order.</p>
+  <p>If a row cannot receive, its share is held in the contract and the other rows are still paid. Held funds are left out of later payouts until someone calls <code>release</code> for that row. If the release fails, the funds stay held.</p>
+  <p>ETH is sent with 100,000 gas. A row that needs more than that to receive is always held.</p>
+
+  <h2 id="s-change">Changing it</h2>
+  <p>The table, the description, the delay and the owner can each be changed. Each change is its own proposal.</p>
+  <p>Propose the change. It shows as pending with a countdown, next to the current table. When the countdown ends, anyone can apply it. Until then the owner can cancel it, and the current table stays in force. Nothing applies on its own.</p>
+  <p>Changing the delay waits the current delay. With a delay of zero, the change applies in the same transaction as the proposal.</p>
+  <p>In a wallet these show as <code>propose</code>, <code>applyQueued</code> and <code>cancel</code>.</p>
+
+  <h2 id="s-owner">Ownership</h2>
+  <p>To transfer ownership, propose the new owner, wait, and apply. Ownership is per chain.</p>
+  <p>To freeze the table, transfer ownership to the zero address. After that nothing can be proposed or cancelled.</p>
+
+  <h2 id="s-widget">The widget</h2>
+  <p>A script that shows a distribution on another page: the bar, the rows, the owner, the delay and any pending change, read from the chain. It uses the host page's font and text colour. There is a full and a compact version.</p>
+  <pre>&lt;script src="widget.js"&gt;&lt;/script&gt;\n&lt;div data-rake="0x…" data-chain="1"&gt;&lt;/div&gt;</pre>
+  <p>The script is served by the same contract as this page.</p>
+
+  <h2 id="s-limits">Limits</h2>
+  <p>The owner is trusted for the length of the delay. The contract protects payees from sudden changes, not from the owner.</p>
+  <p>A token that charges a fee on transfer pays out less than the table says.</p>
+  <p>A row that needs more than 100,000 gas to receive ETH is always held.</p>
+  <p>A contract paying in with <code>transfer</code> or <code>send</code> fails when the implementation is cold, because the 2,300-gas stipend does not cover it.</p>
+  <p>The contracts cannot be upgraded. A bug is fixed by deploying a new distribution.</p>
+  <p>There is no audit yet. Report issues through the repository's <a href="${REPO}/security/advisories/new" target="_blank" rel="noopener">advisory form</a>.</p>
+
+  <h2 id="s-developers">For developers</h2>
+  <p>Source: <a href="${REPO}" target="_blank" rel="noopener">github.com/dnznlabs/rake</a>, MIT. Both contracts are one file with no imports. Every function, event and error, and the <code>Snapshot</code> struct the widget reads, are in <a href="${REPO}/blob/main/docs/REFERENCE.md" target="_blank" rel="noopener">docs/REFERENCE.md</a>. This page is returned by the <code>html()</code> view of a renderer contract.</p>
+  <div class="scroll"><table class="dtab"><tr><th>chain</th><th>factory</th><th>status</th></tr>${chainRows()}</table></div>
+  <p>The timelock, the self-call setters, PUSH0 clones and the sender-bound salt come from multisig.software (Src Co / z0r0z). The low-level patterns follow Solady.</p>
+  </article></div>`;
 }
 
 /* ---- routing · theme ------------------------------------------------------------------------ */
+/* `#/docs#<section>` scrolls to the matching `s-<section>` heading after the page is painted. The
+   browser cannot do it: the hash's own fragment is `/docs#<section>`, which is no element's id, and
+   the headings do not exist until docs() has run. */
+function docScroll(h) {
+  const el = h[6] === '#' ? document.getElementById('s-' + h.slice(7)) : null;
+  if (el) el.scrollIntoView(); else scrollTo(0, 0);
+}
 function route() {
   const h = location.hash || '#/';
   TOKEN++;
   document.getElementById('nav-distros').className = h.startsWith('#/distros') ? 'on' : '';
-  document.getElementById('nav-docs').className = h === '#/docs' ? 'on' : '';
-  if (h === '#/docs') { docs(); scrollTo(0, 0); return; }
+  document.getElementById('nav-docs').className = h.startsWith('#/docs') ? 'on' : '';
+  /* Matched by prefix and painted before every check below it: the docs read with no wallet and on
+     the wrong chain, which is most of the ways a stranger arrives at them. */
+  if (h.startsWith('#/docs')) { docs(); docScroll(h); return; }
   if (!P) { V.innerHTML = notice('No wallet found. Open this page in a browser with a wallet.'); return; }
   if (wrongChain()) { V.innerHTML = notice(`Your wallet is on ${cname(CHAIN)}. This app lives on ${cname(CFG.chainId)}. <button id="sw">Switch network</button>.`); document.getElementById('sw').onclick = switchChain; return; }
   if (S.error) { V.innerHTML = notice(`could not read the factory at ${CFG.factory}: ${esc(S.error)}`, 'err'); return; }
