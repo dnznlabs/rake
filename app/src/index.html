@@ -969,10 +969,10 @@ async function list() {
 }
 
 /* ---- docs ------------------------------------------------------------------------------------ */
-/* Written for the owner of a distribution, in the order they meet it (ROADMAP decision 16): the
-   contract's own surface is docs/REFERENCE.md in the repo, and the last section points there. The ids
-   are what the rail and `#/docs#<section>` reach; the landing's CTA depends on `widget`. */
-const SECTIONS = [['what', 'What you get'], ['create', 'Create one'], ['paid', 'Get paid into it'], ['payout', 'Pay out'], ['change', 'Change it'], ['handover', 'Hand it over, or freeze it'], ['widget', 'Show it'], ['trust', 'What to trust'], ['developers', 'For developers']];
+/* Written for the owner of a distribution (ROADMAP decision 16): what it is, why, how, then the tasks.
+   The contract's own surface is docs/REFERENCE.md in the repo, and the last section points there. The
+   ids are what the rail and `#/docs#<section>` reach; the landing's CTA depends on `widget`. */
+const SECTIONS = [['what', 'What it is'], ['why', 'Why it exists'], ['how', 'How it works'], ['create', 'Creating one'], ['payin', 'Paying in'], ['payout', 'Paying out'], ['change', 'Changing it'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['developers', 'For developers']];
 const REPO = 'https://github.com/dnznlabs/rake';
 /* The two figures, hand-drawn rather than rendered from Mermaid: there is no Mermaid in the bundle and
    none at build time either, so the caption says what shipped. Colour comes through classes on
@@ -1007,54 +1007,64 @@ const chainRows = () => {
 function docs() {
   V.innerHTML = `<div class="docgrid"><nav class="rail" aria-label="sections">${eyebrow('sections')}`
   + SECTIONS.map(s => `<a href="#/docs#${s[0]}">${s[1].toLowerCase()}</a>`).join('') + `</nav>
-  <article class="doc">${eyebrow(`docs · ${CFG.version} draft`)}<h1>Running a distribution</h1>
-  <p>This page is for the person who owns one. If you want the contract's whole surface instead, it is <a href="#/docs#developers">at the end</a>.</p>
+  <article class="doc">${eyebrow(`docs · ${CFG.version} draft`)}<h1>Distributions</h1>
 
-  <h2 id="s-what">What you get</h2>
-  <p>A distribution is an address. Whatever is sent to it — ETH or any ERC-20 — is split across a table you publish: who gets what, as a percentage, with a name and a note on every row. Anyone can trigger the split and anyone can read the table. You own it and you can change it, but every change waits out a delay you chose when you created it, in public, before it takes effect. That wait is the promise your payees and your payers can rely on, and it lives in the contract rather than in you.</p>
-  <p>The contract takes no cut of what passes through it, has no key over your distribution but your own, and cannot be upgraded by anyone. The page you are reading is served from the same chain.</p>
+  <h2 id="s-what">What it is</h2>
+  <p>A distribution is a contract that splits whatever it receives between a list of addresses. The list, the share of each address, a name and a note for each row, and the owner are stored on chain. Anyone can read them and anyone can trigger a payout. Only the owner can change the list, and every change waits a set delay before it takes effect.</p>
 
-  <h2 id="s-create">Create one</h2>
-  <p>Three choices, and each can be changed later through the delay.</p>
-  <p><b>The owner.</b> The address allowed to propose and cancel changes. The create screen fills in the wallet you are using; a multisig or a DAO works just as well, and is the better choice for anything that should outlive one key.</p>
-  <p><b>The delay.</b> How long every change waits before anyone can apply it. Zero is allowed, and it means a change lands the moment you propose it — every interface, this one included, flags a distribution that chose it.</p>
-  <p><b>The table.</b> One row per address, each with a share, a name and a note, and the shares add up to 100%. A row cannot have a zero share and an address cannot appear twice. The contract keeps the rows sorted by address, and when a split does not divide evenly the highest address takes the remainder, so nothing is stranded. The names and notes are stored on chain with the table: they are the distribution's own labels, whatever an interface resolves on top of them.</p>
-  <p>The address is known before you deploy. The create screen shows it, so you can put it into a fee-paying contract or an invoice first and create the distribution after. It depends only on the factory and on a salt tied to the key that creates it, so the same key gets the same address on every chain where the factory sits at the same address — and you can pass a vault as the owner, so the distribution is the vault's from its first block with no transfer needed. ETH sent with the create transaction lands in the distribution.</p>
+  <h2 id="s-why">Why it exists</h2>
+  <p>A fee is easy to charge and hard to explain. Where it goes is usually a sentence on a website, and that sentence can change at any time. A distribution puts the answer on chain. The split is public, the owner is public, and a change to the split is visible for the whole delay before it lands. A payer can check it and a payee can rely on it.</p>
+  <p>The contract takes no cut, has no admin key other than the owner's, and cannot be upgraded.</p>
 
-  <h2 id="s-paid">Get paid into it</h2>
-  <p>Give the address to whoever pays you. ETH and tokens sent to it sit there until someone pays out; nothing moves on its own.</p>
-  <p>If a contract pays you — a fee hook, a royalty, your own app — tell its developer one thing: send ETH with <code>call</code> and gas, not <code>.transfer()</code> or <code>.send()</code>. Those two carry a 2,300-gas stipend only, and a distribution's call into a <em>cold</em> implementation costs more than that, so the payment can fail. A contract can also pay in and pay out in one transaction by calling <code>distribute</code> right after sending.</p>
-
-  <h2 id="s-payout">Pay out</h2>
-  <p>Anyone can press <b>distribute</b> — you, a payee, a stranger — and whoever presses it pays the gas. It splits everything the distribution holds of one token, ETH counted as one, across the table in a single transaction. Each payee is paid directly, in table order.</p>
-  <p>If one of them cannot receive — a contract that rejects ETH, a token transfer that fails — that share is held inside the distribution and the others are still paid. A held share stays out of every later split and waits; anyone can <b>release</b> it later, and a release that fails again leaves it held. An ETH payout carries a fixed allowance of 100,000 gas, so a payee whose receiving code needs more will always be held rather than paid. That is a property of the payee, and the fix is a simpler receiving address.</p>
+  <h2 id="s-how">How it works</h2>
+  <p>Funds arrive at the address and sit there. When someone calls <code>distribute</code>, the balance is split by the table and sent to each row. If a payee cannot receive its share, the share is held in the contract for that payee and can be released later.</p>
   ${figSeq()}
-
-  <h2 id="s-change">Change it</h2>
-  <p>Every change goes the same way: you <b>propose</b> it, the delay runs in public, then anyone <b>applies</b> it. The table, the description, the delay and the owner are each their own proposal, and this interface shows a proposal as <em>pending</em> with a countdown beside the current table, so a payee can see what is coming before it arrives.</p>
-  <p>While it waits you can <b>cancel</b> it, and cancelling is immediate. Once the countdown reaches zero anyone can apply it — it does not have to be you — and until someone does, the current table stays in force; nothing lands on its own. If applying fails, the proposal stays pending, and you can cancel it.</p>
-  <p>Changing the delay itself waits the delay in force, so a long delay cannot be shortened in a hurry. A delay of zero applies the change in the same transaction as the proposal, which is why interfaces flag it. In your wallet the three steps appear as <code>propose</code>, <code>applyQueued</code> and <code>cancel</code>.</p>
+  <p>The owner changes the table, the description, the delay or the owner by proposing the change. After the delay, anyone can apply it. Before that, the owner can cancel it.</p>
   ${figState()}
 
-  <h2 id="s-handover">Hand it over, or freeze it</h2>
-  <p>Ownership moves the same way as everything else: propose a new owner, wait, apply. The new owner can be a key, a multisig or a DAO; all the contract knows is one address allowed to propose and cancel. Ownership is per chain — moving it on one chain changes nothing on another.</p>
-  <p>Hand it to the zero address and you renounce: nothing can propose or cancel again, and the table is frozen for good. It is the strongest promise you can make to your payees, and it cannot be undone.</p>
+  <h2 id="s-create">Creating one</h2>
+  <p>You choose an owner, a delay and a table.</p>
+  <p>The owner is the address that can propose and cancel changes. The create screen fills in your wallet. A multisig or a DAO can own a distribution.</p>
+  <p>The delay is how long a change waits before it can be applied. The create screen starts at seven days. Zero is allowed, and a distribution with no delay is marked as such wherever it is shown.</p>
+  <p>The table is one row per address, with a share in percent, a name and a note. The shares must add up to 100. No row can have a zero share and no address can appear twice. When a payout does not divide evenly, the row with the highest address gets the remainder.</p>
+  <p>The address of the distribution is shown before you deploy, so it can go into a contract or an invoice first. ETH sent with the create transaction goes into the distribution.</p>
 
-  <h2 id="s-widget">Show it</h2>
-  <p>A drop-in script renders your distribution next to the fee it explains: the bar, the rows, the owner, the delay and any pending change, read straight from the chain with no server in between. It takes the font and the ink colour of the page it sits on; rules and muted text are derived from that ink, and the only fixed colours are the bar's segment tints and the pending amber. There is a full variant and a compact one, and both loading and failure degrade quietly without touching the host page.</p>
+  <h2 id="s-payin">Paying in</h2>
+  <p>Send ETH or any ERC-20 token to the address. Nothing is paid out until someone calls <code>distribute</code>.</p>
+  <p>A contract that pays in must send ETH with <code>call</code> and enough gas. <code>transfer</code> and <code>send</code> forward a 2,300-gas stipend only, and receiving into a clone whose implementation is cold costs more than that, so the payment fails.</p>
+
+  <h2 id="s-payout">Paying out</h2>
+  <p>Anyone can call <code>distribute</code>, and the caller pays the gas. One call pays out one token; ETH counts as a token. Each row is paid in table order.</p>
+  <p>If a row cannot receive, its share is held in the contract and the other rows are still paid. Held funds are left out of later payouts until someone calls <code>release</code> for that row. If the release fails, the funds stay held.</p>
+  <p>ETH is sent with 100,000 gas. A row that needs more than that to receive is always held.</p>
+
+  <h2 id="s-change">Changing it</h2>
+  <p>The table, the description, the delay and the owner can each be changed. Each change is its own proposal.</p>
+  <p>Propose the change. It shows as pending with a countdown, next to the current table. When the countdown ends, anyone can apply it. Until then the owner can cancel it, and the current table stays in force. Nothing applies on its own.</p>
+  <p>Changing the delay waits the current delay. With a delay of zero, the change applies in the same transaction as the proposal.</p>
+  <p>In a wallet these show as <code>propose</code>, <code>applyQueued</code> and <code>cancel</code>.</p>
+
+  <h2 id="s-owner">Ownership</h2>
+  <p>To transfer ownership, propose the new owner, wait, and apply. Ownership is per chain.</p>
+  <p>To freeze the table, transfer ownership to the zero address. After that nothing can be proposed or cancelled.</p>
+
+  <h2 id="s-widget">The widget</h2>
+  <p>A script that shows a distribution on another page: the bar, the rows, the owner, the delay and any pending change, read from the chain. It uses the host page's font and text colour. There is a full and a compact version.</p>
   <pre>&lt;script src="widget.js"&gt;&lt;/script&gt;\n&lt;div data-rake="0x…" data-chain="1"&gt;&lt;/div&gt;</pre>
-  <p>The path is root-relative because the contract that serves this page serves the script too, under whichever gateway you are reading it through. A mirror URL arrives with the mainnet deployment.</p>
+  <p>The script is served by the same contract as this page.</p>
 
-  <h2 id="s-trust">What to trust</h2>
-  <p>The contract protects your payees from surprise, not from you: the owner is trusted <em>over a delay</em>. What the owner is — a key, a multisig, a DAO — is outside the contract's scope, though this interface shows it.</p>
-  <div class="scroll"><table class="dtab"><tr><th>date</th><th>auditor</th><th>scope</th><th>findings</th></tr><tr><td class="dim">—</td><td class="dim">none yet — planned pre-launch</td><td class="dim">—</td><td class="dim">—</td></tr></table></div>
-  <p>Known limitations, as the contract stands. A token that charges a fee on transfer settles by balance, so what a payee receives can differ from the percentage on paper. A payee whose receiving code needs more than the 100,000-gas allowance is always held, never paid directly. A contract paying in with <code>.transfer()</code> or <code>.send()</code> can fail, because the 2,300-gas stipend does not cover the call into a <em>cold</em> implementation. The contracts are immutable: a bug is answered by a new distribution and a new table, never by a change under your feet.</p>
-  <p>Report privately through the repository's <a href="${REPO}/security/advisories/new" target="_blank" rel="noopener">advisory form</a>. There is no bounty programme yet; serious reports are taken seriously.</p>
+  <h2 id="s-limits">Limits</h2>
+  <p>The owner is trusted for the length of the delay. The contract protects payees from sudden changes, not from the owner.</p>
+  <p>A token that charges a fee on transfer pays out less than the table says.</p>
+  <p>A row that needs more than 100,000 gas to receive ETH is always held.</p>
+  <p>A contract paying in with <code>transfer</code> or <code>send</code> fails when the implementation is cold, because the 2,300-gas stipend does not cover it.</p>
+  <p>The contracts cannot be upgraded. A bug is fixed by deploying a new distribution.</p>
+  <p>There is no audit yet. Report issues through the repository's <a href="${REPO}/security/advisories/new" target="_blank" rel="noopener">advisory form</a>.</p>
 
   <h2 id="s-developers">For developers</h2>
-  <p>Both contracts are one file, MIT by the SPDX header, the primitive has no imports, and the comments are dense: <a href="${REPO}" target="_blank" rel="noopener">github.com/dnznlabs/rake</a>. Every function, event and error, the <code>Snapshot</code> struct the widget reads — its entire read surface — and the two calls that verify a clone are in <a href="${REPO}/blob/main/docs/REFERENCE.md" target="_blank" rel="noopener">docs/REFERENCE.md</a>, which CI checks against the ABI. The page you are reading is what a renderer contract's <code>html()</code> view returns.</p>
+  <p>Source: <a href="${REPO}" target="_blank" rel="noopener">github.com/dnznlabs/rake</a>, MIT. Both contracts are one file with no imports. Every function, event and error, and the <code>Snapshot</code> struct the widget reads, are in <a href="${REPO}/blob/main/docs/REFERENCE.md" target="_blank" rel="noopener">docs/REFERENCE.md</a>. This page is returned by the <code>html()</code> view of a renderer contract.</p>
   <div class="scroll"><table class="dtab"><tr><th>chain</th><th>factory</th><th>status</th></tr>${chainRows()}</table></div>
-  <p>The timelock, the self-call configuration, PUSH0 clones and the sender-bound CREATE2 salt are lifted from multisig.software (Src Co / z0r0z), whose single-file, audit-first ethos this project inherits. The low-level patterns follow Solady. Splits defined the category this primitive returns to.</p>
+  <p>The timelock, the self-call setters, PUSH0 clones and the sender-bound salt come from multisig.software (Src Co / z0r0z). The low-level patterns follow Solady.</p>
   </article></div>`;
 }
 

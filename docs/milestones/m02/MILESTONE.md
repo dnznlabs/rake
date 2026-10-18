@@ -60,11 +60,12 @@ rather than quote.
    2026-10-11: `0x5FbDB2315678afecb367f032d93F642f64180aa3` on both) and the seed creates the featured
    distribution at the same address with a **different** table. The dapp pointed at each chain shows
    that chain's table and names the chain; nothing presents the two as one distribution.
-6. **Docs page.** `#/docs` is written for the owner of a distribution (decision 16): what it is,
-   creating one, paying in, paying out, changing it, handing it over or renouncing, the widget snippet,
-   trust assumptions and how to report, and a closing section that sends developers to the repo and to
+6. **Docs page.** `#/docs` is written for the owner of a distribution (decision 16): what it is, why
+   it exists, how it works, creating one, paying in, paying out, changing it, ownership, the widget
+   snippet, limits and how to report, and a closing section that sends developers to the repo and to
    `docs/REFERENCE.md`, with the chain table reading "not deployed". Every claim it makes about
-   contract behaviour is read against `src/`. `docs/REFERENCE.md` carries the `Snapshot` struct
+   contract behaviour is read against `src/`. **The text m02-t04 ships is a draft**: Denizen writes
+   the final page himself in Phase 5, and criterion 10's signoff is not dated while the draft stands. `docs/REFERENCE.md` carries the `Snapshot` struct
    verbatim and a function table whose names are exactly the external functions of
    `forge inspect Distribution abi` (decision 9 names, so `applyQueued` and `beneficiaries`), plus
    events and errors; `test/docs.test.mjs` pins the struct and the ABI diff runs against the file.
@@ -93,8 +94,10 @@ rather than quote.
 10. **Signoff.** Phase 5 is closed by Denizen's written signoff, dated, recorded in this file. **This is
     the one criterion in M02 that is not a measurement**, and it is deliberate: the phase it closes is a
     subjective pass over the experience, so no command can settle it. The check is that the signoff
-    line exists and is dated — not that anyone agrees with it. Criteria 8 and 9 are re-run against the
-    code he signs off, and the result is recorded under this line; any other criterion whose inputs
+    line exists and is dated — not that anyone agrees with it. One thing it does gate: the `#/docs`
+    text is his, not the draft m02-t04 shipped (criterion 6, roadmap § Order), and the line is not
+    dated until he has written it. Criteria 8 and 9 are re-run against the code he signs off, and the
+    result is recorded under this line; any other criterion whose inputs
     Phase 5 touched is re-run with them (see Phase 5 § Consequences). Same rule as `state-collection`
     M1 AC 10, decided there on 2026-09-17 over a proposal to close on an empty task table.
 
@@ -195,8 +198,14 @@ Scope is decided per item, not fenced in advance: **anything is fair game**, `ap
 what a change is allowed to touch is settled when it is filed. What that costs is under
 "Consequences" below — it is a real cost, not a reason to narrow the rule.
 
+One row is fixed in advance: the docs page. m02-t04 shipped `#/docs` as a draft (decision 16), and
+Denizen writes the final text himself before the signoff. The checks on the page stay — the
+`docs/REFERENCE.md` struct and tables, the stipend-and-cold lines, criterion 9's greps, the `widget`
+section id the landing's CTA depends on — and run against what he writes.
+
 | Task | Goal | Status |
 |:-----|:-----|:-------|
+| docs text | `#/docs` rewritten by Denizen; criterion 6's checks re-run; criterion 8 re-chunked | not started — gates the signoff |
 
 #### Consequences of "anything is fair game" at end of M02
 

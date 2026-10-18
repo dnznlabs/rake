@@ -33,7 +33,11 @@ as `Distribution`; reviewing before M02 means reviewing twice.
 by Denizen on anvil — the same shape as `state-collection` M1 Phase 5 — open-ended, closed by his
 signoff (decision 14). It sits before M03 for the same reason M03 sits after M02: a UI change made
 after the review is a second review, and a contract change made after it is a third. Nothing in M03
-starts until the signoff line is dated.
+starts until the signoff line is dated. **The docs page is part of that signoff.** `#/docs` ships from
+m02-t04 as a draft the agents wrote (decision 16); Denizen writes its final text himself in Phase 5,
+and the signoff is not dated while the page still carries the draft. The checks on it — the reference
+file's struct and tables, the stipend-and-cold lines, criterion 9's greps — stay as they are and run
+against whatever he writes.
 
 **Same address, separate storage.** A distribution deployed to several chains is several contracts.
 Tables can drift and every owner action is queued once per chain. M02's acceptance criteria must show
@@ -185,10 +189,11 @@ recommended option.
     Ruled by Denizen on 2026-10-17 in the #60 review ("these docs should be targeted to end-user who
     creates and owns a distribution … they read like developer docs"), superseding
     `DESIGN_HANDOFF.md` § 3.3's "technical reader, white-paper register" and its twelve sections. The
-    page is nine sections in the order an owner meets them — what you get, create one, get paid into
-    it, pay out, change it, hand it over or freeze it, show it, what to trust, for developers — in the
-    second person, with a wallet's function names given once where the owner will meet them in a
-    prompt. The function, event and error tables and the verbatim `Snapshot` struct move to
+    page is eleven short sections — what it is, why it exists, how it works, creating one, paying in,
+    paying out, changing it, ownership, the widget, limits, for developers — in plain declarative
+    sentences, with a wallet's function names given once where the owner will meet them in a prompt.
+    The text on the branch is a draft: Denizen writes the final page himself in Phase 5, before the
+    signoff (§ Order, "M02 ends on Denizen"). The function, event and error tables and the verbatim `Snapshot` struct move to
     `docs/REFERENCE.md`, which `test/docs.test.mjs` and criterion 6's ABI diff read instead of the
     page, so the drift check is kept and the page stops paying for it. Rejected: an owner's
     introduction above the developer page (two audiences on one page, and the one who deploys reads
