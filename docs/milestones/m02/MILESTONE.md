@@ -1,6 +1,6 @@
 # M02 — Dapp and widget on anvil
 
-Status: in progress — t01, t02, t03 done, t04 assigned, Phase 5 added · updated 2026-10-13
+Status: in progress — t01, t02, t03, t04 done, t05 assigned, Phase 5 added · updated 2026-10-17
 
 The design prototype (`brainstorming/design/rake-dapp.html`, `rake-widget.html`) rebuilt as the real
 dapp on DNZN Base v1: reading `snapshot()` from the chain, sending the six writes through the wallet,
@@ -178,8 +178,8 @@ Independent of each other; the widget waits on #27, the docs page does not.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m02-t04](tasks/m02-t04/TASK.md) | `#/docs` from the prototype's docs segment against the real ABI; criterion 6; criterion 8 measured and recorded, with the second chunk served for the first time (#53 decided in the plan) | assigned — plan merged [#56](https://github.com/dnznlabs/rake/pull/56) 2026-10-13 at `98f1b89`; task issue [#58](https://github.com/dnznlabs/rake/issues/58), no gate; the report line is [#57](https://github.com/dnznlabs/rake/issues/57), default option 1 |
-| [m02-t05](tasks/m02-t05/TASK.md) | `App` serves `widget.js` as a second chunk set (per #27), `Chunks.s.sol` uploads both, the widget reads `snapshot()` through `data-rpc` or the host's `window.ethereum`, host page under `make serve`; criterion 7; criterion 9 in full, criterion 8 re-measured | planned — plan written 2026-10-13, gated on #60 merging |
+| [m02-t04](tasks/m02-t04/TASK.md) | `#/docs` from the prototype's docs segment against the real ABI; criterion 6; criterion 8 measured and recorded, with the second chunk served for the first time (#53 decided in the plan) | done — [#60](https://github.com/dnznlabs/rake/pull/60) merged 2026-10-17 at `620bcce`, approved at `fc2d4cb` (the twelve-section first cut) and re-approved on the owner's-page rewrite after Denizen's review, recorded as decision 17; two chunks served, `html()` 35,809 bytes, inflated sha256 equal to the build; [#57](https://github.com/dnznlabs/rake/issues/57) closed, default option 1 taken; carried: none |
+| [m02-t05](tasks/m02-t05/TASK.md) | `App` serves `widget.js` as a second chunk set (per #27), `Chunks.s.sol` uploads both, the widget reads `snapshot()` through `data-rpc` or the host's `window.ethereum`, host page under `make serve`; criterion 7; criterion 9 in full, criterion 8 re-measured | assigned — plan merged [#62](https://github.com/dnznlabs/rake/pull/62) 2026-10-17 at `58ba45d`; task issue [#63](https://github.com/dnznlabs/rake/issues/63), no gate; the plan's bundle baseline was taken on #60's first cut, so the issue asks for a re-measure on merged `main` first |
 
 ### Phase 5 — dapp and widget refinement
 
