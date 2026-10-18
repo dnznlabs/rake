@@ -60,11 +60,15 @@ rather than quote.
    2026-10-11: `0x5FbDB2315678afecb367f032d93F642f64180aa3` on both) and the seed creates the featured
    distribution at the same address with a **different** table. The dapp pointed at each chain shows
    that chain's table and names the chain; nothing presents the two as one distribution.
-6. **Docs page.** `#/docs` carries the `Snapshot` struct verbatim, a function table whose names are
-   exactly the external functions of `forge inspect Distribution abi` (decision 9 names, so
-   `applyQueued` and `beneficiaries`), the four verbs, the timelock, push/escrow/release, deployment
-   (chain table reading "not deployed"), the widget snippet, security (trust assumptions, how to
-   report), source and lineage. Diagrams are the prototype's inline SVG, re-inked to theme tokens.
+6. **Docs page.** `#/docs` is written for the owner of a distribution (decision 16): what it is,
+   creating one, paying in, paying out, changing it, handing it over or renouncing, the widget snippet,
+   trust assumptions and how to report, and a closing section that sends developers to the repo and to
+   `docs/REFERENCE.md`, with the chain table reading "not deployed". Every claim it makes about
+   contract behaviour is read against `src/`. `docs/REFERENCE.md` carries the `Snapshot` struct
+   verbatim and a function table whose names are exactly the external functions of
+   `forge inspect Distribution abi` (decision 9 names, so `applyQueued` and `beneficiaries`), plus
+   events and errors; `test/docs.test.mjs` pins the struct and the ABI diff runs against the file.
+   Diagrams are the prototype's inline SVG, re-inked to theme tokens.
 7. **Widget.** Per decision 12: `App.request(["widget.js"])` returns
    `200`, `Content-Type: application/javascript`, and a body byte-equal to `app/dist/widget.js`;
    `request([])` still returns the dapp; `forge test` covers both and the `lock()` paths. A host page

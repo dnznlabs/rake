@@ -109,12 +109,13 @@
   first, so a second run broadcasts nothing.
 - `#/docs` is the long page, and it matches by prefix so it paints before the wallet checks; the rail's
   links are `#/docs#<section>` and `docScroll` reaches `id="s-<section>"` once `docs()` has painted.
-  Its reference lists are data, not prose — `DOCS_FNS`, `DOCS_EVENTS`, `DOCS_ERRORS`, `DOCS_FACTORY` —
-  so `forge inspect Distribution abi` can be diffed against them, and the `Snapshot` struct is one
-  `DOCS_STRUCT` string with `\n` in it because the minifier would flatten an indented `<pre>`.
-  `test/docs.test.mjs` fails when the struct and `src/Distribution.sol` disagree by one character, and
-  when a function the selector fixture names is missing from the table. A claim about contract
-  behaviour on that page is checked against `src/` before it ships; the prototype's prose is a draft.
+  It is written for the owner of a distribution (ROADMAP decision 16), not for a developer: the
+  contract's surface is `docs/REFERENCE.md`, which the page's last section links. The tables there are
+  data — `test/docs.test.mjs` fails when the struct block and `src/Distribution.sol` disagree by one
+  character, or when a function the selector fixture names is missing from the function table, and
+  M02 criterion 6's script diffs the three `Distribution` tables against `forge inspect`. A claim about
+  contract behaviour on the page is checked against `src/` before it ships; the landing CTA depends
+  on the `widget` section id.
 - The build minifier strips leading whitespace on every line, template literals included.
 - gzip output depends on the node build's zlib. Build through devbox when the bytes matter.
 - Node tests are `test/*.test.mjs`.

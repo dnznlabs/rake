@@ -181,6 +181,20 @@ recommended option.
     `BadTable` and that only `cancel` clears after the delay ([#54](https://github.com/dnznlabs/rake/issues/54),
     M03's); and preflighting `applyQueued` at propose time, impossible because the entry does not
     exist yet.
+17. **`#/docs` is written for the owner of a distribution; the contract reference lives in the repo.**
+    Ruled by Denizen on 2026-10-17 in the #60 review ("these docs should be targeted to end-user who
+    creates and owns a distribution … they read like developer docs"), superseding
+    `DESIGN_HANDOFF.md` § 3.3's "technical reader, white-paper register" and its twelve sections. The
+    page is nine sections in the order an owner meets them — what you get, create one, get paid into
+    it, pay out, change it, hand it over or freeze it, show it, what to trust, for developers — in the
+    second person, with a wallet's function names given once where the owner will meet them in a
+    prompt. The function, event and error tables and the verbatim `Snapshot` struct move to
+    `docs/REFERENCE.md`, which `test/docs.test.mjs` and criterion 6's ABI diff read instead of the
+    page, so the drift check is kept and the page stops paying for it. Rejected: an owner's
+    introduction above the developer page (two audiences on one page, and the one who deploys reads
+    the one who does not); the reference as a third on-chain document (a developer has the repo and
+    the contract itself, which is where they go). Criterion 6 reworded in `MILESTONE.md`. Landed in
+    m02-t04 on re-review.
 
 ## Findings carried forward
 
