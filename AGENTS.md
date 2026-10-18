@@ -109,7 +109,7 @@
   first, so a second run broadcasts nothing.
 - `#/docs` is the long page, and it matches by prefix so it paints before the wallet checks; the rail's
   links are `#/docs#<section>` and `docScroll` reaches `id="s-<section>"` once `docs()` has painted.
-  It is written for the owner of a distribution (ROADMAP decision 16), not for a developer: the
+  It is written for the owner of a distribution (ROADMAP decision 17), not for a developer: the
   contract's surface is `docs/REFERENCE.md`, which the page's last section links. The tables there are
   data — `test/docs.test.mjs` fails when the struct block and `src/Distribution.sol` disagree by one
   character, or when a function the selector fixture names is missing from the function table, and

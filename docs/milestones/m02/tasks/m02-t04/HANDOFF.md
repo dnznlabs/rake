@@ -6,7 +6,7 @@ PR: #60 · Branch: `m02/t04-docs` · 2026-10-13, re-scoped 2026-10-17
 exists, how it works, creating one, paying in, paying out, changing it, ownership, the widget, limits,
 and a closing section for developers that points at the repo and at `docs/REFERENCE.md`. The text is
 a draft: Denizen writes the final page himself in Phase 5, before the signoff (ROADMAP § Order). That is ROADMAP
-decision 16, ruled by Denizen in this PR's review; the first cut of this branch was the twelve-section
+decision 17, ruled by Denizen in this PR's review; the first cut of this branch was the twelve-section
 white paper DESIGN_HANDOFF § 3.3 asked for, and the architect's approval at `fc2d4cb` was of that cut.
 The contract's own surface — every function, event and error, and the `Snapshot` struct verbatim —
 moved from the page to `docs/REFERENCE.md`, and the drift check moved with it: `test/docs.test.mjs`
@@ -32,7 +32,7 @@ cut's are in § Size for comparison.
 
 | AC | Result | Evidence |
 |:---|:-------|:---------|
-| **M02 criterion 6** — the reference's tables are the real ABI | pass | `/tmp/t04-abi.sh` (reproduced in § The acceptance script) prints nothing and exits 0, for `.type=="function"` against `### Functions`, `.type=="event"` against `### Events` and `.type=="error"` against `### Errors` in `docs/REFERENCE.md`. `grep -c 'id="s-' app/src/index.html` → `11`, in decision 16's order (asserted by the last test below, which compares the rendered id order with `SECTIONS`). |
+| **M02 criterion 6** — the reference's tables are the real ABI | pass | `/tmp/t04-abi.sh` (reproduced in § The acceptance script) prints nothing and exits 0, for `.type=="function"` against `### Functions`, `.type=="event"` against `### Events` and `.type=="error"` against `### Errors` in `docs/REFERENCE.md`. `grep -c 'id="s-' app/src/index.html` → `11`, in decision 17's order (asserted by the last test below, which compares the rendered id order with `SECTIONS`). |
 | **M02 criterion 6** — the struct is pinned | pass | `node --test test/*.test.mjs` → `tests 46 · pass 46 · fail 0`, `test/docs.test.mjs` among the files (8 tests). Changing one character of `src/Distribution.sol:12` (`uint96 bps;` → `uint96 bips;`) fails it: `+ '    uint96 bps;\n' / - '    uint96 bips;\n'`. Restored; `git diff --stat -- src` prints nothing. |
 | **M02 criterion 6** — the page is the owner's | pass, as a draft | Eleven `h2`: `What it is · Why it exists · How it works · Creating one · Paying in · Paying out · Changing it · Ownership · The widget · Limits · For developers`. The text is Denizen's to finalise in Phase 5 (ROADMAP § Order); what ships here is the draft he reviewed on 2026-10-17 and took as is. No function table, no struct, no event or error list on the page; `grep -c 'REFERENCE.md' app/src/index.html` → `2`: the docs block's comment and the last section's link. Every contract claim on it is in § Reference check with its line. |
 | **M02 criterion 8, re-measured** — two chunks, served | pass | `make deploy ANVIL_PORT=8599`: `chunk 0 0xCafac3dD…052c` **and** `chunk 1 0x9f1ac54B…3a8e`, `payload bytes 26349`, `html() bytes 35809`. `cast call $APP "chunkCount()(uint256)"` → `2`; `"gzipped()(bool)"` → `true`. |
@@ -44,11 +44,11 @@ cut's are in § Size for comparison.
 | **The trim list** | pass, re-measured | § Trim list: three figures, each measured as this branch's bundle with the named block removed, through one `node app/build.mjs` invocation per build. **The conclusion changed with the rewrite:** removing all three now reaches one chunk. |
 | **Criterion 9's vocabulary grep** | pass | `grep -rnE '\btip\b\|govUrl\|about:\|ownerKind' app/src` prints nothing. |
 | **The rest of criterion 9's list** | pass | `grep -c 'rake.distro'` → `0`; `grep -c 'style="'` → `5`, the `main` figure; `grep -cE '#[0-9a-fA-F]{6}'` → `0`; `forge test` → `36 tests passed, 0 failed`, `forge snapshot --check` exit 0, build free of `Warning (`/`warning[`, lint and fmt silent — all at `fc2d4cb`, and the rewrite touches nothing under `src/` or `test/*.t.sol` (`git diff --stat fc2d4cb -- src test/*.t.sol` is empty), so none of them re-opens. `git status --porcelain` empty after the list and after `make chain-doc` (`out/` and `broadcast/` are ignored). |
-| **The diff names only the permitted files, plus the ruling's** | pass | `git diff --stat origin/main` → `AGENTS.md`, `app/src/index.html`, `app/src/theme.css`, `test/docs.test.mjs`, `tools/chain-doc.mjs`, this handoff, and — for decision 16 — `docs/REFERENCE.md` (new), `docs/ROADMAP.md` and `docs/milestones/m02/MILESTONE.md`. `app/src/layout.html` did **not** change — the rail needed no shell element. |
+| **The diff names only the permitted files, plus the ruling's** | pass | `git diff --stat origin/main` → `AGENTS.md`, `app/src/index.html`, `app/src/theme.css`, `test/docs.test.mjs`, `tools/chain-doc.mjs`, this handoff, and — for decision 17 — `docs/REFERENCE.md` (new), `docs/ROADMAP.md` and `docs/milestones/m02/MILESTONE.md`. `app/src/layout.html` did **not** change — the rail needed no shell element. |
 
 ### The acceptance script
 
-`/tmp/t04-abi.sh`, reading `docs/REFERENCE.md` rather than the page since decision 16, because
+`/tmp/t04-abi.sh`, reading `docs/REFERENCE.md` rather than the page since decision 17, because
 `devbox run -- bash -c '…'` mangles `|` and `$VAR`:
 
 ```bash
@@ -161,7 +161,7 @@ all still what the page says, in the owner's words.
 
 ## Deviations from the plan
 
-**The page was re-scoped at review, under decision 16.** The plan, DESIGN_HANDOFF § 3.3 and criterion
+**The page was re-scoped at review, under decision 17.** The plan, DESIGN_HANDOFF § 3.3 and criterion
 6 as written all asked for a technical reader's white paper, and `fc2d4cb` delivered it. Denizen's
 review found it read as developer docs for a page whose reader is the owner of a distribution, and
 ruled; the rewrite is on this branch for the architect's re-review rather than in a new task, by
@@ -217,7 +217,7 @@ section links the repository's private advisory form,
 `https://github.com/dnznlabs/rake/security/advisories/new`, with "there is no bounty programme yet".
 M03's `SECURITY.md` supersedes it. Per #57 § Record, this file is the record until it is ruled.
 
-**Decision 16 — the page is the owner's, and the text is Denizen's to finish.** Ruled by Denizen on
+**Decision 17 — the page is the owner's, and the text is Denizen's to finish.** Ruled by Denizen on
 2026-10-17 in this PR's review; the entry in `ROADMAP.md` § Decisions has the options and what it
 supersedes. Two drafts were written on the branch that day: a nine-section one in the second person,
 which he read as having a tone, and the eleven-section one that ships — what it is, why, how, then the
@@ -278,4 +278,4 @@ and `docs()` repaints identically in either case.
 
 ## Open questions
 
-None. #57's default was taken and is recorded above; decision 16 is recorded in `ROADMAP.md`.
+None. #57's default was taken and is recorded above; decision 17 is recorded in `ROADMAP.md`.

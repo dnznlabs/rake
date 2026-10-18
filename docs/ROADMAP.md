@@ -34,7 +34,7 @@ by Denizen on anvil — the same shape as `state-collection` M1 Phase 5 — open
 signoff (decision 14). It sits before M03 for the same reason M03 sits after M02: a UI change made
 after the review is a second review, and a contract change made after it is a third. Nothing in M03
 starts until the signoff line is dated. **The docs page is part of that signoff.** `#/docs` ships from
-m02-t04 as a draft the agents wrote (decision 16); Denizen writes its final text himself in Phase 5,
+m02-t04 as a draft the agents wrote (decision 17); Denizen writes its final text himself in Phase 5,
 and the signoff is not dated while the page still carries the draft. The checks on it — the reference
 file's struct and tables, the stipend-and-cold lines, criterion 9's greps — stay as they are and run
 against whatever he writes.

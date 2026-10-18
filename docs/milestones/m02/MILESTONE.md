@@ -60,7 +60,7 @@ rather than quote.
    2026-10-11: `0x5FbDB2315678afecb367f032d93F642f64180aa3` on both) and the seed creates the featured
    distribution at the same address with a **different** table. The dapp pointed at each chain shows
    that chain's table and names the chain; nothing presents the two as one distribution.
-6. **Docs page.** `#/docs` is written for the owner of a distribution (decision 16): what it is, why
+6. **Docs page.** `#/docs` is written for the owner of a distribution (decision 17): what it is, why
    it exists, how it works, creating one, paying in, paying out, changing it, ownership, the widget
    snippet, limits and how to report, and a closing section that sends developers to the repo and to
    `docs/REFERENCE.md`, with the chain table reading "not deployed". Every claim it makes about
@@ -198,7 +198,7 @@ Scope is decided per item, not fenced in advance: **anything is fair game**, `ap
 what a change is allowed to touch is settled when it is filed. What that costs is under
 "Consequences" below — it is a real cost, not a reason to narrow the rule.
 
-One row is fixed in advance: the docs page. m02-t04 shipped `#/docs` as a draft (decision 16), and
+One row is fixed in advance: the docs page. m02-t04 shipped `#/docs` as a draft (decision 17), and
 Denizen writes the final text himself before the signoff. The checks on the page stay — the
 `docs/REFERENCE.md` struct and tables, the stipend-and-cold lines, criterion 9's greps, the `widget`
 section id the landing's CTA depends on — and run against what he writes.
