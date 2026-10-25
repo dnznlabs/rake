@@ -1,6 +1,6 @@
 # m02-t06 — handoff
 
-PR: #<n> · Branch: `m02/t06-close-out` · 2026-10-25
+PR: #71 · Branch: `m02/t06-close-out` · 2026-10-25
 
 Five carried issues are closed and #22's test half has landed. `make deploy` now refuses a chain that
 already carries the factory instead of silently moving the featured address (#35); the seed's deposit
@@ -95,7 +95,8 @@ limit" without pinning a figure that moves with the harness.
    `widget.test.mjs`'s precedent instead: it lifts the declaration out of `app/src/index.html` and
    evaluates it, asserting both ends of the slice so a reformat fails with a sentence rather than
    silently testing nothing. **If `amt` should live in `model.js`, that is a one-line move plus a
-   re-point of this test — the architect's call, not taken here.**
+   re-point of this test. **Decided at review: `amt` stays in `index.html`, and the move to
+   `model.js` rides whichever Phase 5 PR next touches the formatter.**
 7. **The collision test emits two `log_named_uint` lines.** Step 6 asks only for the `gasleft()` pair
    and the `assertGt`; the emits exist so the figures above can be read off `-vv` instead of being
    re-derived, and they are part of that row's +3,966.
