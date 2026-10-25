@@ -153,8 +153,35 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&am
 const short = a => a ? a.slice(0, 6) + '…' + a.slice(-4) : '';
 const cname = id => CHAINS[id] || 'chain ' + id;
 const wrongChain = () => !!CHAIN && String(CHAIN) !== String(CFG.chainId);
-// Four decimals, truncated: this is a balance to read, not an amount to settle against.
-const amt = w => { const s = (BigInt(w) / 100000000000000n).toString().padStart(5, '0'); return s.slice(0, -4) + '.' + s.slice(-4); };
+/* Four decimals, truncated: this is a balance to read, not an amount to settle against. `dec` is the
+   token's own `decimals()` — `null` when that call could not be read, and the raw units are then
+   printed with a `raw` suffix rather than a figure scaled by a guess (#43). Under four decimals the
+   value scales up instead of down, so the column still reads four places and nothing is dropped: a
+   0-decimal token's 1500 is `1500.0000`, exactly, and truncation there can never bite. */
+const amt = (w, dec = 18) => {
+  const v = BigInt(w);
+  if (dec == null) return v.toString() + ' raw';
+  const s = (dec >= 4 ? v / 10n ** BigInt(dec - 4) : v * 10n ** BigInt(4 - dec)).toString().padStart(5, '0');
+  return s.slice(0, -4) + '.' + s.slice(-4);
+};
+/* A token's decimals, read once and kept. ETH is seeded because the funds block asks for every token
+   in its list and the zero address heads that list; a token whose `decimals()` cannot be read caches
+   `null`, so the failure costs one call too. */
+const DECIMALS = new Map([[ZERO, 18]]);
+async function decimalsOf(tk) {
+  if (DECIMALS.has(tk)) return DECIMALS.get(tk);
+  let dec = null;
+  try {
+    /* Not through `call`: an empty return decodes to 0, so a token with a fallback that answers
+       nothing would print as whole units — the one thing `raw` exists to prevent. Anything short of
+       a word is a failure here, which is what the plain `eth_call` is for. */
+    const res = await P.request({ method: 'eth_call', params: [{ to: tk, data: Eth.enc('decimals()', []) }, 'latest'] });
+    if (!res || res.length < 66) throw new Error('decimals() answered ' + res);
+    dec = Number(Eth.dec(['uint8'], res)[0]);
+  } catch (e) { dec = null; }
+  DECIMALS.set(tk, dec);
+  return dec;
+}
 /* The clock a timelock is compared against is the chain's, not the browser's: `applyQueued` tests
    `block.timestamp`. On a real chain the two agree to within a block; on a dev chain that has been
    moved forward they do not, and a countdown read from the wrong one keeps `apply` disabled on an
@@ -348,17 +375,21 @@ function entry(log) {
   } else if (kind === 'in') {
     e.what = `${amt(log.data)} ETH from ${esc(short(at(1)))}`;
   } else if (kind === 'distributed') {
-    e.token = at(1);
-    e.what = `${amt(log.data)} ${token(e.token)} by the table`;
+    e.token = at(1); e.amount = log.data;
   } else {
     // `Escrowed` and `Released` both index the token then the account, which is the token list and the
     // escrow list the funds block reads: nothing on chain carries either one.
-    e.token = at(1); e.account = at(2);
-    e.what = `${amt(log.data)} ${token(e.token)} · ${esc(short(e.account))}`;
+    e.token = at(1); e.account = at(2); e.amount = log.data;
   }
   return e;
 }
 const token = a => a === ZERO ? 'ETH' : short(a);
+/* The three fund kinds that carry a token leave their line to here: the amount is in that token's own
+   units, `decimals()` is a call, and `entry` is synchronous over the logs. `dec` is whatever
+   `decimalsOf` found for the token, `null` included — `amt` prints that as raw units. */
+const fundWhat = (e, dec) => e.kind === 'distributed'
+  ? `${amt(e.amount, dec)} ${token(e.token)} by the table`
+  : `${amt(e.amount, dec)} ${token(e.token)} · ${esc(short(e.account))}`;
 /* A decoded pending action as one line, named by the setter it calls. `setBeneficiaries` is also
    drawn as a second bar; the other three say everything they do here. */
 function describe(p) {
@@ -668,8 +699,16 @@ async function detail(addr) {
     if (stale(t)) return;
     DS.nonces = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.nonce]));
     fill('h-changes', h.changes.length ? histRows(h.changes) : notice('no change has been queued yet.'));
-    fill('h-funds', h.funds.length ? histRows(h.funds) : notice('nothing has arrived at this address yet.'));
     fill('pending', pendingBlock(d, true));
+    /* The fund rows carry amounts in their token's own units (#43), and the changes above do not, so
+       they paint first and the token set these logs name is read here — one pass for the whole
+       history, cached for the funds block below, which asks for the same tokens. */
+    const decs = new Map(await Promise.all(
+      [...new Set(h.funds.filter(e => e.amount != null).map(e => e.token))].map(async tk => [tk, await decimalsOf(tk)]),
+    ));
+    if (stale(t)) return;
+    for (const e of h.funds) if (e.amount != null) e.what = fundWhat(e, decs.get(e.token));
+    fill('h-funds', h.funds.length ? histRows(h.funds) : notice('nothing has arrived at this address yet.'));
     const f = await readFunds(d, h.funds);
     if (stale(t)) return;
     fill('funds', fundsHTML(d, f));
@@ -788,7 +827,9 @@ async function readFunds(d, funds) {
       ? BigInt(await P.request({ method: 'eth_getBalance', params: [d.addr, 'latest'] }))
       : (await call(tk, 'balanceOf(address)', [d.addr], ['uint256']))[0];
     const waiting = held - reserved;
-    return { tk, reserved, waiting: waiting > 0n ? waiting : 0n };
+    // The token's own decimals ride along with its balance rather than costing a second pass (#43).
+    const dec = await decimalsOf(tk);
+    return { tk, dec, reserved, waiting: waiting > 0n ? waiting : 0n };
   }));
   /* Every `(token, account)` an `Escrowed` log ever named, read back from the mapping: a released row
      reads zero and is dropped, so this is the escrow as it stands rather than as it happened. */
@@ -796,7 +837,7 @@ async function readFunds(d, funds) {
   const escrows = await Promise.all(pairs.map(async k => {
     const [tk, ac] = k.split(' ');
     const [held] = await call(d.addr, 'escrowed(address,address)', [tk, ac], ['uint256']);
-    return { tk, ac, held };
+    return { tk, ac, held, dec: await decimalsOf(tk) };
   }));
   return { rows, escrows: escrows.filter(e => e.held > 0n) };
 }
@@ -804,14 +845,14 @@ const frow = (k, sub, n, ctl, cls) => `<div class="frow${cls ? ' ' + cls : ''}">
 function fundsHTML(d, f) {
   const rows = f.rows.map(r => frow(
     r.tk === ZERO ? 'ETH' : ext('address', r.tk, esc(short(r.tk))),
-    r.reserved > 0n ? `waiting to distribute · ${amt(r.reserved)} held in escrow` : 'waiting to distribute',
-    amt(r.waiting),
+    r.reserved > 0n ? `waiting to distribute · ${amt(r.reserved, r.dec)} held in escrow` : 'waiting to distribute',
+    amt(r.waiting, r.dec),
     sctl(`dist:${r.tk}`, 'distribute', { to: d.addr, sig: 'distribute(address)', args: () => [r.tk], label: `distribute ${token(r.tk)}` }, r.waiting === 0n),
   )).join('');
   const escrows = f.escrows.map(e => frow(
     `escrowed · ${esc(token(e.tk))}`,
     `${ext('address', e.ac, esc(short(e.ac)))} — the push failed, so this share waits here`,
-    amt(e.held),
+    amt(e.held, e.dec),
     sctl(`rel:${e.tk}:${e.ac}`, 'release', { to: d.addr, sig: 'release(address,address)', args: () => [e.tk, e.ac], label: 'release' }),
     'err',
   )).join('');
