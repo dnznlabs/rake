@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>rake widget — dev host</title>
+<!--
+  A foil, not a page of the dapp. app/build.mjs substitutes the three tokens below and copies this
+  file into app/dist unminified; `make serve` hands it out beside index.html and widget.js, and
+  Chunks.s.sol never reads it. The four panels are styled by the <style> block below and by nothing
+  else — the base's stylesheet is deliberately absent, because the page exists to show the widget
+  wearing a host's font and ink, and a host that is already DNZN Base proves nothing.
+
+  Four panels, five mounts, all of the featured distribution except the failure one:
+
+    dark indigo dex     full
+    light saas billing  full, in a second host's type and ink
+    brutalist serif     compact
+    states              a codeless address (failure), and an endpoint the browser refuses
+                        (loading, then failure)
+
+  http://localhost:3000/host?rpc=http://127.0.0.1:8545 — ?rpc= defaults to that.
+
+  Open it at /host, with no extension. `serve` rewrites /host.html to /host with a bare
+  `Location: /host`, dropping the query string, so /host.html?rpc=… reads the default endpoint
+  instead of the one asked for and the page renders nothing but its own error line.
+-->
+<style>
+body{margin:0;background:#F0EEE9;color:#1a1a1a;font:13px/1.5 ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+.hd{max-width:960px;margin:0 auto;padding:26px 40px 6px}
+.hd b{font-size:14px;letter-spacing:.04em}
+.hd .sub{font-size:10px;letter-spacing:.12em;color:#8a8a85}
+.note{max-width:960px;margin:0 auto;padding:0 40px 20px;font-size:11.5px;color:rgba(0,0,0,.5);line-height:1.6}
+.note code{font-size:11px}
+.grid{max-width:960px;margin:0 auto;padding:0 40px 60px;display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.panel{border:1px solid rgba(0,0,0,.1)}
+.plabel{font:600 10px ui-monospace,Menlo,monospace;letter-spacing:.09em;text-transform:uppercase;color:rgba(0,0,0,.45);padding:8px 12px;border-bottom:1px solid rgba(0,0,0,.08);background:#fff}
+
+/* The four hosts. Each one owns its background, its type stack and its ink; the widget inside it is
+   given none of the three and has to inherit all of them. */
+.dex{background:#14172B;padding:24px;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+.dex .card{background:#1C2140;border-radius:12px;padding:20px 22px;color:#E8E9F2;font-size:13px}
+.dex .fee{display:flex;justify-content:space-between;opacity:.65;font-size:12px;margin-bottom:12px}
+.saas{background:#F3F4F6;padding:24px;font-family:'Segoe UI',system-ui,Roboto,sans-serif}
+.saas .card{background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:18px 20px;color:#1F2937}
+.saas .h{font-size:13px;font-weight:600;margin-bottom:2px}
+.saas .p{font-size:12px;color:#6B7280;margin-bottom:12px}
+.serif{background:#fff;color:#000;padding:26px 28px;font-family:Georgia,'Times New Roman',serif}
+.serif .lead{font-size:15px;line-height:1.6;max-width:52ch;margin-bottom:14px}
+.states{background:#FCFCFA;color:#161616;padding:22px 24px;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;display:grid;gap:22px}
+.states .k{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:rgba(0,0,0,.4);margin-bottom:8px}
+@media (max-width:760px){.grid{grid-template-columns:1fr;padding:0 20px 40px}.hd,.note{padding-left:20px;padding-right:20px}}
+</style>
+</head>
+<body>
+<div class="hd"><b>RAKE</b> <span class="sub">WIDGET · DEV HOST</span></div>
+<div class="note">
+ The widget inherits the host: font from the host, ink from <code>currentColor</code>, rules at reduced
+ opacity. Fixed colours: the bar's three tints, the pending amber, the error red. The theme is picked
+ from the host's background luminance unless <code>data-theme</code> says otherwise.
+ <span id="who">reading the featured distribution…</span>
+</div>
+<div class="grid">
+ <div class="panel"><div class="plabel">dark indigo dex · full</div>
+  <div class="dex"><div class="card">
+   <div class="fee"><span>fee 0.30% · 0.0030 ETH</span><span>where does it go? ▴</span></div>
+   <div id="m-dex"></div>
+  </div></div>
+ </div>
+ <div class="panel"><div class="plabel">light saas billing · full</div>
+  <div class="saas"><div class="card">
+   <div class="h">Platform fee</div>
+   <div class="p">2.0% per transaction, routed on-chain.</div>
+   <div id="m-saas"></div>
+  </div></div>
+ </div>
+ <div class="panel"><div class="plabel">brutalist serif page · compact</div>
+  <div class="serif">
+   <div class="lead">Minting is free. A 1% royalty on secondary sales goes to the maintainers' distribution:</div>
+   <div id="m-serif"></div>
+  </div>
+ </div>
+ <div class="panel"><div class="plabel">states · failure / loading then failure</div>
+  <div class="states">
+   <div><div class="k">codeless address</div><div id="m-fail"></div></div>
+   <div><div class="k">endpoint the browser refuses</div><div id="m-load"></div></div>
+  </div>
+ </div>
+</div>
+<script src="widget.js"></script>
+<script>
+(function () {
+'use strict';
+var RPC = new URLSearchParams(location.search).get('rpc') || 'http://127.0.0.1:8545';
+var FACTORY = '__DISTRIBUTIONFACTORY__', SALT = '__FEATURED_SALT__', CHAIN = '__CHAIN_ID__';
+/* An address with no code: eth_call answers 0x, the decoder refuses, and the widget says so. */
+var DEAD = '0x000000000000000000000000000000000000dEaD';
+/* Port 9 is on chromium's unsafe-port list, so the browser refuses the request itself and the fetch
+   rejects with ERR_UNSAFE_PORT — no connection is attempted and nothing has to be listening. That is
+   why the port stays 9: a browser-refused port fails the same way on every machine, where "nothing
+   listens here" depends on what the machine happens to be running. One mount therefore shows the
+   loading state and then the failure state, in order, which a demo hook could only pretend to. */
+var NOWHERE = 'http://127.0.0.1:9';
+
+function mount(slot, addr, attrs) {
+  var el = document.createElement('div');
+  el.setAttribute('data-rake', addr);
+  el.setAttribute('data-chain', CHAIN);
+  for (var k in attrs) el.setAttribute(k, attrs[k]);
+  document.getElementById(slot).appendChild(el);
+  /* Mounted by hand rather than by the widget's own DOMContentLoaded sweep: every mount here is
+     created after predict() answers, which is after that sweep has run and found nothing. */
+  window.RakeWidget.mount(el);
+  return el;
+}
+
+/* The featured distribution is a salt, not an address (decision 10): factory.predict(salt), the same
+   read the dapp does at boot. `cast sig "predict(bytes32)"` → 0x0e787cce. */
+fetch(RPC, {
+  method: 'POST', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: FACTORY, data: '0x0e787cce' + SALT.slice(2) }, 'latest'] })
+}).then(function (r) { return r.json(); }).then(function (j) {
+  if (!j.result || j.result.length < 66) throw new Error('predict returned ' + JSON.stringify(j));
+  var featured = '0x' + j.result.slice(26);
+  document.getElementById('who').textContent = 'featured ' + featured + ' · chain ' + CHAIN + ' · rpc ' + RPC;
+
+  mount('m-dex', featured, { 'data-rpc': RPC });
+  mount('m-saas', featured, { 'data-rpc': RPC });
+  mount('m-serif', featured, { 'data-rpc': RPC, 'data-variant': 'compact' });
+  mount('m-fail', DEAD, { 'data-rpc': RPC });
+  mount('m-load', featured, { 'data-rpc': NOWHERE });
+}).catch(function (e) {
+  document.getElementById('who').textContent = 'could not reach ' + FACTORY + ' on ' + RPC + ' — ' + e.message;
+});
+})();
+</script>
+</body>
+</html>
