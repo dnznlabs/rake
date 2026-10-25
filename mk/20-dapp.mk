@@ -13,7 +13,7 @@ test::
 	node --test test/*.test.mjs
 
 clean::
-	rm -rf app/dist
+	rm -rf app/dist app/chain
 
 deploy::
 	@$(MAKE) --no-print-directory dapp

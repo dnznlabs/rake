@@ -21,4 +21,6 @@ out/
 # fragment: dapp
 # Built bundle: network-specific once addresses are substituted.
 app/dist/
+# What the chain returns, written by `make chain-doc`. Not under forge's `out/`, which a build empties.
+app/chain/
 node_modules/
