@@ -40,7 +40,8 @@ rather than quote.
    `cast balance` of it above zero. `FEATURED_SALT` is one build token, never an address: the dapp
    computes the address through `predict`.
 3. **Reads.** With the dev build up (`make serve`, `http://localhost:3000/?rpc=…&from=…`):
-   `#/` shows the featured distribution's bar, ledger, delay, owner and the pending change;
+   `#/` links the featured distribution, and `#/distros/<featured>` shows its bar, ledger, delay, owner
+   and the pending change (decision 18; until 2026-10-25 `#/` rendered them itself);
    `#/distros/<addr>` shows the same for any created distribution; `#/distros` lists `recent`
    (localStorage) and `mine` (`Created` logs filtered by owner, each confirmed against `snapshot().owner`).
    Every displayed value equals the matching field of `cast call <addr> "snapshot()"` and the pending
@@ -202,13 +203,14 @@ what a change is allowed to touch is settled when it is filed. What that costs i
 One row is fixed in advance: the docs page. m02-t04 shipped `#/docs` as a draft (decision 17), and
 Denizen writes the final text himself before the signoff. The checks on the page stay — the
 `docs/REFERENCE.md` struct and tables, the stipend-and-cold lines, criterion 9's greps, the `widget`
-section id the landing's CTA depends on — and run against what he writes.
+section id the owner bar's widget link depends on — and run against what he writes.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| docs text | `#/docs` rewritten by Denizen; criterion 6's checks re-run; criterion 8 re-chunked | not started — gates the signoff |
-| landing diagram ([#50](https://github.com/dnznlabs/rake/issues/50)) | The hero's 60/30/10 diagram over a live 60/40, and its ~5 px type at 390 px; three options each in the issue, recommendation: draw the diagram from the featured `snapshot()` | not started — Denizen's call, in the loop he drives |
-| widget reachability ([#68](https://github.com/dnznlabs/rake/issues/68)) | Freedom calls `html()` for every path, so `web3://…/widget.js` renders the dapp there; the client survey is on the issue. A ruling, not a tweak: it decides what `#/docs` § the widget tells a host to embed | open — ruling before the docs text is final |
+| docs text | `#/docs` rewritten at Denizen's direction in the hero's formal register (decision 17, amended 2026-10-25); criterion 6's checks re-run; criterion 8 re-chunked | in review — [#73](https://github.com/dnznlabs/rake/pull/73); Denizen's merge is his approval of the text |
+| landing diagram ([#50](https://github.com/dnznlabs/rake/issues/50)) | The hero's 60/30/10 diagram over a live 60/40, and its ~5 px type at 390 px. Ruled as decision 18: new hero, the live example replaced by the real widget beside the address field, the widget link moved to the owner bar, the diagram captioned `example` with a phone layout, an ink favicon | in review — [#73](https://github.com/dnznlabs/rake/pull/73) |
+| widget reachability ([#68](https://github.com/dnznlabs/rake/issues/68)) | Freedom calls `html()` for every path, so `web3://…/widget.js` renders the dapp there; the client survey is on the issue. A ruling, not a tweak: it decides what `#/docs` § the widget tells a host to embed | ruled 2026-10-25 as decision 19 — in review in [#73](https://github.com/dnznlabs/rake/pull/73) |
+| UI pass | Click-to-copy icon on every address and hash, tx ids on every history row and queued change, section rules dropped on the landing and distribution page, a quiet `create +` on `#/distros` | in review — [#73](https://github.com/dnznlabs/rake/pull/73) |
 
 #### Consequences of "anything is fair game" at end of M02
 

@@ -1,7 +1,7 @@
 /* ═══ rake widget · __VERSION__ — the second document `App` serves. MIT. ═══
 
    One `eth_call` of `snapshot()`, one decoder for its return, one stylesheet. Nothing else: no
-   dependency, no link, no analytics, no demo hook. It inherits the host — font from the host, ink
+   dependency, no analytics, no demo hook, and no link unless the host asks for one. It inherits the host — font from the host, ink
    from `currentColor`, rules and muted text from `currentColor` at reduced opacity — so the only
    fixed colours are the bar's three tints, the pending amber and the error red, and every one of
    them is a literal `app/src/theme.css` carries (`test/widget.test.mjs` (c) pins that).
@@ -13,6 +13,9 @@
           data-rpc="https://…"         optional: read through this endpoint instead of the wallet
           data-variant="compact"       optional: bar + one line, for a footer
           data-theme="dark|light"      optional: overrides the host-luminance guess
+          data-link                    optional: a "view ↗" to this distribution's page in the
+                                       dapp that served this script; data-link="https://…" names
+                                       another copy of the dapp
      ></div>
 
    Without `data-rpc` the read goes through `window.ethereum`, and only after `eth_chainId` agrees
@@ -30,6 +33,9 @@ var CHAINS = {
  '1': 'ethereum', '10': 'op mainnet', '8453': 'base', '42161': 'arbitrum',
  '11155111': 'sepolia', '84532': 'base sepolia', '31337': 'anvil', '31338': 'anvil 31338'
 };
+/* Read now: `currentScript` is null by the time a deferred mount runs. Inlined into the dapp it has no
+   src, and the dapp is the page itself, query string and all. */
+var SRC = document.currentScript && document.currentScript.src;
 var RULE = '1px solid color-mix(in srgb, currentColor 18%, transparent)';
 
 /* One stylesheet, injected once under `#rk-css`, instead of a `style=` string per element: smaller
@@ -67,6 +73,7 @@ var CSS = '.rk{font:inherit;color:inherit;--rk-ac:oklch(.47 .09 230);--rk-am:#B8
 + '.rk-nd{font-size:11.5px;color:var(--rk-am);margin-top:8px}'
 + '.rk-1{font-size:12.5px;margin-top:7px}'
 + '.rk-dm{opacity:.5}'
++ '.rk a{color:inherit;text-decoration:none;border-bottom:1px solid currentColor}'
 + '.rk-f{margin-top:10px;padding-top:8px;border-top:' + RULE + ';font-size:10.5px;opacity:.5}';
 
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
@@ -166,13 +173,14 @@ function render(el){
    +' · <button class="rk-rt" data-retry>retry</button></div>';
    var r=el.querySelector('[data-retry]');if(r)r.addEventListener('click',function(){render(el)});
    return}
-  var foot=(snap.delay?'delay '+fmtDelay(snap.delay):'no delay')+' · owner '+short(snap.owner)+' · '+short(addr)+' · '+esc(cname(cid));
+  var link=el.getAttribute('data-link');
+  var foot=(snap.delay?'delay '+fmtDelay(snap.delay):'no delay')+' · owner '+short(snap.owner)+' · '+short(addr)+' · '+esc(cname(cid))
+  +(link===null?'':' · <a href="'+esc((link||(SRC?new URL('./',SRC).href:location.href)).split('#')[0]+'#/distros/'+addr)+'" target="_blank" rel="noopener">view ↗</a>');
   if(compact){
    el.innerHTML=bar(snap.table,'rk-b',1)
    +'<div class="rk-1">'+snap.table.map(function(b){return '<b>'+esc(b.name)+'</b> '+pct(b.bps)+'%'}).join(' · ')
    +' <span class="rk-dm">— '+foot+'</span></div>';
    widths(el);return}
-  /* The description is text, not an anchor: the only URL the widget could carry is M05's mirror. */
   var h='<div class="rk-h">'+esc(snap.description)+'</div>'
   +bar(snap.table,'rk-b',1)
   +'<div class="rk-t">'+snap.table.map(function(b){

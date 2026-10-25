@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RAKE</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23317E9F'%3E%3Crect x='3' y='2' width='3.2' height='6.8'/%3E%3Crect x='3' y='10' width='3.2' height='4'/%3E%3Cpath d='M6.2 3.6 H9.6 A2.9 2.9 0 0 1 9.6 9.4 H6.2' fill='none' stroke='%23317E9F' stroke-width='3.2'/%3E%3Cpath d='M9 9.4 L12.8 14' fill='none' stroke='%23317E9F' stroke-width='3.2'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='currentColor' color='%23161616'%3E%3Cstyle%3E@media (prefers-color-scheme:dark)%7Bsvg%7Bcolor:%23ECECE6%7D%7D%3C/style%3E%3Crect x='3' y='2' width='3.2' height='6.8'/%3E%3Crect x='3' y='10' width='3.2' height='4'/%3E%3Cpath d='M6.2 3.6 H9.6 A2.9 2.9 0 0 1 9.6 9.4 H6.2' fill='none' stroke='currentColor' stroke-width='3.2'/%3E%3Cpath d='M9 9.4 L12.8 14' fill='none' stroke='currentColor' stroke-width='3.2'/%3E%3C/svg%3E">
 <script>(function(){var t=localStorage.getItem('theme')||'system';var d=t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.className=d?'dark':'';})();</script>
 <style>
 /*@inline theme.css@*/
@@ -18,6 +18,9 @@
 </script>
 <script>
 /*@inline model.js@*/
+</script>
+<script>
+/*@inline widget.js@*/
 </script>
 <script>
 /* Everything this script draws is styled by class alone: theme.css and layout.html are the design,
@@ -44,6 +47,9 @@ document.getElementById('ver').textContent = `dnzn labs · ${CFG.version}`;
 
 /* ---- provider ------------------------------------------------------------------------------ */
 let P = null, ACC = null, CHAIN = null;
+// The landing's widget reads through the wallet, as a host page's does without `data-rpc`; only the dev
+// build hands it an endpoint, the same `?rpc=` the page itself reads through.
+let WRPC = '';
 /*DEV*/
 const rpcProvider = url => ({
   request: async ({ method, params }) => {
@@ -54,7 +60,7 @@ const rpcProvider = url => ({
 /*DEV*/
 async function discover() {
   /*DEV*/
-  if (Q.get('rpc')) { P = rpcProvider(Q.get('rpc')); ACC = Q.get('from') || null; return; }
+  if (Q.get('rpc')) { P = rpcProvider(Q.get('rpc')); ACC = Q.get('from') || null; WRPC = Q.get('rpc'); return; }
   /*DEV*/
   const found = [];
   addEventListener('eip6963:announceProvider', e => found.push(e.detail));
@@ -195,16 +201,35 @@ async function readClock() {
   CLOCK = { t: parseInt(b.timestamp, 16), at: Date.now() };
 }
 const isAddr = v => /^0x[0-9a-fA-F]{40}$/.test(v);
-// Every address and tx hash the page prints goes through here: a link where the chain has an
-// explorer, plain text with the full value in the title elsewhere. An address also carries its own
-// value in `data-addr`, which is what lets `nameSweep` replace the ones that have a name in place.
+// Every address and hash the page prints goes through here: the value, then a copy icon that copies
+// all of it (the one handler is `copyClick`), then, where the chain has an explorer, a ↗ to an address
+// or a tx. A queued action's `hash` is no transaction, so it links nowhere. The icon is a span, not a
+// button, because a list row puts one inside its own <a>. An address carries its value in
+// `data-addr`, which is what lets `nameSweep` replace the ones that have a name in place.
+const COPY = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><g class="i-c"><rect x="4" y="4" width="6.5" height="6.5"/><path d="M8 2.5v-1H1.5V8h1"/></g><path class="i-k" d="M2 6.5l2.5 2.5 5-6"/></svg>';
 const ext = (kind, v, text) => {
   const known = kind === 'address' ? NAMED.get(String(v).toLowerCase()) : null;
   const body = known ? esc(known) : text, mark = kind === 'address' ? ` data-addr="${v}"` : '';
-  return EXPLORER[CFG.chainId]
-    ? `<a href="${EXPLORER[CFG.chainId]}/${kind}/${v}" target="_blank" rel="noopener" title="${v}"${mark}>${body}</a>`
-    : `<span title="${v}"${mark}>${body}</span>`;
+  return `<span title="${v}"${mark}>${body}</span><span class="cp" role="button" tabindex="0" title="copy" aria-label="copy ${v}" data-copy="${v}">${COPY}</span>`
+    + (EXPLORER[CFG.chainId] && kind !== 'hash' ? ` ${xlink(kind, v, '↗')}` : '');
 };
+const xlink = (kind, v, text) => EXPLORER[CFG.chainId]
+  ? `<a class="xl" href="${EXPLORER[CFG.chainId]}/${kind}/${v}" target="_blank" rel="noopener" title="open in explorer">${text}</a>` : '';
+// `navigator.clipboard` needs a secure context; a gateway or file:// page may not be one, so the old
+// selection copy is the fallback. `on` is the copied state for a moment, like every state, a class.
+async function copyClick(e) {
+  const el = e.target.closest('.cp');
+  if (!el || (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ')) return;
+  e.preventDefault(); e.stopPropagation();
+  const v = el.dataset.copy;
+  try { await navigator.clipboard.writeText(v); } catch (err) {
+    const t = document.createElement('textarea'); t.value = v; document.body.appendChild(t); t.select();
+    try { document.execCommand('copy'); } catch (err2) {} t.remove();
+  }
+  el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 1200);
+}
+addEventListener('click', copyClick, true);
+addEventListener('keydown', copyClick, true);
 // localStorage throws in a sandboxed frame, so every access is guarded and a failure means no history.
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 const recents = () => { try { const r = JSON.parse(store.get('rake.recent') || '[]'); return Array.isArray(r) ? r.filter(isAddr) : []; } catch (e) { return []; } };
@@ -363,7 +388,7 @@ const newest = (a, b) => b.block - a.block || b.index - a.index;
 function entry(log) {
   const kind = KINDS.get(log.topics[0]), block = parseInt(log.blockNumber, 16), index = parseInt(log.logIndex, 16);
   const at = t => Eth.dec(['address'], log.topics[t])[0];
-  const e = { kind, block, index, what: '' };
+  const e = { kind, block, index, tx: log.transactionHash, what: '' };
   if (kind === 'queued') {
     const [nonce, eta, action] = Eth.dec(['uint32', 'uint256', 'bytes'], log.data);
     // The `uint32 nonce` `applyQueued` takes: `snapshot()`'s struct does not carry it, this log does.
@@ -371,9 +396,9 @@ function entry(log) {
     e.what = `${describe(Model.decodePending(action))} · nonce ${nonce} · ${Model.countdown(eta, secs())}`;
   } else if (kind === 'applied' || kind === 'cancelled') {
     e.hash = log.topics[1];
-    e.what = short(log.topics[1]);
+    e.what = ext('hash', log.topics[1], short(log.topics[1]));
   } else if (kind === 'in') {
-    e.what = `${amt(log.data)} ETH from ${esc(short(at(1)))}`;
+    e.what = `${amt(log.data)} ETH from ${ext('address', at(1), short(at(1)))}`;
   } else if (kind === 'distributed') {
     e.token = at(1); e.amount = log.data;
   } else {
@@ -383,20 +408,20 @@ function entry(log) {
   }
   return e;
 }
-const token = a => a === ZERO ? 'ETH' : short(a);
+const token = a => a === ZERO ? 'ETH' : ext('address', a, short(a));
 /* The three fund kinds that carry a token leave their line to here: the amount is in that token's own
    units, `decimals()` is a call, and `entry` is synchronous over the logs. `dec` is whatever
    `decimalsOf` found for the token, `null` included — `amt` prints that as raw units. */
 const fundWhat = (e, dec) => e.kind === 'distributed'
   ? `${amt(e.amount, dec)} ${token(e.token)} by the table`
-  : `${amt(e.amount, dec)} ${token(e.token)} · ${esc(short(e.account))}`;
+  : `${amt(e.amount, dec)} ${token(e.token)} · ${ext('address', e.account, short(e.account))}`;
 /* A decoded pending action as one line, named by the setter it calls. `setBeneficiaries` is also
    drawn as a second bar; the other three say everything they do here. */
 function describe(p) {
   if (p.kind === 'setBeneficiaries') return `${p.kind} · new table · ${p.table.map(b => Model.pct(b[1])).join(' / ')}`;
   if (p.kind === 'setDescription') return `${p.kind} · new name · ${esc(p.description)}`;
   if (p.kind === 'setDelay') return `${p.kind} · new delay · ${delayText(p.delay)}`;
-  if (p.kind === 'transferOwnership') return p.owner === ZERO ? `${p.kind} · renounced · nothing can be proposed again` : `${p.kind} · new owner · ${esc(short(p.owner))}`;
+  if (p.kind === 'transferOwnership') return p.owner === ZERO ? `${p.kind} · renounced · nothing can be proposed again` : `${p.kind} · new owner · ${ext('address', p.owner, short(p.owner))}`;
   return 'unknown action · selector ' + esc(p.selector);
 }
 const delayText = d => Number(d) === 0 ? 'none — changes apply instantly' : Number(d) % 86400 === 0 ? Number(d) / 86400 + 'd' : Math.round(Number(d) / 3600) + 'h';
@@ -426,10 +451,10 @@ function ticks(table, opts) {
 const mini = table => `<span class="mini">${table.map((b, i) => `<span class="seg s${i % 3}" style="flex-basis:${basis(b[1])}"></span>`).join('')}</span>`;
 const ledger = table => `<div class="ledger">${table.map(b => row(`${esc(b[2])}${b[3] ? `<span class="nt"> — ${esc(b[3])}</span>` : ''}`, ext('address', b[0], esc(short(b[0]))), Model.pct(b[1]))).join('')}</div>`;
 const row = (k, sub, n, cls) => `<div class="row${cls ? ' ' + cls : ''}"><div><b>${k}</b>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="n">${n}</div></div>`;
-const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow${e.kind === 'escrowed' ? ' err' : e.kind === 'queued' ? ' amber' : ''}"><b>${e.kind}</b><span class="w">${e.what}</span><span class="t">block ${e.block}</span></div>`).join('')}</div>`;
+const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow${e.kind === 'escrowed' ? ' err' : e.kind === 'queued' ? ' amber' : ''}"><b>${e.kind}</b><span class="w">${e.what}</span><span class="t">block ${e.block} · ${ext('tx', e.tx, short(e.tx))}</span></div>`).join('')}</div>`;
 const eyebrow = (text, cls) => `<div class="eyebrow${cls ? ' ' + cls : ''}">${text}</div>`;
 const notice = (text, cls) => `<div class="notice${cls ? ' ' + cls : ''}">${text}</div>`;
-const unreadable = addr => notice(`could not read a distribution at ${esc(short(addr))} on ${cname(CFG.chainId)} — nothing is deployed there.`, 'err');
+const unreadable = addr => notice(`could not read a distribution at ${ext('address', addr, short(addr))} on ${cname(CFG.chainId)} — nothing is deployed there.`, 'err');
 
 /* Owner, delay and the balance behind `distribute`. Writing it is t03; reading it is this task. */
 const meta = d => `<div class="meta"><div><div class="k">owner</div><div class="v">${d.owner === ZERO ? 'renounced' : ext('address', d.owner, esc(short(d.owner)))}${ACC && d.owner.toLowerCase() === ACC.toLowerCase() ? ' · you' : ''}</div></div>`
@@ -438,11 +463,13 @@ const meta = d => `<div class="meta"><div><div class="k">owner</div><div class="
 
 /* The pending block: a queued table as a second bar in the pending style, the other three setters as
    one line each, an action this build does not know as its selector. With `acts`, each row also
-   carries what can be done to it — which is the detail page only; the landing is a reading. */
+   carries what can be done to it — which is the detail page only. */
 function pendingBlock(d, acts) {
   return d.pending.map((p, i) => {
     const decoded = Model.decodePending(p[2]);
-    const head = eyebrow(`change queued · ${Model.countdown(p[1], secs())}`, 'amber') + `<div class="status warn">${describe(decoded)}</div>`;
+    // The tx that queued it comes from the logs, so it appears once `history` has landed.
+    const tx = DS.qtx && DS.qtx.get(p[0]);
+    const head = eyebrow(`change queued · ${Model.countdown(p[1], secs())}`, 'amber') + `<div class="status warn">${describe(decoded)}${tx ? ` · queued in ${ext('tx', tx, short(tx))}` : ''}</div>`;
     const body = decoded.kind === 'setBeneficiaries' ? bar(decoded.table, { pending: true }) + ticks(decoded.table, { pending: true }) : '';
     return head + body + (acts ? pendingActs(d, p, i) : '');
   }).join('');
@@ -580,66 +607,114 @@ function bindWrites(reload) {
 let TOKEN = 0;
 const stale = t => t !== TOKEN;
 
-function distroBody(d) {
-  return bar(d.table, { small: true }) + ticks(d.table, {}) + ledger(d.table) + pendingBlock(d) + meta(d);
-}
-
+/* The claim beside the live widget, then what a distribution is for, the fee path end to end, and the
+   four verbs. */
 async function landing() {
-  V.innerHTML = `<div class="hero"><div>
-  <h1>Protocol fee transparency.</h1>
-  <p class="prose">Every app that takes a fee either tells you where it goes or doesn't, and checking means hours of chasing transactions. A distribution makes the fee an address: one contract, a published table of who gets what, and a delay on every configuration change so users have visibility before it lands.</p>
-  <div class="actions"><a class="btn" href="#/create">Create a distribution</a><a class="btn sec" href="#/docs#widget">Get the widget</a></div>
-  </div><div class="herograph">${FEEPATH}</div></div>
-  <div id="featured">${notice('reading the featured distribution…')}</div>
+  V.innerHTML = `<div class="landing"><div class="hero"><div>
+  <h1>Transparent fund distribution.</h1>
+  <p class="prose">A distribution is a contract that receives funds and divides them according to a published table of beneficiaries. Changes to that table are subject to a public time lock. Protocol fees are the primary case; the mechanism applies to any allocation a project is accountable for.</p>
+  <div class="actions"><a class="btn" href="#/create">Create a distribution</a><a class="btn sec" href="#/docs">Read the docs</a></div>
+  </div><div class="side"><div id="featured"></div>
   <div class="sechead"><b>view a distribution</b></div>
   <div class="load"><input id="load-in" placeholder="0x… or a name" aria-label="address or name"><button class="btn sec" id="load-go">view</button></div>
   <div class="res" id="load-res"></div>
+  </div></div>
+  <div class="sechead"><b>use cases</b><span>any share a project has promised in public</span></div>
+  <div class="uses">
+  <div><b>protocol fees</b><span>A protocol points its fee switch at one address. Holders read the split, and every proposed change to it, before any of it takes effect.</span></div>
+  <div><b>revenue shares</b><span>Contributors to a product are paid from a table they can read. Anyone can trigger the payout; nobody can redirect it without a public notice period.</span></div>
+  <div><b>grants and budgets</b><span>A committee funds its recipients from a published allocation. Raising, cutting or removing a share is announced a full delay in advance.</span></div>
+  </div>
+  <div class="sechead"><b>how funds move</b><span>one example, end to end</span></div>
+  <div class="lfig">${FLOW.wide()}${FLOW.tall()}</div>
   <div class="sechead"><b>how it works</b><span>four verbs, and who can call each</span></div>
   <div class="verbs">
-  ${verb('01', ICON.receive, 'receive', 'ETH and ERC-20 funds accumulate at the address. Nothing moves on its own.', 'anyone can send')}
-  ${verb('02', ICON.distribute, 'distribute', 'Splits the waiting balance across the table. Push, with escrow fallback.', 'callable by anyone')}
-  ${verb('03', ICON.queue, 'queue', 'Changes to the beneficiaries, owner or delay are staged in public first.', 'owner only · waits the delay')}
-  ${verb('04', ICON.apply, 'apply', 'Once the time lock passes, anyone can land the queued change.', 'anyone · after the eta')}
-  </div>`;
+  ${verb('01', 'receive', 'ETH and ERC-20 funds accumulate at the address. Nothing moves on its own.', 'anyone can send')}
+  ${verb('02', 'distribute', 'Splits the waiting balance across the table. Push, with escrow fallback.', 'callable by anyone')}
+  ${verb('03', 'queue', 'Changes to the beneficiaries, owner or delay are staged in public first.', 'owner only · waits the delay')}
+  ${verb('04', 'apply', 'Once the time lock passes, anyone can land the queued change.', 'anyone · after the eta')}
+  </div></div>`;
   loadField();
-  const t = TOKEN, slot = document.getElementById('featured');
+  // The live example is the widget itself, inlined below, mounted once the featured distribution is
+  // known to exist: a chain without the seed leaves its slot empty rather than a widget in its error state.
+  const t = TOKEN;
   const d = await loadDistro(S.featured);
-  if (stale(t)) return;
-  if (d.missing) { slot.innerHTML = unreadable(S.featured); return; }
-  fill('featured', `<div class="sechead"><b>live example · ${esc(d.description)}</b><span>${cname(CFG.chainId)} · ${esc(short(d.addr))} · <a href="#/distros/${d.addr}">view →</a></span></div>`
-    + distroBody(d));
+  // The widget reads `window.ethereum` alone, so with no RPC and no such global it could only fail.
+  if (stale(t) || d.missing || !(WRPC || window.ethereum)) return;
+  fill('featured', `<div class="sechead"><b>live widget</b><span><a href="#/distros/${d.addr}">view →</a></span></div>`
+    + `<div id="wdg" data-rake="${d.addr}" data-chain="${CFG.chainId}"${WRPC ? ` data-rpc="${esc(WRPC)}"` : ''}></div>`);
+  window.RakeWidget.mount(document.getElementById('wdg'));
 }
-const verb = (n, icon, name, what, callers) => `<div><i>${n}</i>${icon}<b>${name}</b><span>${what}</span><span class="who">${callers}</span></div>`;
-const ICON = {
-  receive: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M12 2v6" stroke-width="1.5"/><path d="M12 14l-4 -6h8Z" fill="currentColor" stroke="none"/><path d="M4 13v8h16v-8" stroke-width="1.5"/></svg>',
-  distribute: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="8" y="2" width="8" height="6" stroke-width="1.5"/><path d="M12 8v4M12 12H4.5v4M12 12h7.5v4M12 12v4" stroke-width="1.25"/><rect class="t0" x="1.5" y="17" width="6" height="4.5" stroke="none"/><rect class="t1" x="9" y="17" width="6" height="4.5" stroke="none"/><rect class="t2" x="16.5" y="17" width="6" height="4.5" stroke="none"/></svg>',
-  queue: '<svg class="q" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="4" y="5" width="16" height="11" stroke-width="1.5"/><path d="M4 20.5h9" stroke-width="2"/></svg>',
-  apply: '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="16" height="12" fill="currentColor"/><path class="chk" d="M8.5 12l2.5 2.5 4.5 -5" fill="none" stroke-width="1.8"/></svg>',
-};
-/* The fee path: the prototype's hero diagram, carrying the three things the contract actually promises
-   — funds arrive at one address, a published table splits them, and a change to that table has to queue
-   and wait the delay first. The prototype's addresses under the beneficiary boxes are dropped: at this
-   size they were three lines of hex nobody can check, and the live example below prints the real ones.
-   Classes rather than colours, as everywhere else: `d` is dim, `q` is amber, and t0/t1/t2 are the bar's
-   three tints, so theme.css still owns every colour and the hue moves in one place. */
-const FEEPATH = '<svg viewBox="0 0 400 356" fill="currentColor" aria-hidden="true">'
-  + '<circle cx="200" cy="22" r="13" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="200" y="26" text-anchor="middle" font-size="10">eoa</text>'
-  + '<line x1="200" y1="35" x2="200" y2="54" stroke="currentColor" stroke-width="1.25"/><path d="M200 62l-4 -8h8Z"/><text class="d" x="208" y="52" font-size="10">eth / erc20</text>'
-  + '<rect x="130" y="62" width="140" height="28" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="200" y="80" text-anchor="middle" font-size="11">dapp</text>'
-  + '<path d="M200 90 V106 H120 V116" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M120 124l-4 -8h8Z"/>'
-  + '<rect x="75" y="124" width="90" height="26" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="120" y="141" text-anchor="middle" font-size="11" font-weight="700">% fee</text>'
-  + '<g class="d"><path d="M200 90 V106 H280 V116" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M280 124l-4 -8h8Z"/><rect x="235" y="124" width="90" height="26" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="280" y="141" text-anchor="middle" font-size="11">% else</text></g>'
-  + '<path d="M120 150 V170 H200 V182" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M200 190l-4 -8h8Z"/>'
-  + '<rect x="110" y="190" width="180" height="58" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="200" y="210" text-anchor="middle" font-size="11.5" font-weight="700">distribution</text>'
-  + '<text class="d" x="200" y="225" text-anchor="middle" font-size="10">one address, any chain</text><text class="q" x="200" y="241" text-anchor="middle" font-size="9.5">changes wait the delay</text>'
-  + '<path d="M200 248 V278 H73 V294" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M73 302l-4 -8h8Z"/>'
-  + '<path d="M200 248 V294" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M200 302l-4 -8h8Z"/>'
-  + '<path d="M200 248 V278 H327 V294" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M327 302l-4 -8h8Z"/>'
-  + '<text x="65" y="272" text-anchor="end" font-size="11" font-weight="700">60%</text><text x="208" y="272" font-size="11" font-weight="700">30%</text><text x="335" y="272" font-size="11" font-weight="700">10%</text>'
-  + '<rect x="14" y="302" width="118" height="32" fill="none" stroke="currentColor" stroke-width="1.25"/><rect class="t0" x="26" y="313" width="9" height="9"/><text x="41" y="322" font-size="11">operations</text>'
-  + '<rect x="141" y="302" width="118" height="32" fill="none" stroke="currentColor" stroke-width="1.25"/><rect class="t1" x="153" y="313" width="9" height="9"/><text x="168" y="322" font-size="11">treasury</text>'
-  + '<rect x="268" y="302" width="118" height="32" fill="none" stroke="currentColor" stroke-width="1.25"/><rect class="t2" x="280" y="313" width="9" height="9"/><text x="295" y="322" font-size="11">bounties</text>'
-  + '<text class="d" x="200" y="352" text-anchor="middle" font-size="10">split defined by the published table</text></svg>';
+/* The full-width fee path: three sources into one distribution, four beneficiaries out. Drawn twice from one set of rows, wide and tall, because a 912-unit figure
+   scaled to a phone is the ~5 px type #50 was filed about; theme.css shows one of the two. */
+const FLOW = (() => {
+  const SRC = [['swap fees', 'eth'], ['bridge fees', 'usdc'], ['direct', 'eth or erc-20']];
+  const OUT = [['core contributors', 'team multisig', 45], ['treasury', 'dao safe', 25], ['security fund', 'audits, bounties', 20], ['community grants', 'grants committee', 10]];
+  const box = (x, y, w, h, c = '') => `<rect${c ? ` class="${c}"` : ''} x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="currentColor" stroke-width="1.25"/>`;
+  const line = d => `<path d="${d}" fill="none" stroke="currentColor" stroke-width="1.25"/>`;
+  const down = (x, y) => `<path d="M${x} ${y}l-4 -8h8Z"/>`, right = (x, y) => `<path d="M${x} ${y}l-8 -4v8Z"/>`;
+  const tx = (x, y, s, o = {}) => `<text${o.c ? ` class="${o.c}"` : ''} x="${x}" y="${y}" font-size="${o.f || 11}"${o.a ? ` text-anchor="${o.a}"` : ''}${o.b ? ' font-weight="700"' : ''}>${s}</text>`;
+  const head = (x, y, s) => tx(x, y, s, { c: 'd', f: 9.5 }).replace('<text', '<text letter-spacing=".1em"');
+  /* The distribution itself, the same at either width: its name, its address, the table as the bar,
+     and the delay. */
+  const core = (x, y, w) => {
+    let bx = x + 16, bar = '';
+    const bw = w - 32;
+    OUT.forEach(([, , p], i) => { const sw = bw * p / 100; bar += `<rect class="t${i}" x="${bx}" y="${y + 62}" width="${sw - (i < 3 ? 2 : 0)}" height="10"/>`; bx += sw; });
+    const L = x + 16;
+    return box(x, y, w, 186)
+      + tx(L, y + 28, 'distribution', { f: 12.5, b: 1 }) + tx(L, y + 46, '0x5e1f…a3c0 · one address, any chain', { c: 'd', f: 10 })
+      + bar + tx(L, y + 94, 'published table · 4 beneficiaries', { c: 'd', f: 10 }) + tx(L, y + 110, 'time lock · 7 days', { c: 'd', f: 10 })
+      + `<path class="r" d="M${L} ${y + 128} H${x + w - 16}" stroke="currentColor"/>`
+      + tx(L, y + 150, 'funds wait here until anyone', { c: 'd', f: 10 }) + tx(L, y + 166, 'calls distribute()', { c: 'd', f: 10 });
+  };
+  const svg = (w, h, c, body) => `<svg class="${c}" viewBox="0 0 ${w} ${h}" fill="currentColor" aria-hidden="true">${body}</svg>`;
+  const wide = () => {
+    let s = head(0, 12, '01 · FUNDS ARRIVE') + head(330, 12, '02 · ONE PUBLISHED TABLE') + head(722, 12, '03 · PAID OUT');
+    SRC.forEach(([n, sub], i) => {
+      const cy = 72 + i * 100;
+      s += box(0, cy - 28, 190, 56) + tx(16, cy - 3, n, { b: 1 }) + tx(16, cy + 14, sub, { c: 'd', f: 10 });
+      s += line(`M190 ${cy} H260 V172`);
+    });
+    s += line('M260 172 H322') + right(330, 172) + tx(268, 164, 'anyone', { c: 'd', f: 10 });
+    s += core(330, 79, 252);
+    s += line('M582 172 H672') + tx(590, 164, 'distribute()', { c: 'd', f: 10 });
+    const ys = OUT.map((_, i) => 52 + i * 80);
+    s += line(`M672 ${ys[0]} V${ys[3]}`);
+    OUT.forEach(([n, role, p], i) => {
+      const cy = ys[i];
+      s += line(`M672 ${cy} H714`) + right(722, cy) + tx(697, cy - 6, p + '%', { a: 'middle', b: 1, f: 10.5 });
+      s += box(722, cy - 26, 190, 52) + `<rect class="t${i}" x="736" y="${cy - 12}" width="9" height="9"/>`
+        + tx(752, cy - 3, n, { b: 1 }) + tx(752, cy + 13, role, { c: 'd', f: 10 });
+    });
+    s += tx(456, 344, 'example · a protocol routes its fees to one distribution; the split is the published table, and a change to it waits the delay in public', { c: 'd', f: 10, a: 'middle' });
+    return svg(912, 352, 'wide', s);
+  };
+  const tall = () => {
+    let s = '';
+    SRC.forEach(([n, sub], i) => {
+      const x = i * 124, cx = x + 56;
+      s += box(x, 0, 112, 48) + tx(cx, 21, n, { a: 'middle', b: 1, f: 11 }) + tx(cx, 37, sub, { a: 'middle', c: 'd', f: 10 });
+      s += line(`M${cx} 48 V64 H180`);
+    });
+    s += line('M180 64 V82') + down(180, 90) + tx(188, 80, 'anyone sends', { c: 'd', f: 10 });
+    s += core(0, 90, 360);
+    s += line('M180 276 V296 H12') + tx(188, 292, 'distribute()', { c: 'd', f: 10 });
+    const ys = OUT.map((_, i) => 324 + i * 52);
+    s += line(`M12 296 V${ys[3]}`);
+    OUT.forEach(([n, role, p], i) => {
+      const cy = ys[i];
+      s += line(`M12 ${cy} H20`) + right(28, cy) + box(28, cy - 22, 332, 44)
+        + `<rect class="t${i}" x="40" y="${cy - 9}" width="9" height="9"/>` + tx(56, cy - 1, n, { b: 1 }) + tx(56, cy + 14, role, { c: 'd', f: 10 })
+        + tx(346, cy + 4, p + '%', { a: 'end', b: 1, f: 12 });
+    });
+    s += tx(180, 528, 'example · a protocol routing its fees', { c: 'd', f: 10, a: 'middle' })
+      + tx(180, 543, 'a change to the table waits the delay in public', { c: 'd', f: 10, a: 'middle' });
+    return svg(360, 550, 'tall', s);
+  };
+  return { wide, tall };
+})();
+const verb = (n, name, what, callers) => `<div><i>${n}</i><b>${name}</b><span>${what}</span><span class="who">${callers}</span></div>`;
 /* The field takes an address, or a name wherever a registry can answer one; `addrField` writes which
    of those it did under the input. */
 function loadField() {
@@ -656,8 +731,10 @@ function loadField() {
 /* ---- one distribution ------------------------------------------------------------------------ */
 /* What one load of `#/distros/<addr>` knows. `nonces` arrives with the logs rather than the snapshot,
    which is why the apply buttons are drawn twice: once disabled, once able. */
-let DS = { d: null, next: null, heir: null, nonces: null, failed: false };
+let DS = { d: null, next: null, heir: null, nonces: null, qtx: null, failed: false };
 let PROPOSE = null, DRAWER = false;
+// The distribution `#/docs#widget` embeds: set only where the owner bar paints, cleared by every route but the docs.
+let EMBED = null;
 const bindAll = () => bindWrites(() => detail(DS.d.addr));
 
 /* Decision 7: who this page is for is decided once per load. The owner's own account sends directly;
@@ -687,7 +764,7 @@ async function detail(addr) {
   const next = Model.supersededBy(d.table);
   const [heir, view] = await Promise.all([next ? loadDistro(next) : null, ownerView(d)]);
   if (stale(t)) return;
-  DS = { d, next, heir, nonces: null, failed: false };
+  DS = { d, next, heir, nonces: null, qtx: null, failed: false };
   VIEW = view;
   WRITES.clear();
   paintDetail();
@@ -698,6 +775,7 @@ async function detail(addr) {
   history(addr, from).then(async h => {
     if (stale(t)) return;
     DS.nonces = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.nonce]));
+    DS.qtx = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.tx]));
     fill('h-changes', h.changes.length ? histRows(h.changes) : notice('no change has been queued yet.'));
     fill('pending', pendingBlock(d, true));
     /* The fund rows carry amounts in their token's own units (#43), and the changes above do not, so
@@ -725,9 +803,9 @@ async function detail(addr) {
 
 function paintDetail() {
   const d = DS.d, next = DS.next, heir = DS.heir;
-  V.innerHTML = eyebrow(`${esc(short(d.addr))} · ${cname(CFG.chainId)} · ${ext('address', d.addr, 'explorer')}`)
+  V.innerHTML = '<div class="distro">' + eyebrow(`${ext('address', d.addr, short(d.addr))} · ${cname(CFG.chainId)}`)
     + `<h1>${esc(d.description)}</h1>`
-    + (next ? `<div class="status warn">superseded by ${heir.missing ? esc(short(next)) : `<a href="#/distros/${next}">${esc(heir.description)}</a>`} — this table forwards everything it receives.</div>` : '')
+    + (next ? `<div class="status warn">superseded by ${heir.missing ? ext('address', next, short(next)) : `<a href="#/distros/${next}">${esc(heir.description)}</a>`} — this table forwards everything it receives.</div>` : '')
     + bar(d.table, { small: true }) + ticks(d.table, {}) + ledger(d.table)
     + `<div id="pending">${pendingBlock(d, true)}</div>`
     + meta(d)
@@ -736,7 +814,7 @@ function paintDetail() {
     + (DRAWER ? drawerHTML(d) : '')
     + `<div class="sechead"><b>funds</b><span>moves by the table, permissionlessly — no approval involved</span></div><div id="funds">${notice('reading the balances and the escrow…')}</div>`
     + `<div class="sechead"><b>changes</b><span>every configuration change this contract has seen</span></div><div id="h-changes">${notice('loading…')}</div>`
-    + `<div class="sechead"><b>activity</b><span>funds in, and every split and escrow since</span></div><div id="h-funds">${notice('loading…')}</div>`;
+    + `<div class="sechead"><b>activity</b><span>funds in, and every split and escrow since</span></div><div id="h-funds">${notice('loading…')}</div></div>`;
   const q = document.getElementById('queue');
   if (q) q.onclick = () => { DRAWER = !DRAWER; if (DRAWER && !PROPOSE) PROPOSE = { rows: rowsFrom(d.table) }; paintDetail(); };
   if (DRAWER) bindDrawer(d);
@@ -747,9 +825,10 @@ function paintDetail() {
 /* The owner's one control, in both owner views. The drawer is the same either way: in the vault view
    the writes inside it are calldata rather than transactions, and that is the whole difference. */
 function ownerBar(d) {
-  if (VIEW === 'visitor') return '';
+  EMBED = VIEW === 'visitor' ? null : d;
+  if (!EMBED) return '';
   return '<div class="actions">'
-    + `<button class="btn" id="queue">${DRAWER ? 'Close' : 'Queue a change'}</button>`
+    + `<button class="btn" id="queue">${DRAWER ? 'Close' : 'Queue a change'}</button><a class="btn sec" href="#/docs#widget">Embed the widget</a>`
     + `<span class="status">${VIEW === 'vault'
       ? `you are a signer on ${ext('address', d.owner, esc(short(d.owner)))}, which owns this distribution — every change below is calldata to submit through it`
       : 'you own this distribution'}</span></div>`;
@@ -955,7 +1034,8 @@ async function createPredict() {
   const code = await P.request({ method: 'eth_getCode', params: [addr, 'latest'] });
   if (stale(t) || Number(D.n) !== n) return;
   D.salt = salt; D.predicted = addr; D.taken = !!code && code !== '0x';
-  slot.innerHTML = `<div class="status">will deploy to ${ext('address', addr, esc(addr))} — same address on every chain for this wallet</div>`;
+  slot.innerHTML = `<div class="status">will deploy to ${ext('address', addr, esc(addr))} — same address on every chain for this wallet</div>`
+    + '<div class="status">a contract paying in must send ETH with <code>call</code> and gas: <code>transfer</code> and <code>send</code> can fail — <a href="#/docs#payin">why</a></div>';
   nameSweep();
   paintCreate();
 }
@@ -988,7 +1068,7 @@ async function list() {
   const tabs = [['recent', 'recent'], ['mine', 'mine']];
   if (!ACC) S.tab = 'recent';
   V.innerHTML = eyebrow('distributions')
-    + `<div class="tabs">${tabs.map(([k, label]) => `<button class="tab${S.tab === k ? ' on' : ''}" data-tab="${k}"${!ACC && k !== 'recent' ? ' disabled title="connect a wallet"' : ''}>${label}</button>`).join('')}</div>`
+    + `<div class="tabs">${tabs.map(([k, label]) => `<button class="tab${S.tab === k ? ' on' : ''}" data-tab="${k}"${!ACC && k !== 'recent' ? ' disabled title="connect a wallet"' : ''}>${label}</button>`).join('')}<a class="tab new" href="#/create">create +</a></div>`
     + `<div id="rows">${notice('reading…')}</div>`;
   V.querySelectorAll('[data-tab]').forEach(b => { b.onclick = () => { S.tab = b.dataset.tab; list(); }; });
   const t = TOKEN, slot = document.getElementById('rows');
@@ -1001,45 +1081,46 @@ async function list() {
   if (failed) { slot.innerHTML = notice('could not read the list from this chain.', 'err'); return; }
   if (!items.length) {
     slot.innerHTML = notice(S.tab === 'mine'
-      ? `nothing on ${cname(CFG.chainId)} is owned by ${esc(short(ACC))}.`
-      : 'no distribution opened yet. Paste an address below, or create one.')
+      ? `nothing on ${cname(CFG.chainId)} is owned by ${ext('address', ACC, short(ACC))}.`
+      : 'no distribution opened yet. Paste an address below, or <a href="#/create">create one</a>.')
       + (ACC ? '' : notice('<b>mine</b> needs a connected wallet.'))
       + `<div class="load"><input id="load-in" placeholder="0x… or a name" aria-label="address or name"><button class="btn sec" id="load-go">view</button></div><div class="res" id="load-res"></div>`;
     loadField();
     return;
   }
-  fill('rows', items.map(d => `<a class="list-row" href="#/distros/${d.addr}"><span><b>${esc(d.description)}</b><span class="sub">${cname(CFG.chainId)} · ${esc(short(d.addr))}</span></span>`
+  fill('rows', items.map(d => `<a class="list-row" href="#/distros/${d.addr}"><span><b>${esc(d.description)}</b><span class="sub">${cname(CFG.chainId)} · ${ext('address', d.addr, short(d.addr))}</span></span>`
     + `${d.pending.length ? '<span class="dot" title="change queued"></span>' : '<span></span>'}${mini(d.table)}</a>`).join(''));
 }
 
 /* ---- docs ------------------------------------------------------------------------------------ */
 /* Written for the owner of a distribution (ROADMAP decision 17): what it is, why, how, then the tasks.
    The contract's own surface is docs/REFERENCE.md in the repo, and the last section points there. The
-   ids are what the rail and `#/docs#<section>` reach; the landing's CTA depends on `widget`. */
-const SECTIONS = [['what', 'What it is'], ['why', 'Why it exists'], ['how', 'How it works'], ['create', 'Creating one'], ['payin', 'Paying in'], ['payout', 'Paying out'], ['change', 'Changing it'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['developers', 'For developers']];
+   ids are what the rail and `#/docs#<section>` reach; the owner bar's widget link depends on `widget`. */
+const SECTIONS = [['what', 'Overview'], ['why', 'Purpose'], ['how', 'Mechanism'], ['create', 'Creating a distribution'], ['payin', 'Receiving funds'], ['payout', 'Distributing funds'], ['change', 'Changing a distribution'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['developers', 'For developers']];
 const REPO = 'https://github.com/dnznlabs/rake';
 /* The two figures, hand-drawn rather than rendered from Mermaid: there is no Mermaid in the bundle and
    none at build time either, so the caption says what shipped. Colour comes through classes on
-   currentColor, as the landing's FEEPATH does, so theme.css owns every one. */
-const figSeq = () => '<svg class="fig" width="560" height="226" viewBox="0 0 560 226" fill="currentColor" role="img" aria-label="sequence diagram: a payer funds the distribution, anyone distributes, each share is paid or held">'
-  + '<rect x="30" y="8" width="120" height="26" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="90" y="25" text-anchor="middle" font-size="11.5">payer</text>'
-  + '<rect x="220" y="8" width="140" height="26" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="290" y="25" text-anchor="middle" font-size="11.5">distribution</text>'
-  + '<rect x="410" y="8" width="120" height="26" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="470" y="25" text-anchor="middle" font-size="11.5">payee</text>'
-  + '<g class="r" stroke="currentColor" stroke-dasharray="3 3"><line x1="90" y1="34" x2="90" y2="196"/><line x1="290" y1="34" x2="290" y2="196"/><line x1="470" y1="34" x2="470" y2="196"/></g>'
-  + '<text class="m" x="188" y="60" text-anchor="middle" font-size="10.5">send the fee — eth / erc20</text><line x1="90" y1="68" x2="282" y2="68" stroke="currentColor" stroke-width="1.25"/><path d="M286 68l-8 -4v8Z"/>'
-  + '<text class="m" x="188" y="98" text-anchor="middle" font-size="10.5">distribute — anyone may</text><line x1="90" y1="106" x2="282" y2="106" stroke="currentColor" stroke-width="1.25"/><path d="M286 106l-8 -4v8Z"/>'
-  + '<text class="m" x="378" y="136" text-anchor="middle" font-size="10.5">pay each share — table order</text><line x1="290" y1="144" x2="462" y2="144" stroke="currentColor" stroke-width="1.25"/><path d="M466 144l-8 -4v8Z"/>'
-  + '<g class="q"><text x="378" y="172" text-anchor="middle" font-size="10.5">cannot receive: held · release retries</text><line x1="290" y1="180" x2="462" y2="180" stroke="currentColor" stroke-width="1.25" stroke-dasharray="4 3"/><path d="M466 180l-8 -4v8Z"/></g>'
-  + '</svg><div class="cap">fig 1 · a payment and a payout — rendered to inline svg</div>';
-const figState = () => '<svg class="fig" width="420" height="164" viewBox="0 0 420 164" fill="currentColor" role="img" aria-label="state diagram: a proposed change becomes applied once the delay elapses, or cancelled by the owner">'
-  + '<circle cx="26" cy="80" r="4"/>'
-  + '<text class="m" x="48" y="72" text-anchor="middle" font-size="10">propose</text><line x1="30" y1="80" x2="66" y2="80" stroke="currentColor" stroke-width="1.25"/><path d="M70 80l-8 -4v8Z"/>'
-  + '<g class="q"><rect x="70" y="63" width="92" height="34" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="116" y="84" text-anchor="middle" font-size="11.5">pending</text></g>'
-  + '<path d="M162 72 H210 V38 H264" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M268 38l-8 -4v8Z"/><text class="m" x="260" y="28" text-anchor="end" font-size="10">delay elapses — anyone applies</text>'
-  + '<rect x="268" y="21" width="106" height="34"/><text class="pa" x="321" y="42" text-anchor="middle" font-size="11.5">applied</text>'
-  + '<g class="d"><path d="M162 88 H210 V122 H264" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M268 122l-8 -4v8Z"/><text x="260" y="152" text-anchor="end" font-size="10">owner cancels — immediate</text>'
-  + '<rect x="268" y="105" width="106" height="34" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="321" y="126" text-anchor="middle" font-size="11.5">cancelled</text></g>'
-  + '</svg><div class="cap">fig 2 · every change takes this path, the owner\'s included</div>';
+   currentColor, as the landing's fee path does, so theme.css owns every one. */
+const figSeq = () => '<svg class="fig" width="560" height="196" viewBox="0 0 560 196" fill="currentColor" role="img" aria-label="one payout: 1 ETH split 60, 30 and 10 percent; two shares are paid, the third is held and later released">'
+  + '<rect x="40" y="6" width="180" height="28" fill="none" stroke="currentColor" stroke-width="1.25"/><text x="130" y="24" text-anchor="middle" font-size="11.5">distribution · 1.0000 ETH</text>'
+  + '<line x1="130" y1="34" x2="130" y2="54" stroke="currentColor" stroke-width="1.25"/><path d="M130 58l-4 -8h8Z"/><text class="m" x="140" y="50" font-size="10.5">distribute — anyone may call</text>'
+  + '<rect class="t0" x="40" y="58" width="287" height="18"/><rect class="t1" x="328" y="58" width="143" height="18"/><rect class="t2" x="472" y="58" width="48" height="18"/>'
+  + '<rect class="t0" x="40" y="95" width="10" height="10"/><text x="60" y="104" font-size="11" font-weight="700">ops</text><text x="200" y="104" text-anchor="end" font-size="11">60%</text><text x="296" y="104" text-anchor="end" font-size="11">0.6000 ETH</text><text class="m" x="312" y="104" font-size="10.5">paid</text>'
+  + '<rect class="t1" x="40" y="117" width="10" height="10"/><text x="60" y="126" font-size="11" font-weight="700">treasury</text><text x="200" y="126" text-anchor="end" font-size="11">30%</text><text x="296" y="126" text-anchor="end" font-size="11">0.3000 ETH</text><text class="m" x="312" y="126" font-size="10.5">paid</text>'
+  + '<g class="q"><rect class="t2" x="40" y="139" width="10" height="10"/><text x="60" y="148" font-size="11" font-weight="700">bounties</text><text x="200" y="148" text-anchor="end" font-size="11">10%</text><text x="296" y="148" text-anchor="end" font-size="11">0.1000 ETH</text><text x="312" y="148" font-size="10.5">held — it could not receive</text></g>'
+  + '<g class="q"><path d="M318 154v24h10" fill="none" stroke="currentColor" stroke-width="1.25" stroke-dasharray="3 3"/><path d="M336 178l-8 -4v8Z"/><text x="342" y="182" font-size="10.5">release — anyone, later</text></g>'
+  + '<text x="498" y="182" font-size="10.5">→ paid</text>'
+  + '</svg><div class="cap">fig 1 · one payout: 1 ETH over a 60/30/10 table, with one beneficiary unable to receive</div>';
+const figState = () => '<svg class="fig" width="560" height="150" viewBox="0 0 560 150" fill="currentColor" role="img" aria-label="timeline of a change: proposed at t0, pending and visible for the delay, applicable from the eta, applied by anyone; the owner may cancel until it is applied">'
+  + '<line x1="30" y1="70" x2="544" y2="70" stroke="currentColor" stroke-width="1.25"/><path d="M552 70l-8 -4v8Z"/><text class="m" x="552" y="90" text-anchor="end" font-size="10">time</text>'
+  + '<circle cx="60" cy="70" r="4"/><text x="60" y="46" text-anchor="middle" font-size="11" font-weight="700">proposed</text><text class="m" x="60" y="98" text-anchor="middle" font-size="10">t₀</text>'
+  + '<g class="q"><rect class="bg" x="64" y="58" width="332" height="24" stroke="currentColor" stroke-width="1.25" stroke-dasharray="4 3"/><text x="230" y="74" text-anchor="middle" font-size="10.5">waiting the delay — visible to everyone</text>'
+  + '<rect class="bg" x="400" y="58" width="86" height="24" stroke="currentColor" stroke-width="1.25"/><text x="443" y="74" text-anchor="middle" font-size="10.5">applicable</text></g>'
+  + '<line x1="398" y1="52" x2="398" y2="88" stroke="currentColor" stroke-width="1.25"/><text x="398" y="46" text-anchor="middle" font-size="11" font-weight="700">eta</text><text class="m" x="398" y="98" text-anchor="middle" font-size="10">t₀ + delay</text>'
+  + '<rect x="490" y="58" width="52" height="24"/><text class="pa" x="516" y="74" text-anchor="middle" font-size="10.5">applied</text><text x="542" y="46" text-anchor="end" font-size="11" font-weight="700">anyone applies</text>'
+  + '<g class="d"><path d="M60 108v6H488v-6" fill="none" stroke="currentColor" stroke-width="1"/><text x="274" y="128" text-anchor="middle" font-size="10">the owner may cancel at any point until it is applied</text></g>'
+  + '<text class="m" x="30" y="146" font-size="10">with a delay of zero there is no window: the proposal applies in the same transaction</text>'
+  + '</svg><div class="cap">fig 2 · one change over time — the delay is the window in which everyone can see it coming</div>';
 /* The six chains M05 deploys to, and the dev chain's own row when that is what is being read, so a
    local anvil shows the factory `make addresses` prints rather than six dashes. */
 const DOCS_CHAINS = ['ethereum', 'base', 'arbitrum', 'op mainnet', 'sepolia', 'base sepolia'];
@@ -1048,86 +1129,130 @@ const chainRows = () => {
   return DOCS_CHAINS.map(c => `<tr><td>${c}</td><td class="dim">—</td><td class="dim">not deployed</td></tr>`).join('')
     + (dev ? `<tr><td>${cname(CFG.chainId)}</td><td>${ext('address', CFG.factory, esc(CFG.factory))}</td><td>dev chain</td></tr>` : '');
 };
-/* `widget.js` is the second document `App` serves, so it sits beside this page: relative to an http(s)
-   or web3:// location, and spelled out as web3:// when the page was handed over by `html()` with no
-   usable URL. The address is the featured distribution once `load()` has read it; with no wallet on
-   this chain there is nothing to read it with, and the snippet says so rather than inventing one. */
+/* `widget.js` is the second document `App` serves, so on an http(s) page it sits beside this one.
+   Anywhere else the snippet names an ERC-5219 gateway (#68): `html()`-only clients such as Freedom
+   answer every web3:// path with this page, so a bare web3:// src is offered only as the alternative. The address is the distribution its owner arrived from (the owner bar links here), else
+   the featured one once `load()` has read it; with neither there is nothing to put in it, and the
+   snippet says so rather than inventing one. */
 function widgetDocs() {
   const id = CFG.chainId;
-  const src = /^(https?|web3):$/.test(location.protocol) ? new URL('widget.js', location.href.split('#')[0]).href : `web3://${CFG.app}:${id}/widget.js`;
-  const addr = S.featured || '0x…';
+  const http = /^https?:$/.test(location.protocol);
+  const src = http ? new URL('widget.js', location.href.split('#')[0]).href : `https://${CFG.app}.${id}.w3link.io/widget.js`;
+  const mine = EMBED;
+  const addr = mine ? mine.addr : S.featured || '0x…';
   // Spelled as entities: a literal script tag here would trip the build's inline-script check.
-  const tag = extra => `&lt;script src="${esc(src)}"&gt;&lt;/script&gt;\n` + esc(`<div data-rake="${addr}" data-chain="${id}"${extra}></div>`);
+  // The address sits in its own span so the preview below can rewrite every snippet in place.
+  // One attribute per line. The indent is built here rather than typed: the minifier strips leading
+  // whitespace from every source line, template literals included.
+  const at = (k, v) => '\n  ' + esc(k) + (v === undefined ? '' : `="${v}"`);
+  const tag = rpc => `&lt;script src="${esc(src)}"&gt;&lt;/script&gt;\n&lt;div` + at('data-rake', `<span class="wd-a">${addr}</span>`)
+    + at('data-chain', id) + at('data-link') + (rpc ? at('data-rpc', esc(rpc)) : '') + '\n&gt;&lt;/div&gt;';
   const rpc = PUBLIC_RPC[id];
-  return `<p>Paste this into any page. It reads the ${S.featured ? 'featured distribution' : 'distribution at the address you put in <code>data-rake</code>'} on ${cname(id)} through the visitor's wallet, and shows a failure state if the wallet is missing or on another chain.</p>
-  <pre>${tag('')}</pre>
-  ${rpc ? `<p>Add <code>data-rpc</code> to read through an endpoint instead, so visitors need no wallet. The endpoint is yours to choose: the one below is a public ${cname(id)} endpoint, there so the example works as pasted.</p>
-  <pre>${tag(` data-rpc="${rpc}"`)}</pre>` : ''}
-  <p><code>data-variant="compact"</code> shows the bar and one line, for a footer. <code>data-theme="dark"</code> or <code>"light"</code> overrides the guess the widget makes from the page's background.</p>
-  ${S.featured ? '' : `<p>Connect a wallet on ${cname(id)} and this example fills in the featured distribution's address.</p>`}
-  <p>The script is served by the same contract as this page, ${ext('address', CFG.app, esc(short(CFG.app)))}.</p>`;
+  return `<div class="wdemo"><div class="load"><input id="wd-in" value="${mine || S.featured ? addr : ''}" placeholder="0x… or a name" aria-label="distribution to preview"><button class="btn sec" id="wd-go">preview</button></div>
+  <div class="res" id="wd-res"></div>
+  <div class="wdgrid"><div><div class="cap">full</div><div id="wd-full"></div></div><div><div class="cap">compact</div><div id="wd-compact"></div></div></div></div>
+  <p>Paste the following into any page. It displays <span id="wd-what">${mine ? esc(mine.description) : S.featured ? 'the featured distribution' : 'the distribution at the address given in <code>data-rake</code>'}</span> on ${cname(id)}, read through the visitor's wallet, and shows a failure state if no wallet is present or the wallet is on another chain.</p>
+  <pre class="snip">${tag()}</pre>
+  ${rpc ? `<p>To read through an RPC endpoint instead, so that visitors need no wallet, add <code>data-rpc</code>. The endpoint is the host's to choose; the one below is a public ${cname(id)} endpoint, included so that the example works as pasted.</p>
+  <pre class="snip">${tag(rpc)}</pre>` : ''}
+  <p><code>data-link</code> adds a link from the widget to the distribution's page in this app, where a visitor can verify the table, its history and any pending change. Remove the attribute to omit the link, or give it the address of another copy of the app, such as <code>data-link="https://…"</code>.</p>
+  <p><code>data-variant="compact"</code> renders the bar and a single line, suited to a footer. <code>data-theme="dark"</code> or <code>"light"</code> overrides the widget's inference from the page background.</p>
+  ${mine || S.featured ? '' : `<p>The address is filled in once a wallet on ${cname(id)} is connected.</p>`}
+  <p>The script is served by the contract that serves this page, ${ext('address', CFG.app, esc(short(CFG.app)))}${http ? ', and the <code>src</code> above is resolved against this page\'s own address' : ', through an ERC-5219 gateway'}. A page opened in a web3:// client may load <code>web3://${esc(CFG.app)}:${id}/widget.js</code> instead; clients that call only <code>html()</code>, such as Freedom, cannot reach the script at that address.</p>`;
 }
 function docs() {
   V.innerHTML = `<div class="docgrid"><nav class="rail" aria-label="sections">${eyebrow('sections')}`
   + SECTIONS.map(s => `<a href="#/docs#${s[0]}">${s[1].toLowerCase()}</a>`).join('') + `</nav>
-  <article class="doc">${eyebrow(`docs · ${CFG.version} draft`)}<h1>Distributions</h1>
+  <article class="doc">${eyebrow(`docs · ${CFG.version}`)}<h1>Distributions</h1>
 
-  <h2 id="s-what">What it is</h2>
-  <p>A distribution is a contract that splits whatever it receives between a list of addresses. The list, the share of each address, a name and a note for each row, and the owner are stored on chain. Anyone can read them and anyone can trigger a payout. Only the owner can change the list, and every change waits a set delay before it takes effect.</p>
+  <h2 id="s-what">Overview</h2>
+  <p>A distribution is a contract that receives funds and divides them among a published table of beneficiaries. The table, with each beneficiary's address, share, name and note, is stored on chain together with the owner, the delay and a description, and can be read by anyone. Anyone may trigger a payout. Only the owner may propose a change, and every change is subject to a public delay before it can take effect.</p>
+  <p><b>Paying in from a contract.</b> A contract must send ETH to a distribution with <code>call</code> and sufficient gas. A payment made with <code>transfer</code> or <code>send</code> can fail; see <a href="#/docs#payin">receiving funds</a>.</p>
 
-  <h2 id="s-why">Why it exists</h2>
-  <p>A fee is easy to charge and hard to explain. Where it goes is usually a sentence on a website, and that sentence can change at any time. A distribution puts the answer on chain. The split is public, the owner is public, and a change to the split is visible for the whole delay before it lands. A payer can check it and a payee can rely on it.</p>
-  <p>The contract takes no cut, has no admin key other than the owner's, and cannot be upgraded.</p>
+  <h2 id="s-why">Purpose</h2>
+  <p>Where a fee or a revenue share goes is ordinarily stated off chain, and that statement can be revised without notice. A distribution places it on record. The allocation is public, the owner is public, and a change to either is visible for the full length of the delay before it can be applied. A payer can verify where funds will go; a beneficiary can rely on the share it has been allocated.</p>
+  <p>Protocol fees are the primary case. The mechanism applies equally to revenue shares, grants and any other allocation a project is accountable for and is prepared to publish.</p>
+  <p>The contract takes no fee, holds no administrative key other than the owner's, and cannot be upgraded.</p>
 
-  <h2 id="s-how">How it works</h2>
-  <p>Funds arrive at the address and sit there. When someone calls <code>distribute</code>, the balance is split by the table and sent to each row. If a payee cannot receive its share, the share is held in the contract for that payee and can be released later.</p>
+  <h2 id="s-how">Mechanism</h2>
+  <p>Funds sent to the address remain there until <code>distribute</code> is called. Each call divides the available balance of one asset according to the table and sends each beneficiary its share. A share that cannot be delivered is held in the contract for that beneficiary and may be released later.</p>
   ${figSeq()}
-  <p>The owner changes the table, the description, the delay or the owner by proposing the change. After the delay, anyone can apply it. Before that, the owner can cancel it.</p>
+  <p>Changes follow a fixed sequence. The owner proposes a change, and it is queued with the time from which it may be applied. Once that time has passed, anyone may apply it. Until it is applied, the owner may cancel it.</p>
   ${figState()}
 
-  <h2 id="s-create">Creating one</h2>
-  <p>You choose an owner, a delay and a table.</p>
-  <p>The owner is the address that can propose and cancel changes. The create screen fills in your wallet. A multisig or a DAO can own a distribution.</p>
-  <p>The delay is how long a change waits before it can be applied. The create screen starts at seven days. Zero is allowed, and a distribution with no delay is marked as such wherever it is shown.</p>
-  <p>The table is one row per address, with a share in percent, a name and a note. The shares must add up to 100. No row can have a zero share and no address can appear twice. When a payout does not divide evenly, the row with the highest address gets the remainder.</p>
-  <p>The address of the distribution is shown before you deploy, so it can go into a contract or an invoice first. ETH sent with the create transaction goes into the distribution.</p>
+  <h2 id="s-create">Creating a distribution</h2>
+  <p>A distribution is defined by three parameters: an owner, a delay and a table.</p>
+  <p>The owner is the address permitted to propose and cancel changes. The create screen defaults to the connected wallet. A multisig, a DAO or any other contract may be the owner.</p>
+  <p>The delay is the period a proposed change must wait before it can be applied. The create screen defaults to seven days. A delay of zero is permitted, and a distribution without one is marked as such wherever it is displayed.</p>
+  <p>The table holds one row per beneficiary: an address, a share, a name and a note. Shares are set in steps of 0.01% and must total exactly 100%. Every share must be greater than zero, no address may appear twice, and the zero address may not appear at all. Where a payout does not divide evenly, the remainder is assigned to the last row, which is the row with the highest address because the contract requires the table in ascending address order. The remainder is less than one base unit per row; assigning it to one row means every payout leaves a zero balance behind rather than accumulating dust.</p>
+  <p>The address of a distribution is determined before it is deployed and is displayed on the create screen, so that it can be written into a contract or an invoice in advance. The create screen refuses an address at which code already exists. ETH sent with the creation transaction is deposited into the distribution.</p>
 
-  <h2 id="s-payin">Paying in</h2>
-  <p>Send ETH or any ERC-20 token to the address. Nothing is paid out until someone calls <code>distribute</code>.</p>
-  <p>A contract that pays in must send ETH with <code>call</code> and enough gas. <code>transfer</code> and <code>send</code> forward a 2,300-gas stipend only, and receiving into a clone whose implementation is cold costs more than that, so the payment fails.</p>
+  <h2 id="s-payin">Receiving funds</h2>
+  <p>A distribution accepts ETH and any ERC-20 token at its address. Received funds are not paid out until <code>distribute</code> is called.</p>
+  <p>A contract that sends ETH to a distribution must use <code>call</code> with sufficient gas. <code>transfer</code> and <code>send</code> forward a stipend of 2,300 gas, which does not cover receipt while the implementation is cold, and the payment then fails.</p>
 
-  <h2 id="s-payout">Paying out</h2>
-  <p>Anyone can call <code>distribute</code>, and the caller pays the gas. One call pays out one token; ETH counts as a token. Each row is paid in table order.</p>
-  <p>If a row cannot receive, its share is held in the contract and the other rows are still paid. Held funds are left out of later payouts until someone calls <code>release</code> for that row. If the release fails, the funds stay held.</p>
-  <p>ETH is sent with 100,000 gas. A row that needs more than that to receive is always held.</p>
+  <h2 id="s-payout">Distributing funds</h2>
+  <p>Anyone may call <code>distribute</code>, and the caller pays the gas. Each call distributes one asset, ETH counting as one. Beneficiaries are paid in table order.</p>
+  <p>If a beneficiary cannot receive its share, that share is held in the contract and the remaining beneficiaries are still paid. Held funds are excluded from later distributions until <code>release</code> is called for that beneficiary. Anyone may call <code>release</code>; it pays the beneficiary, never the caller. If the release fails, the funds remain held. Removing a beneficiary from the table does not affect funds already held for it.</p>
+  <p>ETH is sent with a gas allowance of 100,000. A beneficiary that requires more than that to receive ETH is always held.</p>
 
-  <h2 id="s-change">Changing it</h2>
-  <p>The table, the description, the delay and the owner can each be changed. Each change is its own proposal.</p>
-  <p>Propose the change. It shows as pending with a countdown, next to the current table. When the countdown ends, anyone can apply it. Until then the owner can cancel it, and the current table stays in force. Nothing applies on its own.</p>
-  <p>Changing the delay waits the current delay. With a delay of zero, the change applies in the same transaction as the proposal.</p>
-  <p>In a wallet these show as <code>propose</code>, <code>applyQueued</code> and <code>cancel</code>.</p>
+  <h2 id="s-change">Changing a distribution</h2>
+  <p>The table, the description, the delay and the owner may each be changed. Each change is a separate proposal.</p>
+  <p>A proposed change is displayed as pending, with a countdown, beside the current table. When the countdown ends, anyone may apply it. Until then the owner may cancel it, and the current configuration remains in force. No change applies automatically.</p>
+  <p>A change to the delay is itself subject to the current delay. Where the delay is zero, a change applies in the same transaction as its proposal.</p>
+  <p>In a wallet, these operations appear as <code>propose</code>, <code>applyQueued</code> and <code>cancel</code>.</p>
 
   <h2 id="s-owner">Ownership</h2>
-  <p>To transfer ownership, propose the new owner, wait, and apply. Ownership is per chain.</p>
-  <p>To freeze the table, transfer ownership to the zero address. After that nothing can be proposed or cancelled.</p>
+  <p>Ownership is transferred by proposing a new owner, waiting out the delay, and applying the change. Ownership is held separately on each chain.</p>
+  <p>Transferring ownership to the zero address renounces it. Thereafter no change can be proposed or cancelled. A change queued before the renunciation can still be applied by anyone, and once none remains the configuration is permanent.</p>
 
   <h2 id="s-widget">The widget</h2>
-  <p>A script that shows a distribution on another page: the bar, the rows, the owner, the delay and any pending change, read from the chain. It uses the host page's font and text colour. There is a full and a compact version.</p>
+  <p>The widget is a script that displays a distribution on any web page: its allocation, its beneficiaries, its owner, its delay and any pending change, read directly from the chain. It adopts the host page's font and text colour, and is available in a full and a compact form.</p>
   ${widgetDocs()}
 
   <h2 id="s-limits">Limits</h2>
-  <p>The owner is trusted for the length of the delay. The contract protects payees from sudden changes, not from the owner.</p>
-  <p>A token that charges a fee on transfer pays out less than the table says.</p>
-  <p>A row that needs more than 100,000 gas to receive ETH is always held.</p>
-  <p>A contract paying in with <code>transfer</code> or <code>send</code> fails when the implementation is cold, because the 2,300-gas stipend does not cover it.</p>
-  <p>The contracts cannot be upgraded. A bug is fixed by deploying a new distribution.</p>
-  <p>There is no audit yet. Report issues through the repository's <a href="${REPO}/security/advisories/new" target="_blank" rel="noopener">advisory form</a>.</p>
+  <p>The owner is trusted for the length of the delay. The contract protects beneficiaries against sudden changes; it does not protect them against the owner.</p>
+  <p>A token that charges a fee on transfer delivers less than the table specifies.</p>
+  <p>A beneficiary that requires more than 100,000 gas to receive ETH is always held.</p>
+  <p>Funds held for a beneficiary that can never receive them remain in the contract permanently. This is by design: there is no sweep, and neither the owner nor anyone else can redirect them.</p>
+  <p>Every address, share, name and note is public, and remains in the chain's history after it is changed. An allocation that must stay private, such as individual salaries, is not suited to a distribution.</p>
+  <p>A contract that pays in with <code>transfer</code> or <code>send</code> fails while the implementation is cold, because the 2,300-gas stipend does not cover receipt.</p>
+  <p>The contracts cannot be upgraded. A defect is remedied by deploying a new distribution.</p>
+  <p>The contracts have not yet been audited. Security issues should be reported through the repository's <a href="${REPO}/security/advisories/new" target="_blank" rel="noopener">advisory form</a>.</p>
 
   <h2 id="s-developers">For developers</h2>
-  <p>Source: <a href="${REPO}" target="_blank" rel="noopener">github.com/dnznlabs/rake</a>, MIT. Both contracts are one file with no imports. Every function, event and error, and the <code>Snapshot</code> struct the widget reads, are in <a href="${REPO}/blob/main/docs/REFERENCE.md" target="_blank" rel="noopener">docs/REFERENCE.md</a>. This page is returned by the <code>html()</code> view of a renderer contract.</p>
+  <p>The source is published at <a href="${REPO}" target="_blank" rel="noopener">github.com/dnznlabs/rake</a> under the MIT licence. Both contracts reside in one file with no imports. Every function, event and error, and the <code>Snapshot</code> struct the widget reads, are documented in <a href="${REPO}/blob/main/docs/REFERENCE.md" target="_blank" rel="noopener">docs/REFERENCE.md</a>. This page is itself served by the <code>html()</code> view of a contract.</p>
   <div class="scroll"><table class="dtab"><tr><th>chain</th><th>factory</th><th>status</th></tr>${chainRows()}</table></div>
-  <p>The timelock, the self-call setters, PUSH0 clones and the sender-bound salt come from multisig.software (Src Co / z0r0z). The low-level patterns follow Solady.</p>
+  <p>The timelock, the self-call setters, PUSH0 clones and the sender-bound salt derive from multisig.software (Src Co / z0r0z). The low-level patterns follow Solady.</p>
   </article></div>`;
+  widgetDemo();
+}
+/* The docs' live preview: the two variants of the real widget, mounted on whatever address the field
+   holds, and every snippet above rewritten to match. It reads through the dev `?rpc=` or the chain's
+   public endpoint before the wallet, because the docs paint for visitors who have none. */
+function widgetDemo() {
+  const input = document.getElementById('wd-in'), res = document.getElementById('wd-res'), go = document.getElementById('wd-go');
+  if (!input) return;
+  const rpc = WRPC || PUBLIC_RPC[CFG.chainId] || '', first = input.value;
+  const show = async () => {
+    const a = await addrField(input.value, res);
+    if (!a) return;
+    document.querySelectorAll('.wd-a').forEach(el => el.textContent = a);
+    if (a !== first) document.getElementById('wd-what').textContent = 'the distribution previewed above';
+    if (!rpc && !window.ethereum) { res.textContent = `the preview needs a wallet on ${cname(CFG.chainId)}`; return; }
+    for (const v of ['full', 'compact']) {
+      // A fresh element per mount: the widget keeps its state on the node it was given.
+      const el = document.createElement('div');
+      el.dataset.rake = a; el.dataset.chain = CFG.chainId; el.dataset.link = '';
+      if (rpc) el.dataset.rpc = rpc;
+      if (v === 'compact') el.dataset.variant = 'compact';
+      const slot = document.getElementById('wd-' + v); slot.replaceChildren(el);
+      window.RakeWidget.mount(el);
+    }
+  };
+  go.onclick = show;
+  input.onkeydown = e => { if (e.key === 'Enter') show(); };
+  if (input.value) show();
 }
 
 /* ---- routing · theme ------------------------------------------------------------------------ */
@@ -1146,6 +1271,7 @@ function route() {
   /* Matched by prefix and painted before every check below it: the docs read with no wallet and on
      the wrong chain, which is most of the ways a stranger arrives at them. */
   if (h.startsWith('#/docs')) { docs(); docScroll(h); return; }
+  EMBED = null;
   if (!P) { V.innerHTML = notice('No wallet found. Open this page in a browser with a wallet.'); return; }
   if (wrongChain()) { V.innerHTML = notice(`Your wallet is on ${cname(CHAIN)}. This app lives on ${cname(CFG.chainId)}. <button id="sw">Switch network</button>.`); document.getElementById('sw').onclick = switchChain; return; }
   if (S.error) { V.innerHTML = notice(`could not read the factory at ${CFG.factory}: ${esc(S.error)}`, 'err'); return; }

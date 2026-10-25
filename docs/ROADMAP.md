@@ -193,13 +193,37 @@ recommended option.
     paying out, changing it, ownership, the widget, limits, for developers — in plain declarative
     sentences, with a wallet's function names given once where the owner will meet them in a prompt.
     The text on the branch is a draft: Denizen writes the final page himself in Phase 5, before the
-    signoff (§ Order, "M02 ends on Denizen"). The function, event and error tables and the verbatim `Snapshot` struct move to
+    signoff (amended 2026-10-25: Denizen delegated the text — "I really don't want to write them
+    myself" — and the final page is written at his direction and approved by his merge) (§ Order, "M02 ends on Denizen"). The function, event and error tables and the verbatim `Snapshot` struct move to
     `docs/REFERENCE.md`, which `test/docs.test.mjs` and criterion 6's ABI diff read instead of the
     page, so the drift check is kept and the page stops paying for it. Rejected: an owner's
     introduction above the developer page (two audiences on one page, and the one who deploys reads
     the one who does not); the reference as a third on-chain document (a developer has the repo and
     the contract itself, which is where they go). Criterion 6 reworded in `MILESTONE.md`. Landed in
     m02-t04 on re-review.
+18. **The landing is a pitch, not a reading; the fee-path diagram is an illustration.** Ruled by
+    Denizen on 2026-10-25 in Phase 5, closing [#50](https://github.com/dnznlabs/rake/issues/50) ("the
+    landing diagram is just an example"; the live example is "way too loud"). The hero is "Transparent
+    fund distribution." with protocol fees named as the primary case, not the only one, and one CTA.
+    The featured distribution's bar, ledger, pending block and meta leave `#/`; in their place the
+    real widget, `widget.js` inlined into the dapp, renders it beside the address field, mounted only
+    once its `snapshot()` reads. Criterion 3 moves its featured-distribution check to
+    `#/distros/<featured>`. "Get the widget" leaves the hero for the owner bar, where the docs snippet
+    then carries that owner's address. The diagram keeps the mock's 60/30/10, captioned `example`, and
+    under 720 px drops its two minor labels so the rest sets at about 10 px. The landing's rhythm is
+    64 px; the favicon is ink, not accent. Rejected: drawing the diagram from the featured `snapshot()`
+    (#50's recommendation — it ties the pitch to a dev seed); a dapp-drawn look-alike of the widget
+    (no bytes, but it can drift from the thing a host gets); hiding the diagram on a phone (decision
+    15 already turned that down).
+19. **The widget snippet names an ERC-5219 gateway, and shows `web3://` as the alternative.** Ruled
+    by Denizen on 2026-10-25, closing [#68](https://github.com/dnznlabs/rake/issues/68) ("show both
+    for clarity"). Off http(s), `#/docs` § the widget gives `src` as
+    `https://<App>.<chainId>.w3link.io/widget.js`, the gateway's address-and-chain-id host form
+    (`ethstorage/web3url-gateway` `cmd/server/protocol.go`), and names `web3://<App>:<chain>/widget.js`
+    beside it as the form for pages opened in a 5219 client, with the caveat that `html()`-only clients
+    such as Freedom cannot reach it. Decision 12 stands: `App` answering both is what keeps it reachable
+    from both camps. Rejected: the bare `web3://` src alone (it renders the dapp in Freedom). M04's
+    gateway criterion should name a 5219 gateway for the same reason.
 
 ## Findings carried forward
 

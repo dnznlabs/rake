@@ -93,5 +93,5 @@ test('the rail and the headings are the same eleven sections, in one order', () 
 
   assert.equal(sections.length, 11);
   assert.deepEqual(ids, sections.map(s => s[0]));
-  assert.ok(ids.includes('widget'), 'the landing\'s CTA points at #/docs#widget');
+  assert.ok(ids.includes('widget'), 'the owner bar\'s widget link points at #/docs#widget');
 });
