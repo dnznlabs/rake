@@ -1,6 +1,6 @@
 # M02 — Dapp and widget on anvil
 
-Status: in progress — t01–t05 done, t06 (close-out fixes) planned, Phase 5 open · updated 2026-10-25
+Status: in progress — t01–t06 done, Phase 5 open (handoff: [PHASE5.md](PHASE5.md)) · updated 2026-10-25
 
 The design prototype (`brainstorming/design/rake-dapp.html`, `rake-widget.html`) rebuilt as the real
 dapp on DNZN Base v1: reading `snapshot()` from the chain, sending the six writes through the wallet,
@@ -180,7 +180,7 @@ Independent of each other; the widget waits on #27, the docs page does not.
 |:-----|:-----|:-------|
 | [m02-t04](tasks/m02-t04/TASK.md) | `#/docs` from the prototype's docs segment against the real ABI; criterion 6; criterion 8 measured and recorded, with the second chunk served for the first time (#53 decided in the plan) | done — [#60](https://github.com/dnznlabs/rake/pull/60) merged 2026-10-17 at `620bcce`, approved at `fc2d4cb` (the twelve-section first cut) and re-approved on the owner's-page rewrite after Denizen's review, recorded as decision 17; two chunks served, `html()` 35,809 bytes, inflated sha256 equal to the build; [#57](https://github.com/dnznlabs/rake/issues/57) closed, default option 1 taken; carried: none |
 | [m02-t05](tasks/m02-t05/TASK.md) | `App` serves `widget.js` as a second chunk set (per #27), `Chunks.s.sol` uploads both, the widget reads `snapshot()` through `data-rpc` or the host's `window.ethereum`, host page under `make serve`; criterion 7; criterion 9 in full, criterion 8 re-measured | done — [#65](https://github.com/dnznlabs/rake/pull/65) merged 2026-10-25 at `9a0def6`, closing [#63](https://github.com/dnznlabs/rake/issues/63); changes requested then approved after the UTF-8 fallback ([#67](https://github.com/dnznlabs/rake/issues/67), closed); `widget.js` 7,677 bytes of 10,240, one chunk, `widget sha256` equal to the build on 31337 and 31338; carried [#66](https://github.com/dnznlabs/rake/issues/66), and Denizen's [#68](https://github.com/dnznlabs/rake/issues/68) from his Freedom check |
-| [m02-t06](tasks/m02-t06/TASK.md) | Close-out fixes, nothing under `src/`: the `make deploy` guard (#35), the seed's `Received` log (#42), amounts by `decimals()` (#43), `chain-doc` out of `out/` (#66), the hook-token lock test (#21) and the collision gas assertion (#22, test half) | planned 2026-10-25 — task issue opens when this file merges; no gate |
+| [m02-t06](tasks/m02-t06/TASK.md) | Close-out fixes, nothing under `src/`: the `make deploy` guard (#35), the seed's `Received` log (#42), amounts by `decimals()` (#43), `chain-doc` out of `out/` (#66), the hook-token lock test (#21) and the collision gas assertion (#22, test half) | done — [#71](https://github.com/dnznlabs/rake/pull/71) merged 2026-10-25 at `b1efe27` (merge commit, ten commits kept), closing [#70](https://github.com/dnznlabs/rake/issues/70), #21, #35, #42, #43, #66; `forge test` 47, `node --test` 61, every gate re-run by the architect on a second anvil; one plan defect recorded (step 3's `call` form would have read an empty `decimals()` as 0 — § Deviations 3) and one ruling (`amt` stays in `index.html`); carried: none |
 
 ### Phase 5 — dapp and widget refinement
 
