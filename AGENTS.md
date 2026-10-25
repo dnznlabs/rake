@@ -37,8 +37,9 @@
   the only build token; the address is `predict(salt)`, which the page reads at boot, so the same salt
   gives the same address on every chain while the table differs by `block.chainid`. A salt that already
   has code is left alone rather than re-created (#22).
-- The placeholder page under `app/` reads the factory's `implementation()` until M02 replaces it.
-- `lib/` are submodules pinned to a tag. `forge install` would move them.
+- `lib/` are submodules pinned to a tag. `forge install` would move them. A fresh `git worktree add`
+  checks out without them, so the first `forge` command dies on `forge-std/Script.sol`: run
+  `git submodule update --init --recursive` in the worktree first (#41).
 - The toolchain is pinned in `devbox.json`; run forge through devbox. `forge build` must print no
   `warning[` and no `Warning (` line, and lint findings differ across foundry versions.
 - `.gas-snapshot` is tracked and CI runs `forge snapshot --check` with no tolerance. Regenerate with
