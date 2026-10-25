@@ -134,6 +134,17 @@ contract MockERC20 {
     }
 }
 
+/// @notice `MockERC20` that answers `decimals()` with 6, for the dapp's by-decimals amounts (#43).
+/// @dev The base mock deliberately has no `decimals()`, so its rows must render in raw units; this
+/// subclass is the chain-side foil for that. No test exercises it.
+contract MockERC20Dec6 is MockERC20 {
+    constructor(Ret ret_) MockERC20(ret_) {}
+
+    function decimals() external pure returns (uint8) {
+        return 6;
+    }
+}
+
 /// @notice Enough of a multisig to answer the dapp's owner probe: `isOwner(address)` is the one call
 /// decision 7 makes, and a distribution owned by this contract renders the owner view with
 /// copy-calldata for every signer it names.
