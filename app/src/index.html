@@ -109,6 +109,8 @@ async function waitReceipt(hash, ms) {
 const txSay = (label, text, cls) => { const el = document.getElementById('txs'); if (el) el.innerHTML = `<div class="status${cls ? ' ' + cls : ''}">${label} · ${text}</div>`; };
 async function tx(to, sig, args, opts) {
   const o = opts || {}, label = o.label || sig.slice(0, sig.indexOf('('));
+  // A null `from` is not refused everywhere: anvil fills in its first account and sends.
+  if (!ACC) { txSay(label, 'connect a wallet to send', 'bad'); return { ok: false, stage: 'preflight', text: 'no account' }; }
   const params = { from: ACC, to, data: Eth.enc(sig, args), ...(o.value ? { value: '0x' + BigInt(o.value).toString(16) } : {}) };
   txSay(label, 'checking the call against the chain…');
   try { await P.request({ method: 'eth_call', params: [params, 'latest'] }); }
@@ -201,6 +203,9 @@ async function readClock() {
   CLOCK = { t: parseInt(b.timestamp, 16), at: Date.now() };
 }
 const isAddr = v => /^0x[0-9a-fA-F]{40}$/.test(v);
+// EIP-55: one case throughout carries no checksum and passes; mixed case has to be the checksum itself.
+const checksumOk = v => { const h = v.slice(2); return h === h.toLowerCase() || h === h.toUpperCase() || Eth.checksum(v) === v; };
+const BAD_SUM = 'checksum does not match — a character is likely wrong';
 // Every address and hash the page prints goes through here: the value, then a copy icon that copies
 // all of it (the one handler is `copyClick`), then, where the chain has an explorer, a ↗ to an address
 // or a tx. A queued action's `hash` is no transaction, so it links nowhere. The icon is a span, not a
@@ -314,6 +319,8 @@ async function resolveAddr(name) {
    null, and writes the field's own one-line state into `res`. */
 async function addrField(value, res) {
   const v = String(value || '').trim();
+  if (isAddr(v) && !checksumOk(v)) { if (res) { res.textContent = BAD_SUM; res.classList.add('bad'); } return null; }
+  if (res) res.classList.remove('bad');
   if (isAddr(v)) { if (res) res.textContent = ''; return Eth.checksum(v); }
   if (!v) { if (res) res.textContent = ''; return null; }
   if (CHAIN !== 1 && CHAIN !== 11155111) { if (res) res.textContent = 'names resolve on mainnet and Sepolia'; return null; }
@@ -381,7 +388,15 @@ const KINDS = new Map([...CHANGE_EVENTS, ...FUND_EVENTS].map(([sig, kind]) => [t
 async function history(addr, from) {
   const pick = set => logs(addr, [set.map(([sig]) => topic(sig))], from);
   const [changes, funds] = await Promise.all([pick(CHANGE_EVENTS), pick(FUND_EVENTS)]);
-  return { changes: changes.map(entry).sort(newest), funds: funds.map(entry).sort(newest) };
+  const ch = changes.map(entry);
+  /* `Applied` and `Cancelled` carry only the hash, so each borrows the description of the `Queued` it
+     closes, and that `Queued` line trades its countdown for how it ended. */
+  const q = new Map(ch.filter(e => e.kind === 'queued').map(e => [e.hash, e]));
+  for (const e of ch) {
+    const o = e.kind !== 'queued' && q.get(e.hash);
+    if (o) { e.what = `${o.desc} · ${e.what}`; o.what = `${o.desc} · nonce ${o.nonce} · ${e.kind}`; o.closed = true; }
+  }
+  return { changes: ch.sort(newest), funds: funds.map(entry).sort(newest) };
 }
 const newest = (a, b) => b.block - a.block || b.index - a.index;
 /* One log as the line it prints. An unknown topic0 cannot reach here: the query asked for these. */
@@ -392,8 +407,8 @@ function entry(log) {
   if (kind === 'queued') {
     const [nonce, eta, action] = Eth.dec(['uint32', 'uint256', 'bytes'], log.data);
     // The `uint32 nonce` `applyQueued` takes: `snapshot()`'s struct does not carry it, this log does.
-    e.hash = log.topics[1]; e.nonce = Number(nonce);
-    e.what = `${describe(Model.decodePending(action))} · nonce ${nonce} · ${Model.countdown(eta, secs())}`;
+    e.hash = log.topics[1]; e.nonce = Number(nonce); e.desc = describe(Model.decodePending(action));
+    e.what = `${e.desc} · nonce ${nonce} · ${Model.countdown(eta, secs())}`;
   } else if (kind === 'applied' || kind === 'cancelled') {
     e.hash = log.topics[1];
     e.what = ext('hash', log.topics[1], short(log.topics[1]));
@@ -451,7 +466,7 @@ function ticks(table, opts) {
 const mini = table => `<span class="mini">${table.map((b, i) => `<span class="seg s${i % 3}" style="flex-basis:${basis(b[1])}"></span>`).join('')}</span>`;
 const ledger = table => `<div class="ledger">${table.map(b => row(`${esc(b[2])}${b[3] ? `<span class="nt"> — ${esc(b[3])}</span>` : ''}`, ext('address', b[0], esc(short(b[0]))), Model.pct(b[1]))).join('')}</div>`;
 const row = (k, sub, n, cls) => `<div class="row${cls ? ' ' + cls : ''}"><div><b>${k}</b>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="n">${n}</div></div>`;
-const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow${e.kind === 'escrowed' ? ' err' : e.kind === 'queued' ? ' amber' : ''}"><b>${e.kind}</b><span class="w">${e.what}</span><span class="t">block ${e.block} · ${ext('tx', e.tx, short(e.tx))}</span></div>`).join('')}</div>`;
+const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow${e.kind === 'escrowed' ? ' err' : e.kind === 'queued' && !e.closed ? ' amber' : e.kind === 'applied' ? ' done' : ''}"><b>${e.kind}</b><span class="w">${e.what}</span><span class="t">block ${e.block} · ${ext('tx', e.tx, short(e.tx))}</span></div>`).join('')}</div>`;
 const eyebrow = (text, cls) => `<div class="eyebrow${cls ? ' ' + cls : ''}">${text}</div>`;
 const notice = (text, cls) => `<div class="notice${cls ? ' ' + cls : ''}">${text}</div>`;
 const unreadable = addr => notice(`could not read a distribution at ${ext('address', addr, short(addr))} on ${cname(CFG.chainId)} — nothing is deployed there.`, 'err');
@@ -486,7 +501,7 @@ function pendingActs(d, p, i) {
       + `${DS.failed ? 'history unavailable — apply needs the queue log' : 'reading the queue log — apply needs the nonce it carries'}</span>`
     : Model.countdown(p[1], secs()) === 'ready to apply'
       ? sctl(`apply:${i}`, 'apply', { to: d.addr, sig: 'applyQueued(bytes,uint32)', args: () => [p[2], nonce], label: 'applyQueued' })
-        + '<span class="status">the delay has passed — anyone can land it</span>'
+        + `<span class="status">the delay has passed — anyone can land it${ACC ? '' : ' · connect a wallet to send it'}</span>`
       : '<button class="btn off sm" disabled>apply</button><span class="status">anyone can apply once the delay passes</span>';
   const cancel = VIEW === 'visitor' ? ''
     : wctl(`cancel:${i}`, 'cancel', { to: d.addr, sig: 'cancel(bytes32)', args: () => [p[0]], label: 'cancel' })
@@ -566,11 +581,12 @@ let VIEW = 'visitor';
 function wctl(key, label, w) {
   WRITES.set(key, w);
   return VIEW === 'vault'
-    ? `<button class="btn sec sm" data-copy="${key}">copy calldata for your vault</button>`
-    : `<button class="btn sm" data-send="${key}">${label}</button>`;
+    ? `<button class="btn sec sm" data-copy="${key}"${w.locked ? ' disabled' : ''}>copy calldata for your vault</button>`
+    : w.hold ? `<button class="btn sec sm hold" data-send="${key}"${w.locked ? ' disabled' : ''}><span>${label}</span></button>` : `<button class="btn sm" data-send="${key}">${label}</button>`;
 }
 function sctl(key, label, w, off) {
   WRITES.set(key, w);
+  if (!ACC) return `<button class="btn off sm" disabled title="connect a wallet to send">${label}</button>`;
   return off ? `<button class="btn off sm" disabled>${label}</button>` : `<button class="btn sm" data-send="${key}">${label}</button>`;
 }
 /* One handler for all of them. After a write lands the view is read again from the chain rather than
@@ -578,7 +594,7 @@ function sctl(key, label, w, off) {
 function bindWrites(reload) {
   const all = () => V.querySelectorAll('[data-send],[data-copy]');
   V.querySelectorAll('[data-send]').forEach(b => {
-    b.onclick = async () => {
+    const fire = async () => {
       const w = WRITES.get(b.dataset.send);
       if (!w || (w.confirm && !confirm(w.confirm))) return;
       let args;
@@ -588,6 +604,7 @@ function bindWrites(reload) {
       const r = await tx(w.to, w.sig, args, { value: w.value && w.value(), label: w.label });
       if (r.ok) reload(); else all().forEach(x => { x.disabled = false; });
     };
+    if (WRITES.get(b.dataset.send)?.hold) holdToFire(b, fire); else b.onclick = fire;
   });
   V.querySelectorAll('[data-copy]').forEach(b => {
     b.onclick = () => {
@@ -599,6 +616,23 @@ function bindWrites(reload) {
       copyCalldata(Eth.enc(w.sig, args), document.getElementById('txs'));
     };
   });
+}
+
+/* A write that cannot be undone fires only after HOLD_MS of pointer or Enter/Space held down; letting
+   go early cancels it, and the `.on` class draws the fill, whose 3s transition in theme.css matches. A click
+   alone does nothing. */
+const HOLD_MS = 3000;
+function holdToFire(b, fire) {
+  let t = null;
+  const hold = () => { if (t || b.disabled) return; b.classList.add('on'); t = setTimeout(() => { drop(); fire(); }, HOLD_MS); };
+  const drop = () => { clearTimeout(t); t = null; b.classList.remove('on'); };
+  const key = e => e.key === 'Enter' || e.key === ' ';
+  b.onpointerdown = hold;
+  b.onpointerup = b.onpointerleave = b.onpointercancel = drop;
+  b.oncontextmenu = e => e.preventDefault();
+  b.onkeydown = e => { if (key(e)) { e.preventDefault(); if (!e.repeat) hold(); } };
+  b.onkeyup = e => { if (key(e)) drop(); };
+  b.onblur = drop;
 }
 
 /* ---- views ---------------------------------------------------------------------------------- */
@@ -732,7 +766,7 @@ function loadField() {
 /* What one load of `#/distros/<addr>` knows. `nonces` arrives with the logs rather than the snapshot,
    which is why the apply buttons are drawn twice: once disabled, once able. */
 let DS = { d: null, next: null, heir: null, nonces: null, qtx: null, failed: false };
-let PROPOSE = null, DRAWER = false;
+let PROPOSE = null, DRAWER = false, OWNOPEN = false;
 // The distribution `#/docs#widget` embeds: set only where the owner bar paints, cleared by every route but the docs.
 let EMBED = null;
 const bindAll = () => bindWrites(() => detail(DS.d.addr));
@@ -753,7 +787,7 @@ async function ownerView(d) {
 
 async function detail(addr) {
   const t = TOKEN;
-  if (!DS.d || DS.d.addr !== addr) { V.innerHTML = notice(`reading ${esc(short(addr))}…`); PROPOSE = null; DRAWER = false; }
+  if (!DS.d || DS.d.addr !== addr) { V.innerHTML = notice(`reading ${esc(short(addr))}…`); PROPOSE = null; DRAWER = false; OWNOPEN = false; ACK = 0; OWNMODE = 'transfer'; OWNER_IN = ''; }
   // The clock is read again here, not only at boot: every countdown on this page is measured against
   // it, and a write that lands moves the chain's.
   const [d] = await Promise.all([loadDistro(addr), readClock()]);
@@ -867,25 +901,108 @@ function drawerHTML(d) {
         if (s === null) throw new Error('delay takes 7d, 48h, 30m or a number of seconds');
         return [s];
       }))
-    + qrow('owner', `<input id="q-owner" aria-label="owner" value="${esc(d.owner)}"><div class="res" id="q-ownerres"></div>`,
-      prop('owner', 'queue', 'transferOwnership', 'transferOwnership(address)', () => {
-        const v = val('q-owner').trim();
-        if (!isAddr(v)) throw new Error('owner takes an address — a name resolves on mainnet and Sepolia');
-        return [Eth.checksum(v)];
-      }))
     + '</div>'
-    + `<div class="help">or ${wctl('renounce', 'renounce', {
-      to: d.addr, sig: 'propose(bytes)', label: 'propose renounce',
-      confirm: 'Transfer ownership to nobody. The table can never change again. Queue it?',
-      args: () => [Eth.enc('transferOwnership(address)', [ZERO])],
-    })} — transfer to nobody; the table can never change again.</div>`
+    + ownershipHTML(d)
     + '</div>';
+}
+/* Both ownership writes sit collapsed under one disclosure, behind a selector: each has its own
+   three acknowledgements (`ACKS`), each enabled only once the one above it is checked, and a hold
+   button that unlocks after the last. `ACK` is how many are checked, so a repaint keeps them; a switch
+   of mode, or a new address typed, clears them. */
+const ACKS = {
+  transfer: [
+    'Once this is applied, the new owner alone can propose and cancel changes, unless they change the owner back to me.',
+    'I have checked the address. A mistyped address, or one nobody controls, loses control of this distribution permanently.',
+    'After the delay anyone can apply it. I can cancel it only until then.',
+  ],
+  renounce: [
+    'Once this is applied, no change to this distribution can be proposed or cancelled again, by anyone.',
+    'The table, the delay and the name become permanent, mistakes included, once nothing else is queued. Funds keep going to the addresses in the table.',
+    'After the delay anyone can apply it. I can cancel it only until then.',
+  ],
+};
+let ACK = 0, OWNMODE = 'transfer', OWNER_IN = '';
+// Change owner's statements stay locked until the field holds an address that is neither zero nor the
+// current owner; a name counts once resolved.
+const ownReady = () => { const v = OWNER_IN.trim(); return OWNMODE !== 'transfer' || (isAddr(v) && checksumOk(v) && ![ZERO, DS.d.owner].includes(Eth.checksum(v))); };
+/* What the proposed owner is, read once per address and kept so a repaint shows it again: a contract,
+   an account with a history, or one that has never sent a transaction here — legitimate for a new key,
+   and also what a mistyped address looks like, so it is amber rather than refused. */
+const PROBE = new Map();
+async function probeOwner(a) {
+  if (PROBE.has(a)) return PROBE.get(a);
+  const [code, n] = await Promise.all([
+    P.request({ method: 'eth_getCode', params: [a, 'latest'] }),
+    P.request({ method: 'eth_getTransactionCount', params: [a, 'latest'] }),
+  ]).catch(() => [null, null]);
+  const out = code === null ? { text: 'could not read this address', cls: 'warn' }
+    : code !== '0x' ? { text: 'a contract — it will have to propose and cancel through its own calls', cls: '' }
+    : Number(n) > 0 ? { text: `an account · ${Number(n)} transaction${Number(n) === 1 ? '' : 's'} on ${cname(CFG.chainId)}`, cls: '' }
+    : { text: `has never sent a transaction on ${cname(CFG.chainId)} — make sure someone holds its key`, cls: 'warn' };
+  if (code !== null) PROBE.set(a, out);
+  return out;
+}
+function ownerNote() {
+  const v = OWNER_IN.trim();
+  if (!isAddr(v)) return { text: '', cls: '' };
+  if (!checksumOk(v)) return { text: BAD_SUM, cls: 'bad' };
+  const a = Eth.checksum(v);
+  if (a === ZERO) return { text: 'the zero address — renouncing is the other tab', cls: 'bad' };
+  if (a === DS.d.owner) return { text: 'that is the current owner', cls: 'bad' };
+  return PROBE.get(a) || { text: 'reading the address…', cls: '' };
+}
+function ownershipHTML(d) {
+  const t = OWNMODE === 'transfer', acks = ACKS[OWNMODE], ok = ownReady();
+  const hold = VIEW === 'vault' ? '' : ', then hold the button for three seconds to queue it';
+  return `<details class="danger" id="ownership"${OWNOPEN ? ' open' : ''}><summary>ownership</summary>`
+    + `<div class="tabs">${[['transfer', 'change owner'], ['renounce', 'renounce ownership']].map(([k, l]) => `<button class="tab${OWNMODE === k ? ' on' : ''}" data-own="${k}">${l}</button>`).join('')}</div>`
+    + (t
+      ? `<p class="help">Hands this distribution to another address. Enter it, confirm each statement in turn${hold}.</p>`
+        + (n => `<div class="field"><input id="q-owner" aria-label="new owner" placeholder="new owner — 0x… or a name" value="${esc(OWNER_IN)}"><div class="res${n.cls ? ' ' + n.cls : ''}" id="q-ownerres">${esc(n.text)}</div></div>`)(ownerNote())
+      : `<p class="help">Transfers ownership to nobody. Confirm each statement in turn${hold}.</p>`)
+    + acks.map((x, i) => `<label class="ack"><input type="checkbox" data-ack="${i}"${ACK > i ? ' checked' : ''}${ACK < i || !ok ? ' disabled' : ''}><span>${x}</span></label>`).join('')
+    + wctl(OWNMODE, t ? 'hold to change owner' : 'hold to renounce', {
+      to: d.addr, sig: 'propose(bytes)', label: t ? 'propose transferOwnership' : 'propose renounce', hold: true, locked: ACK < acks.length || !ok,
+      args: () => {
+        if (!t) return [Eth.enc('transferOwnership(address)', [ZERO])];
+        const v = document.getElementById('q-owner').value.trim();
+        if (!isAddr(v)) throw new Error('owner takes an address — a name resolves on mainnet and Sepolia');
+        if (Eth.checksum(v) === ZERO) throw new Error('that is the zero address — renouncing is the other tab');
+        return [Eth.enc('transferOwnership(address)', [Eth.checksum(v)])];
+      },
+    })
+    + '</details>';
 }
 function bindDrawer(d) {
   const close = document.getElementById('dclose');
   if (close) close.onclick = () => { DRAWER = false; paintDetail(); };
-  const own = document.getElementById('q-owner');
-  if (own) own.onchange = async () => { const a = await addrField(own.value, document.getElementById('q-ownerres')); if (a) own.value = a; };
+  const ow = document.getElementById('ownership');
+  if (ow) {
+    ow.ontoggle = () => { OWNOPEN = ow.open; };
+    const boxes = [...ow.querySelectorAll('[data-ack]')], btn = ow.querySelector('[data-send],[data-copy]');
+    const setAck = n => {
+      const ok = ownReady();
+      ACK = ok ? n : 0;
+      boxes.forEach((b, j) => { b.checked = j < ACK; b.disabled = !ok || j > ACK; });
+      if (btn) btn.disabled = !ok || ACK < boxes.length;
+    };
+    ow.onchange = e => { if (e.target.dataset.ack) setAck(e.target.checked ? Number(e.target.dataset.ack) + 1 : Number(e.target.dataset.ack)); };
+    ow.querySelectorAll('[data-own]').forEach(b => { b.onclick = () => { if (OWNMODE !== b.dataset.own) { OWNMODE = b.dataset.own; ACK = 0; paintDetail(); } }; });
+    const own = document.getElementById('q-owner');
+    if (own) {
+      const res = document.getElementById('q-ownerres');
+      const note = async () => {
+        const n = ownerNote();
+        res.className = 'res' + (n.cls ? ' ' + n.cls : ''); res.textContent = n.text;
+        if (!ownReady()) return;
+        const v = OWNER_IN, p = await probeOwner(Eth.checksum(v.trim()));
+        if (OWNER_IN === v) { res.className = 'res' + (p.cls ? ' ' + p.cls : ''); res.textContent = p.text; }
+      };
+      own.oninput = () => { OWNER_IN = own.value; setAck(0); note(); };
+      // A name resolves on change; `addrField` writes its own line, and the probe follows once it is an address.
+      own.onchange = async () => { if (isAddr(own.value.trim())) return; const a = await addrField(own.value, res); if (a) { own.value = OWNER_IN = a; setAck(0); note(); } };
+    }
+  }
   editorBind(PROPOSE.rows, () => paintDetail(), st => {
     const why = document.getElementById('ed-why');
     if (why) { why.className = 'status' + (st.ok ? '' : ' bad'); why.textContent = st.why; }
@@ -936,7 +1053,7 @@ function fundsHTML(d, f) {
     'err',
   )).join('');
   return `<div class="ledger">${rows}${escrows}</div>`
-    + '<div class="help">anyone can call distribute() — the contract splits by the table above; you pay the gas.</div>'
+    + `<div class="help">anyone can call distribute() — the contract splits by the table above; you pay the gas.${ACC ? '' : ' Connect a wallet to send it.'}</div>`
     // #18, in the dapp's guidance for payers, as the ruling says M02 should state it.
     + '<div class="help">Paying in from a contract with <code>.transfer()</code> or <code>.send()</code> can fail when the implementation is cold: the 2,300-gas stipend does not cover a clone\'s delegatecall to a cold implementation. Pay in with <code>call</code> and gas.</div>';
 }

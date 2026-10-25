@@ -79,7 +79,7 @@ p.prose{font:15px/1.65 var(--sans);color:var(--muted);max-width:720px;margin:0 0
 .dot{width:8px;height:8px;background:var(--amber)}
 .hist{border-top:1px solid var(--rule)}
 .hrow{display:grid;grid-template-columns:92px 1fr auto;gap:14px;padding:9px 0;border-bottom:1px solid var(--rule);font-size:12px;align-items:center}
-.hrow b{font-weight:700;color:var(--muted)}.hrow.amber b{color:var(--amber)}.hrow.err b{color:var(--err)}
+.hrow b{font-weight:700;color:var(--muted)}.hrow.amber b{color:var(--amber)}.hrow.err b{color:var(--err)}.hrow.done b,.hrow.done .w{color:var(--ink)}
 .hrow .w{color:var(--muted)}.hrow .t{color:var(--dim);font-size:11px;white-space:nowrap}
 .verbs{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;border-top:1px solid var(--rule);margin-top:14px;padding:20px 0 8px}
 .verbs>div{border-left:1px solid var(--rule);padding-left:14px}
@@ -101,7 +101,7 @@ input,textarea{font:13px var(--mono);color:var(--ink);background:var(--paper);bo
 input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--ink)}
 input.narrow{max-width:160px}
 .load{display:flex;gap:10px}
-.res{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}
+.res{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}.res.warn{color:var(--amber)}.res.bad{color:var(--err)}
 .field{margin:0 0 26px;max-width:720px}
 .field .lab{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
 .field .opt{text-transform:none;letter-spacing:0;color:var(--dim)}
@@ -127,6 +127,10 @@ input.narrow{max-width:160px}
 .acts{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 0}
 .btn.sm,.btn.sec.sm,.btn.off.sm{padding:7px 14px;font-size:12px}
 .btn[disabled]{background:none;color:var(--dim);border:1px solid var(--rule);cursor:default}
+.danger{margin-top:26px}.danger summary{cursor:pointer;color:var(--muted);font-size:12px;width:max-content}.danger summary:hover{color:var(--ink)}.danger .help{margin:10px 0 12px}
+.ack{display:flex;gap:10px;align-items:flex-start;font:12px/1.55 var(--sans);color:var(--ink);max-width:60ch;margin:0 0 10px;cursor:pointer}.ack input{width:auto;margin:2px 0 0;accent-color:var(--ink)}.ack input:disabled+span{color:var(--dim)}.ack input:disabled{cursor:default}.danger .btn{margin-top:6px}.danger .tabs{margin:14px 0 0}.danger .field{margin:0 0 14px;max-width:60ch}
+.btn.hold{position:relative;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}.btn.hold span{position:relative}
+.btn.hold:not([disabled]){color:var(--err);border-color:var(--err)}.btn.hold::before{content:"";position:absolute;inset:0;width:0;background:var(--err);opacity:.2}.btn.hold.on::before{width:100%;transition:width 3s linear}
 /* The drawer is a panel in the flow, not an overlay: the page behind it is the thing being changed,
    and it stays readable while a change is written. */
 .drawer{border:1px solid var(--ink);padding:0 20px 20px;margin:8px 0 26px}

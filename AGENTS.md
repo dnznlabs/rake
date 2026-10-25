@@ -107,6 +107,11 @@
   refuses instead. Every countdown, and the gate on `apply`, measures against the chain's latest block
   timestamp rather than the browser's clock: `applyQueued` compares `block.timestamp`, and on a dev
   chain that has been moved forward the two are days apart.
+- The ownership writes, change owner and renounce, sit collapsed in one `<details class="danger">` behind
+  a selector (`OWNMODE`). Each carries `hold: true`, which `holdToFire` turns into a 3-second press of
+  pointer or Enter/Space (a click does nothing), behind three chained checkboxes (`ACKS`), and the
+  button is `--err` red — red for an irreversible action, beyond the base's "red means error". Both are
+  patterns to propose to `design-base`.
 - Every address and hash the page prints goes through `ext(kind, value, text)`: the shortened value,
   then a `.cp` copy icon that copies the full value on click or Enter (`copyClick`, one capturing
   listener), then a `↗` to the explorer only where `EXPLORER` names one. Never print `short(addr)` bare.
