@@ -80,9 +80,18 @@ contract DistributionFactoryTest is Test {
         factory.create(OTHER, 0, "desc", t, openSalt);
 
         // the used salt is spent, and the collision costs the whole gas limit before it says so
+        uint256 before = gasleft();
         vm.prank(alice);
         vm.expectRevert(DistributionFactory.DeploymentFailed.selector);
         factory.create(OWNER, 0, "desc", t, aliceSalt);
+        uint256 used = before - gasleft();
+
+        // Nine tenths, not a figure: the number tracks the harness gas limit, and the claim being
+        // pinned is "the whole limit" — which `63/64` of the available gas satisfies and a cheap
+        // revert never can. The two logs are what the handoff quotes; `-vv` shows them.
+        emit log_named_uint("collision gas available", before);
+        emit log_named_uint("collision gas used", used);
+        assertGt(used, before * 9 / 10, "the collision burns the gas available, not a cheap revert");
     }
 
     function test_factoryRejectsEth() public {

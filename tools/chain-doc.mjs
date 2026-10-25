@@ -2,7 +2,7 @@
 /* Extract the documents the chain serves: App.html() and App.request(["widget.js"]), decoded and
    hashed.
 
-   node tools/chain-doc.mjs [--app 0x…] [--rpc http://…] [--chain 31337] [--out out/chain/index.html]
+   node tools/chain-doc.mjs [--app 0x…] [--rpc http://…] [--chain 31337] [--out app/chain/index.html]
 
    eth_call over fetch rather than `cast call`: cast prints a Solidity string literal with escapes, and
    the document has to come back byte-exact.
@@ -14,7 +14,10 @@
 
    The widget is the second resource and is never gzipped, so its served bytes are hashed as they
    come back. A 404 is a valid answer — an App carrying the dapp and no widget is a complete site —
-   so it is reported rather than thrown, and `out/chain/widget.js` is not written. */
+   so it is reported rather than thrown, and `app/chain/widget.js` is not written.
+
+   The output lives under `app/chain/`, not forge's `out/`: `forge build --force` and `forge clean`
+   empty `out/`, so a build running beside a check would delete the document it is checking (#66). */
 import { writeFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
@@ -39,7 +42,7 @@ const arg = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 ? argv[i
 const root = join(import.meta.dirname, '..');
 const rpc = arg('rpc', 'http://127.0.0.1:8545');
 const chain = arg('chain', '31337');
-const out = join(root, arg('out', 'out/chain/index.html'));
+const out = join(root, arg('out', 'app/chain/index.html'));
 const inflatedOut = out.replace(/(\.html)?$/, '.inflated.html');
 const widgetOut = join(dirname(out), 'widget.js');
 

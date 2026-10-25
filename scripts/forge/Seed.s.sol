@@ -37,9 +37,15 @@ contract Seed is Script {
         vm.startBroadcast();
         // `msg.sender` is `--sender`, which `create` also requires to be the salt's top 20 bytes
         // (decision 10) — so a sender that does not own this salt reverts rather than seeding a
-        // distribution owned by the wrong key. `msg.value` rides the CREATE2, so the deposit lands
-        // without a `Received` log.
-        address distribution = factory.create{value: DEPOSIT}(msg.sender, DELAY, DESCRIPTION, _table(false), salt);
+        // distribution owned by the wrong key.
+        address distribution = factory.create(msg.sender, DELAY, DESCRIPTION, _table(false), salt);
+        // The deposit is a plain transfer, not `create{value:}`: `msg.value` would ride the CREATE2
+        // into the clone without ever running `receive()`, so the dev chain would carry a balance and
+        // no `Received` log, and the dapp's activity list would read "nothing has arrived at this
+        // address yet" above 1 ETH (#42). Sent after create, it emits the one log the first screen
+        // needs.
+        (bool ok,) = distribution.call{value: DEPOSIT}("");
+        require(ok, "deposit");
         // The owner is the sender and the delay is non-zero, so this queues rather than applies.
         Distribution(payable(distribution)).propose(abi.encodeCall(Distribution.setBeneficiaries, (_table(true))));
         vm.stopBroadcast();

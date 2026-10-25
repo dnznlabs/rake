@@ -31,9 +31,28 @@ clean:: ## Remove build artifacts
 
 # Every scripts/forge/Deploy*.s.sol, each with its own broadcast log. LC_ALL=C because glob order is
 # locale-dependent, and deploy order decides the addresses.
+#
+# The second recipe line refuses a chain that already carries the factory. A second deploy is not a
+# refresh: the factory is placed by plain CREATE from the deployer's nonce, so it, the implementation
+# and every `predict()` move together, and the featured distribution's address moves with them while
+# the first one still holds the ETH (#35). The log is read the way `addresses` reads it, and the
+# logged address is checked for code, so an anvil that has restarted falls through and deploys.
+# `deploy::` is double-colon, so this `exit 1` stops `make` before the seed, fixtures and dapp
+# recipes in the later mk/ files run — which is the point.
 deploy:: ## Deploy to the chain at RPC (anvil by default)
 	@cast block-number --rpc-url $(RPC) >/dev/null 2>&1 || \
 	  { echo "deploy: no chain at $(RPC) — 'make serve' starts one"; exit 1; }
+	@if ls broadcast/*/$(CHAIN_ID)/run-latest.json >/dev/null 2>&1; then \
+	  f=$$($(DEPLOYED) | awk '$$1=="DistributionFactory"{print $$2}' | tail -1); \
+	  if [ -n "$$f" ]; then \
+	    a=$$(cast to-check-sum-address $$f); \
+	    code=$$(cast code $$a --rpc-url $(RPC) 2>/dev/null); \
+	    case "$$code" in 0x|"") ;; *) \
+	      echo "deploy: chain $(CHAIN_ID) at $(RPC) already has DistributionFactory at $$a — restart anvil for a fresh chain, or 'make dapp-nodev && make chunks && make dapp' to re-upload the dapp"; \
+	      exit 1;; \
+	    esac; \
+	  fi; \
+	fi
 	@for s in $$(LC_ALL=C ls scripts/forge/Deploy*.s.sol); do forge script $$s $(FORGE_SEND) || exit 1; done
 
 # The broadcast log outlives the chain, so each address is checked for code rather than trusted.

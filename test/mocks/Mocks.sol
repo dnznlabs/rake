@@ -45,6 +45,48 @@ contract ReentrantReleaser {
     }
 }
 
+/// @notice An ERC-20 whose `transfer` re-enters the distribution before it moves the balance, so the
+/// lock is proved against a token with hooks and not only against an ETH recipient (#21).
+/// @dev The callback's outcome is recorded rather than bubbled: the outer `distribute` then takes its
+/// success path, and the test reads the lock straight out of `hookData`.
+contract HookToken {
+    enum Hook {
+        Distribute,
+        Release
+    }
+
+    error InsufficientBalance();
+
+    bool public hookOk;
+    bytes public hookData;
+
+    mapping(address => uint256) public balanceOf;
+
+    Distribution private immutable target;
+    Hook private immutable hook;
+
+    constructor(Distribution target_, Hook hook_) {
+        target = target_;
+        hook = hook_;
+    }
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        bytes memory action = hook == Hook.Distribute
+            ? abi.encodeCall(Distribution.distribute, (address(this)))
+            : abi.encodeCall(Distribution.release, (address(this), to));
+        (hookOk, hookData) = address(target).call(action);
+
+        if (balanceOf[msg.sender] < amount) revert InsufficientBalance();
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+}
+
 /// @notice Sends ETH with `transfer`, which forwards only the 2,300-gas stipend.
 contract PlainSender {
     function send(address to, uint256 amount) external {
@@ -89,6 +131,17 @@ contract MockERC20 {
             }
         }
         return true;
+    }
+}
+
+/// @notice `MockERC20` that answers `decimals()` with 6, for the dapp's by-decimals amounts (#43).
+/// @dev The base mock deliberately has no `decimals()`, so its rows must render in raw units; this
+/// subclass is the chain-side foil for that. No test exercises it.
+contract MockERC20Dec6 is MockERC20 {
+    constructor(Ret ret_) MockERC20(ret_) {}
+
+    function decimals() external pure returns (uint8) {
+        return 6;
     }
 }
 

@@ -29,7 +29,12 @@
   prints them and flags any with no code on the chain.
 - `make addresses` lists `App` and `DistributionFactory`. The implementation is created inside the
   factory's constructor and is not a `CREATE` transaction in the broadcast log; read it with
-  `cast call <factory> "implementation()(address)"`.
+  `cast call <factory> "implementation()(address)"`. The factory itself is placed by plain CREATE from
+  the deployer's nonce, so the factory, the implementation and every `predict()` move together with
+  that sender's nonce history — which is why a second `make deploy` on one chain would move the
+  featured address while the first distribution still holds the ETH (`make deploy` now refuses
+  instead, [#35](https://github.com/dnznlabs/rake/issues/35)), and why a real deployment needs a
+  deterministic deployer rather than "whatever nonce this key is on".
 - `scripts/forge/Seed.s.sol` creates the *featured* distribution every dev chain carries: a two-row
   table, a 1 ETH deposit and one queued change. It is not a `Deploy*.s.sol` — that loop runs with no
   environment, and the seed needs `FACTORY`. `mk/15-seed.mk` runs it between the deploy and the dapp
@@ -170,18 +175,20 @@
 - Any change under `app/` makes the deployed document stale until `make dapp-nodev && make chunks`.
 - The gzip bootstrap in `App.html()` is load-bearing byte for byte and `test_gzipBootstrap` pins it.
   To allow a `<script>` with attributes, change the bootstrap first and re-measure in a real wallet.
-- `make chain-doc` writes the document the chain returns to `out/chain/index.html` and hashes it.
-  `cast call … "html()(string)"` does not produce it: cast escapes the string.
+- `make chain-doc` writes the document the chain returns to `app/chain/index.html` and hashes it.
+  `cast call … "html()(string)"` does not produce it: cast escapes the string. The output sits beside
+  `app/dist/`, not under forge's `out/`: `forge build --force` and `forge clean` empty `out/`, so a
+  build running beside a check would delete the very document being checked.
 - On a gzipped `App` that document is the bootstrap wrapper, not the page, so its `sha256` never equals
   `app/dist/index.html`'s. `chain-doc` therefore also inflates the `atob` payload to
-  `out/chain/index.inflated.html` and prints `payload bytes`, `inflated bytes` and `inflated sha256`;
+  `app/chain/index.inflated.html` and prints `payload bytes`, `inflated bytes` and `inflated sha256`;
   `inflated sha256` is the one to compare. An uncompressed `App` prints neither, since there is nothing
   to inflate.
 - Take that comparison **after `make dapp-nodev`**: `make deploy` rebuilds the dev bundle last
   (`mk/30-onchain.mk`), so `app/dist/index.html` straight after a deploy is the dev build and the two
   hashes differ for that reason alone.
 - `make chain-doc` also reads `request(["widget.js"])` and prints three more lines — `widget status`,
-  `widget bytes`, `widget sha256` — writing the served bytes to `out/chain/widget.js`. Nothing inflates
+  `widget bytes`, `widget sha256` — writing the served bytes to `app/chain/widget.js`. Nothing inflates
   there, so `widget sha256` compares straight with `sha256sum app/dist/widget.js`, and that comparison
   holds in a dev build too: `widget.js` has no `/*DEV*/` fence and no address token, so the dev and
   non-dev builds produce the same bytes. `widget status 404` prints alone, so an `App` with no widget is

@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {Distribution, DistributionFactory} from "../src/Distribution.sol";
 import {
+    HookToken,
     MockERC20,
     MockERC721,
     PlainSender,
@@ -247,6 +248,48 @@ contract DistributionTest is Test {
         assertEq(A.balance, 4000, "the other row is paid");
         assertEq(d.reserved(address(0)), 6000);
         assertEq(address(d).balance, d.reserved(address(0)));
+    }
+
+    /// @dev The ETH cases above prove the lock against a recipient's `receive`. A token's `transfer`
+    /// is the other way in, and it is not gas-capped the way an ETH push is, so the hook has room to
+    /// try anything: #21 asks for that half.
+    function test_hookTokenDistributeIsLocked() public {
+        // Arrange
+        Distribution d = _deploy(0, _defaultTable());
+        HookToken tk = new HookToken(d, HookToken.Hook.Distribute);
+        tk.mint(address(d), 10_000);
+
+        // Act
+        d.distribute(address(tk));
+
+        // Assert — the hook got in and was turned away by the lock, not by anything else.
+        assertFalse(tk.hookOk(), "the reentrant distribute failed");
+        assertEq(tk.hookData(), abi.encodeWithSelector(Distribution.Locked.selector), "and failed on the lock");
+
+        // And the outer distribute took its success path regardless.
+        assertEq(tk.balanceOf(A), 6000, "every row is paid");
+        assertEq(tk.balanceOf(B), 4000);
+        assertEq(d.reserved(address(tk)), 0, "so nothing is escrowed");
+    }
+
+    /// @dev `release` cannot be entered from a hook token on its own terms: there is no escrow to
+    /// release until a push has failed, and a token that returns `true` never fails one. So the
+    /// release-selector callback raised from inside `distribute` is what proves the lock covers it.
+    function test_hookTokenReleaseIsLocked() public {
+        // Arrange
+        Distribution d = _deploy(0, _defaultTable());
+        HookToken tk = new HookToken(d, HookToken.Hook.Release);
+        tk.mint(address(d), 10_000);
+
+        // Act
+        d.distribute(address(tk));
+
+        // Assert — the lock answers before `release` can look for an escrow.
+        assertFalse(tk.hookOk(), "the reentrant release failed");
+        assertEq(tk.hookData(), abi.encodeWithSelector(Distribution.Locked.selector), "and failed on the lock");
+        assertEq(tk.balanceOf(A), 6000, "every row is paid");
+        assertEq(tk.balanceOf(B), 4000);
+        assertEq(d.reserved(address(tk)), 0, "so nothing is escrowed");
     }
 
     function test_receiveUnderStipend() public {
