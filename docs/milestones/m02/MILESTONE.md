@@ -1,6 +1,6 @@
 # M02 — Dapp and widget on anvil
 
-Status: in progress — t01, t02, t03, t04 done, t05 assigned, Phase 5 added · updated 2026-10-17
+Status: in progress — t01–t05 done, t06 (close-out fixes) planned, Phase 5 open · updated 2026-10-25
 
 The design prototype (`brainstorming/design/rake-dapp.html`, `rake-widget.html`) rebuilt as the real
 dapp on DNZN Base v1: reading `snapshot()` from the chain, sending the six writes through the wallet,
@@ -179,7 +179,8 @@ Independent of each other; the widget waits on #27, the docs page does not.
 | Task | Goal | Status |
 |:-----|:-----|:-------|
 | [m02-t04](tasks/m02-t04/TASK.md) | `#/docs` from the prototype's docs segment against the real ABI; criterion 6; criterion 8 measured and recorded, with the second chunk served for the first time (#53 decided in the plan) | done — [#60](https://github.com/dnznlabs/rake/pull/60) merged 2026-10-17 at `620bcce`, approved at `fc2d4cb` (the twelve-section first cut) and re-approved on the owner's-page rewrite after Denizen's review, recorded as decision 17; two chunks served, `html()` 35,809 bytes, inflated sha256 equal to the build; [#57](https://github.com/dnznlabs/rake/issues/57) closed, default option 1 taken; carried: none |
-| [m02-t05](tasks/m02-t05/TASK.md) | `App` serves `widget.js` as a second chunk set (per #27), `Chunks.s.sol` uploads both, the widget reads `snapshot()` through `data-rpc` or the host's `window.ethereum`, host page under `make serve`; criterion 7; criterion 9 in full, criterion 8 re-measured | assigned — plan merged [#62](https://github.com/dnznlabs/rake/pull/62) 2026-10-17 at `58ba45d`; task issue [#63](https://github.com/dnznlabs/rake/issues/63), no gate; the plan's bundle baseline was taken on #60's first cut, so the issue asks for a re-measure on merged `main` first |
+| [m02-t05](tasks/m02-t05/TASK.md) | `App` serves `widget.js` as a second chunk set (per #27), `Chunks.s.sol` uploads both, the widget reads `snapshot()` through `data-rpc` or the host's `window.ethereum`, host page under `make serve`; criterion 7; criterion 9 in full, criterion 8 re-measured | done — [#65](https://github.com/dnznlabs/rake/pull/65) merged 2026-10-25 at `9a0def6`, closing [#63](https://github.com/dnznlabs/rake/issues/63); changes requested then approved after the UTF-8 fallback ([#67](https://github.com/dnznlabs/rake/issues/67), closed); `widget.js` 7,677 bytes of 10,240, one chunk, `widget sha256` equal to the build on 31337 and 31338; carried [#66](https://github.com/dnznlabs/rake/issues/66), and Denizen's [#68](https://github.com/dnznlabs/rake/issues/68) from his Freedom check |
+| [m02-t06](tasks/m02-t06/TASK.md) | Close-out fixes, nothing under `src/`: the `make deploy` guard (#35), the seed's `Received` log (#42), amounts by `decimals()` (#43), `chain-doc` out of `out/` (#66), the hook-token lock test (#21) and the collision gas assertion (#22, test half) | planned 2026-10-25 — task issue opens when this file merges; no gate |
 
 ### Phase 5 — dapp and widget refinement
 
@@ -206,6 +207,8 @@ section id the landing's CTA depends on — and run against what he writes.
 | Task | Goal | Status |
 |:-----|:-----|:-------|
 | docs text | `#/docs` rewritten by Denizen; criterion 6's checks re-run; criterion 8 re-chunked | not started — gates the signoff |
+| landing diagram ([#50](https://github.com/dnznlabs/rake/issues/50)) | The hero's 60/30/10 diagram over a live 60/40, and its ~5 px type at 390 px; three options each in the issue, recommendation: draw the diagram from the featured `snapshot()` | not started — Denizen's call, in the loop he drives |
+| widget reachability ([#68](https://github.com/dnznlabs/rake/issues/68)) | Freedom calls `html()` for every path, so `web3://…/widget.js` renders the dapp there; the client survey is on the issue. A ruling, not a tweak: it decides what `#/docs` § the widget tells a host to embed | open — ruling before the docs text is final |
 
 #### Consequences of "anything is fair game" at end of M02
 
@@ -214,8 +217,10 @@ should be priced when the item is filed rather than discovered at review.
 
 1. **Any change to `app/` invalidates criterion 8.** The chunks `App` serves are uploaded from the
    built bundle, so `html()` is stale the moment the dapp changes, and `widget.js` the moment the widget
-   does. Re-chunking is `make deploy`; criterion 8's sha256 and byte counts are re-recorded, and
-   criterion 7's size budget re-checked if the widget moved.
+   does. Re-chunking is `make dapp-nodev && make chunks && make dapp` — not `make deploy`, which
+   after m02-t06 refuses a chain that already has the factory (#35) and before it moved the featured
+   address; criterion 8's sha256 and byte counts are re-recorded, and criterion 7's size budget
+   re-checked if the widget moved.
 2. **A change under `src/` re-opens M01's evidence, and the amount depends on the file.**
    `forge snapshot --check` fails until the snapshot is regenerated — by design, that is the check
    working. A change to `App.sol` or `Chunks.s.sol` re-opens criteria 7 and 8 only. A change to
@@ -238,6 +243,21 @@ should be priced when the item is filed rather than discovered at review.
 5. **M03, M04 and M05 wait.** The roadmap is strictly sequential and this phase is open-ended, so the
    security review starts when Denizen signs off and not before — and reads the code he signed off.
    That is the point of the placement, not a side effect.
+
+## Carried issues at close-out
+
+Listed 2026-10-25, with t05 merged and Phase 5 not yet started, per handbook `roles/architect.md`
+§ Carrying forward: a milestone does not close with a `carried` issue labelled `m02` open.
+
+| Issue | Disposition |
+|:------|:------------|
+| [#35](https://github.com/dnznlabs/rake/issues/35), [#42](https://github.com/dnznlabs/rake/issues/42), [#66](https://github.com/dnznlabs/rake/issues/66) | `m02-t06`, above. Scripts, make and tools; no `src/`. |
+| [#43](https://github.com/dnznlabs/rake/issues/43), [#21](https://github.com/dnznlabs/rake/issues/21) | Relabelled `m03` → `m02` and folded into `m02-t06`: one is `app/` only, the other `test/` only, and neither waits on the review to be right. |
+| [#22](https://github.com/dnznlabs/rake/issues/22) | Stays `m03`. `m02-t06` lands the gas assertion; the `SECURITY.md` entry is the review's. |
+| [#41](https://github.com/dnznlabs/rake/issues/41) | Closed by the PR that added this section: the submodule line is in `AGENTS.md` § Contracts and in the handbook's checkout runbook. |
+| [#50](https://github.com/dnznlabs/rake/issues/50) | Phase 5 row, above. |
+| [#68](https://github.com/dnznlabs/rake/issues/68) | Phase 5 row, above; a ruling. Whatever it decides about decision 12 reaches M04's acceptance and M03's review scope. |
+| [#18](https://github.com/dnznlabs/rake/issues/18), [#19](https://github.com/dnznlabs/rake/issues/19), [#20](https://github.com/dnznlabs/rake/issues/20), [#23](https://github.com/dnznlabs/rake/issues/23), [#54](https://github.com/dnznlabs/rake/issues/54), [#61](https://github.com/dnznlabs/rake/issues/61) | `m03`, unchanged: each needs `SECURITY.md`, the runbook, or a `Distribution.sol` decision, none of which exists before the review. M03's `MILESTONE.md` lists them as its queue. |
 
 ## One-way doors
 
