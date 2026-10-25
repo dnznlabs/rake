@@ -101,6 +101,11 @@
   refuses instead. Every countdown, and the gate on `apply`, measures against the chain's latest block
   timestamp rather than the browser's clock: `applyQueued` compares `block.timestamp`, and on a dev
   chain that has been moved forward the two are days apart.
+- `#/docs#widget` builds its snippets from the page itself: `src` is `widget.js` resolved against the
+  page's own URL (or `web3://<App>:<chain>/widget.js` when it has none), `data-rake` the featured
+  distribution once `load()` has read it, and `data-rpc` from `PUBLIC_RPC` — public endpoints chosen
+  only so the example works when pasted, since the embedding developer owns that choice. `__APP__` is
+  substituted like any contract token.
 - `make fixtures` adds the two distributions the write screens need and `make deploy` does not: an
   *escrow demo* at salt 2, holding half of 1 ETH and half of 100 of a token that reports failure, both
   escrowed against a receiver that refuses ETH until told not to; and a *vault demo* at salt 3, owned
@@ -116,6 +121,29 @@
   M02 criterion 6's script diffs the three `Distribution` tables against `forge inspect`. A claim about
   contract behaviour on the page is checked against `src/` before it ships; the landing CTA depends
   on the `widget` section id.
+- `app/src/widget.js` is a **second bundle, not part of the dapp**: one IIFE that `App` serves as a
+  classic script, with its own minimal reader for `snapshot()`'s return and none of `eth.js`,
+  `model.js` or `theme.css` inlined — it needs no keccak (both selectors are literals a test pins
+  against `selectors.txt`), and it inherits the host page's font and ink, injecting one
+  `<style id="rk-css">` guarded by that id. `app/build.mjs` runs it through the same minifier, never
+  gzips it, prints `widget: raw N bytes · budget 10240 · N left`, and **exits 1 above 10,240 bytes
+  before writing any artifact**, so the budget is a gate on every `make deploy` rather than a figure in
+  a report. Every colour literal in it must also occur in `theme.css` and it carries no `style=`
+  attribute; `test/widget.test.mjs` pins both, and pins the decoder against
+  `test/fixtures/abi/snapshot.return.hex` — cast's fixture, the same oracle `test/abi.test.mjs` holds
+  `eth.js` to, so the two decoders are never compared with each other.
+- `app/src/host.html` → `app/dist/host.html` is a **dev foil, not a page of the dapp**: four hosts in
+  their own `<style>` block (never `theme.css`, whose job here is to be absent) showing the widget full,
+  compact, failed and loading. `make serve` serves it beside the dapp — at
+  **`/host?rpc=<url>`**, without the extension: `serve`'s clean-URL redirect answers `/host.html?rpc=…`
+  with a bare `Location: /host` and the query string is lost, so the page falls back to its default
+  endpoint and renders nothing. `Chunks.s.sol` never reads it and nothing uploads it.
+- The browser check every `app/` task ends with runs here, driven by `playwright-core` from a directory
+  outside the repo (there is no playwright in this project's `node_modules`). The cached Playwright
+  chromium (`~/.cache/ms-playwright/chromium-1243/chrome-linux-arm64/chrome`) fails on `libnspr4.so` and
+  two dozen other missing host libraries; the nix chromium (`ls -d /nix/store/*-chromium-1*/bin`, not the
+  `-unwrapped` or `-sandbox` one) launches as `executablePath`. Chromium also refuses a handful of ports outright — port 9 answers `ERR_UNSAFE_PORT`
+  rather than connecting — which `host.html` uses deliberately for its failure mount.
 - The build minifier strips leading whitespace on every line, template literals included.
 - gzip output depends on the node build's zlib. Build through devbox when the bytes matter.
 - Node tests are `test/*.test.mjs`.
@@ -125,8 +153,19 @@
 
 - `src/App.sol` hosts the dapp: ERC-8244 `html()` returns the document, ERC-5219 `request()` serves
   it to web3:// gateways. The bytes are SSTORE2 chunks uploaded by `scripts/forge/Chunks.s.sol`.
+- **Two documents, one address.** `html()` and `request([])`/`request(["index.html"])` are the dapp;
+  `request(["widget.js"])` is the widget, a second pointer list (`widgetChunks`) answered `200` with
+  `application/javascript; charset=utf-8`. The widget is stored **raw and never gzipped**: a
+  `<script src="widget.js">` fetched through a gateway has to be plain JavaScript, and the gzip path is
+  an HTML document that inflates itself, which a script tag cannot run. `lock()` freezes both lists and
+  checks every pointer in both for code; it requires the dapp (`EmptyDocument`) and does *not* require
+  a widget, so an `App` carrying the dapp alone is a complete site and answers 404 to `widget.js`.
 - `make deploy` deploys `App` (`scripts/forge/DeployApp.s.sol`), builds the non-dev bundle, uploads
   it, then rebuilds the dev bundle for :3000.
+- `Chunks.s.sol` uploads both documents in one broadcast through one cut loop: the bundle into
+  `addChunk`/`setChunks`, then `app/dist/widget.js` into `addWidgetChunk`/`setWidgetChunks`, logging
+  `widget chunk <i> <ptr>` and `widget bytes`. The widget is one chunk — `MAX_CHUNK` is 24,000 and the
+  budget is 10,240.
 - Any change under `app/` makes the deployed document stale until `make dapp-nodev && make chunks`.
 - The gzip bootstrap in `App.html()` is load-bearing byte for byte and `test_gzipBootstrap` pins it.
   To allow a `<script>` with attributes, change the bootstrap first and re-measure in a real wallet.
@@ -140,6 +179,12 @@
 - Take that comparison **after `make dapp-nodev`**: `make deploy` rebuilds the dev bundle last
   (`mk/30-onchain.mk`), so `app/dist/index.html` straight after a deploy is the dev build and the two
   hashes differ for that reason alone.
+- `make chain-doc` also reads `request(["widget.js"])` and prints three more lines — `widget status`,
+  `widget bytes`, `widget sha256` — writing the served bytes to `out/chain/widget.js`. Nothing inflates
+  there, so `widget sha256` compares straight with `sha256sum app/dist/widget.js`, and that comparison
+  holds in a dev build too: `widget.js` has no `/*DEV*/` fence and no address token, so the dev and
+  non-dev builds produce the same bytes. `widget status 404` prints alone, so an `App` with no widget is
+  reported rather than crashed.
 - `lock()` is one-way.
 
 <!-- fragment: design-base -->

@@ -28,11 +28,14 @@
    address is `factory.predict(salt)`, which the page reads at boot rather than carrying a token per
    chain. `factoryBlock` is the block the factory was created in, so a `Created` scan never starts at
    genesis on a real chain. */
-const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTRIBUTIONFACTORY__', factoryBlock: '__DISTRIBUTIONFACTORY_BLOCK__', featuredSalt: '__FEATURED_SALT__' };
+const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTRIBUTIONFACTORY__', factoryBlock: '__DISTRIBUTIONFACTORY_BLOCK__', featuredSalt: '__FEATURED_SALT__', app: '__APP__' };
 const CONTRACTS = [['DistributionFactory', CFG.factory]];
 const CHAINS = { 1: 'mainnet', 10: 'op mainnet', 8453: 'base', 42161: 'arbitrum', 11155111: 'sepolia', 84532: 'base sepolia', 31337: 'anvil', 31338: 'anvil-b' };
 /* A dev chain has no explorer, so `ext()` prints plain text with the full value in the title. */
 const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.io', 8453: 'https://basescan.org', 42161: 'https://arbiscan.io', 11155111: 'https://sepolia.etherscan.io', 84532: 'https://sepolia.basescan.org' };
+/* What the widget snippet in #/docs puts in `data-rpc`. The embedding page's developer picks their own
+   endpoint; these are only known public ones, so the example works when pasted. */
+const PUBLIC_RPC = { 1: 'https://ethereum-rpc.publicnode.com', 10: 'https://mainnet.optimism.io', 8453: 'https://mainnet.base.org', 42161: 'https://arb1.arbitrum.io/rpc', 11155111: 'https://ethereum-sepolia-rpc.publicnode.com', 84532: 'https://sepolia.base.org', 31337: 'http://127.0.0.1:8545', 31338: 'http://127.0.0.1:8546' };
 const ZERO = '0x' + '0'.repeat(40);
 /*DEV*/
 const Q = new URLSearchParams(location.search);
@@ -1004,6 +1007,25 @@ const chainRows = () => {
   return DOCS_CHAINS.map(c => `<tr><td>${c}</td><td class="dim">—</td><td class="dim">not deployed</td></tr>`).join('')
     + (dev ? `<tr><td>${cname(CFG.chainId)}</td><td>${ext('address', CFG.factory, esc(CFG.factory))}</td><td>dev chain</td></tr>` : '');
 };
+/* `widget.js` is the second document `App` serves, so it sits beside this page: relative to an http(s)
+   or web3:// location, and spelled out as web3:// when the page was handed over by `html()` with no
+   usable URL. The address is the featured distribution once `load()` has read it; with no wallet on
+   this chain there is nothing to read it with, and the snippet says so rather than inventing one. */
+function widgetDocs() {
+  const id = CFG.chainId;
+  const src = /^(https?|web3):$/.test(location.protocol) ? new URL('widget.js', location.href.split('#')[0]).href : `web3://${CFG.app}:${id}/widget.js`;
+  const addr = S.featured || '0x…';
+  // Spelled as entities: a literal script tag here would trip the build's inline-script check.
+  const tag = extra => `&lt;script src="${esc(src)}"&gt;&lt;/script&gt;\n` + esc(`<div data-rake="${addr}" data-chain="${id}"${extra}></div>`);
+  const rpc = PUBLIC_RPC[id];
+  return `<p>Paste this into any page. It reads the ${S.featured ? 'featured distribution' : 'distribution at the address you put in <code>data-rake</code>'} on ${cname(id)} through the visitor's wallet, and shows a failure state if the wallet is missing or on another chain.</p>
+  <pre>${tag('')}</pre>
+  ${rpc ? `<p>Add <code>data-rpc</code> to read through an endpoint instead, so visitors need no wallet. The endpoint is yours to choose: the one below is a public ${cname(id)} endpoint, there so the example works as pasted.</p>
+  <pre>${tag(` data-rpc="${rpc}"`)}</pre>` : ''}
+  <p><code>data-variant="compact"</code> shows the bar and one line, for a footer. <code>data-theme="dark"</code> or <code>"light"</code> overrides the guess the widget makes from the page's background.</p>
+  ${S.featured ? '' : `<p>Connect a wallet on ${cname(id)} and this example fills in the featured distribution's address.</p>`}
+  <p>The script is served by the same contract as this page, ${ext('address', CFG.app, esc(short(CFG.app)))}.</p>`;
+}
 function docs() {
   V.innerHTML = `<div class="docgrid"><nav class="rail" aria-label="sections">${eyebrow('sections')}`
   + SECTIONS.map(s => `<a href="#/docs#${s[0]}">${s[1].toLowerCase()}</a>`).join('') + `</nav>
@@ -1050,8 +1072,7 @@ function docs() {
 
   <h2 id="s-widget">The widget</h2>
   <p>A script that shows a distribution on another page: the bar, the rows, the owner, the delay and any pending change, read from the chain. It uses the host page's font and text colour. There is a full and a compact version.</p>
-  <pre>&lt;script src="widget.js"&gt;&lt;/script&gt;\n&lt;div data-rake="0x…" data-chain="1"&gt;&lt;/div&gt;</pre>
-  <p>The script is served by the same contract as this page.</p>
+  ${widgetDocs()}
 
   <h2 id="s-limits">Limits</h2>
   <p>The owner is trusted for the length of the delay. The contract protects payees from sudden changes, not from the owner.</p>

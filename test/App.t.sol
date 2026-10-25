@@ -202,4 +202,156 @@ contract AppTest is Test {
         assertEq(app.html(), docBefore);
         assertEq(app.html(), "<p>x</p>");
     }
+
+    /// @dev The second resource through the ERC-5219 door: the chunks concatenate the same way the
+    ///      dapp's do, and the header is the one a `<script src>` needs. A gateway that served the
+    ///      widget as text/html would make the script tag inert, so the value is pinned whole.
+    function test_requestWidget() public {
+        vm.startPrank(owner);
+        app.addChunk("<p>x</p>");
+        app.addWidgetChunk("(function(){");
+        app.addWidgetChunk("})();");
+        vm.stopPrank();
+        assertEq(app.widget(), "(function(){})();");
+        assertEq(app.widgetChunkCount(), 2);
+        string[] memory res = new string[](1);
+        res[0] = "widget.js";
+        App.KeyValue[] memory params = new App.KeyValue[](0);
+        (uint16 code, string memory body, App.KeyValue[] memory hdr) = app.request(res, params);
+        assertEq(code, 200);
+        assertEq(body, "(function(){})();");
+        assertEq(hdr.length, 1);
+        assertEq(hdr[0].key, "Content-Type");
+        assertEq(hdr[0].value, "application/javascript; charset=utf-8");
+    }
+
+    /// @dev An `App` with the dapp and no widget is a complete site, not a half-deployed one: the
+    ///      widget path is a plain 404 and the root is untouched. This is the state every deploy
+    ///      passes through between `setChunks` and `setWidgetChunks`.
+    function test_requestWidgetAbsent() public {
+        vm.prank(owner);
+        app.addChunk("<p>x</p>");
+        assertEq(app.widgetChunkCount(), 0);
+        string[] memory res = new string[](1);
+        res[0] = "widget.js";
+        App.KeyValue[] memory params = new App.KeyValue[](0);
+        (uint16 code, string memory body, App.KeyValue[] memory hdr) = app.request(res, params);
+        assertEq(code, 404);
+        assertEq(body, "");
+        assertEq(hdr.length, 0);
+        res = new string[](0);
+        (code, body,) = app.request(res, params);
+        assertEq(code, 200);
+        assertEq(body, "<p>x</p>");
+    }
+
+    /// @dev The gzip flag belongs to the dapp alone. A `<script src="widget.js">` cannot run an HTML
+    ///      document that inflates itself, so the widget has to come back byte-for-byte even when the
+    ///      dapp beside it is wrapped — the one configuration where a shared code path would show.
+    function test_widgetIsNeverWrapped() public {
+        vm.startPrank(owner);
+        address p = app.addChunk(hex"1f8b0800");
+        address[] memory ptrs = new address[](1);
+        ptrs[0] = p;
+        app.setChunks(ptrs, true);
+        app.addWidgetChunk("(function(){'use strict'})();");
+        vm.stopPrank();
+        assertTrue(app.gzipped());
+        assertTrue(LibString.contains(app.html(), "DecompressionStream"));
+        string memory w = app.widget();
+        assertEq(w, "(function(){'use strict'})();");
+        assertFalse(LibString.contains(w, "DecompressionStream"));
+        assertFalse(LibString.contains(w, "DOMParser"));
+        string[] memory res = new string[](1);
+        res[0] = "widget.js";
+        (, string memory body,) = app.request(res, new App.KeyValue[](0));
+        assertEq(body, w);
+    }
+
+    /// @dev `lock()` is one door over two lists: whatever it freezes for the dapp it freezes for the
+    ///      widget, or a locked `App` would still be rewritable through the second resource.
+    function test_lockCoversWidget() public {
+        vm.startPrank(owner);
+        address w = app.addWidgetChunk("(function(){})();");
+        app.addChunk("<p>x</p>");
+        app.lock();
+        vm.expectRevert(App.Locked.selector);
+        app.addWidgetChunk("x");
+        address[] memory ptrs = new address[](1);
+        ptrs[0] = w;
+        vm.expectRevert(App.Locked.selector);
+        app.setWidgetChunks(ptrs);
+        vm.stopPrank();
+        assertEq(app.widgetChunkCount(), 1);
+    }
+
+    /// @dev The same unreachable state `test_lockRejectsCodelessPointer` plants for the dapp, planted
+    ///      in the widget list: `lock()` re-reads both, so a codeless widget pointer stops the one-way
+    ///      door rather than being frozen behind it. `vm.etch` is the only way in.
+    function test_lockRejectsCodelessWidgetPointer() public {
+        vm.startPrank(owner);
+        app.addChunk("<p>x</p>");
+        address ptr = app.addWidgetChunk("(function(){})();");
+        assertGt(ptr.code.length, 0);
+        vm.etch(ptr, "");
+        assertEq(ptr.code.length, 0);
+        vm.expectRevert(abi.encodeWithSelector(App.CodelessChunk.selector, ptr));
+        app.lock();
+        vm.stopPrank();
+        assertFalse(app.locked());
+    }
+
+    /// @dev The widget is optional, so `EmptyDocument` stays a question about the dapp. Without this
+    ///      the natural reading of "lock checks both lists" would make every widgetless deploy
+    ///      unlockable, and nothing above would fail.
+    function test_lockAcceptsDappWithoutWidget() public {
+        vm.startPrank(owner);
+        app.addChunk("<p>x</p>");
+        assertEq(app.widgetChunkCount(), 0);
+        app.lock();
+        vm.stopPrank();
+        assertTrue(app.locked());
+        assertEq(app.html(), "<p>x</p>");
+        assertEq(app.widget(), "");
+    }
+
+    /// @dev `setWidgetChunks` takes its pointers from calldata, so the `SSTORE2.read` memory blow-up
+    ///      `test_setChunksRejectsCodelessPointer` describes is reachable here too — through
+    ///      `widget()` and the widget.js route instead of `html()`.
+    function test_setWidgetChunksRejectsCodelessPointer() public {
+        address codeless = makeAddr("codelessWidget");
+        assertEq(codeless.code.length, 0);
+        address[] memory ptrs = new address[](1);
+        ptrs[0] = codeless;
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(App.CodelessChunk.selector, codeless));
+        app.setWidgetChunks(ptrs);
+    }
+
+    /// @dev An empty list is a mistake rather than a way to remove the widget: the widget is dropped
+    ///      by never uploading one, which `test_requestWidgetAbsent` pins, not by emptying the list.
+    function test_setWidgetChunksRejectsEmptyList() public {
+        address[] memory ptrs = new address[](0);
+        vm.prank(owner);
+        vm.expectRevert(App.EmptyDocument.selector);
+        app.setWidgetChunks(ptrs);
+    }
+
+    /// @dev The positive control for both `setWidgetChunks` guards: a well-formed list goes through
+    ///      and the widget it produces is byte-identical to the one `addWidgetChunk` served before the
+    ///      pointers were re-set. Without it a guard that rejected everything would pass the two above.
+    function test_setWidgetChunksAcceptsValidPointers() public {
+        vm.startPrank(owner);
+        address a = app.addWidgetChunk("(function(){");
+        address b = app.addWidgetChunk("})();");
+        string memory widgetBefore = app.widget();
+        address[] memory ptrs = new address[](2);
+        ptrs[0] = a;
+        ptrs[1] = b;
+        app.setWidgetChunks(ptrs);
+        vm.stopPrank();
+        assertEq(app.widgetChunkCount(), 2);
+        assertEq(app.widget(), widgetBefore);
+        assertEq(app.widget(), "(function(){})();");
+    }
 }
