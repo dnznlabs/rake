@@ -1374,7 +1374,7 @@ function docs() {
 
   <h2 id="s-economics">Economics</h2>
   <p>Rake is free software. The source is published under the MIT licence, the contracts take no fee on anything they receive or pay out, and neither this app nor the widget charges for its use. The only cost of a distribution is the network's gas.</p>
-  ${S.featured ? `<p>If this work is useful to you, please consider supporting its authors. A payment goes to the DNZN Labs distribution, ${ext('address', S.featured, esc(short(S.featured)))}, and is divided by its published table like any other.</p>
+  ${S.featured ? `<p>If this work is useful to you, please consider supporting its authors. A payment goes to the distribution this app features, ${ext('address', S.featured, esc(short(S.featured)))}, and is divided by its published table like any other.</p>
   <div class="give"><input id="give-amt" class="narrow" placeholder="amount" inputmode="decimal" aria-label="amount in ETH"><span>ETH</span><button class="btn sec sm" id="give-go"${ACC ? '' : ' disabled title="connect a wallet to send"'}>send</button><a href="#/distros/${S.featured}">view the distribution →</a></div>
   <div id="txs">${ACC ? '' : '<div class="help">Connect a wallet to send.</div>'}</div>` : ''}
 

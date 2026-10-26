@@ -67,6 +67,13 @@ Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which
    from M02 to M05, where the DNZN distribution has an address. Reached by default when m02-t03's
    issue opened with no ruling; options were defer (chosen), a build token with no value on any M02
    chain, or loosening criterion 9's grep. M02 criterion 9 stays as written.
+   **Addendum 2026-10-26 (Phase 5, [#73](https://github.com/dnznlabs/rake/pull/73)):** the support
+   line comes forward to M02 as `#/docs` § Economics, ruled by Denizen in the walk-through: one amount
+   field sending plain ETH to the distribution the app features (`S.featured`), separate transaction,
+   nothing pre-filled, shown only once that address has read. It is worded "support", never "tip", and
+   names no owner, because on an M02 chain the featured address is a `FEATURED_SALT` dev seed rather
+   than DNZN's; the DNZN attribution, the post-create line and the footer link stay in M05. Criterion 9
+   stays as written.
 2. **No `url` or `about` fields.** Owners carry URLs inside `description`. Rejected: two more string
    fields, which widen the audit surface for copy.
 3. **Name.** `Rake` is the project and the repo; `Distribution` and `DistributionFactory` are the
@@ -215,6 +222,12 @@ recommended option.
     (#50's recommendation — it ties the pitch to a dev seed); a dapp-drawn look-alike of the widget
     (no bytes, but it can drift from the thing a host gets); hiding the diagram on a phone (decision
     15 already turned that down).
+    **Amendment 2026-10-26 (Phase 5, [#73](https://github.com/dnznlabs/rake/pull/73)):** ruled by
+    Denizen in the walk-through. The hero is two columns with two CTAs, create and docs, beside the
+    widget and the address field; a "use cases" row follows it. The diagram is no longer the mock's
+    60/30/10: it draws three sources into one distribution, whose box shows the table, the time lock
+    and that funds wait for `distribute()`, paid out to four beneficiaries at 45/25/20/10, set wide
+    above 720 px and as a tall variant below it. It stays an illustration, not drawn from `snapshot()`.
 19. **The widget snippet names an ERC-5219 gateway, and shows `web3://` as the alternative.** Ruled
     by Denizen on 2026-10-25, closing [#68](https://github.com/dnznlabs/rake/issues/68) ("show both
     for clarity"). Off http(s), `#/docs` § the widget gives `src` as

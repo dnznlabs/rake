@@ -64,9 +64,9 @@ ANVIL_PORT=8545 APP_PORT=3000 devbox run -- process-compose -f procs/10-chain.ym
 
 `#/docs` is in `app/src/index.html`, from `const SECTIONS` (line ~1019) down: twelve sections, each
 an `<section id="s-<key>">` with a heading, and a rail built from `SECTIONS`. Written for the owner of
-a distribution, not a developer (decision 17): what it is, why it exists, how it works, creating one,
-paying in, paying out, changing it, ownership, the widget, limits, for developers. Function names
-appear once, where the owner meets them in a wallet prompt. The contract reference is
+a distribution, not a developer (decision 17): what it is, economics, why it exists, how it works,
+creating one, paying in, paying out, changing it, ownership, the widget, limits, for developers.
+Function names appear once, where the owner meets them in a wallet prompt. The contract reference is
 `docs/REFERENCE.md`, not the page.
 
 Rewrite the text freely. These are the checks that run against whatever is written, so keep their
