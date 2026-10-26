@@ -153,7 +153,8 @@ async function copyCalldata(data, slot) {
 // An event topic is the whole keccak of the signature, not the four-byte selector a call carries.
 const topic = sig => '0x' + Eth.keccak(Eth.utf8(sig));
 const word = a => '0x' + Eth.pad(a);
-const logs = (address, topics, fromBlock) => P.request({ method: 'eth_getLogs', params: [{ address, topics, fromBlock, toBlock: 'latest' }] });
+// A null `address` is left out of the filter, not sent as null: that is the query over every contract.
+const logs = (address, topics, fromBlock) => P.request({ method: 'eth_getLogs', params: [{ ...(address ? { address } : {}), topics, fromBlock, toBlock: 'latest' }] });
 
 /* ---- text ---------------------------------------------------------------------------------- */
 // Descriptions, names and notes are whatever the chain was given, so every one of them is escaped.
@@ -189,6 +190,22 @@ async function decimalsOf(tk) {
   } catch (e) { dec = null; }
   DECIMALS.set(tk, dec);
   return dec;
+}
+/* A token's `symbol()`, read once and kept, as a string or a bytes32 (the older tokens' shape), else
+   `null`. Shown only for a recognised token: a symbol is whatever its deployer typed, and spam carries
+   its pitch there. Capped and escaped where it prints. */
+const SYMBOLS = new Map([[ZERO, 'ETH']]);
+async function symbolOf(tk) {
+  if (SYMBOLS.has(tk)) return SYMBOLS.get(tk);
+  let sym = null;
+  try {
+    const res = await P.request({ method: 'eth_call', params: [{ to: tk, data: Eth.enc('symbol()', []) }, 'latest'] });
+    if (res && res.length === 66) sym = new TextDecoder().decode(Uint8Array.from(res.slice(2).match(/../g).map(h => parseInt(h, 16)))).replace(/\0+$/, '');
+    else if (res && res.length >= 130) sym = Eth.dec(['string'], res)[0];
+    sym = sym && sym.trim() ? sym.trim().slice(0, 12) : null;
+  } catch (e) { sym = null; }
+  SYMBOLS.set(tk, sym);
+  return sym;
 }
 /* The clock a timelock is compared against is the chain's, not the browser's: `applyQueued` tests
    `block.timestamp`. On a real chain the two agree to within a block; on a dev chain that has been
@@ -385,9 +402,24 @@ const FUND_EVENTS = [['Received(address,uint256)', 'in'], ['Distributed(address,
    the factory's for anything created long after it. */
 const FIRST = new Map();
 const KINDS = new Map([...CHANGE_EVENTS, ...FUND_EVENTS].map(([sig, kind]) => [topic(sig), kind]));
+/* Token payments in: ERC-20 `Transfer` logs from any contract with this address as `to`. ERC-721's
+   `Transfer` shares the topic0 and indexes its id as a fourth topic, so three topics is the filter.
+   Nothing on chain says which tokens a distribution expects, so a token is *recognised* once it has
+   been distributed or escrowed here; the rest are anyone's to send, spam included, and are kept apart
+   as `other`. A provider that refuses an address-less query leaves `other` null, never the history. */
+const TRANSFER = topic('Transfer(address,address,uint256)');
+function tokenIn(log) {
+  const block = parseInt(log.blockNumber, 16), index = parseInt(log.logIndex, 16);
+  const tk = Eth.checksum('0x' + log.address.slice(-40));
+  return { kind: 'in', block, index, tx: log.transactionHash, token: tk, from: Eth.dec(['address'], log.topics[1])[0], amount: log.data, what: '' };
+}
 async function history(addr, from) {
   const pick = set => logs(addr, [set.map(([sig]) => topic(sig))], from);
-  const [changes, funds] = await Promise.all([pick(CHANGE_EVENTS), pick(FUND_EVENTS)]);
+  const [changes, funds, ins] = await Promise.all([pick(CHANGE_EVENTS), pick(FUND_EVENTS),
+    logs(null, [TRANSFER, null, word(addr)], from).catch(() => null)]);
+  const fe = funds.map(entry);
+  const known = new Set([ZERO, ...fe.filter(e => e.token).map(e => e.token)]);
+  const tin = ins && ins.filter(l => l.topics.length === 3 && l.data.length === 66).map(tokenIn);
   const ch = changes.map(entry);
   /* `Applied` and `Cancelled` carry only the hash, so each borrows the description of the `Queued` it
      closes, and that `Queued` line trades its countdown for how it ended. */
@@ -396,7 +428,11 @@ async function history(addr, from) {
     const o = e.kind !== 'queued' && q.get(e.hash);
     if (o) { e.what = `${o.desc} · ${e.what}`; o.what = `${o.desc} · nonce ${o.nonce} · ${e.kind}`; o.closed = true; }
   }
-  return { changes: ch.sort(newest), funds: funds.map(entry).sort(newest) };
+  return {
+    changes: ch.sort(newest),
+    funds: [...fe, ...(tin || []).filter(e => known.has(e.token))].sort(newest),
+    other: tin && tin.filter(e => !known.has(e.token)).sort(newest),
+  };
 }
 const newest = (a, b) => b.block - a.block || b.index - a.index;
 /* One log as the line it prints. An unknown topic0 cannot reach here: the query asked for these. */
@@ -423,12 +459,13 @@ function entry(log) {
   }
   return e;
 }
-const token = a => a === ZERO ? 'ETH' : ext('address', a, short(a));
+// A recognised token by its symbol where `symbolOf` found one; the copy icon still copies the address.
+const token = (a, known = true) => a === ZERO ? 'ETH' : ext('address', a, known && SYMBOLS.get(a) ? esc(SYMBOLS.get(a)) : short(a));
 /* The three fund kinds that carry a token leave their line to here: the amount is in that token's own
    units, `decimals()` is a call, and `entry` is synchronous over the logs. `dec` is whatever
    `decimalsOf` found for the token, `null` included — `amt` prints that as raw units. */
-const fundWhat = (e, dec) => e.kind === 'distributed'
-  ? `${amt(e.amount, dec)} ${token(e.token)} by the table`
+const fundWhat = (e, dec, known = true) => e.kind === 'distributed' ? `${amt(e.amount, dec)} ${token(e.token)} by the table`
+  : e.kind === 'in' ? `${amt(e.amount, dec)} ${token(e.token, known)} from ${ext('address', e.from, short(e.from))}`
   : `${amt(e.amount, dec)} ${token(e.token)} · ${ext('address', e.account, short(e.account))}`;
 /* A decoded pending action as one line, named by the setter it calls. `setBeneficiaries` is also
    drawn as a second bar; the other three say everything they do here. */
@@ -466,6 +503,16 @@ function ticks(table, opts) {
 const mini = table => `<span class="mini">${table.map((b, i) => `<span class="seg s${i % 3}" style="flex-basis:${basis(b[1])}"></span>`).join('')}</span>`;
 const ledger = table => `<div class="ledger">${table.map(b => row(`${esc(b[2])}${b[3] ? `<span class="nt"> — ${esc(b[3])}</span>` : ''}`, ext('address', b[0], esc(short(b[0]))), Model.pct(b[1]))).join('')}</div>`;
 const row = (k, sub, n, cls) => `<div class="row${cls ? ' ' + cls : ''}"><div><b>${k}</b>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="n">${n}</div></div>`;
+/* A history list shows its newest HIST_SHOW rows and a "show all" for the rest. Every row is already
+   in hand — the logs arrive whole — so the cap is for reading, and opening it costs no call. */
+const HIST_SHOW = 10;
+function histFill(id, items, empty) {
+  if (!items.length) { fill(id, notice(empty)); return; }
+  const more = items.length - HIST_SHOW;
+  fill(id, histRows(items.slice(0, HIST_SHOW)) + (more > 0 ? `<button class="link more" id="${id}-more">show all ${items.length}</button>` : ''));
+  const b = document.getElementById(id + '-more');
+  if (b) b.onclick = () => fill(id, histRows(items));
+}
 const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow${e.kind === 'escrowed' ? ' err' : e.kind === 'queued' && !e.closed ? ' amber' : e.kind === 'applied' ? ' done' : ''}"><b>${e.kind}</b><span class="w">${e.what}</span><span class="t">block ${e.block} · ${ext('tx', e.tx, short(e.tx))}</span></div>`).join('')}</div>`;
 const eyebrow = (text, cls) => `<div class="eyebrow${cls ? ' ' + cls : ''}">${text}</div>`;
 const notice = (text, cls) => `<div class="notice${cls ? ' ' + cls : ''}">${text}</div>`;
@@ -810,20 +857,21 @@ async function detail(addr) {
     if (stale(t)) return;
     DS.nonces = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.nonce]));
     DS.qtx = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.tx]));
-    fill('h-changes', h.changes.length ? histRows(h.changes) : notice('no change has been queued yet.'));
+    histFill('h-changes', h.changes, 'no change has been queued yet.');
     fill('pending', pendingBlock(d, true));
     /* The fund rows carry amounts in their token's own units (#43), and the changes above do not, so
        they paint first and the token set these logs name is read here — one pass for the whole
        history, cached for the funds block below, which asks for the same tokens. */
-    const decs = new Map(await Promise.all(
-      [...new Set(h.funds.filter(e => e.amount != null).map(e => e.token))].map(async tk => [tk, await decimalsOf(tk)]),
-    ));
+    const toks = [...new Set(h.funds.filter(e => e.amount != null).map(e => e.token))];
+    const decs = new Map(await Promise.all(toks.map(async tk => [tk, await decimalsOf(tk)])));
+    await Promise.all([...new Set(h.funds.filter(e => e.token).map(e => e.token))].map(symbolOf));
     if (stale(t)) return;
     for (const e of h.funds) if (e.amount != null) e.what = fundWhat(e, decs.get(e.token));
-    fill('h-funds', h.funds.length ? histRows(h.funds) : notice('nothing has arrived at this address yet.'));
+    histFill('h-funds', h.funds, 'nothing has arrived at this address yet.');
     const f = await readFunds(d, h.funds);
     if (stale(t)) return;
-    fill('funds', fundsHTML(d, f));
+    fill('funds', fundsHTML(d, f, h.other));
+    bindOthers(d, h.other, t);
     bindAll();
   }).catch(() => {
     if (stale(t)) return;
@@ -1013,11 +1061,11 @@ function bindDrawer(d) {
 
 /* Funds, for everyone. `distribute` is permissionless (decision 11, #26) and so is `release`, so both
    sit under the balance in every view, including a visitor's. The token list is the chain's own: ETH,
-   plus every token that has appeared in a `Distributed` or an `Escrowed` log — which is the answer to
-   t02's deferred question about where a token list comes from, since nothing on chain carries one. */
+   plus every token that has appeared in a `Distributed` or an `Escrowed` log, since nothing on chain
+   carries one. What `history` found sent here and never distributed is `readOthers`', read on demand. */
 async function readFunds(d, funds) {
   const tokens = [ZERO, ...new Set(funds.filter(e => e.token && e.token !== ZERO).map(e => e.token))];
-  const rows = await Promise.all(tokens.map(async tk => {
+  const read = list => Promise.all(list.map(async tk => {
     const [reserved] = await call(d.addr, 'reserved(address)', [tk], ['uint256']);
     const held = tk === ZERO
       ? BigInt(await P.request({ method: 'eth_getBalance', params: [d.addr, 'latest'] }))
@@ -1027,6 +1075,7 @@ async function readFunds(d, funds) {
     const dec = await decimalsOf(tk);
     return { tk, dec, reserved, waiting: waiting > 0n ? waiting : 0n };
   }));
+  const rows = await read(tokens);
   /* Every `(token, account)` an `Escrowed` log ever named, read back from the mapping: a released row
      reads zero and is dropped, so this is the escrow as it stands rather than as it happened. */
   const pairs = [...new Set(funds.filter(e => e.kind === 'escrowed').map(e => e.token + ' ' + e.account))];
@@ -1037,22 +1086,59 @@ async function readFunds(d, funds) {
   }));
   return { rows, escrows: escrows.filter(e => e.held > 0n) };
 }
+/* The unrecognised tokens, read only once their list is opened: each costs a balance and a decimals
+   call, and they are the ones anyone can multiply by sending junk. Never distributed or escrowed here,
+   so nothing is reserved and the whole balance is waiting. Listed while one still holds a balance,
+   with the payments that brought it. */
+async function readOthers(d, other) {
+  const rows = await Promise.all([...new Set(other.map(e => e.token))].map(async tk => {
+    const [[waiting], dec] = await Promise.all([call(tk, 'balanceOf(address)', [d.addr], ['uint256']).catch(() => [0n]), decimalsOf(tk)]);
+    const ins = other.filter(e => e.token === tk);
+    for (const e of ins) e.what = fundWhat(e, dec, false);
+    return { tk, dec, waiting, ins };
+  }));
+  return rows.filter(r => r.waiting > 0n);
+}
+function othersHTML(d, rows) {
+  if (!rows.length) return '<div class="help">None of them still holds a balance here.</div>';
+  return `<div class="ledger">${rows.map(r => frow(token(r.tk, false), `sent here ${r.ins.length} time${r.ins.length === 1 ? '' : 's'}, never distributed`, amt(r.waiting, r.dec),
+    sctl(`dist:${r.tk}`, 'distribute', { to: d.addr, sig: 'distribute(address)', args: () => [r.tk], label: `distribute ${token(r.tk, false)}` }))).join('')}</div>`
+    + histRows(rows.flatMap(r => r.ins).sort(newest));
+}
+function bindOthers(d, other, t) {
+  const el = document.getElementById('others');
+  if (!el) return;
+  el.ontoggle = async () => {
+    if (!el.open || el.dataset.read) return;
+    el.dataset.read = '1';
+    const rows = await readOthers(d, other);
+    if (stale(t)) return;
+    fill('others-body', othersHTML(d, rows));
+    bindAll();
+  };
+}
 const frow = (k, sub, n, ctl, cls) => `<div class="frow${cls ? ' ' + cls : ''}"><div><b>${k}</b>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="n">${n}</div><div class="c">${ctl}</div></div>`;
-function fundsHTML(d, f) {
+function fundsHTML(d, f, other) {
   const rows = f.rows.map(r => frow(
-    r.tk === ZERO ? 'ETH' : ext('address', r.tk, esc(short(r.tk))),
+    token(r.tk),
     r.reserved > 0n ? `waiting to distribute · ${amt(r.reserved, r.dec)} held in escrow` : 'waiting to distribute',
     amt(r.waiting, r.dec),
     sctl(`dist:${r.tk}`, 'distribute', { to: d.addr, sig: 'distribute(address)', args: () => [r.tk], label: `distribute ${token(r.tk)}` }, r.waiting === 0n),
   )).join('');
   const escrows = f.escrows.map(e => frow(
-    `escrowed · ${esc(token(e.tk))}`,
+    `escrowed · ${token(e.tk)}`,
     `${ext('address', e.ac, esc(short(e.ac)))} — the push failed, so this share waits here`,
     amt(e.held, e.dec),
     sctl(`rel:${e.tk}:${e.ac}`, 'release', { to: d.addr, sig: 'release(address,address)', args: () => [e.tk, e.ac], label: 'release' }),
     'err',
   )).join('');
-  return `<div class="ledger">${rows}${escrows}</div>`
+  const n = other && new Set(other.map(e => e.token)).size;
+  const others = !other ? '<div class="help">Token payments in could not be read from this provider, so a token never distributed here is not listed.</div>'
+    : !n ? ''
+    : `<details class="others" id="others"><summary>other tokens received (${n})</summary>`
+      + '<div class="status warn">unverified — anyone can send any token to this address. Check a token before distributing it; once distributed it is listed above.</div>'
+      + `<div id="others-body">${notice('reading their balances…')}</div></details>`;
+  return `<div class="ledger">${rows}${escrows}</div>${others}`
     + `<div class="help">anyone can call distribute() — the contract splits by the table above; you pay the gas.${ACC ? '' : ' Connect a wallet to send it.'}</div>`
     // #18, in the dapp's guidance for payers, as the ruling says M02 should state it.
     + '<div class="help">Paying in from a contract with <code>.transfer()</code> or <code>.send()</code> can fail when the implementation is cold: the 2,300-gas stipend does not cover a clone\'s delegatecall to a cold implementation. Pay in with <code>call</code> and gas.</div>';
@@ -1306,6 +1392,7 @@ function docs() {
 
   <h2 id="s-payin">Receiving funds</h2>
   <p>A distribution accepts ETH and any ERC-20 token at its address. Received funds are not paid out until <code>distribute</code> is called.</p>
+  <p>Because anyone can send any token to the address, this page lists a token by name only once it has been distributed there. A token that has been received but never distributed appears under <i>other tokens received</i>, by address and marked unverified, with its own distribute control.</p>
   <p>A contract that sends ETH to a distribution must use <code>call</code> with sufficient gas. <code>transfer</code> and <code>send</code> forward a stipend of 2,300 gas, which does not cover receipt while the implementation is cold, and the payment then fails.</p>
 
   <h2 id="s-payout">Distributing funds</h2>

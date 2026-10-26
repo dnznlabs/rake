@@ -123,6 +123,12 @@
   distribution its owner arrived from, else the featured one once `load()` has read it, and `data-rpc` from `PUBLIC_RPC` — public endpoints chosen
   only so the example works when pasted, since the embedding developer owns that choice. `__APP__` is
   substituted like any contract token.
+- The funds block lists ETH and every *recognised* token — one this distribution has distributed or
+  escrowed — by `symbol()`. Tokens found only in `Transfer` logs addressed to it (an address-less
+  `eth_getLogs`, so a provider may refuse it) sit in a collapsed "other tokens received" list, by
+  address and never by symbol, because anyone can send any token and spam carries its pitch in the
+  symbol. Their balances and decimals are read only when that list is opened, since spam is what multiplies them. Both history lists show their newest 10 rows behind a "show all"; the logs arrive whole either way, because the apply nonces, the token list and the escrow rows are built from all of them. A token without `Transfer` events (the older mocks) is invisible until distributed.
+  `test/mocks/Mocks.sol:DevToken` is a token with a symbol and events, for testing this by hand.
 - `make fixtures` adds the two distributions the write screens need and `make deploy` does not: an
   *escrow demo* at salt 2, holding half of 1 ETH and half of 100 of a token that reports failure, both
   escrowed against a receiver that refuses ETH until told not to; and a *vault demo* at salt 3, owned

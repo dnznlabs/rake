@@ -127,7 +127,7 @@ input.narrow{max-width:160px}
 .acts{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 0}
 .btn.sm,.btn.sec.sm,.btn.off.sm{padding:7px 14px;font-size:12px}
 .btn[disabled]{background:none;color:var(--dim);border:1px solid var(--rule);cursor:default}
-.danger{margin-top:26px}.danger summary{cursor:pointer;color:var(--muted);font-size:12px;width:max-content}.danger summary:hover{color:var(--ink)}.danger .help{margin:10px 0 12px}
+.link.more{display:inline-block;margin-top:12px;font-size:12px}.others{margin-top:20px}.others summary{cursor:pointer;color:var(--muted);font-size:12px;width:max-content}.others summary:hover{color:var(--ink)}.others .status{margin:10px 0}.danger{margin-top:26px}.danger summary{cursor:pointer;color:var(--muted);font-size:12px;width:max-content}.danger summary:hover{color:var(--ink)}.danger .help{margin:10px 0 12px}
 .ack{display:flex;gap:10px;align-items:flex-start;font:12px/1.55 var(--sans);color:var(--ink);max-width:60ch;margin:0 0 10px;cursor:pointer}.ack input{width:auto;margin:2px 0 0;accent-color:var(--ink)}.ack input:disabled+span{color:var(--dim)}.ack input:disabled{cursor:default}.danger .btn{margin-top:6px}.danger .tabs{margin:14px 0 0}.danger .field{margin:0 0 14px;max-width:60ch}
 .btn.hold{position:relative;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}.btn.hold span{position:relative}
 .btn.hold:not([disabled]){color:var(--err);border-color:var(--err)}.btn.hold::before{content:"";position:absolute;inset:0;width:0;background:var(--err);opacity:.2}.btn.hold.on::before{width:100%;transition:width 3s linear}

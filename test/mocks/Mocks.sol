@@ -184,3 +184,30 @@ contract MockERC721 {
         }
     }
 }
+
+/// @notice A token as the dapp meets one on a real chain: `symbol()`, `decimals()` and `Transfer`
+/// events, which the funds block's token-in scan reads. For hand testing on anvil; no test uses it.
+contract DevToken {
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    string public symbol;
+    uint8 public immutable decimals;
+    mapping(address => uint256) public balanceOf;
+
+    constructor(string memory symbol_, uint8 decimals_) {
+        symbol = symbol_;
+        decimals = decimals_;
+    }
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+        emit Transfer(address(0), to, amount);
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        emit Transfer(msg.sender, to, amount);
+        return true;
+    }
+}
