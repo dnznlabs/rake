@@ -34,7 +34,7 @@ var CHAINS = {
  '11155111': 'sepolia', '84532': 'base sepolia', '31337': 'anvil', '31338': 'anvil 31338'
 };
 /* Read now: `currentScript` is null by the time a deferred mount runs. Inlined into the dapp it has no
-   src, and the dapp is the page itself, query string and all. */
+   src, and the dapp is the page itself, query string and all — so its link stays in the same tab. */
 var SRC = document.currentScript && document.currentScript.src;
 var RULE = '1px solid color-mix(in srgb, currentColor 18%, transparent)';
 
@@ -65,7 +65,6 @@ var CSS = '.rk{font:inherit;color:inherit;--rk-ac:oklch(.47 .09 230);--rk-am:#B8
 + '.rk-r{display:flex;justify-content:space-between;gap:12px;padding:4px 0}'
 + '.rk-r>span{min-width:0}'
 + '.rk-nt{opacity:.55}'
-+ '.rk-ad{opacity:.4;font-family:ui-monospace,Menlo,monospace;font-size:11px}'
 + '.rk-pc{font-variant-numeric:tabular-nums}'
 + '.rk-q{font-size:11px;color:var(--rk-am);margin-top:7px}'
 + '.rk-qb{display:flex;height:8px;gap:2px;margin-top:4px}'
@@ -175,7 +174,7 @@ function render(el){
    return}
   var link=el.getAttribute('data-link');
   var foot=(snap.delay?'delay '+fmtDelay(snap.delay):'no delay')+' · owner '+short(snap.owner)+' · '+short(addr)+' · '+esc(cname(cid))
-  +(link===null?'':' · <a href="'+esc((link||(SRC?new URL('./',SRC).href:location.href)).split('#')[0]+'#/distros/'+addr)+'" target="_blank" rel="noopener">view ↗</a>');
+  +(link===null?'':' · <a href="'+esc((link||(SRC?new URL('./',SRC).href:location.href)).split('#')[0]+'#/distros/'+addr)+'"'+(SRC?' target="_blank" rel="noopener"':'')+'>view ↗</a>');
   if(compact){
    el.innerHTML=bar(snap.table,'rk-b',1)
    +'<div class="rk-1">'+snap.table.map(function(b){return '<b>'+esc(b.name)+'</b> '+pct(b.bps)+'%'}).join(' · ')
@@ -185,8 +184,8 @@ function render(el){
   +bar(snap.table,'rk-b',1)
   +'<div class="rk-t">'+snap.table.map(function(b){
     return '<div class="rk-r"><span><b>'+esc(b.name)+'</b>'
-    +(b.note?' <span class="rk-nt">— '+esc(b.note)+'</span>':'')
-    +' <span class="rk-ad">'+short(b.account)+'</span></span><b class="rk-pc">'+pct(b.bps)+'%</b></div>'}).join('')+'</div>';
+    +(b.note?' <span class="rk-nt">· '+esc(b.note)+'</span>':'')
+    +'</span><b class="rk-pc">'+pct(b.bps)+'%</b></div>'}).join('')+'</div>';
   snap.pending.forEach(function(p){
    var left=p.eta?fmtEta(p.eta):null;
    h+='<div class="rk-q">a change is queued · '+(left?'lands in '+left:'ready to apply')+'</div>';

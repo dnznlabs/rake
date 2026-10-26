@@ -108,10 +108,11 @@ async function waitReceipt(hash, ms) {
    status line calls the write; the line itself is `#txs`, which every view that writes puts in place. */
 const txSay = (label, text, cls) => { const el = document.getElementById('txs'); if (el) el.innerHTML = `<div class="status${cls ? ' ' + cls : ''}">${label} · ${text}</div>`; };
 async function tx(to, sig, args, opts) {
-  const o = opts || {}, label = o.label || sig.slice(0, sig.indexOf('('));
+  const o = opts || {}, label = o.label || sig.slice(0, sig.indexOf('(')) || 'send';
   // A null `from` is not refused everywhere: anvil fills in its first account and sends.
   if (!ACC) { txSay(label, 'connect a wallet to send', 'bad'); return { ok: false, stage: 'preflight', text: 'no account' }; }
-  const params = { from: ACC, to, data: Eth.enc(sig, args), ...(o.value ? { value: '0x' + BigInt(o.value).toString(16) } : {}) };
+  // An empty `sig` is a plain ETH payment: no calldata, so `receive()` takes it.
+  const params = { from: ACC, to, data: sig ? Eth.enc(sig, args) : '0x', ...(o.value ? { value: '0x' + BigInt(o.value).toString(16) } : {}) };
   txSay(label, 'checking the call against the chain…');
   try { await P.request({ method: 'eth_call', params: [params, 'latest'] }); }
   catch (e) { const text = txError(e); txSay(label, text, 'bad'); return { ok: false, stage: 'preflight', text }; }
@@ -722,8 +723,7 @@ async function landing() {
   const d = await loadDistro(S.featured);
   // The widget reads `window.ethereum` alone, so with no RPC and no such global it could only fail.
   if (stale(t) || d.missing || !(WRPC || window.ethereum)) return;
-  fill('featured', `<div class="sechead"><b>live widget</b><span><a href="#/distros/${d.addr}">view →</a></span></div>`
-    + `<div id="wdg" data-rake="${d.addr}" data-chain="${CFG.chainId}"${WRPC ? ` data-rpc="${esc(WRPC)}"` : ''}></div>`);
+  fill('featured', `<div id="wdg" data-rake="${d.addr}" data-chain="${CFG.chainId}" data-link${WRPC ? ` data-rpc="${esc(WRPC)}"` : ''}></div>`);
   window.RakeWidget.mount(document.getElementById('wdg'));
 }
 /* The full-width fee path: three sources into one distribution, four beneficiaries out. Drawn twice from one set of rows, wide and tall, because a 912-unit figure
@@ -1299,7 +1299,7 @@ async function list() {
 /* Written for the owner of a distribution (ROADMAP decision 17): what it is, why, how, then the tasks.
    The contract's own surface is docs/REFERENCE.md in the repo, and the last section points there. The
    ids are what the rail and `#/docs#<section>` reach; the owner bar's widget link depends on `widget`. */
-const SECTIONS = [['what', 'Overview'], ['why', 'Purpose'], ['how', 'Mechanism'], ['create', 'Creating a distribution'], ['payin', 'Receiving funds'], ['payout', 'Distributing funds'], ['change', 'Changing a distribution'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['developers', 'For developers']];
+const SECTIONS = [['what', 'Overview'], ['economics', 'Economics'], ['why', 'Purpose'], ['how', 'Mechanism'], ['create', 'Creating a distribution'], ['payin', 'Receiving funds'], ['payout', 'Distributing funds'], ['change', 'Changing a distribution'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['developers', 'For developers']];
 const REPO = 'https://github.com/dnznlabs/rake';
 /* The two figures, hand-drawn rather than rendered from Mermaid: there is no Mermaid in the bundle and
    none at build time either, so the caption says what shipped. Colour comes through classes on
@@ -1372,6 +1372,12 @@ function docs() {
   <p>A distribution is a contract that receives funds and divides them among a published table of beneficiaries. The table, with each beneficiary's address, share, name and note, is stored on chain together with the owner, the delay and a description, and can be read by anyone. Anyone may trigger a payout. Only the owner may propose a change, and every change is subject to a public delay before it can take effect.</p>
   <p><b>Paying in from a contract.</b> A contract must send ETH to a distribution with <code>call</code> and sufficient gas. A payment made with <code>transfer</code> or <code>send</code> can fail; see <a href="#/docs#payin">receiving funds</a>.</p>
 
+  <h2 id="s-economics">Economics</h2>
+  <p>Rake is free software. The source is published under the MIT licence, the contracts take no fee on anything they receive or pay out, and neither this app nor the widget charges for its use. The only cost of a distribution is the network's gas.</p>
+  ${S.featured ? `<p>If this work is useful to you, please consider supporting its authors. A payment goes to the DNZN Labs distribution, ${ext('address', S.featured, esc(short(S.featured)))}, and is divided by its published table like any other.</p>
+  <div class="give"><input id="give-amt" class="narrow" placeholder="amount" inputmode="decimal" aria-label="amount in ETH"><span>ETH</span><button class="btn sec sm" id="give-go"${ACC ? '' : ' disabled title="connect a wallet to send"'}>send</button><a href="#/distros/${S.featured}">view the distribution →</a></div>
+  <div id="txs">${ACC ? '' : '<div class="help">Connect a wallet to send.</div>'}</div>` : ''}
+
   <h2 id="s-why">Purpose</h2>
   <p>Where a fee or a revenue share goes is ordinarily stated off chain, and that statement can be revised without notice. A distribution places it on record. The allocation is public, the owner is public, and a change to either is visible for the full length of the delay before it can be applied. A payer can verify where funds will go; a beneficiary can rely on the share it has been allocated.</p>
   <p>Protocol fees are the primary case. The mechanism applies equally to revenue shares, grants and any other allocation a project is accountable for and is prepared to publish.</p>
@@ -1425,11 +1431,28 @@ function docs() {
   <p>The contracts have not yet been audited. Security issues should be reported through the repository's <a href="${REPO}/security/advisories/new" target="_blank" rel="noopener">advisory form</a>.</p>
 
   <h2 id="s-developers">For developers</h2>
+  <p class="credit"><b>Credit.</b> The design of these contracts derives from <a href="https://multisig.software" target="_blank" rel="noopener">multisig.software</a> by Src Co / z0r0z: the timelock, the self-call setters, the PUSH0 clones and the sender-bound salt. The low-level patterns follow Solady.</p>
   <p>The source is published at <a href="${REPO}" target="_blank" rel="noopener">github.com/dnznlabs/rake</a> under the MIT licence. Both contracts reside in one file with no imports. Every function, event and error, and the <code>Snapshot</code> struct the widget reads, are documented in <a href="${REPO}/blob/main/docs/REFERENCE.md" target="_blank" rel="noopener">docs/REFERENCE.md</a>. This page is itself served by the <code>html()</code> view of a contract.</p>
   <div class="scroll"><table class="dtab"><tr><th>chain</th><th>factory</th><th>status</th></tr>${chainRows()}</table></div>
-  <p>The timelock, the self-call setters, PUSH0 clones and the sender-bound salt derive from multisig.software (Src Co / z0r0z). The low-level patterns follow Solady.</p>
   </article></div>`;
   widgetDemo();
+  giveBind();
+}
+/* The support form under Economics: a plain payment to the featured distribution, any amount, nothing
+   pre-filled (decision 1). It goes through `tx` like every write, so it is preflighted and confirmed. */
+function giveBind() {
+  const go = document.getElementById('give-go'), amt = document.getElementById('give-amt');
+  if (!go || !ACC) return;
+  const send = async () => {
+    const v = Model.wei(amt.value);
+    if (!v) { txSay('send', 'enter an amount of ETH', 'bad'); return; }
+    go.disabled = true;
+    const r = await tx(S.featured, '', [], { value: v, label: `send ${esc(amt.value.trim())} ETH` });
+    go.disabled = false;
+    if (r.ok) { amt.value = ''; txSay('send', 'received — thank you', ''); }
+  };
+  go.onclick = send;
+  amt.onkeydown = e => { if (e.key === 'Enter') send(); };
 }
 /* The docs' live preview: the two variants of the real widget, mounted on whatever address the field
    holds, and every snippet above rewritten to match. It reads through the dev `?rpc=` or the chain's

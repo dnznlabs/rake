@@ -150,7 +150,7 @@
   classic script, with its own minimal reader for `snapshot()`'s return and none of `eth.js`,
   `model.js` or `theme.css` inlined — it needs no keccak (both selectors are literals a test pins
   against `selectors.txt`), and it inherits the host page's font and ink, injecting one
-  `<style id="rk-css">` guarded by that id. Its one outbound link is opt-in: `data-link` adds a "view ↗" to `#/distros/<addr>` in the dapp that served the script (`currentScript.src`, read at load; inlined, the page itself), or in the copy `data-link="https://…"` names. The docs' snippets and preview carry it; the landing's mount does not. `app/build.mjs` runs it through the same minifier, never
+  `<style id="rk-css">` guarded by that id. Its one outbound link is opt-in: `data-link` adds a "view ↗" to `#/distros/<addr>` in the dapp that served the script (`currentScript.src`, read at load; inlined, the page itself), or in the copy `data-link="https://…"` names. The docs' snippets and preview carry it, and so does the landing's mount, where the link stays in the same tab. `app/build.mjs` runs it through the same minifier, never
   gzips it, prints `widget: raw N bytes · budget 10240 · N left`, and **exits 1 above 10,240 bytes
   before writing any artifact**, so the budget is a gate on every `make deploy` rather than a figure in
   a report. Every colour literal in it must also occur in `theme.css` and it carries no `style=`
