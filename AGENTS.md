@@ -222,6 +222,9 @@
 - A project supplies four slots and inherits everything else unchanged: the mark and wordmark (the
   `<svg>` and name in the nav lockup, and `<title>`), the accent hue (the `250` in both `--accent`
   declarations), the signature data element (`.sig`), and the footer fact (the right-hand footer span).
+- Rake moves the footer fact to the left-hand span, replacing the base's left-hand text, and puts
+  icon links to the repo and dnzn.dev on the right. That departs from the base's footer and is a
+  change to propose to `design-base`.
 - The accent appears on the signature element, the focus ring and link hover, and nowhere else.
   Amber means pending, red means error; neither is restyled.
 - No webfonts, CDN scripts, icon fonts or remote images. No cards, shadows, gradients or emoji.
