@@ -1,6 +1,6 @@
 # M02 — Dapp and widget on anvil
 
-Status: in progress — t01–t06 done, Phase 5 open (handoff: [PHASE5.md](PHASE5.md)) · updated 2026-10-25
+Status: done — t01–t06 done, Phase 5 signed off 2026-10-26 in [#73](https://github.com/dnznlabs/rake/pull/73) (handoff: [PHASE5.md](PHASE5.md)) · updated 2026-10-26
 
 The design prototype (`brainstorming/design/rake-dapp.html`, `rake-widget.html`) rebuilt as the real
 dapp on DNZN Base v1: reading `snapshot()` from the chain, sending the six writes through the wallet,
@@ -40,7 +40,8 @@ rather than quote.
    `cast balance` of it above zero. `FEATURED_SALT` is one build token, never an address: the dapp
    computes the address through `predict`.
 3. **Reads.** With the dev build up (`make serve`, `http://localhost:3000/?rpc=…&from=…`):
-   `#/` shows the featured distribution's bar, ledger, delay, owner and the pending change;
+   `#/` links the featured distribution, and `#/distros/<featured>` shows its bar, ledger, delay, owner
+   and the pending change (decision 18; until 2026-10-25 `#/` rendered them itself);
    `#/distros/<addr>` shows the same for any created distribution; `#/distros` lists `recent`
    (localStorage) and `mine` (`Created` logs filtered by owner, each confirmed against `snapshot().owner`).
    Every displayed value equals the matching field of `cast call <addr> "snapshot()"` and the pending
@@ -101,7 +102,31 @@ rather than quote.
     Phase 5 touched is re-run with them (see Phase 5 § Consequences). Same rule as `state-collection`
     M1 AC 10, decided there on 2026-09-17 over a proposal to close on an empty task table.
 
-    _Not yet signed off._
+    **Signed off by Denizen, 2026-10-26.** Phase 5 is closed. The `#/docs` text is his, written
+    through the walk-through in [#73](https://github.com/dnznlabs/rake/pull/73), and the rows above
+    are what it shipped.
+
+    Re-run on 2026-10-26 at `f2234d2`, the code signed off, on anvil 31337:
+
+    - **3:** `#/` links the featured distribution and mounts the widget (three rows). Its
+      `#/distros/<featured>` shows the same owner, 4h delay, three rows at 60/30/10 with names and notes,
+      and no pending change as `cast call … snapshot()`. The featured distribution's queued change was
+      applied during the walk-through, so `pending` is `[]` in both. `#/distros` lists it under
+      `recent` and `mine`.
+    - **6:** criterion 6's script against `docs/REFERENCE.md` exits 0 with no diff. There are 13
+      `id="s-` sections, which `test/docs.test.mjs` pins.
+    - **7:** `request(["widget.js"])` returns `200` with `Content-Type: application/javascript;
+      charset=utf-8`. `widget sha256` is `e45088fc…f22b`, equal to `app/dist/widget.js`, at 7,920
+      bytes of 10,240. `/host` renders the featured distribution full and compact, plus the
+      no-code and failed-RPC states.
+    - **8:** `make dapp-nodev` then `make chain-doc` gives `inflated sha256` `b9da67c0…47f6`, equal to
+      `sha256sum app/dist/index.html`. That is 122,859 bytes raw, a 38,752-byte payload and 52,349
+      bytes from `html()` over 2 chunks.
+    - **9:** `forge build --force` gives 0 warnings. `forge lint` and `forge fmt --check` are silent.
+      After a second `forge build --force`, `forge snapshot --check` exits 0 and `forge test` passes
+      47/47. Node passes 61/61, the grep is empty and `git status --porcelain` is empty. The 31338
+      deploy was not re-run: `src/` is unchanged since t05, and Phase 5 touched nothing under
+      `scripts/` or `mk/`.
 
 ## Out of scope
 
@@ -202,13 +227,17 @@ what a change is allowed to touch is settled when it is filed. What that costs i
 One row is fixed in advance: the docs page. m02-t04 shipped `#/docs` as a draft (decision 17), and
 Denizen writes the final text himself before the signoff. The checks on the page stay — the
 `docs/REFERENCE.md` struct and tables, the stipend-and-cold lines, criterion 9's greps, the `widget`
-section id the landing's CTA depends on — and run against what he writes.
+section id the owner bar's widget link depends on — and run against what he writes.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| docs text | `#/docs` rewritten by Denizen; criterion 6's checks re-run; criterion 8 re-chunked | not started — gates the signoff |
-| landing diagram ([#50](https://github.com/dnznlabs/rake/issues/50)) | The hero's 60/30/10 diagram over a live 60/40, and its ~5 px type at 390 px; three options each in the issue, recommendation: draw the diagram from the featured `snapshot()` | not started — Denizen's call, in the loop he drives |
-| widget reachability ([#68](https://github.com/dnznlabs/rake/issues/68)) | Freedom calls `html()` for every path, so `web3://…/widget.js` renders the dapp there; the client survey is on the issue. A ruling, not a tweak: it decides what `#/docs` § the widget tells a host to embed | open — ruling before the docs text is final |
+| docs text | `#/docs` rewritten at Denizen's direction in the hero's formal register (decision 17, amended 2026-10-25); criterion 6's checks re-run; criterion 8 re-chunked | done — [#73](https://github.com/dnznlabs/rake/pull/73); the text is Denizen's, signed off under criterion 10 |
+| landing diagram ([#50](https://github.com/dnznlabs/rake/issues/50)) | The hero's 60/30/10 diagram over a live 60/40, and its ~5 px type at 390 px. Ruled as decision 18: new hero, the live example replaced by the real widget beside the address field, the widget link moved to the owner bar, the diagram captioned `example` with a phone layout, an ink favicon | done — [#73](https://github.com/dnznlabs/rake/pull/73) |
+| widget reachability ([#68](https://github.com/dnznlabs/rake/issues/68)) | Freedom calls `html()` for every path, so `web3://…/widget.js` renders the dapp there; the client survey is on the issue. A ruling, not a tweak: it decides what `#/docs` § the widget tells a host to embed | ruled 2026-10-25 as decision 19 — done in [#73](https://github.com/dnznlabs/rake/pull/73) |
+| UI pass | Click-to-copy icon on every address and hash, tx ids on every history row and queued change, section rules dropped on the landing and distribution page, a quiet `create +` on `#/distros` | done — [#73](https://github.com/dnznlabs/rake/pull/73) |
+| ownership guards | Change owner and renounce collapsed behind one selector, a 3-second hold, three acknowledgements and a red button; every send gated on a connected account; history rows closed | done — [#73](https://github.com/dnznlabs/rake/pull/73); carried [#74](https://github.com/dnznlabs/rake/issues/74) |
+| token payments in | Funds list recognised tokens by `symbol()`; tokens seen only in `Transfer` logs sit in a collapsed "other tokens" list by address, read on open; both histories show their newest 10 | done — [#73](https://github.com/dnznlabs/rake/pull/73); carried [#75](https://github.com/dnznlabs/rake/issues/75), [#76](https://github.com/dnznlabs/rake/issues/76) |
+| economics | `#/docs` § Economics (free software, MIT, no fee) with the support form, per decision 1's 2026-10-26 addendum; the multisig.software credit; the widget's opt-in `data-link` | done — [#73](https://github.com/dnznlabs/rake/pull/73) |
 
 #### Consequences of "anything is fair game" at end of M02
 

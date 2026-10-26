@@ -62,17 +62,17 @@ ANVIL_PORT=8545 APP_PORT=3000 devbox run -- process-compose -f procs/10-chain.ym
 
 ## The docs page
 
-`#/docs` is in `app/src/index.html`, from `const SECTIONS` (line ~1019) down: eleven sections, each
+`#/docs` is in `app/src/index.html`, from `const SECTIONS` (line ~1019) down: thirteen sections, each
 an `<section id="s-<key>">` with a heading, and a rail built from `SECTIONS`. Written for the owner of
-a distribution, not a developer (decision 17): what it is, why it exists, how it works, creating one,
-paying in, paying out, changing it, ownership, the widget, limits, for developers. Function names
-appear once, where the owner meets them in a wallet prompt. The contract reference is
+a distribution, not a developer (decision 17): what it is, economics, credits, why it exists, how it
+works, creating one, paying in, paying out, changing it, ownership, the widget, limits, for
+developers. Function names appear once, where the owner meets them in a wallet prompt. The contract reference is
 `docs/REFERENCE.md`, not the page.
 
 Rewrite the text freely. These are the checks that run against whatever is written, so keep their
 inputs:
 
-- **`test/docs.test.mjs`** pins that `SECTIONS` has eleven entries and that the `id="s-…"` sections
+- **`test/docs.test.mjs`** pins that `SECTIONS` has thirteen entries and that the `id="s-…"` sections
   appear in the same order with the same keys, and that `widget` is one of them — the landing's "Get
   the widget" button links `#/docs#widget`. Adding, removing or reordering sections means changing
   `SECTIONS`, the ids and the test together. Section *titles* and *bodies* are free.

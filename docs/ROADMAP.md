@@ -14,7 +14,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 | Milestone | Goal | Status |
 |:----------|:-----|:-------|
 | [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | done 2026-10-11 — t01 (#6), t02 (#11), t03 (#14) and the decision-10 follow-up (#24) merged; every criterion re-run and passing on `main` at `c292106` |
-| [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain, and Denizen has ironed out the experience against it | in progress — plan merged (#29) 2026-10-11; t01 (#33), t02 (#40), t03 (#52), t04 (#60), t05 (#65) done; t06 (close-out fixes) planned 2026-10-25; Phase 5 — Denizen's pass and the `#/docs` text — open, with [#68](https://github.com/dnznlabs/rake/issues/68) to rule on |
+| [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain, and Denizen has ironed out the experience against it | done 2026-10-26 — t01 (#33), t02 (#40), t03 (#52), t04 (#60), t05 (#65), t06 done; Phase 5 signed off by Denizen in [#73](https://github.com/dnznlabs/rake/pull/73) |
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | not started |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | not started |
 | [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; DNZN's own 60/40 distribution live under the Ops multisig with a 7-day delay; dapp mirrored and widget embedded in one DNZN app | not started |
@@ -67,6 +67,13 @@ Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which
    from M02 to M05, where the DNZN distribution has an address. Reached by default when m02-t03's
    issue opened with no ruling; options were defer (chosen), a build token with no value on any M02
    chain, or loosening criterion 9's grep. M02 criterion 9 stays as written.
+   **Addendum 2026-10-26 (Phase 5, [#73](https://github.com/dnznlabs/rake/pull/73)):** the support
+   line comes forward to M02 as `#/docs` § Economics, ruled by Denizen in the walk-through: one amount
+   field sending plain ETH to the distribution the app features (`S.featured`), separate transaction,
+   nothing pre-filled, shown only once that address has read. It is worded "support", never "tip", and
+   names no owner, because on an M02 chain the featured address is a `FEATURED_SALT` dev seed rather
+   than DNZN's; the DNZN attribution, the post-create line and the footer link stay in M05. Criterion 9
+   stays as written.
 2. **No `url` or `about` fields.** Owners carry URLs inside `description`. Rejected: two more string
    fields, which widen the audit surface for copy.
 3. **Name.** `Rake` is the project and the repo; `Distribution` and `DistributionFactory` are the
@@ -193,13 +200,43 @@ recommended option.
     paying out, changing it, ownership, the widget, limits, for developers — in plain declarative
     sentences, with a wallet's function names given once where the owner will meet them in a prompt.
     The text on the branch is a draft: Denizen writes the final page himself in Phase 5, before the
-    signoff (§ Order, "M02 ends on Denizen"). The function, event and error tables and the verbatim `Snapshot` struct move to
+    signoff (amended 2026-10-25: Denizen delegated the text — "I really don't want to write them
+    myself" — and the final page is written at his direction and approved by his merge) (§ Order, "M02 ends on Denizen"). The function, event and error tables and the verbatim `Snapshot` struct move to
     `docs/REFERENCE.md`, which `test/docs.test.mjs` and criterion 6's ABI diff read instead of the
     page, so the drift check is kept and the page stops paying for it. Rejected: an owner's
     introduction above the developer page (two audiences on one page, and the one who deploys reads
     the one who does not); the reference as a third on-chain document (a developer has the repo and
     the contract itself, which is where they go). Criterion 6 reworded in `MILESTONE.md`. Landed in
     m02-t04 on re-review.
+18. **The landing is a pitch, not a reading; the fee-path diagram is an illustration.** Ruled by
+    Denizen on 2026-10-25 in Phase 5, closing [#50](https://github.com/dnznlabs/rake/issues/50) ("the
+    landing diagram is just an example"; the live example is "way too loud"). The hero is "Transparent
+    fund distribution." with protocol fees named as the primary case, not the only one, and one CTA.
+    The featured distribution's bar, ledger, pending block and meta leave `#/`; in their place the
+    real widget, `widget.js` inlined into the dapp, renders it beside the address field, mounted only
+    once its `snapshot()` reads. Criterion 3 moves its featured-distribution check to
+    `#/distros/<featured>`. "Get the widget" leaves the hero for the owner bar, where the docs snippet
+    then carries that owner's address. The diagram keeps the mock's 60/30/10, captioned `example`, and
+    under 720 px drops its two minor labels so the rest sets at about 10 px. The landing's rhythm is
+    64 px; the favicon is ink, not accent. Rejected: drawing the diagram from the featured `snapshot()`
+    (#50's recommendation — it ties the pitch to a dev seed); a dapp-drawn look-alike of the widget
+    (no bytes, but it can drift from the thing a host gets); hiding the diagram on a phone (decision
+    15 already turned that down).
+    **Amendment 2026-10-26 (Phase 5, [#73](https://github.com/dnznlabs/rake/pull/73)):** ruled by
+    Denizen in the walk-through. The hero is two columns with two CTAs, create and docs, beside the
+    widget and the address field; a "use cases" row follows it. The diagram is no longer the mock's
+    60/30/10: it draws three sources into one distribution, whose box shows the table, the time lock
+    and that funds wait for `distribute()`, paid out to four beneficiaries at 45/25/20/10, set wide
+    above 720 px and as a tall variant below it. It stays an illustration, not drawn from `snapshot()`.
+19. **The widget snippet names an ERC-5219 gateway, and shows `web3://` as the alternative.** Ruled
+    by Denizen on 2026-10-25, closing [#68](https://github.com/dnznlabs/rake/issues/68) ("show both
+    for clarity"). Off http(s), `#/docs` § the widget gives `src` as
+    `https://<App>.<chainId>.w3link.io/widget.js`, the gateway's address-and-chain-id host form
+    (`ethstorage/web3url-gateway` `cmd/server/protocol.go`), and names `web3://<App>:<chain>/widget.js`
+    beside it as the form for pages opened in a 5219 client, with the caveat that `html()`-only clients
+    such as Freedom cannot reach it. Decision 12 stands: `App` answering both is what keeps it reachable
+    from both camps. Rejected: the bare `web3://` src alone (it renders the dapp in Freedom). M04's
+    gateway criterion should name a 5219 gateway for the same reason.
 
 ## Findings carried forward
 

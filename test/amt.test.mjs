@@ -83,11 +83,11 @@ test('a token whose decimals() could not be read prints raw units, never a scale
 
 test('every amt() call that formats a token passes that token\'s decimals', () => {
   /* The other half of the fix: a call site that formats a token amount without its decimals prints a
-     wrong number again, and the two that may stand bare are ETH's — the `Received` row and the meta
-     strip's "waiting to distribute". */
+     wrong number again. The one that may stand bare is `eth()`, which formats ETH and nothing else. */
   const bare = [...SRC.matchAll(/\bamt\(([^)]*)\)/g)].map(m => m[1]).filter(a => !a.includes(','));
 
-  assert.deepEqual(bare.sort(), ['d.waiting', 'log.data']);
+  assert.deepEqual(bare, ['w']);
+  assert.ok(SRC.includes("const eth = w => 'Ξ' + amt(w);"), 'the bare amt() is no longer eth()');
 });
 
 test('the decimals cache is seeded with ETH, so the funds block never calls the zero address', () => {

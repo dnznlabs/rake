@@ -64,8 +64,8 @@
 ## The dapp
 
 - `app/src/index.html` is the dapp: no dependencies, no network but the wallet's EIP-1193 provider.
-  The build inlines `eth.js` (keccak and the ABI subset), `model.js`, `theme.css` and `layout.html`
-  into it.
+  The build inlines `eth.js` (keccak and the ABI subset), `model.js`, `widget.js`, `theme.css` and
+  `layout.html` into it.
 - `app/src/model.js` is everything that needs no DOM and no provider: `pct`, `countdown`,
   `decodePending`, `supersededBy`, `salt` and the `snapshot()` type string `SNAPSHOT_T`. It is tested
   under node in `test/model.test.mjs` and inlined unchanged, so it reads an ambient `Eth` rather than
@@ -76,15 +76,15 @@
   genesis is not one on a chain with a history: `__DISTRIBUTIONFACTORY_BLOCK__` is where the dapp's
   `Created` scan starts.
 - `theme.css` and `layout.html` are the whole look. The script styles nothing: it emits classes and
-  looks up ids, and state is a class (`warn`, `bad`, `err`, `on`), never an inline style. The one
-  colour outside `theme.css` is the favicon's: it is a `data:` URI in `<head>`, with no page to
-  inherit `currentColor` from, so it carries the accent frozen as a hex. Move the accent's hue and
-  move that hex — `theme.css` names the coupling where the hue is set.
+  looks up ids, and state is a class (`warn`, `bad`, `err`, `on`), never an inline style. The only
+  colours outside `theme.css` are the favicon's: it is a `data:` URI in `<head>`, with no page to
+  inherit from, so it carries `--ink`'s light and dark values frozen as hexes behind its own
+  `prefers-color-scheme` rule. Move `--ink` and move those — `theme.css` names the coupling.
 - `app/build.mjs` inlines `/*@inline file@*/`, substitutes every `__NAME__` token, strips the
   `/*DEV*/` fences unless `--dev`, minifies, and writes `app/dist/` (gitignored). It refuses to emit a
   bundle with an unresolved token, comments included. A deployed contract's token is its name,
   uppercased, between double underscores. The minifier drops `/* */` blocks and `//` lines, so a
-  comment in any of the four inlined files costs the bundle nothing — but it does not know
+  comment in any of the five inlined files costs the bundle nothing — but it does not know
   `<!-- -->`, which would ship. There is no HTML comment in `app/src` for that reason.
 - `make dapp` is the dev build `make serve` hosts on :3000; `?rpc=<url>&from=<address>` reads and
   sends without a wallet. `make dapp-nodev` is the bundle that ships.
@@ -107,11 +107,28 @@
   refuses instead. Every countdown, and the gate on `apply`, measures against the chain's latest block
   timestamp rather than the browser's clock: `applyQueued` compares `block.timestamp`, and on a dev
   chain that has been moved forward the two are days apart.
+- The ownership writes, change owner and renounce, sit collapsed in one `<details class="danger">` behind
+  a selector (`OWNMODE`). Each carries `hold: true`, which `holdToFire` turns into a 3-second press of
+  pointer or Enter/Space (a click does nothing), behind three chained checkboxes (`ACKS`), and the
+  button is `--err` red — red for an irreversible action, beyond the base's "red means error". Both are
+  patterns to propose to `design-base`.
+- Every address and hash the page prints goes through `ext(kind, value, text)`: the shortened value,
+  then a `.cp` copy icon that copies the full value on click or Enter (`copyClick`, one capturing
+  listener), then a `↗` to the explorer only where `EXPLORER` names one. Never print `short(addr)` bare.
+  Every history row carries the tx that emitted it, and a queued change the tx that queued it. The widget does not
+  copy; it is a second bundle on a byte budget.
 - `#/docs#widget` builds its snippets from the page itself: `src` is `widget.js` resolved against the
-  page's own URL (or `web3://<App>:<chain>/widget.js` when it has none), `data-rake` the featured
-  distribution once `load()` has read it, and `data-rpc` from `PUBLIC_RPC` — public endpoints chosen
+  page's own URL on http(s), else `https://<App>.<chain>.w3link.io/widget.js` — a 5219 gateway, never a
+  bare `web3://` src, which `html()`-only clients answer with the dapp (decision 19) — `data-rake` the
+  distribution its owner arrived from, else the featured one once `load()` has read it, and `data-rpc` from `PUBLIC_RPC` — public endpoints chosen
   only so the example works when pasted, since the embedding developer owns that choice. `__APP__` is
   substituted like any contract token.
+- The funds block lists ETH and every *recognised* token — one this distribution has distributed or
+  escrowed — by `symbol()`. Tokens found only in `Transfer` logs addressed to it (an address-less
+  `eth_getLogs`, so a provider may refuse it) sit in a collapsed "other tokens received" list, by
+  address and never by symbol, because anyone can send any token and spam carries its pitch in the
+  symbol. Their balances and decimals are read only when that list is opened, since spam is what multiplies them. Both history lists show their newest 10 rows behind a "show all"; the logs arrive whole either way, because the apply nonces, the token list and the escrow rows are built from all of them. A token without `Transfer` events (the older mocks) is invisible until distributed.
+  `test/mocks/Mocks.sol:DevToken` is a token with a symbol and events, for testing this by hand.
 - `make fixtures` adds the two distributions the write screens need and `make deploy` does not: an
   *escrow demo* at salt 2, holding half of 1 ETH and half of 100 of a token that reports failure, both
   escrowed against a receiver that refuses ETH until told not to; and a *vault demo* at salt 3, owned
@@ -125,13 +142,15 @@
   data — `test/docs.test.mjs` fails when the struct block and `src/Distribution.sol` disagree by one
   character, or when a function the selector fixture names is missing from the function table, and
   M02 criterion 6's script diffs the three `Distribution` tables against `forge inspect`. A claim about
-  contract behaviour on the page is checked against `src/` before it ships; the landing CTA depends
-  on the `widget` section id.
-- `app/src/widget.js` is a **second bundle, not part of the dapp**: one IIFE that `App` serves as a
+  contract behaviour on the page is checked against `src/` before it ships; the owner bar's "Embed the
+  widget" link depends on the `widget` section id.
+- `app/src/widget.js` is a **second bundle**, also inlined unchanged into the dapp so the landing's
+  live example is the real widget, mounted through `window.RakeWidget.mount` after the view paints
+  (decision 18). It is one IIFE that `App` serves as a
   classic script, with its own minimal reader for `snapshot()`'s return and none of `eth.js`,
   `model.js` or `theme.css` inlined — it needs no keccak (both selectors are literals a test pins
   against `selectors.txt`), and it inherits the host page's font and ink, injecting one
-  `<style id="rk-css">` guarded by that id. `app/build.mjs` runs it through the same minifier, never
+  `<style id="rk-css">` guarded by that id. Its one outbound link is opt-in: `data-link` adds a "view ↗" to `#/distros/<addr>` in the dapp that served the script (`currentScript.src`, read at load; inlined, the page itself), or in the copy `data-link="https://…"` names. The docs' snippets and preview carry it, and so does the landing's mount, where the link stays in the same tab. `app/build.mjs` runs it through the same minifier, never
   gzips it, prints `widget: raw N bytes · budget 10240 · N left`, and **exits 1 above 10,240 bytes
   before writing any artifact**, so the budget is a gate on every `make deploy` rather than a figure in
   a report. Every colour literal in it must also occur in `theme.css` and it carries no `style=`
@@ -203,6 +222,9 @@
 - A project supplies four slots and inherits everything else unchanged: the mark and wordmark (the
   `<svg>` and name in the nav lockup, and `<title>`), the accent hue (the `250` in both `--accent`
   declarations), the signature data element (`.sig`), and the footer fact (the right-hand footer span).
+- Rake moves the footer fact to the left-hand span, replacing the base's left-hand text, and puts
+  icon links to the repo and dnzn.dev on the right. That departs from the base's footer and is a
+  change to propose to `design-base`.
 - The accent appears on the signature element, the focus ring and link hover, and nowhere else.
   Amber means pending, red means error; neither is restyled.
 - No webfonts, CDN scripts, icon fonts or remote images. No cards, shadows, gradients or emoji.

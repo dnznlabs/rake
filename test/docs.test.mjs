@@ -84,14 +84,14 @@ for (const heading of ['### Functions', '### Events', '### Errors', '## Distribu
   });
 }
 
-test('the rail and the headings are the same eleven sections, in one order', () => {
+test('the rail and the headings are the same thirteen sections, in one order', () => {
   const m = PAGE.match(/const SECTIONS\s*=\s*(\[[\s\S]*?\]);/);
   assert.ok(m, 'SECTIONS is not an array literal in app/src/index.html');
   const sections = new Function(`return ${m[1]}`)();
 
   const ids = [...PAGE.matchAll(/id="s-([a-z]+)"/g)].map(m => m[1]);
 
-  assert.equal(sections.length, 11);
+  assert.equal(sections.length, 13);
   assert.deepEqual(ids, sections.map(s => s[0]));
-  assert.ok(ids.includes('widget'), 'the landing\'s CTA points at #/docs#widget');
+  assert.ok(ids.includes('widget'), 'the owner bar\'s widget link points at #/docs#widget');
 });
