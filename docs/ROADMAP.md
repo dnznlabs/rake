@@ -238,7 +238,7 @@ recommended option.
     from both camps. Rejected: the bare `web3://` src alone (it renders the dapp in Freedom). M04's
     gateway criterion should name a 5219 gateway for the same reason.
 
-Ruled by Denizen on 2026-10-27, before M03 Phase 2, each on the issue linked
+Ruled by Denizen on 2026-10-27, before M03 Phase 2, each on the issue linked and each as the recommended option
 (`docs/milestones/m03/MILESTONE.md` § Human-in-the-loop requirements, D1–D13). Where the issue was
 amended after it opened, the amendment is what was ruled on, and the milestone table row is marked.
 
@@ -296,11 +296,14 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     and a second match arm in the dapp's "retry failed" branch. Rejected: no named error (the
     original recommendation, made on the wrong bytecode premise); naming every failure (throws away
     the token's own reason in the reverting case).
-25. **D6 — `propose` queuing an action `applyQueued` will always revert ([#54](https://github.com/dnznlabs/rake/issues/54)).**
-    No ruling as of 2026-10-27 on [#83](https://github.com/dnznlabs/rake/issues/83). The default is
-    option 3: document it in `SECURITY.md` as a known shape, since the editor already refuses both
-    detectable cases (decision 16) and nothing is lost, only the pending list is wrong. It proceeds
-    on 2026-11-02 if still unruled, and this entry is rewritten with the ruling either way.
+25. **A queued action that can never apply is documented, not validated or cancellable.** D6, ruled
+    on [#83](https://github.com/dnznlabs/rake/issues/83) ("Option 3"), closing
+    [#54](https://github.com/dnznlabs/rake/issues/54) when the line lands. `SECURITY.md` records it
+    as a known shape: the editor already refuses both detectable cases (decision 16), nothing is
+    lost, and only the pending list is wrong until `cancel` clears it after the delay. Rejected:
+    validating the table in `propose` too (gas on every propose, and a duplicate check that a future
+    `_set` change silently desynchronises); letting anyone `cancel` an entry whose apply reverts (a
+    second path to reason about, and a preflight that is not always decidable).
 26. **`_push` requires a return word equal to one; the comment says so.** D7, ruled on
     [#84](https://github.com/dnznlabs/rake/issues/84) ("Option 1"), closing
     [#61](https://github.com/dnznlabs/rake/issues/61) when it lands. The comment is tightened to
@@ -314,10 +317,10 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     writes the constant, and the figure is added here when it exists. Rejected: no cap with the
     ceiling documented (a table past the block gas limit traps every balance behind a `distribute`
     that cannot be mined, and only a `setBeneficiaries` through the delay frees it).
-28. **D9 — is ERC-1363 in the review's scope?** No ruling as of 2026-10-27 on
-    [#86](https://github.com/dnznlabs/rake/issues/86). The default is option 1, no: it is not a goal,
-    it is surface before the audit, and § Not on the roadmap already lists it. It proceeds on
-    2026-11-02 if still unruled, and this entry is rewritten with the ruling either way.
+28. **ERC-1363 is out of the review's scope.** D9, ruled on
+    [#86](https://github.com/dnznlabs/rake/issues/86) ("Option 1"). It is not a goal, it is surface
+    before the audit, and § Not on the roadmap already lists it. Rejected: adding it (about ten
+    lines, and a Phase 2 task before the review).
 29. **`audits/SCOPE` is `Distribution.sol`, `App.sol` and the two deploy scripts.** D10, ruled on
     [#87](https://github.com/dnznlabs/rake/issues/87) ("Option 1"), as amended by
     [#91](https://github.com/dnznlabs/rake/pull/91). `src/Distribution.sol`, `src/App.sol`,
