@@ -1,6 +1,6 @@
 # m03-t01 — handoff
 
-PR: #<n> · Branch: `m03/t01-measurements` · 2026-10-27
+PR: #94 · Branch: `m03/t01-measurements` · 2026-10-27
 
 The two numbers M01 left as guesses are measured and pinned by tests. A Safe v1.4.1 proxy needs
 **4,029** gas to `receive` ETH and a multisig.software vault clone needs **404**, both against a
@@ -113,9 +113,19 @@ difference of 99,893, which is the 100,000 cap being consumed.
    newline, as a text file should. The tests use `vm.parseBytes(vm.trim(vm.readFile(…)))`.
 6. **The multisig factory's `create` takes a `uint256` salt, not `bytes32`.** The interface in
    `PushGas.t.sol` is declared from the deployed selector rather than from the README's prose.
-7. **`CAP` is a constant in `test/TableCap.t.sol`,** as step 3 says, and t02 moves it into
-   `src/Distribution.sol` under D8.
-8. The plan's step 1 says "The five" above a table of **four** fixtures, and its acceptance criteria
+7. **Each prepared table owns a *disjoint* range of row addresses**, handed out from `FIRST_ROW =
+   0x10000` by a counter, where step 3 says `address(uint160(0x10000 + i))` — which would give every
+   table the same range. The three points of `test_perRowAndFixedCost` share one transaction, so a
+   shared range would find the `n = 8` rows already warm from the `n = 1` measurement and flatten the
+   line. The plan's addresses are still the base; only the per-table offset is added.
+8. **The three-point fit is taken on a deliberately *warm* implementation.** Each table is built in
+   `setUp` (the access list resets before each test, which is what makes the rows cold without a
+   cheatcode), and the implementation is warmed once before the first of the three measurements so all
+   three share one basis and the cold `DELEGATECALL` cannot tilt the line. The two pinning tests leave
+   it cold, which is why their figures sit 2,500 above the line — the `+2,500` term in the `CAP`
+   arithmetic above is that, not a fudge. Measured both ways rather than assumed: a row comes out
+   2,500 cheaper warm, which would have made the cap one row too long.
+9. The plan's step 1 says "The five" above a table of **four** fixtures, and its acceptance criteria
    say "all four". Four is what exists.
 
 ## The knee the plan predicted is a constant, not a bend
