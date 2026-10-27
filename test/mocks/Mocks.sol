@@ -19,6 +19,19 @@ contract RevertingReceiver {
     }
 }
 
+/// @notice A beneficiary that spends every unit `_push` forwards it and then fails, which is the
+/// worst case a row can cost `distribute`: the full `PUSH_GAS` cap plus the escrow writes.
+/// @dev The loop runs until the call frame is out of gas, so the frame reverts, the caller's `call`
+/// returns `false` and `distribute` escrows the share and carries on. A revert here would be cheap
+/// and would measure the wrong thing — the point is to consume the cap, not to refuse the ETH.
+/// Etched at many addresses by `TableCap.t.sol` rather than deployed once, so a table of `n` rows
+/// has `n` distinct burners without `n` deploys.
+contract GasBurner {
+    receive() external payable {
+        while (true) {}
+    }
+}
+
 /// @notice A beneficiary that calls back into `distribute` while it is running.
 contract ReentrantDistributor {
     Distribution private immutable target;
