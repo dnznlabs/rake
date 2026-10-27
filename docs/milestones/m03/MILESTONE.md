@@ -45,8 +45,8 @@ than quote.
    M01 criteria 1, 2, 4, 5 and 7 all pass on the final `main`, with the test table of M01 criterion 2
    intact and every test the Phase 2 tasks add listed by `forge test --list`.
 3. **Both measurements are closed, in code.** `PUSH_GAS` is a measured figure: a test deploys a
-   multisig.software vault clone and a Safe from their published creation bytecode (fixtures under
-   `test/fixtures/`, provenance recorded beside them) as beneficiaries and `distribute`s ETH to both
+   multisig.software vault clone and a Safe from their canonical deployed bytecode, codehash-asserted
+   (fixtures under `test/fixtures/`, provenance recorded beside them) as beneficiaries and `distribute`s ETH to both
    with no `Escrowed` event, and the handoff records the gas each `receive` consumed against the
    constant. `_set` refuses a table longer than a cap, pinned by a test that proves the cap-length
    table's worst case — every push escrowed — `distribute`s under half of a 30M-gas block, with the
