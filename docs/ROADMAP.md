@@ -238,6 +238,142 @@ recommended option.
     from both camps. Rejected: the bare `web3://` src alone (it renders the dapp in Freedom). M04's
     gateway criterion should name a 5219 gateway for the same reason.
 
+Ruled by Denizen on 2026-10-27, before M03 Phase 2, each on the issue linked and each as the recommended option
+(`docs/milestones/m03/MILESTONE.md` § Human-in-the-loop requirements, D1–D13). Where the issue was
+amended after it opened, the amendment is what was ruled on, and the milestone table row is marked.
+
+20. **The M03 review is the shared `forge-audit` method now, and a paid external review later.**
+    D1, ruled on [#78](https://github.com/dnznlabs/rake/issues/78) ("Select Option 3"), as amended
+    by [#91](https://github.com/dnznlabs/rake/pull/91). Phase 3 runs the method `state-collection`
+    ran on 2026-09-28: two legs from two labs (Codex and Claude, each with the pinned
+    `solidity-auditor` skill) over `audits/SCOPE`, reconciled by a rollup into `audits/<date>/AUDIT.md`
+    with a provenance block, graded against a known answer the legs are not told. Two models from two
+    labs is the whole independence claim; `SECURITY.md` and `README.md`'s `AUDIT` cell say "two-model
+    agent review" until a paid review happens. The paid review, the only kind that is *independent*
+    in the overview § 10 sense, is an M05 go/no-go input, not a gate on M03 or M04: testnets are the
+    cheap place to find what a review missed, and a paid review of code that then changes is a second
+    paid review. It is a spend Denizen approves on a quote; nothing here commits it. Rejected: the
+    agent review alone (no independent party ever reads it); the paid review alone or first (weeks of
+    lead time on code M04 may still change).
+21. **`transferOwnership` becomes two-step, without a struct change.** D2, ruled on
+    [#79](https://github.com/dnznlabs/rake/issues/79) ("Select Option 2"), closing
+    [#74](https://github.com/dnznlabs/rake/issues/74) when it lands. `pendingOwner()` is its own
+    getter and `acceptOwnership()` a new external; the `snapshot()` struct is unchanged, so decision 9
+    is amended by an ABI addition and `docs/REFERENCE.md` and the selector fixtures are regenerated.
+    Renounce stays one-step: `transferOwnership(address(0))` clears `owner` directly, since nothing
+    can accept for `address(0)`. A vault owner accepts through its own calldata, as for every other
+    owner write (decision 7). The dapp gains one surface: accept, and "transfer pending to …" on the
+    page. Rejected: `pendingOwner` inside the struct (the whole cost of two-step is the struct, and
+    the struct does not need the field; it re-opens M02 t01–t05 and every codec test); one-step with
+    the dapp's guards as the mitigation (a caller who skips the page is unprotected).
+22. **Distributions do not declare their tokens on chain.** D3, ruled on
+    [#80](https://github.com/dnznlabs/rake/issues/80) ("Select Option 3"). Nothing on the contract in
+    v1; the dapp's "recognised by a first distribute" rule stands, with per-chain curated lists later
+    if wanted. A declaration binds nothing, since anyone can still send anything; it widens the
+    surface the review reads; and the display problem it solves is the dapp's.
+    [#75](https://github.com/dnznlabs/rake/issues/75) is relabelled `m05` with this reason.
+    Rejected: a `tokens` array in config set through `propose` (struct change, re-opens t01–t05); an
+    event-only `TokensDeclared(address[])` (no struct, but read by a log scan, which is what #76 says
+    real providers refuse).
+23. **`reserved[token]` above the balance is documented, not saturated.** D4, ruled on
+    [#81](https://github.com/dnznlabs/rake/issues/81) ("Select Option 1"), closing
+    [#19](https://github.com/dnznlabs/rake/issues/19) when the line lands. Non-standard balance
+    semantics are a non-goal; one line of owner guidance in `SECURITY.md`. The reviewer may reopen
+    it in Phase 3 with a finding. Rejected: `balance < reserved ? 0 : balance − reserved` plus a
+    test that `release` still pays what is there (a primitive change for tokens the overview
+    excludes).
+24. **`release` names the opaque failure and bubbles the rest.** D5, ruled on
+    [#82](https://github.com/dnznlabs/rake/issues/82) ("Selected Option 3"), closing
+    [#20](https://github.com/dnznlabs/rake/issues/20) when it lands. `revert ReleaseFailed(token)`
+    when the push returns `false` with revert data of 32 bytes or fewer (the bare word, or nothing);
+    anything longer, which is a real `Error(string)` or a custom error with arguments, bubbles as
+    today. Supersedes the reason carried from #20 into the milestone's D5 row, that a named error
+    "adds bytecode to every clone's implementation": measured on 2026-10-27 (`origin/main` at
+    `3bae486`, solc 0.8.34, via-IR, `optimizer_runs = 1000`, `forge build --force`), the current
+    bubble path is 8,306 deployed bytes, always-named 8,175, and this option 8,195, so the named
+    error *shrinks* the implementation by 111 bytes; builds only, re-measure rather than quote once
+    `release` changes for any other reason. Costs accepted: one more error in the primitive's ABI,
+    and a second match arm in the dapp's "retry failed" branch. Rejected: no named error (the
+    original recommendation, made on the wrong bytecode premise); naming every failure (throws away
+    the token's own reason in the reverting case).
+25. **A queued action that can never apply is documented, not validated or cancellable.** D6, ruled
+    on [#83](https://github.com/dnznlabs/rake/issues/83) ("Option 3"), closing
+    [#54](https://github.com/dnznlabs/rake/issues/54) when the line lands. `SECURITY.md` records it
+    as a known shape: the editor already refuses both detectable cases (decision 16), nothing is
+    lost, and only the pending list is wrong until `cancel` clears it after the delay. Rejected:
+    validating the table in `propose` too (gas on every propose, and a duplicate check that a future
+    `_set` change silently desynchronises); letting anyone `cancel` an entry whose apply reverts (a
+    second path to reason about, and a preflight that is not always decidable).
+26. **`_push` requires a return word equal to one; the comment says so.** D7, ruled on
+    [#84](https://github.com/dnznlabs/rake/issues/84) ("Option 1"), closing
+    [#61](https://github.com/dnznlabs/rake/issues/61) when it lands. The comment is tightened to
+    what the code does; the docs page already says it. Rejected: accepting any non-zero word (a code
+    change for tokens nobody has named).
+27. **Tables have a cap, at the measured figure.** D8, ruled on
+    [#85](https://github.com/dnznlabs/rake/issues/85) ("Option 1"). `_set` refuses `n > CAP`, one
+    comparison and one `BadTable`, so a table that can never distribute becomes impossible. `CAP` is
+    the largest length whose worst-case `distribute` (every row escrowed, `PUSH_GAS` spent per row)
+    stays under half of a 30M-gas block; m03-t01 measures it and posts the figures on #85, t02
+    writes the constant, and the figure is added here when it exists. Rejected: no cap with the
+    ceiling documented (a table past the block gas limit traps every balance behind a `distribute`
+    that cannot be mined, and only a `setBeneficiaries` through the delay frees it).
+28. **ERC-1363 is out of the review's scope.** D9, ruled on
+    [#86](https://github.com/dnznlabs/rake/issues/86) ("Option 1"). It is not a goal, it is surface
+    before the audit, and § Not on the roadmap already lists it. Rejected: adding it (about ten
+    lines, and a Phase 2 task before the review).
+29. **`audits/SCOPE` is `Distribution.sol`, `App.sol` and the two deploy scripts.** D10, ruled on
+    [#87](https://github.com/dnznlabs/rake/issues/87) ("Option 1"), as amended by
+    [#91](https://github.com/dnznlabs/rake/pull/91). `src/Distribution.sol`, `src/App.sol`,
+    `scripts/forge/Deploy.s.sol` and `scripts/forge/DeployApp.s.sol`: `App` is what strangers load
+    and its `lock()` is one-way; the deploy scripts set constructor arguments and hand over
+    ownership, Phase 4's runbook runs them, and the method's first finding on `state-collection` was
+    in a deploy script. Not `Chunks.s.sol`, `Fixtures.s.sol` or `Seed.s.sol`, which are owner-run on
+    a dev chain; every exclusion is written in `audits/SCOPE` with its reason, as the method
+    requires. Rejected: `Distribution.sol` only (cheaper, and the roadmap's reason for M03 sitting
+    after M02 goes unmet); everything under `src/` and `scripts/forge/` (dev-chain seeding read as if
+    it shipped).
+30. **`PUSH_GAS` stays `100_000` if both reference wallets receive within it.** D11, ruled on
+    [#88](https://github.com/dnznlabs/rake/issues/88) ("Option 1") ahead of the measurement, on the
+    option's own condition: keep the constant and record the headroom if both a multisig.software
+    vault clone and a Safe `receive` within it. If either does not, the ruling's fallback is the
+    issue's default for that case, option 2 at twice the larger measured need rounded up to a
+    thousand; m03-t01 posts the figures on #88 and they are added here. Rejected in advance:
+    lowering it (a lower cap buys nothing and escrows more).
+31. **The factory is placed through SafeSummoner; the keyless proxy is the fallback.** D12, ruled on
+    [#89](https://github.com/dnznlabs/rake/issues/89) ("Option 4"), confirming the Telegram
+    agreement of the same day. "SafeSummoner" is a contract, `0x00000000004473e1f31C8266612e7FD5504e6f2a`,
+    exposing `create2Deploy(bytes bytecode, bytes32 salt)`; it is the deployer `multisig`'s README
+    § Deployments names for Ethereum, Base, MegaETH, Arbitrum, Optimism, Robinhood Chain, Sepolia and
+    Base Sepolia, the eight chains of criterion 7, and `multisig` carries `script/deploy.html` and
+    `script/VanityMiner.sol` around it. The overview § 10 line stands as written. Supersedes the
+    milestone's D12 row, whose candidates were the keyless proxy, the Safe singleton factory and
+    CreateX, and whose default was the keyless proxy. Chosen because it is proven on the eight target
+    chains by our own deployments, it reuses org tooling, and vanity-mined addresses match house
+    style. Rejected: the keyless deterministic-deployment proxy (`0x4e59b44847b379578588920cA78FbF26c0B4956C`;
+    more ubiquitous and 69 bytes to SafeSummoner's 18,730, which would matter beyond those eight
+    chains, but a second deployer convention inside one org for no gain today); it is used only if
+    SafeSummoner is absent on a criterion-7 chain. Still owed by m03-t06: the `cast code` preflight
+    on all eight chains (only Ethereum mainnet checked, block 26,283,809), and a read of
+    SafeSummoner's salt rules, since the miner's `CALLER` option suggests the salt may bind to
+    `msg.sender`, which decides who runs the deploy.
+32. **DNZN's distribution is created by one org-wide cold creator key.** D13, ruled on
+    [#90](https://github.com/dnznlabs/rake/issues/90) ("option 1, scoped to the org rather than to
+    rake"). The key that calls `create` is a fresh cold EOA, **DNZN Creator** (keystore
+    `dnzn-creator`), held by Denizen and backed up to the standard of an owner key; it is the one
+    creator key for every DNZN project whose contracts are placed by a salted `create`, not a key for
+    rake alone. Two conditions, recorded org-wide in the handbook beside the vaults, which the M03
+    runbook references rather than restates: salted creates only (it is a CREATE2 `msg.sender`, never
+    a plain CREATE, where the address would depend on the order of every other deploy across projects
+    and chains; a project that needs nonce-based addresses gets its own throwaway key); and never an
+    owner or a signer for anything else (the owner passed to `create` is the Ops multisig, M05's).
+    Compromise costs nothing deployed: the holder could place a contract at a DNZN predicted address
+    on a chain DNZN has not reached, with an owner of their choosing, which is the squat decision 10
+    exists to prevent, now across every project at once; accepted because separate keys stored the
+    same way would fall together anyway and multiply the backup burden. Rejected: an existing key
+    Denizen names. Still open on #90: the key's address (the salt's top 20 bytes) and the low 12
+    bytes (the runbook proposes `…0001`). Criterion 6 stays open and m03-t06 proceeds with a
+    placeholder salt until the address is named here.
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
