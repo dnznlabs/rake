@@ -390,6 +390,9 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     31's premises "our own deployments" and "org tooling" were `src-company/multisig`'s, and
     SafeSummoner's salt is not sender-bound: `create2Deploy` passes it raw. A front-run of the
     factory's init code yields the identical contract, since no constructor reads the sender. The
+    cost of the proxy is that a constructor run through it sees the proxy as `msg.sender` and the
+    submitter as `tx.origin`; `App` takes its owner as an argument and the factory has none, and the
+    runbook greps `src/` for both before any deploy so a later constructor change fails there. The
     runbook's preflight expects 69 bytes of runtime code with keccak
     `0x2fa86add0aed31f33a762c9d88e807c475bd51d0f52bd0955754b2608f7e4989` on every chain. The
     overview § 10 line naming SafeSummoner is superseded by this record; the brainstorming folder
