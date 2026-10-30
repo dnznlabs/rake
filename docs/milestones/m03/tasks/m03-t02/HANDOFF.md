@@ -129,15 +129,17 @@ revision it is from, which is deviation 5.
 ## Deviations from the plan
 
 1. **The cap's upper bound stopped being measurable, and the 108 measurement is gone** (architect's
-   ruling, option 1 of three I put to him). Step 2 says "the 107 and 108 measurements still run".
+   ruling, option 1 of three I put to him; TASK.md and milestone criterion 3 corrected in
+   [#102](https://github.com/dnznlabs/rake/pull/102)). Step 2 as merged says "the 107 and 108 measurements still run".
    They cannot: `_prepare` reaches its table through `factory.create` → `init` → `_set`, `_set` is
    the only writer of `_table`, and it now rejects `n > MAX_BENEFICIARIES` — so `setUp`'s
    `_prepare(CAP + 1)` reverted `BadTable()` and took the whole suite down with it. Dropped that
    line; `TableCapTest` keeps `_prepare(1/8/64/107)` and the 107 measurement. 15,035,242 stays
    findable in m03-t01's HANDOFF and in the `@dev`. `test_capPlusOneRowsExceedHalfABlock` is removed,
    which is the one row fewer in the snapshot count.
-2. **`pendingOwner` goes after `nonce`, not after `owner`** (architect's ruling; his plan error).
-   Step 1 says after `owner`, but `owner`, `delay` and `nonce` pack into slot 0 and a 20-byte address
+2. **`pendingOwner` goes after `nonce`, not after `owner`** (architect's ruling; his plan error,
+   corrected in [#102](https://github.com/dnznlabs/rake/pull/102)). Step 1 as merged says after
+   `owner`, but `owner`, `delay` and `nonce` pack into slot 0 and a 20-byte address
    cannot join them either way — so the plan's position split the hot slot for nothing, and `propose`
    and `snapshot`, which read `owner` and `delay` together, each gained a read. Measured on a tree
    identical but for that one declaration's position: **37 rows move, 34 of them cheaper, net
@@ -147,7 +149,8 @@ revision it is from, which is deviation 5.
    `cast storage`, `getStorageAt` across `src test tools mk scripts app .github` finds only
    comments), so the shift costs nothing.
 3. **`node --test test/` cannot pass on this host, and the command is `node --test test/*.test.mjs`**
-   (architect's ruling; being fixed in TASK.md and the milestone in a separate docs PR). Node
+   (architect's ruling; the step 6 check and the acceptance line are corrected in
+   [#102](https://github.com/dnznlabs/rake/pull/102)). Node
    v24.12.0 resolves the bare directory as a module and loads zero test files. It fails identically
    on untouched `main`, so it is a stale command and not this branch. `mk/20-dapp.mk:13` has the real
    one, which gives 61/61.
@@ -183,6 +186,21 @@ revision it is from, which is deviation 5.
    `release` is at 137, not 144; `_set` at 227, not 229; `_push`'s `@dev` around 275. The anchors in
    steps 1, 2 and 3 for `owner` (53), `BPS_TOTAL` (49), `PUSH_GAS`'s `@dev` (47) and `Unauthorized()`
    (45) were exact, as were `Mocks.sol:8`, `Distribution.t.sol:473` and `TableCap.t.sol:45`.
+
+10. **Where the refusal lives disagrees with #102's acceptance line, and I kept the architect's
+    latitude over its checklist.** #102's step 2 says "keep one of the two and say which in the
+    handoff", which is the ruling I was given and which I exercised (see § Decisions). But the same
+    PR rewrites the acceptance line to read `forge test --mc TableCapTest` ... "asserts 107 under
+    15,000,000 and 108 refused with `BadTable`" — and on this branch the refusal is in
+    `DistributionTest.test_tableCapBoundary`, so `--mc TableCapTest` asserts the 107 measurement and
+    *not* the refusal. Two lines of the same revision disagree: the prose delegates the choice, the
+    checklist assumes one of the answers. I have not changed the code to match the checklist, because
+    the delegation is explicit, dated and addressed to me, and because #102 is still open — `main`'s
+    TASK.md, which is my authority, still carries the impossible "108 over". **If the reviewer wants
+    the checklist taken literally, moving the refusal into `TableCapTest` and dropping
+    `test_tableCapBoundary` is a small change and I will make it; the cheaper fix is for #102 to say
+    "asserts 107 under 15,000,000, with the `CAP + 1` refusal pinned in whichever suite the handoff
+    names".**
 
 ## Decisions
 
