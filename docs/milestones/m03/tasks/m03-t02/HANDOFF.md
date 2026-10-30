@@ -198,20 +198,20 @@ and only here, which is the review's ruling and deviation 12.
    steps 1, 2 and 3 for `owner` (53), `BPS_TOTAL` (49), `PUSH_GAS`'s `@dev` (47) and `Unauthorized()`
    (45) were exact, as were `Mocks.sol:8`, `Distribution.t.sol:473` and `TableCap.t.sol:45`.
 
-10. **Where the refusal lives disagrees with #102's acceptance line, and I kept the architect's
-    latitude over its checklist.** #102's step 2 says "keep one of the two and say which in the
-    handoff", which is the ruling I was given and which I exercised (see § Decisions). But the same
-    PR rewrites the acceptance line to read `forge test --mc TableCapTest` ... "asserts 107 under
-    15,000,000 and 108 refused with `BadTable`" — and on this branch the refusal is in
-    `DistributionTest.test_tableCapBoundary`, so `--mc TableCapTest` asserts the 107 measurement and
-    *not* the refusal. Two lines of the same revision disagree: the prose delegates the choice, the
-    checklist assumes one of the answers. I have not changed the code to match the checklist, because
-    the delegation is explicit, dated and addressed to me, and because #102 is still open — `main`'s
-    TASK.md, which is my authority, still carries the impossible "108 over". **If the reviewer wants
-    the checklist taken literally, moving the refusal into `TableCapTest` and dropping
-    `test_tableCapBoundary` is a small change and I will make it; the cheaper fix is for #102 to say
-    "asserts 107 under 15,000,000, with the `CAP + 1` refusal pinned in whichever suite the handoff
-    names".**
+10. **#102's acceptance line contradicted its own step 2 about where the refusal lives — resolved in
+    the plan, not in the code.** Step 2 says "keep one of the two and say which in the handoff",
+    which is the ruling I was given and which I exercised (§ Decisions). But the same PR first
+    rewrote the acceptance line to require `forge test --mc TableCapTest` to assert "108 refused with
+    `BadTable`", and on this branch that refusal is in `DistributionTest.test_tableCapBoundary`, so
+    `--mc TableCapTest` asserts the 107 measurement and *not* the refusal. Two lines of one revision
+    disagreed: the prose delegated the choice, the checklist assumed one of the answers. I left the
+    code alone and raised it rather than guessing, since the delegation was explicit and addressed to
+    me and #102 was still open. **Ruled: the plan moves, not the code** — #102's third commit
+    `45c6d30` now reads "the `CAP + 1` refusal (`BadTable`) is pinned in whichever suite the handoff
+    names — `DistributionTest.test_tableCapBoundary` as built", and the architect's instruction was
+    "do not move the refusal". Recorded because it is the kind of conflict that reads as a passing
+    gate from one angle and a failing one from another, and because the sequencing matters: the
+    checklist was corrected *after* the code was built to the prose.
 
 11. **`acceptOwnership()` emits `OwnershipTransferred(address indexed previousOwner, address indexed
     newOwner)`** — the Ownable2Step name and shape, topic0
