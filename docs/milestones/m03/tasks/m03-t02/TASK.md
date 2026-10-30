@@ -20,7 +20,11 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
 
 1. **Two-step ownership, struct unchanged (decision 21, [#74](https://github.com/dnznlabs/rake/issues/74)).**
    In `src/Distribution.sol`:
-   - Add `address public pendingOwner;` after `owner` (line 53). It is **not** in `Snapshot`; the
+   - Add `address public pendingOwner;` after `nonce` (line 55), not after `owner`: `owner`, `delay`
+     and `nonce` pack into slot 0 today and a 20-byte `pendingOwner` cannot join them either way, so
+     placing it after `nonce` leaves slot 0 intact and `propose` and `snapshot` keep one SLOAD for
+     the three; after `owner` would split that slot for nothing. (Corrected 2026-10-30; the first
+     version of this step said "after `owner`".) It is **not** in `Snapshot`; the
      struct and `snapshot()` do not change.
    - `transferOwnership(address owner_)` stays `onlySelf` and becomes: `owner_ == address(0)` →
      `owner = address(0); pendingOwner = address(0);` (renounce stays immediate, and a transfer that
@@ -57,11 +61,18 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
    In `test/TableCap.t.sol`: delete the local `CAP` constant (line 45) and read
    `Distribution(payable(address(impl))).MAX_BENEFICIARIES()` — or import the constant through the
    contract type, whichever `forge lint` accepts silently — so the two pinning tests measure the
-   contract's own figure. The 107 and 108 measurements still run, which is what makes criterion 3
-   "closed in code".
+   contract's own figure. The 107-row measurement still runs; **the 108-row measurement cannot**,
+   since `_prepare` builds every table through `create` → `init` → `_set` and the cap now refuses
+   it there — so `setUp` drops `_prepare(CAP + 1)`, and the `CAP + 1` test becomes
+   `vm.expectRevert(BadTable.selector)` on a 108-row `create`. The 15,035,242 figure is history,
+   kept in t01's handoff and in the constant's `@dev`; the handoff points there. (Corrected
+   2026-10-30: the first version of this step said both measurements still run, which Elanik found
+   impossible — `setUp` itself reverted. Criterion 3 was clarified the same day to say "refused".)
+   With that refusal in `TableCapTest`, step 5's `test_tableCapBoundary` may be redundant; keep one
+   of the two and say which in the handoff.
 
    Check: `forge test --mc TableCapTest -vv` passes and still prints `gas at CAP` under
-   15,000,000 and `CAP + 1` over.
+   15,000,000, and the `CAP + 1` test shows `BadTable` refused.
 
 3. **`ReleaseFailed(address token)` (decision 24, [#20](https://github.com/dnznlabs/rake/issues/20)).**
    Add `error ReleaseFailed(address token);` to the errors block (after `Unauthorized()`, line 45). In
@@ -129,7 +140,7 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
    `sigs` after `transferOwnership(address)`, keep the existing order otherwise, and run it. Add a
    row to `docs/REFERENCE.md`'s factory section only if the factory changed (it should not).
 
-   Check: `node --test test/` passes (`docs.test.mjs` reads the struct and the selector fixture
+   Check: `node --test test/*.test.mjs` passes (the form `mk/20-dapp.mk` runs; a bare `test/` loads zero files) (`docs.test.mjs` reads the struct and the selector fixture
    against the tables); running `tools/abi-vectors.sh` a second time leaves `git status --porcelain`
    empty; M02 criterion 6's diff of the three `Distribution` tables against
    `forge inspect Distribution abi` is clean.
@@ -170,9 +181,10 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
   on the branch minus the same on `origin/main` is those four names.
 - `forge test` passes; `forge test --list --match-contract Distribution` lists the ten tests of step
   5 and every M01 test; `forge test --mc TableCapTest` reads the cap from the contract and still
-  asserts 107 under and 108 over 15,000,000 (milestone criterion 3, cap half, closed in code).
+  asserts 107 under 15,000,000 and 108 refused with `BadTable` (milestone criterion 3, cap half,
+  closed in code).
 - `grep -n 'non-zero word\|M03 measures' src/Distribution.sol` prints nothing (#61, decision 30).
-- `node --test test/` passes; `tools/abi-vectors.sh` is idempotent; `docs/REFERENCE.md`'s three
+- `node --test test/*.test.mjs` passes (the form `mk/20-dapp.mk` runs; a bare `test/` loads zero files); `tools/abi-vectors.sh` is idempotent; `docs/REFERENCE.md`'s three
   `Distribution` tables match `forge inspect Distribution abi` (M02 criterion 6's diff).
 - `forge build --force` prints zero `warning[` / `Warning (` lines; `forge lint` and
   `forge fmt --check` are silent; `forge snapshot --check` exits 0 on the committed snapshot;
