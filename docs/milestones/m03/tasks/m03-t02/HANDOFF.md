@@ -329,8 +329,11 @@ The four selectors t03 needs, each confirmed with `cast sig` rather than derived
 - `:1431` — the wallet-operations list omits `acceptOwnership`, the only one the *incoming* owner
   signs.
 - `:1434` — the three-step sequence is four. Must also say that the current owner keeps every power
-  until acceptance, that the nomination can be withdrawn by proposing oneself, and that **there is
-  no event for either** — the only on-chain trace stays the `Queued`/`Applied` pair.
+  until acceptance, that the nomination can be withdrawn by proposing oneself, and that the two
+  halves leave **different** traces: acceptance emits `OwnershipTransferred(previousOwner,
+  newOwner)` (added in the #103 review, deviation 11), but the **nomination has no event of its
+  own** and rides in `Queued`'s calldata, so a pending transfer is legible only from a second
+  `eth_call` to `pendingOwner()` (ruling 3 below).
 - `:1435` — renouncing now also destroys a nomination in flight.
 
 ### `app/src/index.html` — the table cap
