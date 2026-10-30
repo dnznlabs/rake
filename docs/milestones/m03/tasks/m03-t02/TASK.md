@@ -36,9 +36,13 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
      zero and no caller equals it, so the one comparison covers both cases). `Unauthorized()` rather
      than `NotOwner()`:
      the caller is not claiming to be the owner, and `NotOwner` is documented as "the caller is not
-     the owner". No new event: the handover's intent is already on chain as the `Queued`/`Applied`
-     pair of the `transferOwnership` action, and the dapp reads `owner()`; the reviewer may ask for
-     one in Phase 3, and it would be an ABI addition then, not a struct change.
+     the owner". `acceptOwnership` emits `OwnershipTransferred(address indexed previousOwner, address indexed newOwner)`,
+     the Ownable2Step name. (Corrected 2026-10-30 in the #103 review; the first version said "no new
+     event". Reversed because every other mutator in the contract leaves a log — the setters and
+     renounce through `Queued`/`Applied`, the money paths through their own events — and the accept
+     would have been the one state change with no on-chain trace, so a log reader sees "nominated B"
+     and never "B took it". The nomination itself needs no event: it rides in `Queued`'s calldata.)
+     One event, emitted in `acceptOwnership` only; a REFERENCE § Events row follows it.
    - Doc comments: `transferOwnership`'s `@notice` says a non-zero address is *pending until accepted*
      and `address(0)` renounces at once; `acceptOwnership` has a `@notice`.
    - `cancel(bytes32)` needs no change: cancelling the queued `transferOwnership` action before its
@@ -176,9 +180,11 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
 
 - `forge inspect Distribution abi --json | jq -c '.[]|select(.name=="snapshot")|.outputs[0].components|map(.name)'`
   prints `["owner","delay","nonce","description","table","pending"]` (milestone criterion 2).
-- The ABI gains exactly `acceptOwnership()`, `pendingOwner()`, `MAX_BENEFICIARIES()` and
-  `ReleaseFailed(address)`, and loses nothing: `forge inspect Distribution abi --json | jq -r '.[]|select(.type!="constructor")|.name' | sort`
-  on the branch minus the same on `origin/main` is those four names.
+- The ABI gains exactly `acceptOwnership()`, `pendingOwner()`, `MAX_BENEFICIARIES()`,
+  `ReleaseFailed(address)` and `OwnershipTransferred(address,address)`, and loses nothing:
+  `forge inspect Distribution abi --json | jq -r '.[]|select(.type!="constructor")|.name' | sort`
+  on the branch minus the same on `origin/main` is those five names (four before the #103 review
+  added the event).
 - `forge test` passes; `forge test --list --match-contract Distribution` lists the ten tests of step
   5 and every M01 test; `forge test --mc TableCapTest` reads the cap from the contract and still
   asserts 107 under 15,000,000 and 108 refused with `BadTable` (milestone criterion 3, cap half,
@@ -200,7 +206,7 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
   t03's, not this task's, so the PR stays reviewable as a contract change.
 - `pendingOwner` in `Snapshot`, or any struct change. Decision 21 rejected it; it re-opens M02
   t01–t05.
-- An `OwnershipTransferred` event, an `isPendingOwner` probe, or a deadline on the pending transfer.
+- An `OwnershipTransferStarted` event, an `isPendingOwner` probe, or a deadline on the pending transfer. (`OwnershipTransferred` on accept is in, step 1, since the #103 review.)
   Raise in the handoff if the tests make a case; the reviewer decides in Phase 3.
 - Changing `PUSH_GAS` (decision 30 keeps it), `_push`'s return-word rule (decision 26 keeps it), or
   `reserved`'s semantics (decision 23 documents instead).
@@ -213,7 +219,7 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
 
 None. Four choices this plan makes rather than asks, each the architect's and recorded here: the
 getter is named `MAX_BENEFICIARIES` and is `public` (step 2); `acceptOwnership` by the wrong caller
-reverts `Unauthorized()` and emits no event (step 1); a pending transfer is withdrawn by proposing
+reverts `Unauthorized()` and emits `OwnershipTransferred` on success (step 1, corrected in the #103 review); a pending transfer is withdrawn by proposing
 the current owner (step 1); and `release`'s threshold is read as `data.length <= 32` exactly as
 decision 24 words it (step 3).
 
