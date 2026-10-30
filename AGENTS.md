@@ -233,3 +233,14 @@
 - No webfonts, CDN scripts, icon fonts or remote images. No cards, shadows, gradients or emoji.
 - A pattern the base is missing is designed to its rules here and proposed to `design-base` for the
   next version.
+
+<!-- fragment: forge-audit -->
+## Audits
+
+- `make audit` runs two independent adversarial reviews (Codex, then Claude) and a rollup into
+  `audits/<date>/AUDIT.md`. The method, prerequisites and provenance spec are `audits/README.md`.
+- The scope is `audits/SCOPE`, one file per line. Every exclusion is written down with its reason,
+  here or in a comment block in that file.
+- Audits are append-only: a past `audits/<date>/` is never edited. A wrong finding is corrected in
+  the next audit's `AUDIT.md`, marked as superseding.
+- `audits/SKILL_PIN` is bumped in its own commit, never alongside an audit.

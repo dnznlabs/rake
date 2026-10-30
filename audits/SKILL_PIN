@@ -1,0 +1,7 @@
+# The audit skill source, pinned. Bumped in its own commit, never alongside an audit —
+# a finding has to be attributable to a skill version.
+#
+# repo                              commit                                    observed
+https://github.com/pashov/skills    f6c7f0de9cce16f6aa9c57aaac104f0dee90582e  2026-09-23T12:20:55Z
+#
+# solidity-auditor VERSION at this commit: 4

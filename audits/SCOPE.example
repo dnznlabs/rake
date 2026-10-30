@@ -1,0 +1,12 @@
+# The files `make audit` reviews: one repo-relative path per line. `#` lines and blank lines are
+# ignored. Copy this to audits/SCOPE and edit it — the runner refuses to start until SCOPE exists.
+#
+# Name every file explicitly; the skill's own discovery skips src/lib/ (audits/README.md § Scope).
+# In scope: everything with authority, value, packing or deploy arguments, deploy scripts included.
+#
+# Excluded, each with its reason, so the next reader does not have to re-derive it:
+#   test/   not shipped
+#   lib/    dependencies we did not write
+
+src/Counter.sol
+scripts/forge/Deploy.s.sol

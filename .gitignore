@@ -24,3 +24,14 @@ app/dist/
 # What the chain returns, written by `make chain-doc`. Not under forge's `out/`, which a build empties.
 app/chain/
 node_modules/
+
+# fragment: forge-audit
+# Audit scratch. The skill writes .solidity-auditor/runs/<stamp>/ into the repo on every
+# scan whatever flags it gets, and scripts/audit.sh relocates those bytes under
+# audits/<date>/ — without this, every audit would land in git twice. audits/.skills/ is
+# the pinned clone of someone else's MIT-licensed prose: pinned, deliberately not vendored.
+.solidity-auditor/
+audits/.skills/
+# The skill's per-scan bundle, `mktemp -d ./.audit-XXXXXX`. A scan that dies leaves it behind by
+# design, and unignored it would make the next audit's provenance record itself as dirty.
+.audit-*/
