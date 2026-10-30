@@ -28,8 +28,9 @@ import {GasBurner, PlainSender} from "./mocks/Mocks.sol";
 ///    `test_perRowAndFixedCost` share one transaction, so a range shared between tables would find
 ///    the `n = 8` rows already warm from the `n = 1` measurement and would flatten the line.
 contract TableCapTest is Test {
-    /// @dev Mirrors the `private constant` in `Distribution`; t02 is what makes it readable, under
-    /// D11. Used only to sanity-check that the burner really spends the cap.
+    /// @dev Still a copy: t02 made `MAX_BENEFICIARIES` public but left `PUSH_GAS` a `private
+    /// constant`, so there is nothing to read it from. Used only to sanity-check that the burner
+    /// really spends the cap.
     uint256 internal constant PUSH_GAS = 100_000;
 
     /// @dev `uint96` to match `Beneficiary.bps`, so `_prepare` divides the table up in that type.
@@ -40,9 +41,17 @@ contract TableCapTest is Test {
 
     /// @dev The longest table whose worst-case `distribute` stays under `HALF_BLOCK`. Pinned by
     /// `test_capRowsStayUnderHalfABlock` and `test_capPlusOneRowsExceedHalfABlock` running it, not
-    /// by a formula. t02 moves this constant into `src/Distribution.sol` under D8 and this test
-    /// reads it from there.
-    uint256 internal constant CAP = 107;
+    /// by a formula. t02 moved the figure into `src/Distribution.sol` under D8, so this is the
+    /// contract's own constant rather than a copy of it: change `MAX_BENEFICIARIES` and the two
+    /// pinning tests move with it instead of silently going on measuring the old number.
+    ///
+    /// Read off an instance, in the constructor, for two reasons. `Distribution.MAX_BENEFICIARIES`
+    /// does not compile — a `public constant` of another contract is reachable only through an
+    /// instance, not through the contract type (solc 9582) — and `_prepare(CAP)` runs from `setUp`,
+    /// so the figure has to exist before any clone does. The instance is a throwaway deployed to be
+    /// asked and nothing else: it is not the implementation the clones delegate into, so it warms
+    /// nothing any measurement here touches.
+    uint256 internal immutable CAP = new Distribution().MAX_BENEFICIARIES();
 
     /// @dev Clear of the precompiles. `_set` needs each table's accounts ascending and distinct.
     uint160 internal constant FIRST_ROW = 0x10000;
@@ -78,6 +87,11 @@ contract TableCapTest is Test {
         _prepare(8);
         _prepare(64);
         _prepare(CAP);
+        // This line reverts `BadTable()` as of `9fbbb29`, and with it the whole suite: `_prepare`
+        // reaches its table through `factory.create` → `init` → `_set`, and `_set` is now the thing
+        // that rejects `n > MAX_BENEFICIARIES`. There is no other writer of `_table`, so the
+        // measurement that justifies the cap is a measurement the cap forbids. Left standing rather
+        // than worked around: it is a question about the primitive, not about this harness.
         _prepare(CAP + 1);
     }
 
