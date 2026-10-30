@@ -90,11 +90,9 @@ contract TableCapTest is Test {
         // No `_prepare(CAP + 1)`. `_prepare` reaches its table through `factory.create` → `init` →
         // `_set`; `_set` is now what rejects `n > MAX_BENEFICIARIES` and is the only writer of
         // `_table`, so a 108-row table cannot be built at all — the measurement that justified the
-        // cap is one the cap forbids. The 108-row figure, 15,035,242 against 14,896,325 at 107, was
-        // taken in m03-t01 on `main` at `b055bc3` and stays readable in its HANDOFF and in
-        // `MAX_BENEFICIARIES`'s own `@dev`. What is live here is the refusal, in
-        // `test_capPlusOneRowIsRefused`, and the 107 measurement, which on this revision comes to
-        // 14,892,067 rather than t01's figure.
+        // cap is one the cap forbids. t01's 108-row figure stays readable in its HANDOFF and in
+        // `MAX_BENEFICIARIES`'s own `@dev`; what is live here is the 107 measurement, and the
+        // refusal is pinned in `DistributionTest.test_tableCapBoundary`.
     }
 
     /// @notice The three points, the per-row cost between the two larger, and the fixed cost under them.

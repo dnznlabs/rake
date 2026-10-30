@@ -52,6 +52,7 @@ round. `self` means the function is reachable only as a queued action, the contr
 | `Queued(bytes32 indexed hash, uint32 nonce, uint256 eta, bytes action)` | propose | an action was staged, with its calldata in the log |
 | `Applied(bytes32 indexed hash)` | applyQueued, propose | the action ran — from propose when the delay is zero |
 | `Cancelled(bytes32 indexed hash)` | cancel | the owner withdrew a queued action |
+| `OwnershipTransferred(address indexed previousOwner, address indexed newOwner)` | acceptOwnership | the named owner took it — the only trace of the handover, since the nomination rides in Queued's calldata |
 
 ### Errors
 

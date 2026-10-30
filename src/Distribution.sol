@@ -37,6 +37,11 @@ contract Distribution {
     event Applied(bytes32 indexed hash);
     event Cancelled(bytes32 indexed hash);
 
+    /// @dev Ownable2Step's name and shape. Emitted on acceptance only: the nomination already rides
+    /// in `Queued`'s calldata, so without this a log reader sees "B was nominated" and never "B took
+    /// it" — the one state change in the contract with no trace of its own.
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
     error NotOwner();
     error BadTable();
     error NotReady(uint256 eta);
@@ -54,13 +59,8 @@ contract Distribution {
     /// @dev Measured in m03-t01 (`test/TableCap.t.sol`): a worst-case row, where the recipient burns
     /// the whole push cap and then fails, costs 138,917 gas, so 107 rows distribute in 14,896,325 and
     /// 108 need 15,035,242. The rule enforced is that a worst-case `distribute` stays under half a
-    /// 30M block.
-    ///
-    /// Those three figures are of the tree t01 measured, which is `main` at `b055bc3`. On this
-    /// revision a row costs 138,877 and 107 rows come to 14,892,067 — 40 gas a row cheaper, from
-    /// `via_ir` codegen moving under the members added here, not from any change to `distribute`.
-    /// The 15,035,242 has no counterpart here by construction: `_set` refuses 108 rows, so that
-    /// figure stays a t01 reading and `test_capPlusOneRowIsRefused` pins the refusal instead.
+    /// 30M block. Those three figures are of the tree t01 measured, `main` at `b055bc3`; re-measure
+    /// rather than quote them.
     uint256 public constant MAX_BENEFICIARIES = 107;
     bytes4 private constant TRANSFER = 0xa9059cbb;
     bytes4 private constant BALANCE_OF = 0x70a08231;
@@ -245,6 +245,7 @@ contract Distribution {
     function acceptOwnership() external {
         if (msg.sender != pendingOwner) revert Unauthorized();
 
+        emit OwnershipTransferred(owner, msg.sender);
         owner = msg.sender;
         pendingOwner = address(0);
     }

@@ -532,7 +532,10 @@ contract DistributionTest is Test {
         vm.prank(OWNER);
         d.propose(abi.encodeCall(Distribution.transferOwnership, (B)));
 
-        // Act
+        // Act — the acceptance is the one ownership change with no `Queued`/`Applied` pair of its
+        // own, so this event is the only trace a log reader gets (ruled in the #103 review).
+        vm.expectEmit(true, true, false, true, address(d));
+        emit Distribution.OwnershipTransferred(OWNER, B);
         vm.prank(B);
         d.acceptOwnership();
 

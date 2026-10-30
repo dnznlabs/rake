@@ -3,22 +3,26 @@
 PR: #103 · Branch: `m03/t02-primitive` · 2026-10-30
 
 `Distribution` is the contract the review will read. Ownership moves in two steps, tables are capped
-at 107 rows inside `_set`, `release` names an opaque retry failure, and the two comments the rulings
-touched say what the code does. The ABI gains exactly four names and loses nothing, and the
+at 107 rows inside `_set`, `release` names an opaque retry failure, the accept leaves a log, and the
+two comments the rulings touched say what the code does. The ABI gains exactly five names and loses
+nothing, and the
 `Snapshot` struct is byte-for-byte unchanged — so nothing under `app/` had to move, and step 8's job
 was to list what it must follow in t03 rather than to edit it.
 
-Three of the plan's instructions could not stand, and the architect ruled on all three mid-task
-(§ Deviations 1–3). The largest is that **the cap's upper bound stopped being measurable**: `_set` is
-the only writer of `_table`, so a 108-row table cannot be built, and the measurement that justified
-107 is one the cap now forbids.
+Five of the plan's instructions did not survive contact, and the architect ruled on all five — three
+mid-task (§ Deviations 1–3) and two in the #103 review (11 and 12), all five corrected in
+[#102](https://github.com/dnznlabs/rake/pull/102) so plan and code agree. The largest is that **the
+cap's upper bound stopped being measurable**: `_set` is the only writer of `_table`, so a 108-row
+table cannot be built, and the measurement that justified 107 is one the cap now forbids. The
+review's own reversal is the second: `acceptOwnership` emits `OwnershipTransferred`, where step 1
+first said no event.
 
 ## Acceptance criteria
 
 | AC | Result | Evidence |
 |:---|:-------|:---------|
 | `snapshot` struct unchanged | pass | `forge inspect Distribution abi` → `["owner","delay","nonce","description","table","pending"]` |
-| ABI gains exactly four, loses nothing | pass | gained `acceptOwnership MAX_BENEFICIARIES pendingOwner ReleaseFailed`; lost: nothing (`comm` against `origin/main`) |
+| ABI gains exactly five, loses nothing | pass | gained `acceptOwnership MAX_BENEFICIARIES OwnershipTransferred pendingOwner ReleaseFailed`; lost: nothing (`comm` against `origin/main`). Five since the #103 review added the event (#102 `9f0b937`) |
 | `forge test` passes | pass | `63 tests passed, 0 failed, 0 skipped (63 total)` |
 | every M01 name still listed | pass | all nine definition-of-done names present in `forge test --list --match-contract Distribution` (36 names) |
 | `TableCapTest` reads the cap off the contract | pass | `CAP` is `new Distribution().MAX_BENEFICIARIES()`; `gas at CAP: 14892067` < 15,000,000 |
@@ -26,7 +30,7 @@ the only writer of `_table`, so a 108-row table cannot be built, and the measure
 | `grep 'non-zero word\|M03 measures'` empty | pass | 0 matches |
 | `node --test` passes *(command corrected, deviation 3)* | pass | `node --test test/*.test.mjs` → `tests 61, pass 61, fail 0` |
 | `tools/abi-vectors.sh` idempotent | pass | second run leaves `git status --porcelain` empty |
-| REFERENCE tables match the ABI | pass | functions 23 = 23, events 7 = 7, errors 7 = 7; all three diffs empty |
+| REFERENCE tables match the ABI | pass | functions 23 = 23, events 8 = 8, errors 7 = 7; all three diffs empty, populations enumerated |
 | zero build warnings | pass | `forge build --force` → `grep -cE 'warning\[|Warning \('` = 0 |
 | `forge lint`, `forge fmt --check` silent | pass | both exit 0, no output; lint run last per `AGENTS.md` |
 | `forge snapshot --check` exits 0 | pass | exit 0 on the committed snapshot |
@@ -38,19 +42,21 @@ the only writer of `_table`, so a 108-row table cannot be built, and the measure
 Names only, `forge inspect Distribution abi` on `origin/main` against the branch:
 
 ```
-gained: acceptOwnership  MAX_BENEFICIARIES  pendingOwner  ReleaseFailed
+gained: acceptOwnership  MAX_BENEFICIARIES  OwnershipTransferred  pendingOwner  ReleaseFailed
 lost:   (nothing)
 ```
 
-Selectors, each confirmed with `cast sig` rather than derived once: `acceptOwnership()` `0x79ba5097`,
-`pendingOwner()` `0xe30c3978`, `MAX_BENEFICIARIES()` `0x2348dd18`, `ReleaseFailed(address)`
-`0xca0b64e5`.
+Five names, not the four the plan first listed: `OwnershipTransferred` was added in the #103 review
+(deviation 11). Selectors, each confirmed with `cast sig` rather than derived once:
+`acceptOwnership()` `0x79ba5097`, `pendingOwner()` `0xe30c3978`, `MAX_BENEFICIARIES()`
+`0x2348dd18`, `ReleaseFailed(address)` `0xca0b64e5`. The event's topic0 is
+`0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0`.
 
 ## Bytecode sizes
 
 | contract | `878dfa3` baseline | `origin/main` (`b055bc3`) | this branch | change |
 |:--|--:|--:|--:|--:|
-| `Distribution` | 8,306 | 8,306 | **8,424** | +118 |
+| `Distribution` | 8,306 | 8,306 | **8,469** | +163 |
 | `DistributionFactory` | 1,320 | 1,320 | **1,320** | 0 |
 
 The factory is byte-identical, which matters for M04: its init code contains every byte of
@@ -63,15 +69,15 @@ The factory is byte-identical, which matters for M04: its init code contains eve
 
 | change | row | main → branch |
 |--:|:--|:--|
-| +47,540 | `test_create2AddressStableAcrossChains` | 4,519,050 → 4,566,590 |
-| +23,756 | `test_createEmitsAndInits` | 2,282,906 → 2,306,662 |
-| +23,721 | `test_createForwardsValue` | 2,266,467 → 2,290,188 |
-| +23,710 | `test_factoryRejectsEth` | 2,016,575 → 2,040,285 |
-| −4,263 | `test_capRowsStayUnderHalfABlock` | 15,100,104 → 15,095,841 |
-| −2,918 | `test_perRowAndFixedCost` | 10,403,499 → 10,400,581 |
+| +65,640 | `test_create2AddressStableAcrossChains` | 4,519,050 → 4,584,690 |
+| +32,803 | `test_createEmitsAndInits` | 2,282,906 → 2,315,709 |
+| +32,768 | `test_createForwardsValue` | 2,266,467 → 2,299,235 |
+| +32,757 | `test_factoryRejectsEth` | 2,016,575 → 2,049,332 |
+| -4,263 | `test_capRowsStayUnderHalfABlock` | 15,100,104 → 15,095,841 |
+| -2,918 | `test_perRowAndFixedCost` | 10,403,499 → 10,400,581 |
 | +2,644 | `test_renounceFreezes` | 372,348 → 374,992 |
 | +1,385 | `test_tableValidation` | 1,609,015 → 1,610,400 |
-| +737 | `test_saltFrontRunningRejected` | 1,040,504,375 → 1,040,505,112 |
+| +1,018 | `test_saltFrontRunningRejected` | 1,040,504,375 → 1,040,505,393 |
 | +637 | `test_setDelayZeroDoesNotShortcutQueued` | 900,703 → 901,340 |
 | +622 | `test_pendingIterable` | 725,758 → 726,380 |
 | +530 | `test_applyFailureKeepsQueued` | 738,482 → 739,012 |
@@ -88,23 +94,27 @@ The factory is byte-identical, which matters for M04: its init code contains eve
 | +103 | `test_hookTokenDistributeIsLocked` | 703,747 → 703,850 |
 | +83 | `test_escrowRevertingEthRecipientOthersPaid` | 569,500 → 569,583 |
 | +81 | `test_implementationRejectsEth` | 289,156 → 289,237 |
-| −37 | `test_distributeReleaseDistributeKeepsReserved` | 644,813 → 644,776 |
+| -37 | `test_distributeReleaseDistributeKeepsReserved` | 644,813 → 644,776 |
 | +13 | `test_rounding_3333_3333_3334` | 499,059 → 499,072 |
-| −3 | `test_realPathPaysASafeAndAVaultClone` | 333,660 → 333,657 |
+| -3 | `test_realPathPaysASafeAndAVaultClone` | 333,660 → 333,657 |
 
 **Sentences for the rows that moved by more than a few hundred gas**, as step 7 asks.
 
-- The four `+23.7k`–`+47.5k` rows all deploy a `DistributionFactory`, whose constructor deploys the
-  implementation. 118 more bytes of implementation at 200 gas a byte is 23,600, which is the whole of
-  three of them; `test_create2AddressStableAcrossChains` deploys two factories, hence roughly double.
-- `test_renounceFreezes` +2,644 is the only *behavioural* row: renouncing now writes `pendingOwner`
-  as well as `owner`, and that is a second slot.
-- `test_tableValidation` +1,385 is `_set`'s extra `n > MAX_BENEFICIARIES` comparison paid across the
-  suite's many validation cases.
-- The two `TableCapTest` rows went **down** — `−4,263` and `−2,918` — which is the same effect as the
-  per-row figure moving (see § The figures t01 measured are not this revision's).
+- The three `+32.7k` rows and the `+65.6k` one are **deploy cost, not run cost**: each deploys a
+  `DistributionFactory`, whose constructor deploys the implementation, and the implementation grew
+  163 bytes. At 200 gas a byte that is 32,600, which is essentially the whole of the three;
+  `test_create2AddressStableAcrossChains` deploys two factories, hence roughly double. Checked
+  against the event alone, which added 45 of those bytes: it moved those same rows by +9,047 and
+  +18,100, and 45 × 200 = 9,000.
+- `test_acceptOwnershipByPendingOwner` +7,573 and `test_renounceFreezes` +2,644 are the two
+  *behavioural* rows. The accept now writes a `LOG3` and the test asserts it with `expectEmit`;
+  renouncing writes `pendingOwner` as well as `owner`, which is a second slot.
+- `test_tableValidation` +1,385 is `_set`'s extra `n > MAX_BENEFICIARIES` comparison, paid across
+  that test's many validation cases.
+- The two `TableCapTest` rows went **down**, `−4,263` and `−2,918`, which is the same effect as the
+  per-row figure moving — see § The figures t01 measured are not this revision's.
 - Everything else is a double handful of gas from the test contracts growing by eleven tests, which
-  reorders selector dispatch. Same effect measured on m02-t05, where a rename moved eighteen rows.
+  reorders selector dispatch. Same effect measured on m02-t05, where one rename moved eighteen rows.
 
 ## The figures t01 measured are not this revision's
 
@@ -123,8 +133,9 @@ the tree t01 measured**, which is `main` at `b055bc3` — re-run there, `TableCa
 source is untouched (`git diff origin/main -- src/` shows no change inside it), so I attribute it to
 `via_ir` codegen moving under the members added here — attributed, not proven, which is why the
 comment says so rather than claiming an opcode. No assertion depends on it: the margin under half a
-block is unchanged in direction and the cap does not move. The `@dev` now labels each figure with the
-revision it is from, which is deviation 5.
+block is unchanged in direction and the cap does not move. The `@dev` names t01's figures, says which
+tree they are of and tells the reader to re-measure rather than quote; the branch figures live here
+and only here, which is the review's ruling and deviation 12.
 
 ## Deviations from the plan
 
@@ -159,10 +170,10 @@ revision it is from, which is deviation 5.
    `Error(string)`, test 10 a 4-byte custom error. `test_releaseBubblesJustOverThreshold` reverts with
    exactly 33 raw bytes and asserts they come back byte for byte. Without it the rule is pinned only
    from a distance; a mutation moving the arm from 32 to 33 passes the other ten.
-5. **`MAX_BENEFICIARIES`'s `@dev` says which revision each figure is from.** Step 2 dictates the three
-   t01 figures and I kept them, but a reviewer re-measuring on this branch gets 138,877 and
-   14,892,067, and 108 is unmeasurable by construction. The comment now says so. See § The figures
-   t01 measured are not this revision's.
+5. **`MAX_BENEFICIARIES`'s `@dev` labels t01's figures with the tree they are of.** Step 2 dictates
+   the three figures and I kept them, but a reviewer re-measuring on this branch gets 138,877 and
+   14,892,067, and 108 is unmeasurable by construction. The comment names `b055bc3` and says to
+   re-measure rather than quote. It does *not* carry the branch's own numbers — see deviation 12.
 6. **The two revert shapes went into a new `RevertingToken`, not into `MockERC20`.** Step 5 says to
    add a `Ret.RevertString` arm to `MockERC20`. Doing that moved `test_usdtStyleNoReturnToken` — an
    M01 definition-of-done row — by **+260,510 gas**, because it deploys two of them, for reasons
@@ -202,6 +213,29 @@ revision it is from, which is deviation 5.
     "asserts 107 under 15,000,000, with the `CAP + 1` refusal pinned in whichever suite the handoff
     names".**
 
+11. **`acceptOwnership()` emits `OwnershipTransferred(address indexed previousOwner, address indexed
+    newOwner)`** — the Ownable2Step name and shape, topic0
+    `0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0`, which is the same topic
+    every Ownable contract uses, so existing log tooling reads it without being told. Added in the
+    #103 review: the architect reversed his own "no new event" choice in step 1 on the strength of
+    Discovery 3, because every other mutator leaves a log — the setters and renounce through
+    `Queued`/`Applied`, the money paths through their own events — and the accept would have been
+    the one state change with no trace, so a log reader saw "B was nominated" and never "B took it".
+    Emitted in `acceptOwnership` only; the nomination still rides in `Queued`'s calldata. TASK.md
+    step 1 and the acceptance line are amended in #102's second commit `9f0b937`, so plan and code
+    agree and the ABI now gains five names rather than four.
+    `test_acceptOwnershipByPendingOwner` asserts it with `vm.expectEmit`, checking both topics and
+    the data against `(OWNER, B)`. Cost, measured alone: 45 bytes of implementation, which is +9,047
+    on each factory-deploying row (45 × 200 = 9,000) and +3,650 on the accept test for the `LOG3`
+    and the cheatcode.
+
+12. **`MAX_BENEFICIARIES`'s `@dev` does not carry this revision's figures**, on the review's
+    instruction. It had a paragraph giving 138,877 and 14,892,067 beside t01's numbers; the reviewer's
+    point is that such a figure is true of one commit and false of the next, and the handoff is where
+    it belongs. The comment is now the rule, t01's three figures labelled as t01's at `b055bc3`, and
+    "re-measure rather than quote". The same figure came out of `TableCap.t.sol`'s `setUp` comment
+    for the same reason.
+
 ## Decisions
 
 - **Which of the two cap-boundary tests to keep**, which the architect left to me: `test_tableCapBoundary`
@@ -229,10 +263,14 @@ Not fixed here; each is outside this task's scope.
    (`src/Distribution.sol:301`), so a token whose `balanceOf` reverts with 32 bytes still reaches
    `d.length === 66` through `distribute`. t03 keeps the branch and re-attributes the comment rather
    than deleting it — the full reasoning is in § For t03.
-3. **`acceptOwnership()` has no on-chain trace of its own.** No event, and `Snapshot` does not carry
-   `pendingOwner`, so a completed handover is visible only as `owner()` changing between two reads.
-   The plan rules an event out of scope for this task and leaves it to Phase 3; recording that the
-   tests made the case, since nothing but a second `eth_call` tells a client a transfer is pending.
+3. ~~**`acceptOwnership()` has no on-chain trace of its own.**~~ **Ruled and fixed in the #103
+   review, so this is no longer carried.** It was: no event, and `Snapshot` does not carry
+   `pendingOwner`, so a completed handover was visible only as `owner()` changing between two reads.
+   The architect reversed his own "no event" choice on the strength of it and
+   `OwnershipTransferred` is now emitted — deviation 11. What remains true, and is t03's to handle
+   rather than a defect here: the *nomination* still has no event of its own and rides in `Queued`'s
+   calldata, so a client learns a transfer is pending only from a second `eth_call` to
+   `pendingOwner()` (ruling 3 of § For t03).
 
 ## Open questions
 
