@@ -12,6 +12,9 @@ setBeneficiaries((address,uint96,string,string)[]) 0x8868f490
 setDescription(string) 0x90c3f38f
 setDelay(uint32) 0x10348665
 transferOwnership(address) 0xf2fde38b
+acceptOwnership() 0x79ba5097
+pendingOwner() 0xe30c3978
+MAX_BENEFICIARIES() 0x2348dd18
 reserved(address) 0xda9425e2
 escrowed(address,address) 0x13126902
 isOwner(address) 0x2f54bf6e

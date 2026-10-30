@@ -11,7 +11,8 @@ import {
     PlainSender,
     ReentrantDistributor,
     ReentrantReleaser,
-    RevertingReceiver
+    RevertingReceiver,
+    RevertingToken
 } from "./mocks/Mocks.sol";
 
 /// @dev Every case runs against a clone the factory deployed, because `receive()` rejects ETH on the
@@ -32,6 +33,13 @@ contract DistributionTest is Test {
     address internal constant C = address(0x1003);
 
     uint32 internal constant WEEK = 7 days;
+
+    /// @dev `uint96` to match `Beneficiary.bps`, so `_capTable` divides a table up in that type.
+    uint96 internal constant BPS_TOTAL = 10_000;
+
+    /// @dev Where `_capTable`'s rows start: clear of the precompiles, and clear of `A`/`B`/`C` so a
+    /// cap-length table cannot collide with the addresses the rest of the suite pays.
+    uint160 internal constant FIRST_CAP_ROW = 0x20000;
 
     function setUp() public {
         factory = new DistributionFactory();
@@ -495,6 +503,262 @@ contract DistributionTest is Test {
         assertEq(B.balance, 4000);
     }
 
+    /// @notice Naming a successor moves nothing on its own. The owner keeps every power until the
+    /// successor turns up, which is the whole of what the two-step buys.
+    function test_transferOwnershipIsPending() public {
+        // Arrange
+        Distribution d = _deploy(0, _defaultTable());
+
+        // Act
+        vm.prank(OWNER);
+        d.propose(abi.encodeCall(Distribution.transferOwnership, (B)));
+
+        // Assert
+        assertEq(d.owner(), OWNER, "the live owner is untouched by the nomination");
+        assertEq(d.pendingOwner(), B, "the successor is named and nothing more");
+        // `Snapshot` has no `pendingOwner` field at all, so this reads the live owner by
+        // construction — the assertion is that it is not quietly the nominee.
+        assertEq(d.snapshot().owner, OWNER, "and the snapshot still reports the live owner");
+
+        vm.prank(OWNER);
+        d.propose(abi.encodeCall(Distribution.setDelay, (1)));
+        assertEq(d.delay(), 1, "the owner still governs while a transfer is pending");
+    }
+
+    /// @notice The nominee's own call is what moves the ownership, and it moves all of it.
+    function test_acceptOwnershipByPendingOwner() public {
+        // Arrange
+        Distribution d = _deploy(0, _defaultTable());
+        vm.prank(OWNER);
+        d.propose(abi.encodeCall(Distribution.transferOwnership, (B)));
+
+        // Act — the acceptance is the one ownership change with no `Queued`/`Applied` pair of its
+        // own, so this event is the only trace a log reader gets (ruled in the #103 review).
+        vm.expectEmit(true, true, false, true, address(d));
+        emit Distribution.OwnershipTransferred(OWNER, B);
+        vm.prank(B);
+        d.acceptOwnership();
+
+        // Assert
+        assertEq(d.owner(), B);
+        assertEq(d.pendingOwner(), address(0), "accepting consumes the nomination");
+
+        vm.prank(OWNER);
+        vm.expectRevert(Distribution.NotOwner.selector);
+        d.propose(abi.encodeCall(Distribution.setDelay, (1)));
+
+        vm.prank(B);
+        d.propose(abi.encodeCall(Distribution.setDelay, (1)));
+        assertEq(d.delay(), 1, "and the new owner has it instead");
+    }
+
+    /// @notice Only the nominee, and only while there is one: an unset `pendingOwner` is `address(0)`,
+    /// which no caller can be, so a cleared nomination is not an open door.
+    function test_acceptOwnershipByOtherReverts() public {
+        // Arrange
+        Distribution d = _deploy(0, _defaultTable());
+        vm.prank(OWNER);
+        d.propose(abi.encodeCall(Distribution.transferOwnership, (B)));
+
+        // Act / assert — a third party cannot take a nomination made to someone else.
+        vm.prank(C);
+        vm.expectRevert(Distribution.Unauthorized.selector);
+        d.acceptOwnership();
+        assertEq(d.owner(), OWNER, "the refused attempt moved nothing");
+        assertEq(d.pendingOwner(), B);
+
+        // Act / assert — and nobody can take one that was never made.
+        Distribution fresh = _deploy(0, _defaultTable());
+        assertEq(fresh.pendingOwner(), address(0), "a fresh clone names no successor");
+        vm.prank(STRANGER);
+        vm.expectRevert(Distribution.Unauthorized.selector);
+        fresh.acceptOwnership();
+    }
+
+    /// @notice Renouncing stayed one step — `test_renounceFreezes` is the freeze itself — and it
+    /// takes any pending nomination down with it, so a transfer in flight cannot outlive the owner.
+    function test_renounceStillImmediateAndClearsPending() public {
+        // Arrange
+        Distribution d = _deploy(0, _defaultTable());
+        vm.prank(OWNER);
+        d.propose(abi.encodeCall(Distribution.transferOwnership, (B)));
+        assertEq(d.pendingOwner(), B);
+
+        // Act
+        vm.prank(OWNER);
+        d.propose(abi.encodeCall(Distribution.transferOwnership, (address(0))));
+
+        // Assert
+        assertEq(d.owner(), address(0), "renouncing is still immediate");
+        assertEq(d.pendingOwner(), address(0), "and drops the pending transfer with it");
+
+        vm.prank(B);
+        vm.expectRevert(Distribution.Unauthorized.selector);
+        d.acceptOwnership();
+    }
+
+    /// @notice Naming the current owner is how a nomination is withdrawn: it is the one `owner_` that
+    /// cannot be a successor, so it means "nobody" without meaning `address(0)`, which renounces.
+    function test_transferToCurrentOwnerWithdrawsPending() public {
+        // Arrange
+        Distribution d = _deploy(0, _defaultTable());
+        vm.prank(OWNER);
+        d.propose(abi.encodeCall(Distribution.transferOwnership, (B)));
+        assertEq(d.pendingOwner(), B);
+
+        // Act
+        vm.prank(OWNER);
+        d.propose(abi.encodeCall(Distribution.transferOwnership, (OWNER)));
+
+        // Assert
+        assertEq(d.pendingOwner(), address(0), "the nomination is withdrawn");
+        assertEq(d.owner(), OWNER, "and the owner is unchanged, not renounced");
+
+        vm.prank(B);
+        vm.expectRevert(Distribution.Unauthorized.selector);
+        d.acceptOwnership();
+    }
+
+    /// @notice `cancel` reaches the queue, not the state. A nomination that has already been applied
+    /// is live state, so cancelling a later queued transfer leaves it exactly where it was.
+    function test_cancelQueuedTransferLeavesPendingOwner() public {
+        // Arrange — a real delay, so the second transfer queues instead of running.
+        Distribution d = _deploy(WEEK, _defaultTable());
+        bytes memory toB = abi.encodeCall(Distribution.transferOwnership, (B));
+        vm.prank(OWNER);
+        bytes32 hashB = d.propose(toB);
+        vm.warp(d.queued(hashB));
+        d.applyQueued(toB, 1);
+        assertEq(d.pendingOwner(), B, "the first transfer applied");
+
+        bytes memory toC = abi.encodeCall(Distribution.transferOwnership, (C));
+        vm.prank(OWNER);
+        bytes32 hashC = d.propose(toC);
+        assertEq(d.pendingOwner(), B, "queueing the second one does not run it");
+
+        // Act
+        vm.prank(OWNER);
+        d.cancel(hashC);
+
+        // Assert
+        assertEq(d.queued(hashC), 0, "the second transfer is off the queue");
+        assertEq(d.pendingCount(), 0);
+        assertEq(d.pendingOwner(), B, "and the applied nomination is untouched by the cancel");
+
+        vm.prank(B);
+        d.acceptOwnership();
+        assertEq(d.owner(), B, "so B can still accept it");
+    }
+
+    /// @notice The cap is the contract's own `MAX_BENEFICIARIES`, measured against a table that is
+    /// faultless apart from its length: ascending, no zero share, summing to exactly 10,000. So the
+    /// `BadTable()` at one row more can only be the cap and not another rule tripping first.
+    function test_tableCapBoundary() public {
+        // Arrange
+        uint256 cap = impl.MAX_BENEFICIARIES();
+
+        // Act / assert — the longest table the contract accepts.
+        Distribution d = _deploy(0, _capTable(cap));
+        assertEq(d.beneficiaries().length, cap, "a table of exactly the cap goes in");
+        assertEq(d.snapshot().table.length, cap);
+
+        // Assert — one row more, by the same construction, breaks no other rule: asserted here
+        // rather than assumed, so a `BadTable()` below cannot be a zero share or a bad ordering.
+        Distribution.Beneficiary[] memory over = _capTable(cap + 1);
+        uint96 sum;
+        address prev;
+        for (uint256 i; i < over.length; ++i) {
+            assertGt(over[i].bps, 0, "no row of the over-cap table has a zero share");
+            assertGt(uint160(over[i].account), uint160(prev), "and its accounts ascend");
+            prev = over[i].account;
+            sum += over[i].bps;
+        }
+        assertEq(sum, BPS_TOTAL, "and it sums to exactly 10,000");
+
+        // Act / assert — so the length is the only thing left to reject it for.
+        _expectBadInit(over);
+    }
+
+    /// @notice A token that answers a push with a bare `false` gives `release` a 32-byte word and no
+    /// reason, so the failure is named rather than bubbled — and the escrow it was retrying survives.
+    function test_releaseFailedNamesBareWord() public {
+        // Arrange
+        MockERC20 liar = new MockERC20(MockERC20.Ret.False);
+        Distribution d = _escrowFailingToken(liar);
+
+        // Act / assert
+        vm.expectRevert(abi.encodeWithSelector(Distribution.ReleaseFailed.selector, address(liar)));
+        d.release(address(liar), A);
+
+        assertEq(d.escrowed(address(liar), A), 6000, "the failed retry leaves the escrow where it was");
+        assertEq(d.reserved(address(liar)), 10_000, "and the reserve with it");
+
+        // Arrange / act / assert — the other shape on this side of the threshold: 32 bytes of revert
+        // data, the longest payload that is still named instead of bubbled.
+        RevertingToken word = new RevertingToken(RevertingToken.Fail.WithRawBytes);
+        word.setRevertBytes(32);
+        Distribution e = _escrowFailingToken(word);
+
+        vm.expectRevert(abi.encodeWithSelector(Distribution.ReleaseFailed.selector, address(word)));
+        e.release(address(word), A);
+
+        assertEq(e.escrowed(address(word), A), 6000, "32 bytes is still named, and still kept");
+        assertEq(e.reserved(address(word)), 10_000);
+    }
+
+    /// @notice A reason worth having is kept. `Error(string)` wraps even a short reason to 100 bytes,
+    /// which is over the threshold, so the string arrives rather than `ReleaseFailed`.
+    /// @dev `MockERC20.InsufficientBalance()` is no use here: an argument-less custom error is 4
+    /// bytes, so by the same rule it would come back named. The reason has to be a real string.
+    function test_releaseBubblesLongReason() public {
+        // Arrange
+        RevertingToken tk = new RevertingToken(RevertingToken.Fail.WithString);
+        Distribution d = _escrowFailingToken(tk);
+
+        // Act / assert
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", tk.REASON()));
+        d.release(address(tk), A);
+
+        assertEq(d.escrowed(address(tk), A), 6000, "a bubbled reason leaves the escrow too");
+        assertEq(d.reserved(address(tk)), 10_000);
+    }
+
+    /// @notice The threshold is `data.length <= 32`, so 33 bytes is the first payload that bubbles.
+    /// Nothing else in the suite sits on that byte: the bare `false` is 32, `Refused()` is 4 and an
+    /// `Error(string)` is 100, so without this the rule is only pinned from a distance.
+    function test_releaseBubblesJustOverThreshold() public {
+        // Arrange — the mock's default length is the tight case.
+        RevertingToken tk = new RevertingToken(RevertingToken.Fail.WithRawBytes);
+        assertEq(tk.revertBytes(), 33, "one byte over the threshold");
+        assertEq(tk.rawRevertData().length, 33);
+        Distribution d = _escrowFailingToken(tk);
+
+        // Act / assert — the payload itself comes back, byte for byte, and not the name.
+        vm.expectRevert(tk.rawRevertData());
+        d.release(address(tk), A);
+    }
+
+    /// @notice An ETH row refusing its share is the same ruling with no token to name: `Refused()` is
+    /// 4 bytes, under the threshold, so it comes back as `ReleaseFailed(address(0))`.
+    function test_releaseFailedEthRecipient() public {
+        // Arrange
+        RevertingReceiver bad = new RevertingReceiver();
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](2);
+        t[0] = _row(address(bad), 5000);
+        t[1] = _row(A, 5000);
+        Distribution d = _deploy(0, _asc(t));
+        _send(d, 10_000);
+        d.distribute(address(0));
+        assertEq(d.escrowed(address(0), address(bad)), 5000, "the refused push is escrowed");
+
+        // Act / assert — it is still refusing, so the retry fails the same way.
+        vm.expectRevert(abi.encodeWithSelector(Distribution.ReleaseFailed.selector, address(0)));
+        d.release(address(0), address(bad));
+
+        assertEq(d.escrowed(address(0), address(bad)), 5000, "and the escrow stays put");
+        assertEq(d.reserved(address(0)), 5000);
+    }
+
     function test_nftTransferReverts() public {
         // Arrange
         Distribution d = _deploy(0, _defaultTable());
@@ -532,6 +796,46 @@ contract DistributionTest is Test {
         t = new Distribution.Beneficiary[](2);
         t[0] = _row(A, 6000);
         t[1] = _row(B, 4000);
+    }
+
+    /// @dev `n` rows that break no rule but a length one: ascending accounts, no zero share, and a
+    /// sum of exactly `BPS_TOTAL` with the remainder on the last row — the same construction
+    /// `TableCap.t.sol`'s `_prepare` uses, so the two files agree on what a cap-length table is.
+    function _capTable(uint256 n) internal pure returns (Distribution.Beneficiary[] memory t) {
+        // One cast, as in `TableCap.t.sol`: the row loop and the `bps` split both want a type narrow
+        // enough to fill `Beneficiary.bps` and to add to a `uint160` address.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint96 rows = uint96(n);
+
+        t = new Distribution.Beneficiary[](rows);
+        uint96 each = BPS_TOTAL / rows;
+        for (uint96 i; i < rows; ++i) {
+            uint96 bps = i + 1 == rows ? BPS_TOTAL - each * (rows - 1) : each;
+            t[i] = _row(address(FIRST_CAP_ROW + uint160(i)), bps);
+        }
+    }
+
+    /// @dev A clone holding 10,000 of `tk` with every row escrowed, for the `release` cases: each
+    /// mock used here fails every push, so `distribute` escrows the whole balance instead of paying
+    /// it, and `release` has something to retry.
+    function _escrowFailingToken(MockERC20 tk) internal returns (Distribution d) {
+        return _escrowFailingToken(address(tk));
+    }
+
+    function _escrowFailingToken(RevertingToken tk) internal returns (Distribution d) {
+        return _escrowFailingToken(address(tk));
+    }
+
+    /// @dev Both failing mocks carry `mint(address,uint256)` and `balanceOf(address)` at the same
+    /// selectors, so the core needs only the address.
+    function _escrowFailingToken(address tk) internal returns (Distribution d) {
+        d = _deploy(0, _defaultTable());
+        MockERC20(tk).mint(address(d), 10_000);
+        d.distribute(tk);
+
+        assertEq(d.escrowed(tk, A), 6000, "the push failed, so the row is escrowed");
+        assertEq(d.escrowed(tk, B), 4000);
+        assertEq(d.reserved(tk), 10_000, "and nothing was paid out");
     }
 
     /// @dev Mock addresses are not known at authoring time, and the table must ascend by account.

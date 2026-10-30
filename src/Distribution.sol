@@ -37,22 +37,42 @@ contract Distribution {
     event Applied(bytes32 indexed hash);
     event Cancelled(bytes32 indexed hash);
 
+    /// @dev Ownable2Step's name and shape. Emitted on acceptance only: the nomination already rides
+    /// in `Queued`'s calldata, so without this a log reader sees "B was nominated" and never "B took
+    /// it" — the one state change in the contract with no trace of its own.
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
     error NotOwner();
     error BadTable();
     error NotReady(uint256 eta);
     error NothingToDo();
     error Locked();
     error Unauthorized();
+    error ReleaseFailed(address token);
 
-    /// @dev Draft from PROJECT_OVERVIEW § 6; M03 measures it against a real multisig and a Safe.
+    /// @dev Measured in m03-t01 (`test/PushGas.t.sol`, cold): a Safe v1.4.1 proxy receives in 4,029
+    /// gas and a multisig.software vault clone in 404, so 100_000 is 23x the larger need and was kept
+    /// under decision 30.
     uint256 private constant PUSH_GAS = 100_000;
     uint256 private constant BPS_TOTAL = 10_000;
+
+    /// @dev Measured in m03-t01 (`test/TableCap.t.sol`): a worst-case row, where the recipient burns
+    /// the whole push cap and then fails, costs 138,917 gas, so 107 rows distribute in 14,896,325 and
+    /// 108 need 15,035,242. The rule enforced is that a worst-case `distribute` stays under half a
+    /// 30M block. Those three figures are of the tree t01 measured, `main` at `b055bc3`; re-measure
+    /// rather than quote them.
+    uint256 public constant MAX_BENEFICIARIES = 107;
     bytes4 private constant TRANSFER = 0xa9059cbb;
     bytes4 private constant BALANCE_OF = 0x70a08231;
 
     address public owner;
     uint32 public delay;
     uint32 public nonce;
+
+    /// @dev After `nonce`, not after `owner`: `owner`, `delay` and `nonce` pack into one slot and a
+    /// 20-byte address cannot join them, so placing it here leaves that slot whole and `propose` and
+    /// `snapshot` keep their single read of it.
+    address public pendingOwner;
     string public description;
 
     /// @dev Stored in the order given, which table validation forces to be ascending by account.
@@ -141,7 +161,13 @@ contract Distribution {
         escrowed[token][account] = 0;
         reserved[token] -= amount;
         (bool ok, bytes memory data) = _push(token, account, amount);
-        if (!ok) _bubble(data);
+        // A word or less is the bare `false` of a non-reverting token, empty revert data, or an
+        // argument-less custom error: no reason worth bubbling, so name the failure instead
+        // (decision 24). Anything longer carries its own reason and keeps it.
+        if (!ok) {
+            if (data.length <= 32) revert ReleaseFailed(token);
+            _bubble(data);
+        }
         emit Released(token, account, amount);
     }
 
@@ -202,9 +228,26 @@ contract Distribution {
         delay = delay_;
     }
 
-    /// @notice `address(0)` renounces: nothing can be proposed or cancelled again.
+    /// @notice Name the next owner, who must call `acceptOwnership()` before anything changes; until
+    /// then the current owner keeps every power. `address(0)` renounces at once — nothing can be
+    /// proposed or cancelled again — and drops any pending transfer with it. Naming the current owner
+    /// withdraws a pending transfer.
     function transferOwnership(address owner_) external onlySelf {
-        owner = owner_;
+        if (owner_ == address(0)) {
+            owner = address(0);
+            pendingOwner = address(0);
+            return;
+        }
+        pendingOwner = owner_ == owner ? address(0) : owner_;
+    }
+
+    /// @notice Take ownership after the owner named you with `transferOwnership`.
+    function acceptOwnership() external {
+        if (msg.sender != pendingOwner) revert Unauthorized();
+
+        emit OwnershipTransferred(owner, msg.sender);
+        owner = msg.sender;
+        pendingOwner = address(0);
     }
 
     /// @notice Everything a reader needs in one call.
@@ -226,7 +269,7 @@ contract Distribution {
     /// @dev Ascending accounts make duplicates impossible and keep the first row above `address(0)`.
     function _set(Beneficiary[] calldata table_) private {
         uint256 n = table_.length;
-        if (n == 0) revert BadTable();
+        if (n == 0 || n > MAX_BENEFICIARIES) revert BadTable();
 
         delete _table;
         uint256 sum;
@@ -272,7 +315,7 @@ contract Distribution {
 
     /// @dev ETH is capped so one hostile recipient cannot burn the whole distribution; an ERC-20 push
     /// is bounded by the token. A no-return token (mainnet USDT) counts as success; anything else must
-    /// answer with a non-zero word, decoded as a `uint256` so hostile return data cannot revert here.
+    /// answer with a word equal to one, decoded as a `uint256` so hostile return data cannot revert here.
     function _push(address token, address to, uint256 amount) private returns (bool ok, bytes memory data) {
         if (token == address(0)) {
             (ok, data) = to.call{value: amount, gas: PUSH_GAS}("");

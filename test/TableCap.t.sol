@@ -28,8 +28,9 @@ import {GasBurner, PlainSender} from "./mocks/Mocks.sol";
 ///    `test_perRowAndFixedCost` share one transaction, so a range shared between tables would find
 ///    the `n = 8` rows already warm from the `n = 1` measurement and would flatten the line.
 contract TableCapTest is Test {
-    /// @dev Mirrors the `private constant` in `Distribution`; t02 is what makes it readable, under
-    /// D11. Used only to sanity-check that the burner really spends the cap.
+    /// @dev Still a copy: t02 made `MAX_BENEFICIARIES` public but left `PUSH_GAS` a `private
+    /// constant`, so there is nothing to read it from. Used only to sanity-check that the burner
+    /// really spends the cap.
     uint256 internal constant PUSH_GAS = 100_000;
 
     /// @dev `uint96` to match `Beneficiary.bps`, so `_prepare` divides the table up in that type.
@@ -40,9 +41,17 @@ contract TableCapTest is Test {
 
     /// @dev The longest table whose worst-case `distribute` stays under `HALF_BLOCK`. Pinned by
     /// `test_capRowsStayUnderHalfABlock` and `test_capPlusOneRowsExceedHalfABlock` running it, not
-    /// by a formula. t02 moves this constant into `src/Distribution.sol` under D8 and this test
-    /// reads it from there.
-    uint256 internal constant CAP = 107;
+    /// by a formula. t02 moved the figure into `src/Distribution.sol` under D8, so this is the
+    /// contract's own constant rather than a copy of it: change `MAX_BENEFICIARIES` and the two
+    /// pinning tests move with it instead of silently going on measuring the old number.
+    ///
+    /// Read off an instance, in the constructor, for two reasons. `Distribution.MAX_BENEFICIARIES`
+    /// does not compile — a `public constant` of another contract is reachable only through an
+    /// instance, not through the contract type (solc 9582) — and `_prepare(CAP)` runs from `setUp`,
+    /// so the figure has to exist before any clone does. The instance is a throwaway deployed to be
+    /// asked and nothing else: it is not the implementation the clones delegate into, so it warms
+    /// nothing any measurement here touches.
+    uint256 internal immutable CAP = new Distribution().MAX_BENEFICIARIES();
 
     /// @dev Clear of the precompiles. `_set` needs each table's accounts ascending and distinct.
     uint160 internal constant FIRST_ROW = 0x10000;
@@ -78,7 +87,12 @@ contract TableCapTest is Test {
         _prepare(8);
         _prepare(64);
         _prepare(CAP);
-        _prepare(CAP + 1);
+        // No `_prepare(CAP + 1)`. `_prepare` reaches its table through `factory.create` → `init` →
+        // `_set`; `_set` is now what rejects `n > MAX_BENEFICIARIES` and is the only writer of
+        // `_table`, so a 108-row table cannot be built at all — the measurement that justified the
+        // cap is one the cap forbids. t01's 108-row figure stays readable in its HANDOFF and in
+        // `MAX_BENEFICIARIES`'s own `@dev`; what is live here is the 107 measurement, and the
+        // refusal is pinned in `DistributionTest.test_tableCapBoundary`.
     }
 
     /// @notice The three points, the per-row cost between the two larger, and the fixed cost under them.
@@ -131,13 +145,13 @@ contract TableCapTest is Test {
         assertLt(gasUsed, HALF_BLOCK, "CAP rows stay under half a 30M block");
     }
 
-    /// @notice One more row does not.
-    function test_capPlusOneRowsExceedHalfABlock() public {
-        uint256 gasUsed = _measure(CAP + 1);
-        emit log_named_uint("rows         ", CAP + 1);
-        emit log_named_uint("gas at CAP+1 ", gasUsed);
-        assertGt(gasUsed, HALF_BLOCK, "CAP is the longest table that does");
-    }
+    // There is no `CAP + 1` test here. `_set` refuses that table, so the upper side of the cap is a
+    // validation rule rather than a measurement, and it is pinned where the other `_set` rules are:
+    // `DistributionTest.test_tableCapBoundary`, which takes both sides — a table of exactly the cap
+    // goes in, one row more reverts `BadTable()` — off the contract's own `MAX_BENEFICIARIES`, and
+    // first asserts the over-cap table breaks no other rule so the revert cannot be the wrong one.
+    // Duplicating it here would mean re-implementing `_prepare`'s table build to make one assertion
+    // honest, in a harness whose subject is gas.
 
     /// @dev The `gasleft()` delta across one `distribute` over the prepared table of `n` burners,
     /// asserted to have escrowed every row: the figure is worthless if a push succeeded or a row was
