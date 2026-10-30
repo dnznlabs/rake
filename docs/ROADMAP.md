@@ -15,7 +15,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 |:----------|:-----|:-------|
 | [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | done 2026-10-11 — t01 (#6), t02 (#11), t03 (#14) and the decision-10 follow-up (#24) merged; every criterion re-run and passing on `main` at `c292106` |
 | [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain, and Denizen has ironed out the experience against it | done 2026-10-26 — t01 (#33), t02 (#40), t03 (#52), t04 (#60), t05 (#65), t06 done; Phase 5 signed off by Denizen in [#73](https://github.com/dnznlabs/rake/pull/73) |
-| [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | not started |
+| [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | in progress — Phase 1 closed 2026-10-30 (decisions 20–33); t01 (#94) merged 2026-10-27 with both measurements; t02 next |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | not started |
 | [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; DNZN's own 60/40 distribution live under the Ops multisig with a 7-day delay; dapp mirrored and widget embedded in one DNZN app | not started |
 | [M06 — Owner integrations](milestones/m06/MILESTONE.md) | Optional, after mainnet. When the connected wallet is a member of the owner rather than the owner, route `propose`/`cancel` into the multisig vault's or Majeur DAO's own submit flow instead of copy-calldata. UI only; no contract change | not started |
@@ -314,7 +314,11 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     comparison and one `BadTable`, so a table that can never distribute becomes impossible. `CAP` is
     the largest length whose worst-case `distribute` (every row escrowed, `PUSH_GAS` spent per row)
     stays under half of a 30M-gas block; m03-t01 measures it and posts the figures on #85, t02
-    writes the constant, and the figure is added here when it exists. Rejected: no cap with the
+    writes the constant. **The figure is 107**, measured by m03-t01 (#94, 2026-10-27,
+    `test/TableCap.t.sol`): a worst-case row (recipient burns the full push, then fails) costs
+    138,917 gas; 107 rows `distribute` in 14,896,325, 108 in 15,035,242, both asserted by running
+    them rather than computed. Re-measure rather than quote if `distribute`, `_push` or `PUSH_GAS`
+    changes. Rejected: no cap with the
     ceiling documented (a table past the block gas limit traps every balance behind a `distribute`
     that cannot be mined, and only a `setBeneficiaries` through the delay frees it).
 28. **ERC-1363 is out of the review's scope.** D9, ruled on
@@ -337,8 +341,13 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     option's own condition: keep the constant and record the headroom if both a multisig.software
     vault clone and a Safe `receive` within it. If either does not, the ruling's fallback is the
     issue's default for that case, option 2 at twice the larger measured need rounded up to a
-    thousand; m03-t01 posts the figures on #88 and they are added here. Rejected in advance:
-    lowering it (a lower cap buys nothing and escrows more).
+    thousand; m03-t01 posts the figures on #88 and they are added here. **Measured 2026-10-27
+    (#94, `test/PushGas.t.sol`), against the wallets' mainnet runtime bytecode etched at their
+    canonical addresses and read cold:** a Safe v1.4.1 proxy needs 4,029 gas to `receive`, a
+    multisig.software vault clone 404, so `PUSH_GAS` stays `100_000` with 95,971 of headroom over the
+    larger and option 2 does not apply. Two methods agree to the gas (binary search on the cap; the
+    `distribute` trace's push frames at 6,329 and 2,704, each the minimum plus the 2,300 stipend).
+    Rejected in advance: lowering it (a lower cap buys nothing and escrows more).
 31. *Superseded by 33 on 2026-10-30; kept as ruled.* **The factory is placed through SafeSummoner;
     the keyless proxy is the fallback.** D12, ruled on
     [#89](https://github.com/dnznlabs/rake/issues/89) ("Option 4"), confirming the Telegram
@@ -440,6 +449,13 @@ milestone that first acts on it, and the issue list is the queue — this sectio
   chain, the address never does. **M03**'s runbook names the key as a protected artefact, says the
   consequence in one sentence, and does the `create` on every expected chain while the key is live.
   Issue [#23](https://github.com/dnznlabs/rake/issues/23).
+- **An escrow to a recipient that always burns the push can never be released.** Found in
+  `m03-t01` (`HANDOFF.md` § Discoveries 2): `release` re-pushes with the same `PUSH_GAS` cap and
+  bubbles the failure, so a recipient that consumes the cap every time keeps its share in `escrowed`
+  until it changes behaviour, and nothing says so. By design (an escrow is recoverable only if the
+  recipient becomes payable); the owner's remedy is a re-table (decision 6). **M03** states it in
+  `SECURITY.md` beside decision 25 and puts it in the review's known answer; no code change. Issue
+  [#95](https://github.com/dnznlabs/rake/issues/95).
 - **`forge lint` poisons the build cache**, so a following `forge snapshot --check` can exit 0 having
   skipped an edited file's whole suite. Found in `m01-t03` (`HANDOFF.md` § Discoveries), reproduced in
   review. Toolchain, not rake; CI cannot reach it. Closed by one ordering rule in `AGENTS.md`
