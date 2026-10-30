@@ -109,36 +109,21 @@ contract PlainSender {
     receive() external payable {}
 }
 
-/// @notice ERC-20 with the three return shapes a real token can have on `transfer`, and the two
-/// revert shapes that straddle the threshold `release` sorts failures by.
+/// @notice ERC-20 with the three return shapes a real token can have on `transfer`.
 contract MockERC20 {
     /// @dev `None` is mainnet USDT: it moves the balance and returns no data at all. `False` reports
-    /// failure, so it must not move the balance either.
-    ///
-    /// `RevertString` and `RevertRaw` fail with revert data rather than a return value, which is the
-    /// other half of what `release` has to sort: a word or less is named `ReleaseFailed(token)`,
-    /// anything longer is bubbled. Note that `InsufficientBalance()` is no use for the longer side —
-    /// an argument-less custom error is 4 bytes, so by that rule it is named, not bubbled.
+    /// failure, so it must not move the balance either. The two *revert* shapes `release` sorts by
+    /// live in `RevertingToken` rather than here, so that this contract's bytecode — and with it the
+    /// gas of every test that deploys one — does not move when they change.
     enum Ret {
         True,
         None,
-        False,
-        RevertString,
-        RevertRaw
+        False
     }
 
     error InsufficientBalance();
 
-    /// @dev The reason `RevertString` fails with. `Error(string)` wraps it to 100 bytes, which is
-    /// over the threshold, so `release` must bubble it. Readable so that a test can assert on the
-    /// reason it will actually be given rather than on a second copy of this literal.
-    string public constant REASON = "insufficient";
-
     Ret public immutable ret;
-
-    /// @dev How many bytes `RevertRaw` reverts with. 33 by default, the first length that must
-    /// bubble; set it to 32 for the longest payload that must be named instead.
-    uint256 public revertBytes = 33;
 
     mapping(address => uint256) public balanceOf;
 
@@ -150,29 +135,8 @@ contract MockERC20 {
         balanceOf[to] += amount;
     }
 
-    function setRevertBytes(uint256 revertBytes_) external {
-        revertBytes = revertBytes_;
-    }
-
-    /// @dev Exactly what `RevertRaw` will revert with: `revertBytes` bytes of `0xab`. It carries no
-    /// selector and no decodable reason, so nothing but its length can decide how `release` treats
-    /// it — which is the point, and why the test can compare against this byte for byte.
-    function rawRevertData() public view returns (bytes memory data) {
-        data = new bytes(revertBytes);
-        for (uint256 i; i < data.length; ++i) {
-            data[i] = 0xab;
-        }
-    }
-
     function transfer(address to, uint256 amount) external returns (bool) {
         if (ret == Ret.False) return false;
-        if (ret == Ret.RevertString) revert(REASON);
-        if (ret == Ret.RevertRaw) {
-            bytes memory raw = rawRevertData();
-            assembly ("memory-safe") {
-                revert(add(raw, 0x20), mload(raw))
-            }
-        }
         if (balanceOf[msg.sender] < amount) revert InsufficientBalance();
         balanceOf[msg.sender] -= amount;
         balanceOf[to] += amount;
@@ -182,6 +146,67 @@ contract MockERC20 {
             }
         }
         return true;
+    }
+}
+
+/// @notice A token whose `transfer` fails with revert *data*, on either side of the threshold
+/// `release` sorts failures by: a word or less is named `ReleaseFailed(token)`, anything longer is
+/// bubbled with its own reason.
+/// @dev Separate from `MockERC20` on purpose. `test_usdtStyleNoReturnToken` deploys two of those, so
+/// growing that contract moved an M01 definition-of-done row by 260,510 gas for reasons having
+/// nothing to do with it — noise that would mask a real regression later.
+///
+/// `MockERC20.InsufficientBalance()` is no use for the bubbled side: an argument-less custom error
+/// is 4 bytes, so by the rule it is named, not bubbled. That is why the long case needs a string.
+contract RevertingToken {
+    enum Fail {
+        WithString,
+        WithRawBytes
+    }
+
+    /// @dev The reason `WithString` fails with. `Error(string)` wraps it to 100 bytes, over the
+    /// threshold, so `release` must bubble it. Readable so a test can assert on the reason it will
+    /// actually be given rather than on a second copy of this literal.
+    string public constant REASON = "insufficient";
+
+    Fail public immutable fail;
+
+    /// @dev How many bytes `WithRawBytes` reverts with. 33 by default, the first length that must
+    /// bubble; set it to 32 for the longest payload that must be named instead.
+    uint256 public revertBytes = 33;
+
+    constructor(Fail fail_) {
+        fail = fail_;
+    }
+
+    function setRevertBytes(uint256 revertBytes_) external {
+        revertBytes = revertBytes_;
+    }
+
+    /// @dev Exactly what `WithRawBytes` will revert with: `revertBytes` bytes of `0xab`. No selector
+    /// and no decodable reason, so nothing but its length can decide how `release` treats it — which
+    /// is the point, and why a test can compare against it byte for byte.
+    function rawRevertData() public view returns (bytes memory data) {
+        data = new bytes(revertBytes);
+        for (uint256 i; i < data.length; ++i) {
+            data[i] = 0xab;
+        }
+    }
+
+    /// @dev `distribute` reads `balanceOf(this)` through `_balance` before it pushes anything, so a
+    /// token that only knows how to fail still has to hold a balance to fail over.
+    mapping(address => uint256) public balanceOf;
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function transfer(address, uint256) external view returns (bool) {
+        if (fail == Fail.WithString) revert(REASON);
+        bytes memory raw = rawRevertData();
+        assembly ("memory-safe") {
+            revert(add(raw, 0x20), mload(raw))
+        }
     }
 }
 

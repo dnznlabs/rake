@@ -11,7 +11,8 @@ import {
     PlainSender,
     ReentrantDistributor,
     ReentrantReleaser,
-    RevertingReceiver
+    RevertingReceiver,
+    RevertingToken
 } from "./mocks/Mocks.sol";
 
 /// @dev Every case runs against a clone the factory deployed, because `receive()` rejects ETH on the
@@ -691,7 +692,7 @@ contract DistributionTest is Test {
 
         // Arrange / act / assert — the other shape on this side of the threshold: 32 bytes of revert
         // data, the longest payload that is still named instead of bubbled.
-        MockERC20 word = new MockERC20(MockERC20.Ret.RevertRaw);
+        RevertingToken word = new RevertingToken(RevertingToken.Fail.WithRawBytes);
         word.setRevertBytes(32);
         Distribution e = _escrowFailingToken(word);
 
@@ -708,7 +709,7 @@ contract DistributionTest is Test {
     /// bytes, so by the same rule it would come back named. The reason has to be a real string.
     function test_releaseBubblesLongReason() public {
         // Arrange
-        MockERC20 tk = new MockERC20(MockERC20.Ret.RevertString);
+        RevertingToken tk = new RevertingToken(RevertingToken.Fail.WithString);
         Distribution d = _escrowFailingToken(tk);
 
         // Act / assert
@@ -724,7 +725,7 @@ contract DistributionTest is Test {
     /// `Error(string)` is 100, so without this the rule is only pinned from a distance.
     function test_releaseBubblesJustOverThreshold() public {
         // Arrange — the mock's default length is the tight case.
-        MockERC20 tk = new MockERC20(MockERC20.Ret.RevertRaw);
+        RevertingToken tk = new RevertingToken(RevertingToken.Fail.WithRawBytes);
         assertEq(tk.revertBytes(), 33, "one byte over the threshold");
         assertEq(tk.rawRevertData().length, 33);
         Distribution d = _escrowFailingToken(tk);
@@ -815,13 +816,23 @@ contract DistributionTest is Test {
     /// mock used here fails every push, so `distribute` escrows the whole balance instead of paying
     /// it, and `release` has something to retry.
     function _escrowFailingToken(MockERC20 tk) internal returns (Distribution d) {
-        d = _deploy(0, _defaultTable());
-        tk.mint(address(d), 10_000);
-        d.distribute(address(tk));
+        return _escrowFailingToken(address(tk));
+    }
 
-        assertEq(d.escrowed(address(tk), A), 6000, "the push failed, so the row is escrowed");
-        assertEq(d.escrowed(address(tk), B), 4000);
-        assertEq(d.reserved(address(tk)), 10_000, "and nothing was paid out");
+    function _escrowFailingToken(RevertingToken tk) internal returns (Distribution d) {
+        return _escrowFailingToken(address(tk));
+    }
+
+    /// @dev Both failing mocks carry `mint(address,uint256)` and `balanceOf(address)` at the same
+    /// selectors, so the core needs only the address.
+    function _escrowFailingToken(address tk) internal returns (Distribution d) {
+        d = _deploy(0, _defaultTable());
+        MockERC20(tk).mint(address(d), 10_000);
+        d.distribute(tk);
+
+        assertEq(d.escrowed(tk, A), 6000, "the push failed, so the row is escrowed");
+        assertEq(d.escrowed(tk, B), 4000);
+        assertEq(d.reserved(tk), 10_000, "and nothing was paid out");
     }
 
     /// @dev Mock addresses are not known at authoring time, and the table must ascend by account.
