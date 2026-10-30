@@ -187,8 +187,10 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
   added the event).
 - `forge test` passes; `forge test --list --match-contract Distribution` lists the ten tests of step
   5 and every M01 test; `forge test --mc TableCapTest` reads the cap from the contract and still
-  asserts 107 under 15,000,000 and 108 refused with `BadTable` (milestone criterion 3, cap half,
-  closed in code).
+  asserts 107 under 15,000,000, and the `CAP + 1` refusal (`BadTable`) is pinned in whichever suite
+  the handoff names — `DistributionTest.test_tableCapBoundary` as built (milestone criterion 3, cap
+  half, closed in code). (Reworded 2026-10-30: an earlier version of this line put the refusal in
+  `TableCapTest`, contradicting step 2's "keep one of the two"; handoff deviation 10.)
 - `grep -n 'non-zero word\|M03 measures' src/Distribution.sol` prints nothing (#61, decision 30).
 - `node --test test/*.test.mjs` passes (the form `mk/20-dapp.mk` runs; a bare `test/` loads zero files); `tools/abi-vectors.sh` is idempotent; `docs/REFERENCE.md`'s three
   `Distribution` tables match `forge inspect Distribution abi` (M02 criterion 6's diff).
