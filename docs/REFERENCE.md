@@ -25,7 +25,8 @@ round. `self` means the function is reachable only as a queued action, the contr
 | `setBeneficiaries(Beneficiary[] table)` | self | replaces the table; reachable only as a queued action |
 | `setDescription(string description)` | self | replaces the label; reachable only as a queued action |
 | `setDelay(uint32 delay)` | self | changes the delay, through the delay in force |
-| `transferOwnership(address owner)` | self | hands over, or renounces by passing the zero address |
+| `transferOwnership(address owner)` | self | names the next owner, who must call acceptOwnership() before anything changes; the zero address renounces at once and clears any pending transfer; naming the current owner withdraws one |
+| `acceptOwnership()` | pending owner | takes ownership after transferOwnership named the caller, and clears the pending transfer |
 | `init(address owner, uint32 delay, string description, Beneficiary[] table)` | factory | initialises a clone, once, as part of the create transaction |
 | `snapshot()` | view | owner, delay, nonce, description, table and pending in one call |
 | `beneficiaries()` | view | the table as stored, which is ascending by account |
@@ -34,9 +35,11 @@ round. `self` means the function is reachable only as a queued action, the contr
 | `escrowed(address token, address account)` | view | what is held for one account after a push failed |
 | `reserved(address token)` | view | everything escrowed for a token, which the next split leaves alone |
 | `owner()` | view | who may propose and cancel; the zero address means renounced |
+| `pendingOwner()` | view | who has been named as the next owner; the zero address means no transfer is pending |
 | `delay()` | view | seconds every proposal waits before it can be applied |
 | `nonce()` | view | proposals made so far; it is hashed into every queued action |
 | `description()` | view | the label the distribution carries for itself |
+| `MAX_BENEFICIARIES()` | view | the most rows a table may carry — measured so that a worst-case split stays under half a block |
 
 ### Events
 
@@ -55,11 +58,12 @@ round. `self` means the function is reachable only as a queued action, the contr
 | error | thrown by | when |
 |:--|:--|:--|
 | `NotOwner()` | propose, cancel | the caller is not the owner |
-| `BadTable()` | init, setBeneficiaries | empty, not ascending by account, a zero share, or shares that do not sum to 10,000 |
+| `BadTable()` | init, setBeneficiaries | empty or more than 107 rows, not ascending by account, a zero share, or shares that do not sum to 10,000 |
 | `NotReady(uint256 eta)` | applyQueued | nothing is queued under that hash, or its eta has not passed |
 | `NothingToDo()` | distribute, release, cancel | there is nothing to split, retry or withdraw |
 | `Locked()` | distribute, release | re-entered while a push was still in flight |
-| `Unauthorized()` | init, the setters, receive | not the factory, not a self-call, or ETH sent to the implementation itself |
+| `ReleaseFailed(address token)` | release | the retry failed with no reason of its own — a bare false, empty revert data, or an argument-less custom error |
+| `Unauthorized()` | init, the setters, acceptOwnership, receive | not the factory, not a self-call, not the pending owner, or ETH sent to the implementation itself |
 
 ### The snapshot struct
 
