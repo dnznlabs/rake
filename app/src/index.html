@@ -390,20 +390,25 @@ async function load() {
   S.featured = a; S.loaded = true;
 }
 
-/* One distribution, in three reads: code first, so an address with nothing on it is "could not read"
-   rather than a decode error; then the snapshot; then the two numbers behind "waiting to distribute".
+/* One distribution, in four reads: code first, so an address with nothing on it is "could not read"
+   rather than a decode error; then the snapshot; then the two numbers behind "waiting to distribute";
+   then `pendingOwner()`, which the struct deliberately does not carry (ruling 3) and no event
+   announces, so a transfer waiting to be accepted is legible from nothing else. It goes beside the
+   balance reads and is guarded no more than they are: an RPC that cannot answer it could not answer
+   `snapshot()` either, and a zero here means "nothing pending", which a failure must never read as.
    ETH only in v1 — a token balance needs a token list, which the chain does not carry. */
 async function loadDistro(addr) {
   const code = await P.request({ method: 'eth_getCode', params: [addr, 'latest'] });
   if (!code || code === '0x') return { addr, missing: true };
   const [snap] = Eth.dec([Model.SNAPSHOT_T], await P.request({ method: 'eth_call', params: [{ to: addr, data: Eth.enc('snapshot()', []) }, 'latest'] }));
-  const [reserved, balance] = await Promise.all([
+  const [reserved, balance, nominee] = await Promise.all([
     call(addr, 'reserved(address)', [ZERO], ['uint256']),
     P.request({ method: 'eth_getBalance', params: [addr, 'latest'] }),
+    call(addr, 'pendingOwner()', [], ['address']),
   ]);
   const [owner, delay, nonce, description, table, pending] = snap;
   const waiting = BigInt(balance) - reserved[0];
-  return { addr, owner, delay, nonce, description, table, pending, waiting: waiting > 0n ? waiting : 0n };
+  return { addr, owner, delay, nonce, description, table, pending, pendingOwner: nominee[0], waiting: waiting > 0n ? waiting : 0n };
 }
 
 /* The histories, as two log queries with their topic0s OR'd. `from` is the distribution's own first
@@ -539,8 +544,12 @@ const eyebrow = (text, cls) => `<div class="eyebrow${cls ? ' ' + cls : ''}">${te
 const notice = (text, cls) => `<div class="notice${cls ? ' ' + cls : ''}">${text}</div>`;
 const unreadable = addr => notice(`could not read a distribution at ${ext('address', addr, short(addr))} on ${cname(CFG.chainId)} — nothing is deployed there.`, 'err');
 
-/* Owner, delay and the balance behind `distribute`. Writing it is t03; reading it is this task. */
-const meta = d => `<div class="meta"><div><div class="k">owner</div><div class="v">${d.owner === ZERO ? 'renounced' : ext('address', d.owner, esc(short(d.owner)))}${ACC && d.owner.toLowerCase() === ACC.toLowerCase() ? ' · you' : ''}</div></div>`
+/* Owner, delay and the balance behind `distribute`. The owner cell takes a second line while a
+   transfer is waiting for its nominee to accept (decision 21): the current owner above it still holds
+   every power, which is why the pending address is a line of its own and not a replacement. */
+const meta = d => `<div class="meta"><div><div class="k">owner</div><div class="v">${d.owner === ZERO ? 'renounced' : ext('address', d.owner, esc(short(d.owner)))}${ACC && d.owner.toLowerCase() === ACC.toLowerCase() ? ' · you' : ''}</div>`
+  + (d.pendingOwner && d.pendingOwner !== ZERO ? `<div class="v amber">transfer pending to ${ext('address', d.pendingOwner, esc(short(d.pendingOwner)))}</div>` : '')
+  + `</div>`
   + `<div><div class="k">delay</div><div class="v${Number(d.delay) ? '' : ' amber'}">${delayText(d.delay)}</div></div>`
   + `<div><div class="k">waiting to distribute</div><div class="v">${eth(d.waiting)}</div></div></div>`;
 
@@ -571,7 +580,7 @@ function pendingActs(d, p, i) {
       ? sctl(`apply:${i}`, 'apply', { to: d.addr, sig: 'applyQueued(bytes,uint32)', args: () => [p[2], nonce], label: 'applyQueued' })
         + `<span class="status">the delay has passed — anyone can land it${ACC ? '' : ' · connect a wallet to send it'}</span>`
       : '<button class="btn off sm" disabled>apply</button><span class="status">anyone can apply once the delay passes</span>';
-  const cancel = VIEW === 'visitor' ? ''
+  const cancel = !OWNS() ? ''
     : wctl(`cancel:${i}`, 'cancel', { to: d.addr, sig: 'cancel(bytes32)', args: () => [p[0]], label: 'cancel' })
       + '<span class="status">cancel is owner-only and immediate</span>';
   return `<div class="acts">${cancel}${apply}</div>`;
@@ -641,14 +650,19 @@ function editorBind(rows, redraw, after) {
 /* ---- the writes, and who may send them ------------------------------------------------------- */
 /* Every write a view offers is registered here under the key its button carries, with its arguments
    as a thunk so an input is read when the button is pressed and not when it was drawn. Two kinds:
-   `wctl` is owner-gated, and in the vault view decision 7 turns it into calldata to copy rather than
-   a transaction this page could not sign; `sctl` is permissionless — `distribute`, `release` and
-   `applyQueued` are anyone's, whoever the owner is — and always sends. */
+   `wctl` is for the writes one named account may send, and where that account is a contract decision 7
+   turns the control into calldata to copy rather than a transaction this page could not sign; `sctl`
+   is permissionless — `distribute`, `release` and `applyQueued` are anyone's, whoever the owner is —
+   and always sends. The five `VIEW` values answer two different questions, so each has its own
+   reading: `OWNS` is who may propose and cancel, and `COPIES` is who acts through a contract. A
+   nominee's vault is the second without being the first — it may accept, and nothing else. */
 const WRITES = new Map();
 let VIEW = 'visitor';
+const OWNS = () => VIEW === 'owner' || VIEW === 'vault';
+const COPIES = () => VIEW === 'vault' || VIEW === 'pending-vault';
 function wctl(key, label, w) {
   WRITES.set(key, w);
-  return VIEW === 'vault'
+  return COPIES()
     ? `<button class="btn sec sm" data-copy="${key}"${w.locked ? ' disabled' : ''}>copy calldata for your vault</button>`
     : w.hold ? `<button class="btn sec sm hold" data-send="${key}"${w.locked ? ' disabled' : ''}><span>${label}</span></button>` : `<button class="btn sm" data-send="${key}">${label}</button>`;
 }
@@ -843,13 +857,26 @@ const bindAll = () => bindWrites(() => detail(DS.d.addr));
    calldata to copy; anything else is a visitor. The probe is a raw `eth_call` rather than `call()`,
    because an EOA owner has no code and answers `0x` — which has to read as "not a vault", and so does
    a revert from a contract that has no such function. */
-async function ownerView(d) {
-  if (!ACC || d.owner === ZERO) return 'visitor';
-  if (same(ACC, d.owner)) return 'owner';
+const signsFor = async addr => {
+  if (!addr || addr === ZERO) return false;
   try {
-    const r = await P.request({ method: 'eth_call', params: [{ to: d.owner, data: Eth.enc('isOwner(address)', [ACC]) }, 'latest'] });
-    return r && r !== '0x' && BigInt(r) === 1n ? 'vault' : 'visitor';
-  } catch (e) { return 'visitor'; }
+    const r = await P.request({ method: 'eth_call', params: [{ to: addr, data: Eth.enc('isOwner(address)', [ACC]) }, 'latest'] });
+    return !!r && r !== '0x' && BigInt(r) === 1n;
+  } catch (e) { return false; }
+};
+/* The two pending views are additive: they are what an account that reads as a `visitor` today gets
+   when the two-step ABI has named it, or a vault it signs for, as the next owner. The owner views
+   keep their precedence — an account that is both a signer of the owning vault and the nominee is
+   shown the bar with more power on it, and accepting is still one route away. */
+async function ownerView(d) {
+  if (!ACC) return 'visitor';
+  if (d.owner !== ZERO) {
+    if (same(ACC, d.owner)) return 'owner';
+    if (await signsFor(d.owner)) return 'vault';
+  }
+  if (same(ACC, d.pendingOwner)) return 'pending';
+  if (await signsFor(d.pendingOwner)) return 'pending-vault';
+  return 'visitor';
 }
 
 async function detail(addr) {
@@ -925,15 +952,30 @@ function paintDetail() {
 }
 
 /* The owner's one control, in both owner views. The drawer is the same either way: in the vault view
-   the writes inside it are calldata rather than transactions, and that is the whole difference. */
+   the writes inside it are calldata rather than transactions, and that is the whole difference.
+   `'you own this distribution'` is still right for an owner with a transfer pending against them,
+   because it is: nothing moves until the nominee accepts. */
 function ownerBar(d) {
-  EMBED = VIEW === 'visitor' ? null : d;
-  if (!EMBED) return '';
+  EMBED = OWNS() ? d : null;
+  if (!EMBED) return acceptBar(d);
   return '<div class="actions">'
     + `<button class="btn" id="queue">${DRAWER ? 'Close' : 'Queue a change'}</button><a class="btn sec" href="#/docs#widget">Embed the widget</a>`
     + `<span class="status">${VIEW === 'vault'
       ? `you are a signer on ${ext('address', d.owner, esc(short(d.owner)))}, which owns this distribution — every change below is calldata to submit through it`
       : 'you own this distribution'}</span></div>`;
+}
+/* The other half of a two-step transfer, and the only control the nominee is offered: a transfer this
+   dapp starts can be finished in it (ruling 2). `acceptOwnership()` takes no argument and is refused
+   for anyone but the nominee, so the account is the whole of the authorisation — which is why the
+   status line names it rather than describing a rule. A nominee that is a contract gets the calldata
+   to submit through it, like every other write a contract owner makes (decision 7). */
+function acceptBar(d) {
+  if (VIEW !== 'pending' && VIEW !== 'pending-vault') return '';
+  return '<div class="actions">'
+    + wctl('accept', 'accept ownership', { to: d.addr, sig: 'acceptOwnership()', args: () => [], label: 'acceptOwnership' })
+    + `<span class="status">${VIEW === 'pending-vault'
+      ? `you are a signer on ${ext('address', d.pendingOwner, esc(short(d.pendingOwner)))}, which is the pending owner — accepting makes it the owner at once; nothing changes until it does`
+      : 'you are the pending owner — accepting makes you the owner at once; nothing changes until you do'}</span></div>`;
 }
 
 /* The prototype's "Queue a change" (`rake-dapp.html:408-425`), less the four rows it carried that this
