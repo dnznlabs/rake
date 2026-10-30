@@ -20,7 +20,11 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
 
 1. **Two-step ownership, struct unchanged (decision 21, [#74](https://github.com/dnznlabs/rake/issues/74)).**
    In `src/Distribution.sol`:
-   - Add `address public pendingOwner;` after `owner` (line 53). It is **not** in `Snapshot`; the
+   - Add `address public pendingOwner;` after `nonce` (line 55), not after `owner`: `owner`, `delay`
+     and `nonce` pack into slot 0 today and a 20-byte `pendingOwner` cannot join them either way, so
+     placing it after `nonce` leaves slot 0 intact and `propose` and `snapshot` keep one SLOAD for
+     the three; after `owner` would split that slot for nothing. (Corrected 2026-10-30; the first
+     version of this step said "after `owner`".) It is **not** in `Snapshot`; the
      struct and `snapshot()` do not change.
    - `transferOwnership(address owner_)` stays `onlySelf` and becomes: `owner_ == address(0)` →
      `owner = address(0); pendingOwner = address(0);` (renounce stays immediate, and a transfer that
@@ -32,9 +36,13 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
      zero and no caller equals it, so the one comparison covers both cases). `Unauthorized()` rather
      than `NotOwner()`:
      the caller is not claiming to be the owner, and `NotOwner` is documented as "the caller is not
-     the owner". No new event: the handover's intent is already on chain as the `Queued`/`Applied`
-     pair of the `transferOwnership` action, and the dapp reads `owner()`; the reviewer may ask for
-     one in Phase 3, and it would be an ABI addition then, not a struct change.
+     the owner". `acceptOwnership` emits `OwnershipTransferred(address indexed previousOwner, address indexed newOwner)`,
+     the Ownable2Step name. (Corrected 2026-10-30 in the #103 review; the first version said "no new
+     event". Reversed because every other mutator in the contract leaves a log — the setters and
+     renounce through `Queued`/`Applied`, the money paths through their own events — and the accept
+     would have been the one state change with no on-chain trace, so a log reader sees "nominated B"
+     and never "B took it". The nomination itself needs no event: it rides in `Queued`'s calldata.)
+     One event, emitted in `acceptOwnership` only; a REFERENCE § Events row follows it.
    - Doc comments: `transferOwnership`'s `@notice` says a non-zero address is *pending until accepted*
      and `address(0)` renounces at once; `acceptOwnership` has a `@notice`.
    - `cancel(bytes32)` needs no change: cancelling the queued `transferOwnership` action before its
@@ -57,11 +65,18 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
    In `test/TableCap.t.sol`: delete the local `CAP` constant (line 45) and read
    `Distribution(payable(address(impl))).MAX_BENEFICIARIES()` — or import the constant through the
    contract type, whichever `forge lint` accepts silently — so the two pinning tests measure the
-   contract's own figure. The 107 and 108 measurements still run, which is what makes criterion 3
-   "closed in code".
+   contract's own figure. The 107-row measurement still runs; **the 108-row measurement cannot**,
+   since `_prepare` builds every table through `create` → `init` → `_set` and the cap now refuses
+   it there — so `setUp` drops `_prepare(CAP + 1)`, and the `CAP + 1` test becomes
+   `vm.expectRevert(BadTable.selector)` on a 108-row `create`. The 15,035,242 figure is history,
+   kept in t01's handoff and in the constant's `@dev`; the handoff points there. (Corrected
+   2026-10-30: the first version of this step said both measurements still run, which Elanik found
+   impossible — `setUp` itself reverted. Criterion 3 was clarified the same day to say "refused".)
+   With that refusal in `TableCapTest`, step 5's `test_tableCapBoundary` may be redundant; keep one
+   of the two and say which in the handoff.
 
    Check: `forge test --mc TableCapTest -vv` passes and still prints `gas at CAP` under
-   15,000,000 and `CAP + 1` over.
+   15,000,000, and the `CAP + 1` test shows `BadTable` refused.
 
 3. **`ReleaseFailed(address token)` (decision 24, [#20](https://github.com/dnznlabs/rake/issues/20)).**
    Add `error ReleaseFailed(address token);` to the errors block (after `Unauthorized()`, line 45). In
@@ -129,7 +144,7 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
    `sigs` after `transferOwnership(address)`, keep the existing order otherwise, and run it. Add a
    row to `docs/REFERENCE.md`'s factory section only if the factory changed (it should not).
 
-   Check: `node --test test/` passes (`docs.test.mjs` reads the struct and the selector fixture
+   Check: `node --test test/*.test.mjs` passes (the form `mk/20-dapp.mk` runs; a bare `test/` loads zero files) (`docs.test.mjs` reads the struct and the selector fixture
    against the tables); running `tools/abi-vectors.sh` a second time leaves `git status --porcelain`
    empty; M02 criterion 6's diff of the three `Distribution` tables against
    `forge inspect Distribution abi` is clean.
@@ -165,14 +180,19 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
 
 - `forge inspect Distribution abi --json | jq -c '.[]|select(.name=="snapshot")|.outputs[0].components|map(.name)'`
   prints `["owner","delay","nonce","description","table","pending"]` (milestone criterion 2).
-- The ABI gains exactly `acceptOwnership()`, `pendingOwner()`, `MAX_BENEFICIARIES()` and
-  `ReleaseFailed(address)`, and loses nothing: `forge inspect Distribution abi --json | jq -r '.[]|select(.type!="constructor")|.name' | sort`
-  on the branch minus the same on `origin/main` is those four names.
+- The ABI gains exactly `acceptOwnership()`, `pendingOwner()`, `MAX_BENEFICIARIES()`,
+  `ReleaseFailed(address)` and `OwnershipTransferred(address,address)`, and loses nothing:
+  `forge inspect Distribution abi --json | jq -r '.[]|select(.type!="constructor")|.name' | sort`
+  on the branch minus the same on `origin/main` is those five names (four before the #103 review
+  added the event).
 - `forge test` passes; `forge test --list --match-contract Distribution` lists the ten tests of step
   5 and every M01 test; `forge test --mc TableCapTest` reads the cap from the contract and still
-  asserts 107 under and 108 over 15,000,000 (milestone criterion 3, cap half, closed in code).
+  asserts 107 under 15,000,000, and the `CAP + 1` refusal (`BadTable`) is pinned in whichever suite
+  the handoff names — `DistributionTest.test_tableCapBoundary` as built (milestone criterion 3, cap
+  half, closed in code). (Reworded 2026-10-30: an earlier version of this line put the refusal in
+  `TableCapTest`, contradicting step 2's "keep one of the two"; handoff deviation 10.)
 - `grep -n 'non-zero word\|M03 measures' src/Distribution.sol` prints nothing (#61, decision 30).
-- `node --test test/` passes; `tools/abi-vectors.sh` is idempotent; `docs/REFERENCE.md`'s three
+- `node --test test/*.test.mjs` passes (the form `mk/20-dapp.mk` runs; a bare `test/` loads zero files); `tools/abi-vectors.sh` is idempotent; `docs/REFERENCE.md`'s three
   `Distribution` tables match `forge inspect Distribution abi` (M02 criterion 6's diff).
 - `forge build --force` prints zero `warning[` / `Warning (` lines; `forge lint` and
   `forge fmt --check` are silent; `forge snapshot --check` exits 0 on the committed snapshot;
@@ -188,7 +208,7 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
   t03's, not this task's, so the PR stays reviewable as a contract change.
 - `pendingOwner` in `Snapshot`, or any struct change. Decision 21 rejected it; it re-opens M02
   t01–t05.
-- An `OwnershipTransferred` event, an `isPendingOwner` probe, or a deadline on the pending transfer.
+- An `OwnershipTransferStarted` event, an `isPendingOwner` probe, or a deadline on the pending transfer. (`OwnershipTransferred` on accept is in, step 1, since the #103 review.)
   Raise in the handoff if the tests make a case; the reviewer decides in Phase 3.
 - Changing `PUSH_GAS` (decision 30 keeps it), `_push`'s return-word rule (decision 26 keeps it), or
   `reserved`'s semantics (decision 23 documents instead).
@@ -201,7 +221,7 @@ re-derived ([#96](https://github.com/dnznlabs/rake/issues/96)): `CAP = 107`, `PU
 
 None. Four choices this plan makes rather than asks, each the architect's and recorded here: the
 getter is named `MAX_BENEFICIARIES` and is `public` (step 2); `acceptOwnership` by the wrong caller
-reverts `Unauthorized()` and emits no event (step 1); a pending transfer is withdrawn by proposing
+reverts `Unauthorized()` and emits `OwnershipTransferred` on success (step 1, corrected in the #103 review); a pending transfer is withdrawn by proposing
 the current owner (step 1); and `release`'s threshold is read as `data.length <= 32` exactly as
 decision 24 words it (step 3).
 

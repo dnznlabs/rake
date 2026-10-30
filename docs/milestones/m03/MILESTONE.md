@@ -53,8 +53,12 @@ than quote.
    with no `Escrowed` event, and the handoff records the gas each `receive` consumed against the
    constant. `_set` refuses a table longer than a cap, pinned by a test that proves the cap-length
    table's worst case — every push escrowed — `distribute`s under half of a 30M-gas block, with the
-   measured figure in the handoff and in `SECURITY.md`. The cap's value is the ruling's (D8), the
-   measurement is this criterion's. Today: no cap, `PUSH_GAS` unmeasured.
+   measured figure in the handoff and in `SECURITY.md`, and a table one row longer is refused by
+   `_set` (`BadTable`) — refused, not measured: once the contract enforces the cap, the cost of a
+   cap-plus-one table is a historical figure, m03-t01's 15,035,242 at 108 rows, kept in that handoff
+   and in the constant's own comment (clarified 2026-10-30 after m03-t02 found that the 108-row
+   measurement cannot be built through `_set` once the cap is in it). The cap's value is the
+   ruling's (D8), the measurement is this criterion's. Today: no cap, `PUSH_GAS` unmeasured.
 4. **An independent review has read the final code and `SECURITY.md` dispositions all of it.**
    `SECURITY.md` at the repo root, in the shape of multisig.software's (prior reviews with date,
    method, scope commit and result; one disposition row per finding with severity, contract change
