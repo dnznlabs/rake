@@ -1015,26 +1015,40 @@ function drawerHTML(d) {
     + ownershipHTML(d)
     + '</div>';
 }
-/* Both ownership writes sit collapsed under one disclosure, behind a selector: each has its own
-   three acknowledgements (`ACKS`), each enabled only once the one above it is checked, and a hold
-   button that unlocks after the last. `ACK` is how many are checked, so a repaint keeps them; a switch
-   of mode, or a new address typed, clears them. */
+/* There are four ownership writes and the owner sends three of them: `transferOwnership(address)`
+   nominates, the zero address renounces, and the owner's own address withdraws a nomination in flight.
+   The fourth is the nominee's `acceptOwnership()`, which is the other bar on the page, not this
+   disclosure. The three the owner sends sit collapsed here behind a selector — nominate and withdraw
+   are one field, since they are one call (ruling 5) — each mode with its own three acknowledgements
+   (`ACKS`), each enabled only once the one above it is checked, and a hold button that unlocks after
+   the last. `ACK` is how many are checked, so a repaint keeps them; a switch of mode, or a new address
+   typed, clears them. */
 const ACKS = {
   transfer: [
-    'Once this is applied, the new owner alone can propose and cancel changes, unless they change the owner back to me.',
-    'I have checked the address. A mistyped address, or one nobody controls, loses control of this distribution permanently.',
-    'After the delay anyone can apply it. I can cancel it only until then.',
+    'Applying this names the address as the pending owner. I keep every power over this distribution until that address calls acceptOwnership() itself.',
+    'I have checked the address. One that cannot accept takes nothing, and until it accepts I can withdraw the nomination by proposing my own address.',
+    'After the delay anyone can apply it. I can cancel it until then, and withdraw the nomination after.',
   ],
   renounce: [
-    'Once this is applied, no change to this distribution can be proposed or cancelled again, by anyone.',
+    'Once this is applied, no change to this distribution can be proposed or cancelled again, by anyone. A transfer waiting to be accepted is destroyed with it.',
     'The table, the delay and the name become permanent, mistakes included, once nothing else is queued. Funds keep going to the addresses in the table.',
     'After the delay anyone can apply it. I can cancel it only until then.',
   ],
 };
 let ACK = 0, OWNMODE = 'transfer', OWNER_IN = '';
-// Change owner's statements stay locked until the field holds an address that is neither zero nor the
-// current owner; a name counts once resolved.
-const ownReady = () => { const v = OWNER_IN.trim(); return OWNMODE !== 'transfer' || (isAddr(v) && checksumOk(v) && ![ZERO, DS.d.owner].includes(Eth.checksum(v))); };
+/* The current owner's own address is the one way to withdraw a nomination (ruling 5), so the field
+   admits it while a transfer is pending and refuses it otherwise, where it would queue a call that
+   does nothing. */
+const withdrawing = a => same(a, DS.d.owner) && DS.d.pendingOwner !== ZERO;
+// Change owner's statements stay locked until the field holds an address that is not zero and is
+// either not the current owner or a withdrawal; a name counts once resolved.
+const ownReady = () => {
+  const v = OWNER_IN.trim();
+  if (OWNMODE !== 'transfer') return true;
+  if (!isAddr(v) || !checksumOk(v)) return false;
+  const a = Eth.checksum(v);
+  return a !== ZERO && (a !== DS.d.owner || withdrawing(a));
+};
 /* What the proposed owner is, read once per address and kept so a repaint shows it again: a contract,
    an account with a history, or one that has never sent a transaction here — legitimate for a new key,
    and also what a mistyped address looks like, so it is amber rather than refused. */
@@ -1058,7 +1072,9 @@ function ownerNote() {
   if (!checksumOk(v)) return { text: BAD_SUM, cls: 'bad' };
   const a = Eth.checksum(v);
   if (a === ZERO) return { text: 'the zero address — renouncing is the other tab', cls: 'bad' };
-  if (a === DS.d.owner) return { text: 'that is the current owner', cls: 'bad' };
+  if (a === DS.d.owner) return withdrawing(a)
+    ? { text: 'withdraws the pending transfer', cls: 'warn' }
+    : { text: 'that is the current owner', cls: 'bad' };
   return PROBE.get(a) || { text: 'reading the address…', cls: '' };
 }
 function ownershipHTML(d) {
@@ -1067,11 +1083,11 @@ function ownershipHTML(d) {
   return `<details class="danger" id="ownership"${OWNOPEN ? ' open' : ''}><summary>ownership</summary>`
     + `<div class="tabs">${[['transfer', 'change owner'], ['renounce', 'renounce ownership']].map(([k, l]) => `<button class="tab${OWNMODE === k ? ' on' : ''}" data-own="${k}">${l}</button>`).join('')}</div>`
     + (t
-      ? `<p class="help">Hands this distribution to another address. Enter it, confirm each statement in turn${hold}.</p>`
+      ? `<p class="help">Nominates another address as the next owner, which becomes the owner only when it calls <code>acceptOwnership()</code> itself. Your own address withdraws a nomination. Enter it, confirm each statement in turn${hold}.</p>`
         + (n => `<div class="field"><input id="q-owner" aria-label="new owner" placeholder="new owner — 0x… or a name" value="${esc(OWNER_IN)}"><div class="res${n.cls ? ' ' + n.cls : ''}" id="q-ownerres">${esc(n.text)}</div></div>`)(ownerNote())
       : `<p class="help">Transfers ownership to nobody. Confirm each statement in turn${hold}.</p>`)
     + acks.map((x, i) => `<label class="ack"><input type="checkbox" data-ack="${i}"${ACK > i ? ' checked' : ''}${ACK < i || !ok ? ' disabled' : ''}><span>${x}</span></label>`).join('')
-    + wctl(OWNMODE, t ? 'hold to change owner' : 'hold to renounce', {
+    + wctl(OWNMODE, t ? 'hold to nominate' : 'hold to renounce', {
       to: d.addr, sig: 'propose(bytes)', label: t ? 'propose transferOwnership' : 'propose renounce', hold: true, locked: ACK < acks.length || !ok,
       args: () => {
         if (!t) return [Eth.enc('transferOwnership(address)', [ZERO])];
