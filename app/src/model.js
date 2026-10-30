@@ -55,8 +55,9 @@ const Model = (() => {
   }
 
   /* Every custom error a write from this page can provoke, by the selector `cast sig` gives it. The
-     value is what the page says instead of the four bytes; `NotReady` is the only one carrying data,
-     and its eta reads as the same countdown the pending block already prints. */
+     value is what the page says instead of the four bytes. Two of them carry data: `NotReady`'s eta
+     reads as the same countdown the pending block already prints, and `ReleaseFailed`'s token is
+     deliberately not printed — the release button it answers already names the token. */
   const ERRORS = {
     '0x30cd7471': () => 'only the owner can do that',                                     // NotOwner()
     '0x40da0647': () => 'the table must total 100%, every share above zero, ascending by address', // BadTable()
@@ -71,7 +72,13 @@ const Model = (() => {
     },
     '0x5c52a868': () => 'nothing to do — there is nothing waiting here',                   // NothingToDo()
     '0x0f2e5b6c': () => 'locked — another call on this contract is still running',         // Locked()
-    '0x82b42900': () => 'this contract will not take that call',                           // Unauthorized()
+    /* ReleaseFailed(address token): decision 24's threshold swallows an argument-less custom error
+       too, so a token that reverted `Refused()` arrives here as well — "no reason" is exact for both,
+       and for the bare `false` the push path turns into one. */
+    '0xca0b64e5': () => 'retry failed — the token gave no reason',                         // ReleaseFailed(address)
+    /* One message for both callers: the `init`/`receive` guards, and a wrong account pressing
+       accept, which `acceptOwnership()` refuses with the same four bytes. */
+    '0x82b42900': () => 'this contract will not take that call from this account',         // Unauthorized()
     '0x30116425': () => 'a distribution already exists at that address',                   // DeploymentFailed()
     '0x0c4549ef': () => 'that salt belongs to another wallet',                             // SaltDoesNotStartWith()
   };
@@ -80,8 +87,11 @@ const Model = (() => {
   function revertMessage(data, now) {
     const d = String(data == null ? '' : data);
     if (!d || d === '0x') return 'reverted';
-    // #20: `release` bubbles the token's own `false` word — 32 bytes, no selector in front of them.
-    if (d.length === 66) return 'retry failed';
+    /* #20: `_balance` bubbles whatever `balanceOf` reverted with, unguarded (`src/Distribution.sol:308`),
+       so a token whose balance read reverts with one bare word — 32 bytes, no selector in front of
+       them — still reaches here through `distribute`. `release` no longer does: it names
+       `ReleaseFailed(token)` above. */
+    if (d.length === 66) return 'the token refused the call';
     const known = ERRORS[d.slice(0, 10).toLowerCase()];
     return known ? known(d, now) : `reverted (${d.slice(0, 10)})`;
   }

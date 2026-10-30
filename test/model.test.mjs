@@ -125,18 +125,22 @@ test('salt puts the sender in the top 20 bytes and the counter in the low 12', (
   assert.equal(salt(sender, 255).slice(-24), '0000000000000000000000ff');
 });
 
-/* The eight selectors, each beside the `cast sig` that produced it and the line of
-   `src/Distribution.sol` that declares it. `test/fixtures/abi/selectors.txt` carries function
-   selectors only, so the errors are held against the contract instead — see the handoff. */
+/* The nine selectors, each beside the `cast sig` that produced it and the line of
+   `src/Distribution.sol` that declares it — every annotation re-read on this revision rather than
+   carried over. `test/fixtures/abi/selectors.txt` carries function selectors only, so the errors are
+   held against the contract instead — see the handoff. `ReleaseFailed` takes an argument, so its
+   padded token rides behind the selector here; the message deliberately does not name it. */
 test('revertMessage names every custom error the write screens can provoke', () => {
+  const TOKEN = '0x' + 'e'.repeat(40);
   const got = [
-    revertMessage('0x30cd7471'),  // cast sig "NotOwner()"              · Distribution.sol:40
-    revertMessage('0x40da0647'),  // cast sig "BadTable()"              · Distribution.sol:41
-    revertMessage('0x5c52a868'),  // cast sig "NothingToDo()"           · Distribution.sol:43
-    revertMessage('0x0f2e5b6c'),  // cast sig "Locked()"                · Distribution.sol:44
-    revertMessage('0x82b42900'),  // cast sig "Unauthorized()"          · Distribution.sol:45
-    revertMessage('0x30116425'),  // cast sig "DeploymentFailed()"      · Distribution.sol:299
-    revertMessage('0x0c4549ef'),  // cast sig "SaltDoesNotStartWith()"  · Distribution.sol:300
+    revertMessage('0x30cd7471'),  // cast sig "NotOwner()"              · Distribution.sol:45
+    revertMessage('0x40da0647'),  // cast sig "BadTable()"              · Distribution.sol:46
+    revertMessage('0x5c52a868'),  // cast sig "NothingToDo()"           · Distribution.sol:48
+    revertMessage('0x0f2e5b6c'),  // cast sig "Locked()"                · Distribution.sol:49
+    revertMessage('0x82b42900'),  // cast sig "Unauthorized()"          · Distribution.sol:50
+    revertMessage('0xca0b64e5' + Eth.pad(TOKEN)),  // cast sig "ReleaseFailed(address)" · Distribution.sol:51
+    revertMessage('0x30116425'),  // cast sig "DeploymentFailed()"      · Distribution.sol:342
+    revertMessage('0x0c4549ef'),  // cast sig "SaltDoesNotStartWith()"  · Distribution.sol:343
   ];
 
   assert.deepEqual(got, [
@@ -144,7 +148,8 @@ test('revertMessage names every custom error the write screens can provoke', () 
     'the table must total 100%, every share above zero, ascending by address',
     'nothing to do — there is nothing waiting here',
     'locked — another call on this contract is still running',
-    'this contract will not take that call',
+    'this contract will not take that call from this account',
+    'retry failed — the token gave no reason',
     'a distribution already exists at that address',
     'that salt belongs to another wallet',
   ]);
@@ -154,7 +159,7 @@ test('revertMessage names every custom error the write screens can provoke', () 
    queued at all, which is what a stale page clicking a change someone else already applied gets. */
 test('NotReady carries its eta as the countdown, not as the raw error', () => {
   const now = 1760000000;
-  // cast sig "NotReady(uint256)" · Distribution.sol:42 — the eta is its one argument.
+  // cast sig "NotReady(uint256)" · Distribution.sol:47 — the eta is its one argument.
   const got = [
     revertMessage('0x5a997526' + Eth.pad(now + 3 * 86400 + 14 * 3600), now),
     revertMessage('0x5a997526' + Eth.pad(now + 90), now),
@@ -168,14 +173,17 @@ test('NotReady carries its eta as the countdown, not as the raw error', () => {
   ]);
 });
 
-test('a bare 32-byte word is the token refusing, and reads as retry failed', () => {
-  // #20: `release` bubbles the `false` the token returned, with no selector in front of it.
+test('a bare 32-byte word is a balanceOf revert bubbled raw, and reads as the token refusing', () => {
+  /* #20: `_balance` bubbles whatever `balanceOf` reverted with and guards nothing
+     (`src/Distribution.sol:308-313`), so one bare word with no selector in front of it still reaches
+     here through `distribute`. `release` no longer takes this path — it reverts `ReleaseFailed(token)`,
+     asserted above. */
   const got = [
     revertMessage('0x' + '0'.repeat(64)),
     revertMessage('0x' + '0'.repeat(63) + '1'),
   ];
 
-  assert.deepEqual(got, ['retry failed', 'retry failed']);
+  assert.deepEqual(got, ['the token refused the call', 'the token refused the call']);
 });
 
 test('revertMessage says reverted when there are no bytes to read', () => {
