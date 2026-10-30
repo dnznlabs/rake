@@ -1,6 +1,9 @@
 # M03 — Hardening and deploy readiness
 
-Status: not started · updated 2026-10-26
+Status: in progress · updated 2026-10-30 — Phase 1 closed 2026-10-30 (D1–D13 ruled as decisions
+20–33; the four `decision` issues ruled last, #85, #88 and #89, closed that day; #90 stays open until
+the DNZN Creator key exists, which is criterion 6's remaining input); Phase 2 t01 merged 2026-10-27
+(#94)
 
 Everything that has to be true about the contracts before they touch a public network: every open
 question about `src/Distribution.sol` ruled and the accepted changes landed, an independent review of
@@ -62,9 +65,11 @@ than quote.
    — run with `make audit` complete in the method's own sense: `audits/<date>/AUDIT.md` exists, its
    provenance block names the review commit with `dirty: no`, and both leg directories under it are
    non-empty. `SECURITY.md` calls it what the method's README calls it, a two-model agent review and
-   not an independent audit, until D1(b) happens. For every one of `#18 #19 #20 #22 #54 #61 #74`,
+   not an independent audit, until D1(b) happens. For every one of `#18 #19 #20 #22 #54 #61 #74 #95`,
    `grep -c "rake/issues/<n>\|#<n>\b" SECURITY.md` is at least 1, and the row says what was decided and
-   where the ruling is. `README.md`'s `AUDIT` cell no longer reads `none yet (M03)`.
+   where the ruling is. `README.md`'s `AUDIT` cell no longer reads `none yet (M03)`. (#95, the
+   permanent escrow to a recipient that always burns the push, was added to this list on 2026-10-30
+   from t01's handoff § Discoveries 2; it is a `SECURITY.md` paragraph, not a code change.)
 5. **The overview's stipend claim is qualified where it is made.** `grep -n '2,300' docs/brainstorming/PROJECT_OVERVIEW.md`
    finds the § 5 sentence followed by the qualifier #18 asks for — in the frozen brainstorming folder
    this is one appended sentence pointing at `SECURITY.md`, nothing else moves — and `#/docs`'s
@@ -165,7 +170,7 @@ reference following the ABI.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m03-t01](tasks/m03-t01/TASK.md) | The two measurements, no `src/` change: a multisig.software vault clone and a Safe as ETH beneficiaries from their published creation bytecode, the gas each `receive` needs against `PUSH_GAS`; `distribute` gas per row with every push escrowed, and the table length that stays under 15M; figures in the handoff, the two tests of criterion 3 written against the current constants and failing or passing as the figures say | not started |
+| [m03-t01](tasks/m03-t01/TASK.md) | The two measurements, no `src/` change: a multisig.software vault clone and a Safe as ETH beneficiaries from their published creation bytecode, the gas each `receive` needs against `PUSH_GAS`; `distribute` gas per row with every push escrowed, and the table length that stays under 15M; figures in the handoff, the two tests of criterion 3 written against the current constants and failing or passing as the figures say | done 2026-10-27 ([#94](https://github.com/dnznlabs/rake/pull/94)): Safe `receive` 4,029, clone 404, `PUSH_GAS` headroom 95,971; worst-case row 138,917, `CAP` 107 (14,896,325 at 107, 15,035,242 at 108); `src/` untouched; opened [#95](https://github.com/dnznlabs/rake/issues/95) and [#96](https://github.com/dnznlabs/rake/issues/96) |
 | [m03-t02](tasks/m03-t02/TASK.md) | `Distribution.sol` under D2, D4–D8 and D11: two-step ownership as (a′) with `pendingOwner()` and `acceptOwnership()`, the table cap, `PUSH_GAS` as ruled, the `_push` comment; tests for every path the ABI gains (accept by the pending owner, accept by anyone else reverting, renounce still immediate, cancel of a pending transfer, cap boundary); M01 suite re-run, `.gas-snapshot` regenerated, `docs/REFERENCE.md` tables and `tools/abi-vectors.sh` fixtures regenerated; `#/docs` claims about ownership re-read against the new lines | not started |
 | [m03-t03](tasks/m03-t03/TASK.md) | The dapp follows the ABI: the ownership block shows a pending owner and offers accept to the connected wallet that is it (copy-calldata when a vault, decision 7); `#/docs` § ownership rewritten for two steps; node tests and the M02 criterion 4 ownership walk re-run on anvil; chunks re-uploaded and criterion 8's hashes re-recorded. Retired if D2 rules (b) | not started |
 
@@ -175,7 +180,7 @@ An independent reading of the final `src/`, every finding dispositioned, and the
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m03-t04](tasks/m03-t04/TASK.md) | The review as D1 rules: `add.sh forge-audit`, `audits/SCOPE` as D10 rules with every exclusion reasoned, `audits/KNOWN_ANSWER.md` holding the carried issues the legs are not told about (#19, #20, #54, #61, #74 — appended to the rollup prompt only, so the rollup records which leg found which), the legs run on a blinded tree (`foundry.toml`, `src/`, the scoped scripts, a `lib/` symlink, `git init`, sha256 of each scoped file recorded in both trees — the method's 2026-09-30 lesson: a leg inside this checkout reads ten markdown files that name every carried weakness, this plan included) at the named commit, `make audit` complete; `SECURITY.md` in the multisig.software shape with a disposition row per finding and per carried issue (#18, #19, #20, #22, #54, #61, #74 — the first two with their measurements), the invariants the suite holds, what the review did not cover; the overview § 5 qualifier (criterion 5); `README.md`'s `AUDIT` cell | not started |
+| [m03-t04](tasks/m03-t04/TASK.md) | The review as D1 rules: `add.sh forge-audit`, `audits/SCOPE` as D10 rules with every exclusion reasoned, `audits/KNOWN_ANSWER.md` holding the carried issues the legs are not told about (#19, #20, #54, #61, #74 — appended to the rollup prompt only, so the rollup records which leg found which), the legs run on a blinded tree (`foundry.toml`, `src/`, the scoped scripts, a `lib/` symlink, `git init`, sha256 of each scoped file recorded in both trees — the method's 2026-09-30 lesson: a leg inside this checkout reads ten markdown files that name every carried weakness, this plan included) at the named commit, `make audit` complete; `SECURITY.md` in the multisig.software shape with a disposition row per finding and per carried issue (#18, #19, #20, #22, #54, #61, #74, #95 — the first two with their measurements, #95 as a known shape beside decision 25's), the invariants the suite holds, what the review did not cover; the overview § 5 qualifier (criterion 5); `README.md`'s `AUDIT` cell | not started |
 | [m03-t05](tasks/m03-t05/TASK.md) | The findings t04 accepts as contract changes, if any, each with a test; snapshot and reference regenerated; `SECURITY.md`'s review commit then names *this* PR's merge and the reviewer re-reads the diff as the method's single-leg re-check (the leg from the other lab than the engineer who wrote the fix, a narrowed prompt committed beside it, run on a blinded tree): its second run ever, which is the method's own threshold for moving it into the fragment. **Retired if t04 accepts no contract change**, which is the expected outcome and the cheapest | not started |
 
 ### Phase 4 — The runbook
@@ -211,6 +216,8 @@ close with a `carried` issue labelled `m03` open. The queue today, 2026-10-26:
 | [#54](https://github.com/dnznlabs/rake/issues/54) `propose` does not validate | D6, then t04's row. |
 | [#61](https://github.com/dnznlabs/rake/issues/61) `_push` comment | D7, then t02's one line. |
 | [#74](https://github.com/dnznlabs/rake/issues/74) one-step ownership | D2, then t02 and t03; t04's row either way. |
+| [#95](https://github.com/dnznlabs/rake/issues/95) permanent escrow to a recipient that always burns | Opened by t01 (2026-10-27). t04's `SECURITY.md` paragraph under known shapes, beside decision 25; in `audits/KNOWN_ANSWER.md`. No code. |
+| [#96](https://github.com/dnznlabs/rake/issues/96) t02's inputs from t01 | Opened by t01 (2026-10-27). t02's `TASK.md` carries the figures as givens and its PR closes it. |
 | [#75](https://github.com/dnznlabs/rake/issues/75) declared tokens | D3; the recommendation relabels it `m05` or closes it. Not `carried` today — labelled by the ruling. |
 | [#76](https://github.com/dnznlabs/rake/issues/76) log paging | **M04's**, for the reason in § Out of scope; to be labelled `m04` by Denizen when he agrees, not by this file. The repo has no `m04` or `m05` label yet (2026-10-26: `decision`, `carried`, `m02`, `m03` and the defaults); whoever relabels first creates it. |
 
