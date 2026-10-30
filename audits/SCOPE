@@ -1,0 +1,28 @@
+# The files `make audit` reviews: one repo-relative path per line, `#` and blank lines ignored.
+# Decision 29 (`docs/ROADMAP.md`) rules this list — D10 on #87 ("Option 1"), as amended by #91.
+# `App` is what strangers load and its `lock()` is one-way; the deploy scripts set constructor
+# arguments and hand over ownership, Phase 4's runbook runs them, and the method's first finding on
+# `state-collection` was in a deploy script.
+#
+# Named file by file, never the skill's own discovery: its exclude pattern carries
+# `-not -path '*/lib/*'`, which swallows `src/lib/` too (`README.md` § Scope).
+#
+# Excluded, each with a reason the method accepts (`README.md` § Scope), so the next reader does not
+# have to re-derive it:
+#
+#   scripts/forge/Chunks.s.sol    owner-run on a dev chain, never shipped (decision 29)
+#   scripts/forge/Fixtures.s.sol  owner-run on a dev chain, never shipped (decision 29)
+#   scripts/forge/Seed.s.sol      owner-run on a dev chain, never shipped (decision 29)
+#   test/                         not shipped
+#   lib/forge-std                 a dependency we did not write, pinned by tag
+#   lib/solady                    a dependency we did not write, pinned by tag
+#   app/                          not Solidity; the dapp was signed off in M02 Phase 5, and a UI
+#                                 change after this review is a second review (decision 14)
+#   tools/                        build tooling, no authority on chain
+#   mk/                           build tooling, no authority on chain
+#   app/build.mjs                 build tooling, no authority on chain
+
+src/Distribution.sol
+src/App.sol
+scripts/forge/Deploy.s.sol
+scripts/forge/DeployApp.s.sol
