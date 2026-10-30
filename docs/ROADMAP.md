@@ -339,7 +339,8 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     issue's default for that case, option 2 at twice the larger measured need rounded up to a
     thousand; m03-t01 posts the figures on #88 and they are added here. Rejected in advance:
     lowering it (a lower cap buys nothing and escrows more).
-31. **The factory is placed through SafeSummoner; the keyless proxy is the fallback.** D12, ruled on
+31. *Superseded by 33 on 2026-10-30; kept as ruled.* **The factory is placed through SafeSummoner;
+    the keyless proxy is the fallback.** D12, ruled on
     [#89](https://github.com/dnznlabs/rake/issues/89) ("Option 4"), confirming the Telegram
     agreement of the same day. "SafeSummoner" is a contract, `0x00000000004473e1f31C8266612e7FD5504e6f2a`,
     exposing `create2Deploy(bytes bytecode, bytes32 salt)`; it is the deployer `multisig`'s README
@@ -373,6 +374,26 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     Denizen names. Still open on #90: the key's address (the salt's top 20 bytes) and the low 12
     bytes (the runbook proposes `…0001`). Criterion 6 stays open and m03-t06 proceeds with a
     placeholder salt until the address is named here.
+33. **The factory is placed through Arachnid's keyless deterministic-deployment proxy,
+    `0x4e59b44847b379578588920cA78FbF26c0B4956C`; the Safe singleton factory is the fallback for a
+    chain that refuses pre-EIP-155 transactions and lacks it.** D12, re-ruled on
+    [#89](https://github.com/dnznlabs/rake/issues/89) on 2026-10-30 ("Lockin Option 1") after the
+    2026-10-27 ruling was suspended for research. Supersedes 31. Chosen because it is the only
+    candidate anyone can place on a new chain without a key (a published pre-EIP-155 transaction
+    after funding `0x3fab184622dc19b6109349b94811493bf2a45362` with 0.01 ETH), it is present on all
+    eight criterion-7 chains and in genesis on MegaETH and Robinhood Chain, it is Foundry's default
+    CREATE2 deployer, and its salt is raw, so vanity mining and offline prediction are a
+    `cast create2` call. Rejected: SafeSummoner (placed by `z0r0z.eth` through a sender-bound
+    VanityMarket token, mainnet tx `0x028bd2b5…f05cfc`; no path to a new chain without that key;
+    its users are z0r0z's projects only); CreateX (unaudited by its own README, a held key, hashed
+    salts); the Safe factory as primary (every new chain waits on Safe's key and queue). Decision
+    31's premises "our own deployments" and "org tooling" were `src-company/multisig`'s, and
+    SafeSummoner's salt is not sender-bound: `create2Deploy` passes it raw. A front-run of the
+    factory's init code yields the identical contract, since no constructor reads the sender. The
+    runbook's preflight expects 69 bytes of runtime code with keccak
+    `0x2fa86add0aed31f33a762c9d88e807c475bd51d0f52bd0955754b2608f7e4989` on every chain. The
+    overview § 10 line naming SafeSummoner is superseded by this record; the brainstorming folder
+    stays frozen.
 
 ## Findings carried forward
 
