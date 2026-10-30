@@ -87,12 +87,14 @@ contract TableCapTest is Test {
         _prepare(8);
         _prepare(64);
         _prepare(CAP);
-        // This line reverts `BadTable()` as of `9fbbb29`, and with it the whole suite: `_prepare`
-        // reaches its table through `factory.create` → `init` → `_set`, and `_set` is now the thing
-        // that rejects `n > MAX_BENEFICIARIES`. There is no other writer of `_table`, so the
-        // measurement that justifies the cap is a measurement the cap forbids. Left standing rather
-        // than worked around: it is a question about the primitive, not about this harness.
-        _prepare(CAP + 1);
+        // No `_prepare(CAP + 1)`. `_prepare` reaches its table through `factory.create` → `init` →
+        // `_set`; `_set` is now what rejects `n > MAX_BENEFICIARIES` and is the only writer of
+        // `_table`, so a 108-row table cannot be built at all — the measurement that justified the
+        // cap is one the cap forbids. The 108-row figure, 15,035,242 against 14,896,325 at 107, was
+        // taken in m03-t01 on `main` at `b055bc3` and stays readable in its HANDOFF and in
+        // `MAX_BENEFICIARIES`'s own `@dev`. What is live here is the refusal, in
+        // `test_capPlusOneRowIsRefused`, and the 107 measurement, which on this revision comes to
+        // 14,892,067 rather than t01's figure.
     }
 
     /// @notice The three points, the per-row cost between the two larger, and the fixed cost under them.
@@ -145,13 +147,13 @@ contract TableCapTest is Test {
         assertLt(gasUsed, HALF_BLOCK, "CAP rows stay under half a 30M block");
     }
 
-    /// @notice One more row does not.
-    function test_capPlusOneRowsExceedHalfABlock() public {
-        uint256 gasUsed = _measure(CAP + 1);
-        emit log_named_uint("rows         ", CAP + 1);
-        emit log_named_uint("gas at CAP+1 ", gasUsed);
-        assertGt(gasUsed, HALF_BLOCK, "CAP is the longest table that does");
-    }
+    // There is no `CAP + 1` test here. `_set` refuses that table, so the upper side of the cap is a
+    // validation rule rather than a measurement, and it is pinned where the other `_set` rules are:
+    // `DistributionTest.test_tableCapBoundary`, which takes both sides — a table of exactly the cap
+    // goes in, one row more reverts `BadTable()` — off the contract's own `MAX_BENEFICIARIES`, and
+    // first asserts the over-cap table breaks no other rule so the revert cannot be the wrong one.
+    // Duplicating it here would mean re-implementing `_prepare`'s table build to make one assertion
+    // honest, in a harness whose subject is gas.
 
     /// @dev The `gasleft()` delta across one `distribute` over the prepared table of `n` burners,
     /// asserted to have escrowed every row: the figure is worthless if a push succeeded or a row was

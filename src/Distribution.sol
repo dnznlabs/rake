@@ -55,14 +55,24 @@ contract Distribution {
     /// the whole push cap and then fails, costs 138,917 gas, so 107 rows distribute in 14,896,325 and
     /// 108 need 15,035,242. The rule enforced is that a worst-case `distribute` stays under half a
     /// 30M block.
+    ///
+    /// Those three figures are of the tree t01 measured, which is `main` at `b055bc3`. On this
+    /// revision a row costs 138,877 and 107 rows come to 14,892,067 — 40 gas a row cheaper, from
+    /// `via_ir` codegen moving under the members added here, not from any change to `distribute`.
+    /// The 15,035,242 has no counterpart here by construction: `_set` refuses 108 rows, so that
+    /// figure stays a t01 reading and `test_capPlusOneRowIsRefused` pins the refusal instead.
     uint256 public constant MAX_BENEFICIARIES = 107;
     bytes4 private constant TRANSFER = 0xa9059cbb;
     bytes4 private constant BALANCE_OF = 0x70a08231;
 
     address public owner;
-    address public pendingOwner;
     uint32 public delay;
     uint32 public nonce;
+
+    /// @dev After `nonce`, not after `owner`: `owner`, `delay` and `nonce` pack into one slot and a
+    /// 20-byte address cannot join them, so placing it here leaves that slot whole and `propose` and
+    /// `snapshot` keep their single read of it.
+    address public pendingOwner;
     string public description;
 
     /// @dev Stored in the order given, which table validation forces to be ascending by account.
