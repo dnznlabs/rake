@@ -3,7 +3,8 @@
 Status: in progress · updated 2026-10-30 — Phase 1 closed 2026-10-30 (D1–D13 ruled as decisions
 20–33; the four `decision` issues ruled last, #85, #88 and #89, closed that day; #90 stays open until
 the DNZN Creator key exists, which is criterion 6's remaining input); Phase 2 t01 merged 2026-10-27
-(#94)
+(#94), t02 merged 2026-10-30 (#103) — `src/` is final at `ede55c3`; t03 and t04 scoped 2026-10-30
+and run in parallel (decision 34)
 
 Everything that has to be true about the contracts before they touch a public network: every open
 question about `src/Distribution.sol` ruled and the accepted changes landed, an independent review of
@@ -68,7 +69,9 @@ than quote.
    org's shared tooling (`add.sh forge-audit`): two legs from two labs over `audits/SCOPE`, reconciled
    — run with `make audit` complete in the method's own sense: `audits/<date>/AUDIT.md` exists, its
    provenance block names the review commit with `dirty: no`, and both leg directories under it are
-   non-empty. `SECURITY.md` calls it what the method's README calls it, a two-model agent review and
+   non-empty (clarified 2026-10-30 at t04's scoping: the legs run on a blinded tree, so the
+   provenance block names *that* tree's commit, and `audits/<date>/BLIND.md` maps it to the review
+   commit with the sha256 of every scoped file in both trees; the artifact is not edited). `SECURITY.md` calls it what the method's README calls it, a two-model agent review and
    not an independent audit, until D1(b) happens. For every one of `#18 #19 #20 #22 #54 #61 #74 #95`,
    `grep -c "rake/issues/<n>\|#<n>\b" SECURITY.md` is at least 1, and the row says what was decided and
    where the ruling is. `README.md`'s `AUDIT` cell no longer reads `none yet (M03)`. (#95, the
@@ -157,9 +160,20 @@ milestone: everything runs on anvil, and the one external thing it produces — 
 
 In order; each phase's criteria are the next one's preconditions. Phase 1 is rulings, not tasks.
 Phase 2's tasks run in the order listed because t02 takes t01's figures and t03 takes t02's ABI.
-Phase 3 starts only when `src/` is final: the reviewer reads the merge commit of the last Phase 2 PR,
-named in `SECURITY.md`. Phase 4 can be written while Phase 3 runs — the runbook reads no finding —
-but its rehearsal (criterion 6) runs against the code Phase 3 signs off.
+Phase 3 starts only when `src/` is final: the reviewer reads the merge commit of the last Phase 2 PR
+that touches `src/`, named in `SECURITY.md`. Phase 4 can be written while Phase 3 runs — the runbook
+reads no finding — but its rehearsal (criterion 6) runs against the code Phase 3 signs off.
+
+**Deviation, ruled by Denizen on 2026-10-30 (decision 34): Phase 3 (t04) starts in parallel with
+t03 rather than after Phase 2 closes.** `src/` is final at `ede55c3`, the merge of t02 (#103): t03
+touches only `app/` (its acceptance criteria include `git diff --stat origin/main -- src/` empty),
+and the review reads `src/` and the two deploy scripts, so the commit t04 reviews is fixed before
+t03 lands and does not move when it does. The sentence above already keys Phase 3 on `src/` being
+final, not on Phase 2 closing; t04's `TASK.md` names `ede55c3` and stops if the diff from it under
+`src/` is ever non-empty. What is given up: if t03 found an `app/` change that needed a contract
+change, the review would have read a commit that was not final — accepted, because t02's handoff
+swept the whole of `app/` and found no such need, and the struct and ABI are the only things `app/`
+depends on.
 
 ### Phase 1 — Dispositions
 
@@ -175,8 +189,8 @@ reference following the ABI.
 | Task | Goal | Status |
 |:-----|:-----|:-------|
 | [m03-t01](tasks/m03-t01/TASK.md) | The two measurements, no `src/` change: a multisig.software vault clone and a Safe as ETH beneficiaries from their published creation bytecode, the gas each `receive` needs against `PUSH_GAS`; `distribute` gas per row with every push escrowed, and the table length that stays under 15M; figures in the handoff, the two tests of criterion 3 written against the current constants and failing or passing as the figures say | done 2026-10-27 ([#94](https://github.com/dnznlabs/rake/pull/94)): Safe `receive` 4,029, clone 404, `PUSH_GAS` headroom 95,971; worst-case row 138,917, `CAP` 107 (14,896,325 at 107, 15,035,242 at 108); `src/` untouched; opened [#95](https://github.com/dnznlabs/rake/issues/95) and [#96](https://github.com/dnznlabs/rake/issues/96) |
-| [m03-t02](tasks/m03-t02/TASK.md) | `Distribution.sol` under D2, D4–D8 and D11: two-step ownership as (a′) with `pendingOwner()` and `acceptOwnership()`, the table cap, `PUSH_GAS` as ruled, the `_push` comment; tests for every path the ABI gains (accept by the pending owner, accept by anyone else reverting, renounce still immediate, cancel of a pending transfer, cap boundary); M01 suite re-run, `.gas-snapshot` regenerated, `docs/REFERENCE.md` tables and `tools/abi-vectors.sh` fixtures regenerated; `#/docs` claims about ownership re-read against the new lines | scoped 2026-10-30; closes #74, #61, #20, #96 |
-| [m03-t03](tasks/m03-t03/TASK.md) | The dapp follows the ABI: the ownership block shows a pending owner and offers accept to the connected wallet that is it (copy-calldata when a vault, decision 7); `#/docs` § ownership rewritten for two steps; node tests and the M02 criterion 4 ownership walk re-run on anvil; chunks re-uploaded and criterion 8's hashes re-recorded. Retired if D2 rules (b) | not started |
+| [m03-t02](tasks/m03-t02/TASK.md) | `Distribution.sol` under D2, D4–D8 and D11: two-step ownership as (a′) with `pendingOwner()` and `acceptOwnership()`, the table cap, `PUSH_GAS` as ruled, the `_push` comment; tests for every path the ABI gains (accept by the pending owner, accept by anyone else reverting, renounce still immediate, cancel of a pending transfer, cap boundary); M01 suite re-run, `.gas-snapshot` regenerated, `docs/REFERENCE.md` tables and `tools/abi-vectors.sh` fixtures regenerated; `#/docs` claims about ownership re-read against the new lines | done 2026-10-30 ([#103](https://github.com/dnznlabs/rake/pull/103), merge `ede55c3`; closed #74, #61, #20, #96): "The ABI gains exactly five names and loses nothing" — `acceptOwnership MAX_BENEFICIARIES OwnershipTransferred pendingOwner ReleaseFailed` — "and the `Snapshot` struct is byte-for-byte unchanged"; `MAX_BENEFICIARIES` 107; `63 tests passed, 0 failed, 0 skipped (63 total)`; `Distribution` 8,469 deployed bytes, +163, the factory byte-identical at 1,320; five deviations ruled and corrected in [#102](https://github.com/dnznlabs/rake/pull/102) (handoff § Deviations 1–3, 11, 12); § For t03 lists every `app/` line the ABI made stale |
+| [m03-t03](tasks/m03-t03/TASK.md) | The dapp follows the ABI: the ownership block shows a pending owner and offers accept to the connected wallet that is it (copy-calldata when a vault, decision 7); `#/docs` § ownership rewritten for two steps; node tests and the M02 criterion 4 ownership walk re-run on anvil; chunks re-uploaded and criterion 8's hashes re-recorded; [#104](https://github.com/dnznlabs/rake/issues/104) folded in as one line. ~~Retired if D2 rules (b)~~ — D2 ruled (a′), decision 21 | scoped 2026-10-30 ([TASK.md](tasks/m03-t03/TASK.md)); closes #104 |
 
 ### Phase 3 — The review
 
@@ -184,7 +198,7 @@ An independent reading of the final `src/`, every finding dispositioned, and the
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m03-t04](tasks/m03-t04/TASK.md) | The review as D1 rules: `add.sh forge-audit`, `audits/SCOPE` as D10 rules with every exclusion reasoned, `audits/KNOWN_ANSWER.md` holding the carried issues the legs are not told about (#19, #20, #54, #61, #74 — appended to the rollup prompt only, so the rollup records which leg found which), the legs run on a blinded tree (`foundry.toml`, `src/`, the scoped scripts, a `lib/` symlink, `git init`, sha256 of each scoped file recorded in both trees — the method's 2026-09-30 lesson: a leg inside this checkout reads ten markdown files that name every carried weakness, this plan included) at the named commit, `make audit` complete; `SECURITY.md` in the multisig.software shape with a disposition row per finding and per carried issue (#18, #19, #20, #22, #54, #61, #74, #95 — the first two with their measurements, #95 as a known shape beside decision 25's), the invariants the suite holds, what the review did not cover; the overview § 5 qualifier (criterion 5); `README.md`'s `AUDIT` cell | not started |
+| [m03-t04](tasks/m03-t04/TASK.md) | The review as D1 rules: `add.sh forge-audit`, `audits/SCOPE` as D10 rules with every exclusion reasoned, `audits/KNOWN_ANSWER.md` holding the carried issues the legs are not told about (#19, #20, #54, #61, #74 — appended to the rollup prompt only, so the rollup records which leg found which), the legs run on a blinded tree (`foundry.toml`, `src/`, the scoped scripts, a `lib/` symlink, `git init`, sha256 of each scoped file recorded in both trees — the method's 2026-09-30 lesson: a leg inside this checkout reads ten markdown files that name every carried weakness, this plan included) at the named commit, `make audit` complete; `SECURITY.md` in the multisig.software shape with a disposition row per finding and per carried issue (#18, #19, #20, #22, #54, #61, #74, #95 — the first two with their measurements, #95 as a known shape beside decision 25's), the invariants the suite holds, what the review did not cover; the overview § 5 qualifier (criterion 5); `README.md`'s `AUDIT` cell. *Amended 2026-10-30 at scoping: #20, #61 and #74 are closed in the code by #103, so they cannot be graded as findings; the known answer carries them as closed and grades on #18, #19, #22, #54 and #95, the shapes still in the code* | scoped 2026-10-30 ([TASK.md](tasks/m03-t04/TASK.md)), reviewed commit `ede55c3`; closes #18, #19, #54, #95 |
 | [m03-t05](tasks/m03-t05/TASK.md) | The findings t04 accepts as contract changes, if any, each with a test; snapshot and reference regenerated; `SECURITY.md`'s review commit then names *this* PR's merge and the reviewer re-reads the diff as the method's single-leg re-check (the leg from the other lab than the engineer who wrote the fix, a narrowed prompt committed beside it, run on a blinded tree): its second run ever, which is the method's own threshold for moving it into the fragment. **Retired if t04 accepts no contract change**, which is the expected outcome and the cheapest | not started |
 
 ### Phase 4 — The runbook

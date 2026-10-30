@@ -15,7 +15,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 |:----------|:-----|:-------|
 | [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | done 2026-10-11 — t01 (#6), t02 (#11), t03 (#14) and the decision-10 follow-up (#24) merged; every criterion re-run and passing on `main` at `c292106` |
 | [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain, and Denizen has ironed out the experience against it | done 2026-10-26 — t01 (#33), t02 (#40), t03 (#52), t04 (#60), t05 (#65), t06 done; Phase 5 signed off by Denizen in [#73](https://github.com/dnznlabs/rake/pull/73) |
-| [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | in progress — Phase 1 closed 2026-10-30 (decisions 20–33); t01 (#94) merged 2026-10-27 with both measurements; t02 next |
+| [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | in progress — Phase 1 closed 2026-10-30 (decisions 20–33); t01 (#94) merged 2026-10-27 with both measurements; t02 merged 2026-10-30 ([#103](https://github.com/dnznlabs/rake/pull/103)), `src/` final at `ede55c3`; t03 and t04 scoped 2026-10-30, running in parallel (decision 34) |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | not started |
 | [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; DNZN's own 60/40 distribution live under the Ops multisig with a 7-day delay; dapp mirrored and widget embedded in one DNZN app | not started |
 | [M06 — Owner integrations](milestones/m06/MILESTONE.md) | Optional, after mainnet. When the connected wallet is a member of the owner rather than the owner, route `propose`/`cancel` into the multisig vault's or Majeur DAO's own submit flow instead of copy-calldata. UI only; no contract change | not started |
@@ -406,6 +406,16 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     `0x2fa86add0aed31f33a762c9d88e807c475bd51d0f52bd0955754b2608f7e4989` on every chain. The
     overview § 10 line naming SafeSummoner is superseded by this record; the brainstorming folder
     stays frozen.
+34. **M03 Phase 3 starts beside t03, not after Phase 2 closes.** Ruled by Denizen on 2026-10-30
+    (Telegram), at the scoping of m03-t03 and m03-t04. The review's input is `src/` and the two
+    deploy scripts, final at `ede55c3` (the merge of #103, m03-t02); t03 touches only `app/` and
+    carries `git diff --stat origin/main -- src/` empty as an acceptance criterion, so the commit
+    t04 reviews is fixed before t03 lands and does not move when it does. Supersedes nothing: M03
+    § Phases already keyed Phase 3 on `src/` being final rather than on Phase 2 closing, and that
+    sentence is clarified to say so. The cost accepted is that an `app/` change found to need a
+    contract change would re-open a review already run; t02's handoff swept all of `app/` and
+    found none, and `app/` depends on the struct and the ABI only. Rejected: serialising (a
+    review that waits for a dapp task reads the same bytes a week later).
 
 ## Findings carried forward
 
