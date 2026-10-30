@@ -7,8 +7,10 @@ const Model = (() => {
   const BENEFICIARY = '(address,uint96,string,string)';
   /* The `snapshot()` return type, in one place: every reader of a distribution decodes with this. */
   const SNAPSHOT_T = `(address,uint32,uint32,string,${BENEFICIARY}[],(bytes32,uint256,bytes)[])`;
-  /* The four `onlySelf` setters a pending action can carry. `transferOwnership(address(0))` is the
-     renounce; it is the same call, so it decodes as one. */
+  /* The four `onlySelf` setters a pending action can carry. `transferOwnership(address)` is one call
+     with three effects since decision 21 — it nominates, and `address(0)` renounces, and the current
+     owner's own address withdraws a nomination still in flight — so it decodes as one and
+     `ownerChange` below says which of the three a decoded action is. */
   const SETTERS = [
     [`setBeneficiaries(${BENEFICIARY}[])`, 'setBeneficiaries', 'table'],
     ['setDescription(string)', 'setDescription', 'description'],
@@ -42,6 +44,17 @@ const Model = (() => {
       if (args) return { kind, [field]: args[0] };
     }
     return { kind: 'unknown', selector: String(action).slice(0, 10) };
+  }
+
+  /** Which of `transferOwnership`'s three effects a decoded action carries: `renounce` for the zero
+     address, `withdraw` where it names `owner` — the two-step ABI's way to take a nomination back —
+     and `nominate` for any other address. `owner` is who the action is read against; a log does not
+     carry the owner of the moment it was written, so without one the reading is `nominate`, which is
+     what the call does either way. */
+  function ownerChange(p, owner) {
+    if (BigInt(p.owner) === 0n) return 'renounce';
+    const self = owner && String(p.owner).toLowerCase() === String(owner).toLowerCase();
+    return self ? 'withdraw' : 'nominate';
   }
 
   /** The account a one-row table at 100% forwards to — decision 6's supersession — else null. */
@@ -128,6 +141,6 @@ const Model = (() => {
     return '0x' + node;
   }
 
-  return { SNAPSHOT_T, pct, countdown, decodePending, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash };
+  return { SNAPSHOT_T, pct, countdown, decodePending, ownerChange, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash };
 })();
 export default Model;

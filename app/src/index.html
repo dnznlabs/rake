@@ -480,12 +480,21 @@ const fundWhat = (e, dec, known = true) => e.kind === 'distributed' ? `${money(e
   : e.kind === 'in' ? `${money(e.amount, e.token, dec, known)} from ${ext('address', e.from, short(e.from))}`
   : `${money(e.amount, e.token, dec)} · ${ext('address', e.account, short(e.account))}`;
 /* A decoded pending action as one line, named by the setter it calls. `setBeneficiaries` is also
-   drawn as a second bar; the other three say everything they do here. */
-function describe(p) {
+   drawn as a second bar; the other three say everything they do here. `transferOwnership` has three
+   readings, so it is the one line that needs to know whose distribution this is: `owner` is passed
+   where the page knows it, which is every live pending entry. A `Queued` log does not carry the owner
+   of the moment it was written, so a history row is read without one and says `nominates`, which is
+   what the call did whether or not it also withdrew something. */
+function describe(p, owner) {
   if (p.kind === 'setBeneficiaries') return `${p.kind} · new table · ${p.table.map(b => Model.pct(b[1])).join(' / ')}`;
   if (p.kind === 'setDescription') return `${p.kind} · new name · ${esc(p.description)}`;
   if (p.kind === 'setDelay') return `${p.kind} · new delay · ${delayText(p.delay)}`;
-  if (p.kind === 'transferOwnership') return p.owner === ZERO ? `${p.kind} · renounced · nothing can be proposed again` : `${p.kind} · new owner · ${ext('address', p.owner, short(p.owner))}`;
+  if (p.kind === 'transferOwnership') {
+    const eff = Model.ownerChange(p, owner);
+    if (eff === 'renounce') return `${p.kind} · renounced · nothing can be proposed again`;
+    if (eff === 'withdraw') return `${p.kind} · withdraws the pending transfer`;
+    return `${p.kind} · nominates · ${ext('address', p.owner, short(p.owner))}`;
+  }
   return 'unknown action · selector ' + esc(p.selector);
 }
 const delayText = d => Number(d) === 0 ? 'none — changes apply instantly' : Number(d) % 86400 === 0 ? Number(d) / 86400 + 'd' : Math.round(Number(d) / 3600) + 'h';
@@ -543,7 +552,7 @@ function pendingBlock(d, acts) {
     const decoded = Model.decodePending(p[2]);
     // The tx that queued it comes from the logs, so it appears once `history` has landed.
     const tx = DS.qtx && DS.qtx.get(p[0]);
-    const head = eyebrow(`change queued · ${Model.countdown(p[1], secs())}`, 'amber') + `<div class="status warn">${describe(decoded)}${tx ? ` · queued in ${ext('tx', tx, short(tx))}` : ''}</div>`;
+    const head = eyebrow(`change queued · ${Model.countdown(p[1], secs())}`, 'amber') + `<div class="status warn">${describe(decoded, d.owner)}${tx ? ` · queued in ${ext('tx', tx, short(tx))}` : ''}</div>`;
     const body = decoded.kind === 'setBeneficiaries' ? bar(decoded.table, { pending: true }) + ticks(decoded.table, { pending: true }) : '';
     return head + body + (acts ? pendingActs(d, p, i) : '');
   }).join('');

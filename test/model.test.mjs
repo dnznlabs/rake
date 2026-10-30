@@ -12,9 +12,9 @@ import Model from '../app/src/model.js';
    touches it, so assigning here — after the import — is in time for every call below. */
 globalThis.Eth = Eth;
 
-const { SNAPSHOT_T, pct, countdown, decodePending, supersededBy, salt } = Model;
+const { SNAPSHOT_T, pct, countdown, decodePending, ownerChange, supersededBy, salt } = Model;
 const { revertMessage, tableFrom, parseDelay, wei, namehash } = Model;
-const FUNCTIONS = ['countdown', 'decodePending', 'namehash', 'parseDelay', 'pct', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei'];
+const FUNCTIONS = ['countdown', 'decodePending', 'namehash', 'ownerChange', 'parseDelay', 'pct', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei'];
 const SET_BENEFICIARIES = 'setBeneficiaries((address,uint96,string,string)[])';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/abi');
@@ -88,6 +88,25 @@ test('decodePending decodes the other three setters to their one field', () => {
     { kind: 'setDelay', delay: 172800n },
     { kind: 'transferOwnership', owner: '0x' + '0'.repeat(40) },
   ]);
+});
+
+/* Decision 21 gave the one `transferOwnership(address)` call three effects, and the detail page's
+   pending line reads them apart from the decode alone: a queued call naming the current owner is a
+   withdrawal of the nomination in flight, which under one-step ownership could not exist. The
+   renounce arm is the zero address the test above decodes. */
+test('a queued transferOwnership naming the owner reads as a withdrawal, not a nomination', () => {
+  const queued = decodePending(Eth.enc('transferOwnership(address)', [OWNER]));
+
+  const got = [
+    ownerChange(queued, OWNER),
+    ownerChange(queued, TREASURY),
+    ownerChange(queued),
+    ownerChange(decodePending(fixture('renounce.calldata')), OWNER),
+  ];
+
+  assert.equal(queued.owner, OWNER);
+  // The owner of the moment is not in a `Queued` log, so a reading without one says what the call does.
+  assert.deepEqual(got, ['withdraw', 'nominate', 'nominate', 'renounce']);
 });
 
 test('four bytes of garbage decode to their selector, not to a setter', () => {
