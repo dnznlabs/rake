@@ -11,8 +11,10 @@ ruled documented rather than capped as decision 36. The code was frozen at `b0fb
 by the architect and once by a blind two-model run of the refreshed audit runner, and no `src/`,
 `test/*.t.sol` or `.gas-snapshot` byte moved after the freeze. **The second run raised two new
 Mediums and one Low; none is acted on here, per § Out of scope, and all three are in § Open
-questions.** One acceptance criterion is blocked by a repository-wide config question, also in
-§ Open questions.
+questions.** Every acceptance criterion passes. One line outside the plan's files was needed — the
+large-file guard narrowed so the leg 2 transcript could be committed at all — raised rather than
+assumed, ruled by the architect, and recorded in § Decisions 5 with both of the ruling's claims
+verified.
 
 ## Acceptance criteria
 
@@ -24,9 +26,9 @@ questions.** One acceptance criterion is blocked by a repository-wide config que
 | 4 — `test_hookRecipientStarvesLaterRows` passes, gas stated | **pass** | `[PASS] test_hookRecipientStarvesLaterRows() (gas: 240808854)`, logging `F8 distribute completes at : 95049000`. D14 ruled *document*, so the ERC-20 push carries no `gas:` argument and the cap branch of this criterion does not apply. |
 | 5 — `app/` claim gone, `REFERENCE.md` rows, `node --test` | **pass** | `grep -c 'can still be applied' app/src/index.html` → **0**. Rows 22 and 23 carry "refused while", 28 and 29 carry "drops every queued". `node --test test/*.test.mjs` → **62 pass, 0 fail**. ABI gains no name, so `tools/abi-vectors.sh` was not re-run. |
 | 6 — the seven fragment files byte-identical to `../shared` | **pass** | All seven `diff -q` clean against `~/src/shared/templates/forge-audit/files/`: `audits/README.md`, `audits/SCOPE.example`, `audits/SKILL_PIN`, `audits/prompts/leg.md`, `audits/prompts/rollup.md`, `mk/20-audit.mk`, `scripts/audit.sh`. |
-| 7 — milestone criterion 4 on the branch | **partial — one file blocked** | `audits/2026-10-31/AUDIT.md` provenance reads `dirty: no`; both leg directories hold 3 files each; `BLIND.md` maps `b2ed060` to `b0fb4e3` with the four hashes measured in both trees; `SECURITY.md` names `b0fb4e3` (5 occurrences); every finding of both runs is dispositioned (13 rows); `README.md`'s AUDIT cell reads 2026-10-31. `git diff --stat b0fb4e3 HEAD -- src/` is **empty**. **`transcripts/` carries leg 1 only**: `leg-2-claude.jsonl` is refused by the repo's own `check-added-large-files` at 2,254 KB against a 500 KB default. § Open questions 1. |
+| 7 — milestone criterion 4 on the branch | **pass** | `audits/2026-10-31/AUDIT.md` provenance reads `dirty: no`; both leg directories hold 3 files each; `transcripts/` holds **both** legs — `leg-1-codex.log` (278 KB) and `leg-2-claude.jsonl` (2,254 KB); `BLIND.md` maps `b2ed060` to `b0fb4e3` with the four hashes measured in both trees; `SECURITY.md` names `b0fb4e3` (5 occurrences); every finding of both runs is dispositioned (13 rows); `README.md`'s AUDIT cell reads 2026-10-31. `git diff --stat b0fb4e3 HEAD -- src/ test/ .gas-snapshot` is **empty**. The leg 2 transcript needed the large-file guard narrowed for that one path — § Decisions 5. |
 | 8 — `KNOWN_ANSWER.md` names the head, F1/F2/F6 closed | **pass** | Names `b0fb4e3` (3 occurrences), titled with the short sha; six shapes still in the code and six closed before this audit, each closed one with its function and the one-line mechanism that is gone. `grep -ci 'unchecked\|wait out the delay'` → **0**, which is #118's two defects fixed. `grep -c unchecked src/Distribution.sol` → **0**, proving #118's point. |
-| 9 — build/lint/fmt/snapshot clean, tree clean | **partial — same single cause** | `forge build --force` → **0** `warning[` / `Warning (` lines. `forge test` → **72 passed, 0 failed**. `forge snapshot --check` → **exit 0** with all 72 run. `forge lint` → exit 0, silent. `forge fmt --check` → exit 0, silent. Gates run in the plan's order, lint and fmt last, `build --force` before every count. **`git status --porcelain` is not empty**: it reports `?? audits/2026-10-31/transcripts/leg-2-claude.jsonl`, the one file AC 7 names. |
+| 9 — build/lint/fmt/snapshot clean, tree clean | **pass** | `forge build --force` → **0** `warning[` / `Warning (` lines. `forge test` → **72 passed, 0 failed**. `forge snapshot --check` → **exit 0** with all 72 run. `forge lint` → exit 0, silent. `forge fmt --check` → exit 0, silent. `node --test test/*.test.mjs` → **62 pass**. `git status --porcelain` → **empty**. Gates run in the plan's order, lint and fmt last, `build --force` before every count. |
 | 10 — the handoff carries step 12's list | **pass** | This file: the AC table, the six failing assertions, the moved snapshot rows, the bytecode sizes, the F7 and F8 figures, the provenance block verbatim, per-leg grading, the runner observations, § Deviations, § Discoveries, § Open questions. |
 
 ### The six failing assertions on `ede55c3`'s `src/`
@@ -204,8 +206,10 @@ in `/tmp`, outside both trees.
    proves it, as does `git diff HEAD -- src/` empty after restoring.
 3. **`test_releaseStillBubblesEthReason` passes on `ede55c3`.** Step 7 says each of the seven must
    fail there; this one cannot. See § Discoveries 2 — it is a plan defect, not a weak test.
-4. **The harvest is committed without `leg-2-claude.jsonl`.** The repo's own pre-commit hook refuses
-   it. § Open questions 1.
+4. **One line was changed in `.pre-commit-config.yaml`, which no step authorises.** The leg 2
+   transcript could not otherwise be committed, and the method requires it. Raised rather than
+   assumed, ruled by the architect, and recorded in § Decisions 5 with both of the ruling's claims
+   verified. It is the only change outside the files the plan names.
 5. **Step 11's "the new tests join the owner, delay and money-path groups" is right for eight of
    nine.** The ninth, `test_capBloatingRowsStayUnderHalfABlock`, is a cap measurement and joins the
    table group, which now reads "and the cap holds for the worst-case row kind rather than for one
@@ -225,21 +229,38 @@ in `/tmp`, outside both trees.
 4. **F13 was given its own `SECURITY.md` row rather than folded into F9.** The mechanism is F9's,
    but the severity and the stated cost are new, and the rollup did not treat it as a duplicate.
    Folding it in would have hidden a severity change; the row states the overlap instead.
+5. **The large-file guard was narrowed, not raised, so the leg 2 transcript could be committed.**
+   `check-added-large-files` refused `leg-2-claude.jsonl` at 2,254 KB against the plugin's 500 KB
+   default. Ruled by the architect: add `exclude: ^audits/.*/transcripts/` to that **one** hook
+   entry, merged into the existing `stages: [pre-commit]` rather than replacing it, leaving
+   `check-yaml` and the `betterleaks` block untouched. The ruling rests on two claims, and both
+   were verified rather than assumed:
+   - **The guard still covers everything else.** A 600 KB throwaway at `docs/large-file-probe.tmp`
+     was staged and the commit **refused** — `docs/large-file-probe.tmp (600 KB) exceeds 500 KB` —
+     with `HEAD` unchanged and the probe absent from it. Removed by exact path afterwards.
+   - **`betterleaks` still scans the transcripts.** It reports
+     `scanned ~2307510 bytes (2.31 MB) in 288ms · no leaks found`, and 2,307,510 bytes is the
+     file's exact size. **The first attempt at this check scanned `~0 bytes` and still printed
+     "no leaks found"** — because `betterleaks` reads the git index, so `pre-commit run --files` on
+     an **unstaged** path gives it nothing to scan while still reporting success. The file had to
+     be staged for the check to mean anything. A second false pass of exactly the shape in
+     § Discoveries 1, found only because the ruling asked for the justification to be proved.
 
 ## Discoveries
 
-1. **`scripts/audit.sh:285`'s comment is wrong, and the ABI criterion is silently vacuous outside
-   `devbox`.** Two related things, neither of them what they first looked like. (a) The fragment
-   says *"node, not jq: jq is not in devbox.json, so it is not a dependency this repo may assume."*
-   But `jq@latest` is in `devbox.json:8` and has been since `6cc72a6 feat: initial create`, the
-   first commit — so the comment is false for rake and always has been. `scripts/audit.sh` is
-   byte-identical to the shared fragment, so the staleness is upstream, not rake's to fix here.
-   (b) The ABI criterion is nevertheless a trap for the reason the comment gestures at: `jq` is in
-   `devbox.json` but not on the bare PATH, so the same command **passes vacuously when run outside
-   `devbox`** — both captures are empty, and it reports "identical" for any tree, including one
-   whose ABI changed. It was first measured here that way and recorded as vacuous before being
-   re-run correctly; the criterion would be safer written with a count assertion than with a bare
-   `diff` that cannot distinguish "equal" from "empty".
+1. **A measurement hazard, not a plan defect: a check run outside the pinned toolchain can report
+   a confident false pass.** The ABI criterion **stands as written** — `jq@latest` is in
+   `devbox.json:8`, resolves through `devbox run --` to jq 1.8.2, and the plan's exact command
+   returns 39 on both sides. But `jq` is **not on the bare PATH**, so the same command run outside
+   `devbox` captures nothing, compares two empty lists, and reports "identical" for any tree
+   including one whose ABI changed. That is how it was first measured here and wrongly written up
+   as a vacuous criterion; the misreading was the reviewer's, who read `scripts/audit.sh`'s
+   *"jq is not in devbox.json"* as a fact about rake when it is a statement about what the
+   **shared fragment** may assume across projects, and then confirmed it with a bare run. The
+   general lesson is the one worth keeping: **a comparison that cannot distinguish "equal" from
+   "empty" is not a check.** Both of this task's false passes were that shape — this one, and
+   `betterleaks` reporting "no leaks found" after scanning 0 bytes of an unstaged file
+   (§ Decisions 5). A count assertion beside each `diff` would catch both.
 2. **Step 7's "each must fail on `ede55c3`" should read six of seven.**
    `test_releaseStillBubblesEthReason` pins behaviour the F6 fix deliberately *keeps* — decision 24
    still bubbles a real reason from an ETH recipient — so "fails on `ede55c3`" is not a property it
@@ -262,47 +283,50 @@ in `/tmp`, outside both trees.
 6. **The audit transcripts are 31× the rest of the harvest.** `audits/2026-10-30` is 80 KB total;
    this run's transcripts alone are 2.5 MB, and each future run adds about as much to a repository
    whose `.git` is 204 MB. Worth a line upstream in the fragment about retention or compression,
-   independent of § Open questions 1.
+   independent of the guard narrowed in § Decisions 5 — that admitted the file, it did not make it
+   smaller. **This is also the first run to produce a transcript at all**, which is why no earlier
+   audit hit the guard: the 2026-10-30 run wrote none, so the collision between the method's commit
+   rule and the template's size limit could not surface until now.
 7. **Findings the second run raised that this PR did not act on:** the two new Mediums and one Low
    now carried as `SECURITY.md` **F11** (`App.lock` accepts a 7702 code pointer), **F12** (a second
    token address for the native balance pays escrowed ETH again, chain-dependent) and **F13** (a
    superseded queued action applied out of order). F11 is the first finding in `src/App.sol`, whose
    bytes were byte-identical in the 2026-10-30 run and raised by neither leg then. Per § Out of
-   scope each is recorded and stopped at; § Open questions 2 puts them to the architect.
+   scope each is recorded and stopped at; § Open questions 1 puts them to the architect.
+
+## For the fragment
+
+**The large-file guard and the transcript commit rule come from two different templates, neither
+aware of the other, and the fix belongs upstream rather than here.**
+`check-added-large-files` arrives with the shared **project template** — it has been in
+`.pre-commit-config.yaml` since `6cc72a6 feat: initial create`, at the plugin's 500 KB default with
+no `args`, and nothing about it is rake's choice. The rule that transcripts are committed with the
+findings arrives with the **forge-audit fragment**: *"The transcripts are the only evidence of what
+a leg read, so they are committed with the findings"* (`audits/README.md`). The fragment also chose
+`--output-format stream-json`, which is what makes a transcript large enough to trip the guard. So
+the collision is structural and every project taking both templates will hit it on its first
+two-model run.
+
+The `exclude: ^audits/.*/transcripts/` line added here is the local patch. Upstream it belongs in
+one of the two templates — in the project template's hook config, or as compression in the
+fragment's `audit.sh` before the `mv` into `transcripts/` — and the two owners should decide which,
+since fixing it in both would be redundant and fixing it in neither leaves the next project to
+rediscover it. That repository is Denizen's; the architect has raised it with him.
+
+Two smaller notes for the same file:
+
+- **`scripts/audit.sh:285`'s comment is misleading read locally.** *"node, not jq: jq is not in
+  devbox.json, so it is not a dependency this repo may assume"* is correct as a statement about what
+  the shared fragment may assume across projects, but in rake `jq@latest` **is** in `devbox.json`
+  and has been since the first commit. Anyone reading the comment inside this repo will take it as
+  a fact about this repo. A clause naming it as a cross-project constraint would prevent that.
+- **Transcript retention is now the fragment's largest artifact by far** — 2.5 MB a run against
+  80 KB for everything else the 2026-10-30 run produced. Worth a line about retention or
+  compression independently of the guard.
 
 ## Open questions
 
-### 1. `check-added-large-files` refuses the leg 2 transcript the method requires
-
-**Question.** The audit fragment says the transcripts "are the only evidence of what a leg read, so
-they are committed with the findings", and milestone criterion 4 requires `transcripts/` non-empty;
-this repo's `pre-commit` refuses `leg-2-claude.jsonl` at 2,254 KB. Which gives?
-
-**Options.**
-1. **Exclude `audits/*/transcripts/` from that one hook** (`exclude: '^audits/.*/transcripts/'`) —
-   keeps the 500 KB gate everywhere else, including `src/`, `app/` and fixtures; costs one line in
-   `.pre-commit-config.yaml` and admits an unbounded file in exactly one directory.
-2. **Raise `maxkb`** (`args: [--maxkb=4096]`) — one line, but weakens the gate repository-wide for
-   every path, which is the opposite of what the gate is for.
-3. **Compress transcripts in the fragment** (`gzip` in `audit.sh` before the move) — fixes it for
-   every project using the fragment and keeps the gate intact, but changes the artifact shape
-   upstream and makes `grep` on a transcript a two-step operation.
-4. **Do not commit the leg 2 transcript** — criterion 4's `transcripts/` is then half-met and the
-   independence measurement is reproducible only from a scratch tree outside the repo.
-
-**Recommendation.** Option 1 if the decision is rake's alone and wanted today; option 3 if the
-architect would rather fix it once for every project, since the 500 KB default was never a
-deliberate rake choice — it came in with `6cc72a6 feat: initial create`, long before the audit
-fragment existed, and nobody has reconciled the two.
-
-**Default and deadline.** No default: this is the one thing blocking AC 7 and AC 9, and therefore
-the PR leaving draft. The file is intact at
-`~/src/rake-blind-2026-10-31/audits/2026-10-31/transcripts/leg-2-claude.jsonl` and one commit
-finishes the harvest once ruled.
-
-**Record.** `ROADMAP.md` § Decisions if the config changes; the fragment's own changelog if option 3.
-
-### 2. Three findings accepted for a task that does not exist
+### 1. Three findings accepted for a task that does not exist
 
 **Question.** Does a t07 open for `SECURITY.md`'s F11, F12 and F13, or are they documented and
 carried?
@@ -328,7 +352,7 @@ blocks nothing in t05; it blocks M03's close-out, which must say what happened t
 **Record.** `ROADMAP.md` § Decisions, and the `SECURITY.md` rows updated from "a task that does not
 exist yet" to the ruling.
 
-### 3. Does F13's severity change F9's disposition?
+### 2. Does F13's severity change F9's disposition?
 
 **Question.** 2026-10-30's F9 (queued actions never expire, any caller chooses the order) was
 dispositioned "none needed", on the reasoning that the owner controls what is queued and `cancel` is
@@ -340,7 +364,7 @@ still listed in and then `distribute`, in one transaction. Does "none needed" st
 1. **Keep "none needed"** — the mitigation is unchanged and genuinely immediate; costs nothing, and
    accepts that two independent reviews have now flagged the shape.
 2. **Rule it a change** — ordering or expiry on the queue; a real contract change, and it is F13's
-   row either way, so it belongs to whatever task option 2 of § Open questions 2 settles.
+   row either way, so it belongs to whatever task option 2 of § Open questions 1 settles.
 
 **Recommendation.** Option 1, but say so explicitly in F9's row rather than leaving two rows that
 disagree about the same mechanism.
