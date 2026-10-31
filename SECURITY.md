@@ -58,6 +58,7 @@ column records which leg reported it, from `AUDIT.md`'s grading section.
 | [#61](https://github.com/dnznlabs/rake/issues/61) — `_push`'s comment | Closed by [#103](https://github.com/dnznlabs/rake/pull/103). | decision 26 | {{leg}} |
 | [#74](https://github.com/dnznlabs/rake/issues/74) — two-step ownership | Closed by [#103](https://github.com/dnznlabs/rake/pull/103). | decision 21 | {{leg}} |
 | [#95](https://github.com/dnznlabs/rake/issues/95) — an escrow to a recipient that burns the push can never be released | Documented. A known shape beside decision 25's: an escrow is recoverable only if the recipient becomes payable; the owner's remedy is a re-table. | decision 25, with decision 6 for the re-table | {{leg}} |
+| [#111](https://github.com/dnznlabs/rake/issues/111) — the handover's two halves leave different traces | Documented. `acceptOwnership` emits `OwnershipTransferred`; `renounceOwnership` does not, so a renounce is invisible to indexers and to the dapp's event-derived history, and is observable only through `snapshot()`. **Not an invariant**, since no test asserts the absence of an event. | decision 21 and m03-t02's deviation 11; added as a tenth row at t03's review by [#112](https://github.com/dnznlabs/rake/pull/112) | {{leg}} |
 
 ---
 
