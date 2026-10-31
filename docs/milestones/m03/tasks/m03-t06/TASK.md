@@ -102,9 +102,8 @@ commit's and are re-run, not quoted.
      export PROXY=0x4e59b44847b379578588920cA78FbF26c0B4956C FACTORY= IMPL= APP= DISTRO=
      ```
      `OWNER` is one value for every chain on purpose, as `state-collection`'s `PAYEE` is: there is
-     no second constant to pick the wrong one of. The Ops vault is at this address on seven of
-     the eight chains (read 2026-10-30, table on #114); Base Sepolia is open question 1 below,
-     and the runbook carries its ruling as one line under this variable. `CREATOR` is a
+     no second constant to pick the wrong one of. The Ops vault is at this address on all eight
+     chains (read 2026-10-30, table on #114; decision 35), so this line never branches by chain. `CREATOR` is a
      placeholder until #90 names the address; the rehearsal uses anvil's first account for it and
      says so. The creator key's two conditions are referenced to the handbook
      (`docs/multisig-transactions.md` § The DNZN Creator key), not restated.
@@ -288,20 +287,12 @@ commit's and are re-run, not quoted.
 
 ## Open questions
 
-1. **Question.** What is `OWNER` — `App`'s owner and the owner passed to `create` — on Base
-   Sepolia, the one target chain where the Ops vault does not exist? (Read on chain 2026-10-30:
-   Ops `0x00c0…3790` and Treasury `0x00b6…cFb9` carry the same code and owners on Ethereum, OP
-   Mainnet, Base, Arbitrum One, MegaETH, Robinhood Chain and Sepolia; neither is on Base Sepolia;
-   the executor is on all eight. The handbook's "mainnet + Sepolia" row is stale. Table on #114.)
-   **Options.** (a) Deploy Ops to Base Sepolia at its address before M04's first run there, as
-   was done on the other seven: `OWNER` one value everywhere and `App` same-address on all
-   eight. (b) Denizen's EOA `0x357836fFcB45307FA7ff2A574F505753c961902B` on Base Sepolia only,
-   handed over if a vault ever lands there; `App` differs on that one testnet.
-   **Recommendation.** (a); it is the deploy that has already been done seven times.
-   **Default and deadline.** (b) for Base Sepolia alone if the vault is not there when M04
-   starts. Gates nothing in this task — the rehearsal uses one anvil account as `OWNER` on both
-   chains — and the runbook's § 0 line under `OWNER` records the ruling. Deadline: M04's scoping.
-   **Record.** `ROADMAP.md` § Decisions; issue [#114](https://github.com/dnznlabs/rake/issues/114).
+1. **Ruled — decision 35.** What `OWNER` is on Base Sepolia, the one target chain that lacked
+   the Ops vault when this task was scoped. Denizen placed Treasury and Ops there at their
+   addresses on 2026-10-30 (same factory, same sender-bound salts), and both read identically on
+   all eight chains the same night. `OWNER` is the Ops vault everywhere; the runbook's § 0 line
+   under `OWNER` says so and names decision 35. [#114](https://github.com/dnznlabs/rake/issues/114)
+   is closed by that record.
 
 2. **Question.** Are `FACTORY_SALT` and `APP_SALT` zero, or mined for a vanity prefix like the
    vaults' (`0x00b6…`, `0x00c0…`, `0x00000000a7…`)?
