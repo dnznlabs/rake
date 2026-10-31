@@ -94,9 +94,9 @@ commit's and are re-run, not quoted.
      export PROXY=0x4e59b44847b379578588920cA78FbF26c0B4956C FACTORY= IMPL= APP= DISTRO=
      ```
      `OWNER` is one value for every chain on purpose, as `state-collection`'s `PAYEE` is: there is
-     no second constant to pick the wrong one of. The Ops vault exists on Ethereum and Sepolia
-     only today (handbook § Vaults); what `OWNER` is on the other six chains is open question 1
-     below, and the runbook carries its ruling as one line under this variable. `CREATOR` is a
+     no second constant to pick the wrong one of. The Ops vault is at this address on seven of
+     the eight chains (read 2026-10-30, table on #114); Base Sepolia is open question 1 below,
+     and the runbook carries its ruling as one line under this variable. `CREATOR` is a
      placeholder until #90 names the address; the rehearsal uses anvil's first account for it and
      says so. The creator key's two conditions are referenced to the handbook
      (`docs/multisig-transactions.md` § The DNZN Creator key), not restated.
@@ -279,26 +279,19 @@ commit's and are re-run, not quoted.
 
 ## Open questions
 
-1. **Question.** What is `OWNER` — `App`'s owner and the owner passed to `create` — on the six
-   chains where the Ops vault does not exist (Base, Arbitrum One, OP Mainnet, MegaETH, Robinhood
-   Chain, Base Sepolia)?
-   **Options.** (a) Denizen's own EOA `0x357836fFcB45307FA7ff2A574F505753c961902B` on those
-   chains, transferred to a vault once one exists there (`App` is `Ownable`; a distribution's
-   owner changes through the two-step, decision 21): nothing to deploy first, one more line in
-   the runbook, and `App`'s address then differs between chains with and without a vault, since
-   `OWNER` is in its init code. (b) Deploy the Ops vault to every target chain first, at its
-   mainnet address, so `OWNER` is one value everywhere: same-address `App` on all eight, but a
-   vault deployment per chain is `multisig`'s runbook and a prerequisite M04 does not have today.
-   (c) One value everywhere by making `OWNER` the EOA on every chain including Ethereum, and
-   handing to the vault afterwards: same-address `App`, but two handovers on the chains that
-   have a vault already.
-   **Recommendation.** (b) if the vault's placement is a salted deploy the org can run in M04
-   with no new key; otherwise (a). `App` being same-address is a convenience the roadmap never
-   promised (decision 5 promises it for distributions, which it keeps either way, since `OWNER`
-   is not in a clone's address).
-   **Default and deadline.** (a). Gates nothing in this task — the rehearsal uses one anvil
-   account as `OWNER` on both chains — but the runbook's § 0 line under `OWNER` is written from
-   the ruling, and M04 cannot start without it. Deadline: the day this task's PR opens.
+1. **Question.** What is `OWNER` — `App`'s owner and the owner passed to `create` — on Base
+   Sepolia, the one target chain where the Ops vault does not exist? (Read on chain 2026-10-30:
+   Ops `0x00c0…3790` and Treasury `0x00b6…cFb9` carry the same code and owners on Ethereum, OP
+   Mainnet, Base, Arbitrum One, MegaETH, Robinhood Chain and Sepolia; neither is on Base Sepolia;
+   the executor is on all eight. The handbook's "mainnet + Sepolia" row is stale. Table on #114.)
+   **Options.** (a) Deploy Ops to Base Sepolia at its address before M04's first run there, as
+   was done on the other seven: `OWNER` one value everywhere and `App` same-address on all
+   eight. (b) Denizen's EOA `0x357836fFcB45307FA7ff2A574F505753c961902B` on Base Sepolia only,
+   handed over if a vault ever lands there; `App` differs on that one testnet.
+   **Recommendation.** (a); it is the deploy that has already been done seven times.
+   **Default and deadline.** (b) for Base Sepolia alone if the vault is not there when M04
+   starts. Gates nothing in this task — the rehearsal uses one anvil account as `OWNER` on both
+   chains — and the runbook's § 0 line under `OWNER` records the ruling. Deadline: M04's scoping.
    **Record.** `ROADMAP.md` § Decisions; issue [#114](https://github.com/dnznlabs/rake/issues/114).
 
 2. **Question.** Are `FACTORY_SALT` and `APP_SALT` zero, or mined for a vanity prefix like the
