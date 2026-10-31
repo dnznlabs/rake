@@ -32,7 +32,7 @@ cut's are in § Size for comparison.
 
 | AC | Result | Evidence |
 |:---|:-------|:---------|
-| **M02 criterion 6** — the reference's tables are the real ABI | pass | `/tmp/t04-abi.sh` (reproduced in § The acceptance script) prints nothing and exits 0, for `.type=="function"` against `### Functions`, `.type=="event"` against `### Events` and `.type=="error"` against `### Errors` in `docs/REFERENCE.md`. `grep -c 'id="s-' app/src/index.html` → `11`, in decision 17's order (asserted by the last test below, which compares the rendered id order with `SECTIONS`). |
+| **M02 criterion 6** — the reference's tables are the real ABI | pass | `/tmp/t04-abi.sh` (reproduced in § The acceptance script) prints nothing and exits 0, for `.type=="function"` against `### Functions`, `.type=="event"` against `### Events` and `.type=="error"` against `### Errors` in `docs/REFERENCE.md`. `grep -c 'id="s-' app/src/index.html` → `11`, in decision 17's order (asserted by the last test below, which compares the rendered id order with `SECTIONS`). corrected 2026-10-30 ([#104](https://github.com/dnznlabs/rake/issues/104)): 13 since Phase 5; test/docs.test.mjs pins it — re-run rather than quote |
 | **M02 criterion 6** — the struct is pinned | pass | `node --test test/*.test.mjs` → `tests 46 · pass 46 · fail 0`, `test/docs.test.mjs` among the files (8 tests). Changing one character of `src/Distribution.sol:12` (`uint96 bps;` → `uint96 bips;`) fails it: `+ '    uint96 bps;\n' / - '    uint96 bips;\n'`. Restored; `git diff --stat -- src` prints nothing. |
 | **M02 criterion 6** — the page is the owner's | pass, as a draft | Eleven `h2`: `What it is · Why it exists · How it works · Creating one · Paying in · Paying out · Changing it · Ownership · The widget · Limits · For developers`. The text is Denizen's to finalise in Phase 5 (ROADMAP § Order); what ships here is the draft he reviewed on 2026-10-17 and took as is. No function table, no struct, no event or error list on the page; `grep -c 'REFERENCE.md' app/src/index.html` → `2`: the docs block's comment and the last section's link. Every contract claim on it is in § Reference check with its line. |
 | **M02 criterion 8, re-measured** — two chunks, served | pass | `make deploy ANVIL_PORT=8599`: `chunk 0 0xCafac3dD…052c` **and** `chunk 1 0x9f1ac54B…3a8e`, `payload bytes 26349`, `html() bytes 35809`. `cast call $APP "chunkCount()(uint256)"` → `2`; `"gzipped()(bool)"` → `true`. |
@@ -69,7 +69,7 @@ check function '### Functions'
 check event '### Events'
 check error '### Errors'
 n=$(grep -c 'id="s-' app/src/index.html)
-[ "$n" = 11 ] || { echo "id=\"s- count is $n, expected 11"; exit 1; }
+[ "$n" = 13 ] || { echo "id=\"s- count is $n, expected 13"; exit 1; }
 ```
 
 ## Size
