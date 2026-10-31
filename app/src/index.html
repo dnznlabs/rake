@@ -1134,6 +1134,9 @@ function bindDrawer(d) {
         const n = ownerNote();
         res.className = 'res' + (n.cls ? ' ' + n.cls : ''); res.textContent = n.text;
         if (!ownReady()) return;
+        /* A withdrawal keeps the line `ownerNote` wrote: the probe would answer with the owner's own
+           transaction count, which replaces what the call does with something the owner knows. */
+        if (withdrawing(Eth.checksum(OWNER_IN.trim()))) return;
         const v = OWNER_IN, p = await probeOwner(Eth.checksum(v.trim()));
         if (OWNER_IN === v) { res.className = 'res' + (p.cls ? ' ' + p.cls : ''); res.textContent = p.text; }
       };
