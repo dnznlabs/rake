@@ -32,6 +32,134 @@ contract GasBurner {
     }
 }
 
+/// @notice A beneficiary that spends the whole push cap and then reverts with 0x31000 bytes of return
+/// data, which is what `distribute` used to copy on every failed ETH push (F6).
+/// @dev `GasBurner` measures a row that spends the cap; this measures a row that spends the cap *and*
+/// hands back something to copy. Touching 0x31000 bytes of memory costs about 95,600 gas — inside
+/// `PUSH_GAS`, which is why leg 2 chose the figure — so the frame can pay the expansion and still
+/// revert with the whole range. A separate contract rather than an arm on `GasBurner`: `TableCap.t.sol`
+/// etches the burner at every row of four tables, so growing it would move every figure in that file.
+contract BloatingReceiver {
+    receive() external payable {
+        assembly ("memory-safe") {
+            // The expansion is charged here rather than left to `revert`, so the frame pays it whether
+            // or not the caller gives the return data anywhere to land.
+            mstore(0x30fe0, 0)
+            revert(0, 0x31000)
+        }
+    }
+}
+
+/// @notice `GasBurner` for a call that carries calldata: it burns on `receive()` and on `fallback()`.
+/// @dev A hook token's `transfer` calls its recipient with a selector, which `GasBurner`'s bare
+/// `receive()` does not answer. Separate from `GasBurner` for the same reason `BloatingReceiver` is.
+contract GasBurnerAny {
+    receive() external payable {
+        while (true) {}
+    }
+
+    fallback() external payable {
+        while (true) {}
+    }
+}
+
+/// @notice An ERC-20 whose `transfer` makes one caller-chosen call into the distribution before it
+/// moves the balance — the re-entry a hook token gives a beneficiary, pointed wherever a test needs.
+/// @dev `HookToken` carries the two arms t02 needed and is deployed by two tests whose gas rows would
+/// move if it grew, so the `applyQueued` and `propose` re-entries of F1 live here instead. The
+/// callback's outcome is recorded rather than bubbled, exactly as `HookToken` does it: the outer
+/// `distribute` then takes its success path and the test reads the refusal out of `hookData`.
+contract CallbackToken {
+    error InsufficientBalance();
+
+    bool public hookOk;
+    bytes public hookData;
+
+    /// @dev What `transfer` calls the target with. Set after deployment, because an `applyQueued`
+    /// action's hash depends on a nonce the queue hands out after the table naming this token exists.
+    bytes public action;
+
+    mapping(address => uint256) public balanceOf;
+
+    address private immutable target;
+
+    constructor(address target_) {
+        target = target_;
+    }
+
+    function setAction(bytes calldata action_) external {
+        action = action_;
+    }
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        (hookOk, hookData) = target.call(action);
+
+        if (balanceOf[msg.sender] < amount) revert InsufficientBalance();
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+}
+
+/// @notice An ERC-20 whose `transfer` hands the recipient every unit of gas it has left before moving
+/// the balance — the shape F8 sizes, where a beneficiary burns 63/64 of the frame.
+/// @dev The ERC-20 branch of `_push` passes no gas, so the whole remaining frame reaches `transfer`
+/// and from there the row. The call's outcome is ignored: a burner recipient leaves the 1/64 the
+/// caller keeps, and what F8 measures is whether that remainder can pay the rows after it.
+contract HookRecipientToken {
+    error InsufficientBalance();
+
+    mapping(address => uint256) public balanceOf;
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        // Deliberately unchecked and deliberately uncapped: `to` is given everything this frame has.
+        (bool ok,) = to.call("");
+        ok;
+
+        if (balanceOf[msg.sender] < amount) revert InsufficientBalance();
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+}
+
+/// @notice An ETH beneficiary that reverts with a raw payload over the word `release` sorts by, so
+/// decision 24's "bubble a real reason" can be proved still to hold on the ETH path after F6.
+/// @dev `RevertingToken.Fail.WithRawBytes`' shape, on a `receive()` rather than a `transfer`: 33
+/// bytes of `0xab`, the first length that must bubble rather than be named `ReleaseFailed`.
+contract RawRevertReceiver {
+    /// @dev How many bytes to revert with. 33 by default, the first length that must bubble.
+    uint256 public revertBytes = 33;
+
+    function setRevertBytes(uint256 revertBytes_) external {
+        revertBytes = revertBytes_;
+    }
+
+    /// @dev Exactly what `receive()` will revert with, so a test can compare byte for byte rather
+    /// than keep a second copy of the literal.
+    function rawRevertData() public view returns (bytes memory data) {
+        data = new bytes(revertBytes);
+        for (uint256 i; i < data.length; ++i) {
+            data[i] = 0xab;
+        }
+    }
+
+    receive() external payable {
+        bytes memory raw = rawRevertData();
+        assembly ("memory-safe") {
+            revert(add(raw, 0x20), mload(raw))
+        }
+    }
+}
+
 /// @notice A beneficiary that calls back into `distribute` while it is running.
 contract ReentrantDistributor {
     Distribution private immutable target;
