@@ -306,3 +306,25 @@ nothing. The new control and the new note needed no CSS: `.actions`, `.status`, 
 ## Open questions
 
 None for the Product Owner.
+
+## Merged past the approval
+
+Written 2026-10-30 by Lakos, after the merge. The review approved `c27d466`. Three commits by
+Denizen landed on the branch at 22:03 CDT, after that approval and before the merge, so #109 merged
+at `c85cd5c` (merge `da09ae6`). All three touch `app/src/index.html` only; `git log a1f45f1..da09ae6
+-- src/ scripts/forge/` is empty, so `ede55c3` stands as t04's input. Everything above this heading
+describes `c27d466`; the line numbers in § For t03 are that commit's.
+
+| Commit | What it does | Read against the handoff |
+|:-------|:-------------|:-------------------------|
+| `7007200` history shows the accepted ownership handover | Adds `OwnershipTransferred(address,address)` to `CHANGE_EVENTS` as a fourth kind, `accepted`, rendered `owner · A → B` and styled as done. | Consistent with deviation 5, which it does not touch: `describe()` still says `nominates` on history rows. `OwnershipTransferred` has exactly one emit site, `acceptOwnership()` (`src/Distribution.sol:248`); the constructor and the renounce arm of `transferOwnership` emit nothing, so every `accepted` row is an acceptance and the comment in the code is exact. |
+| `619eac2` resolve `.wei` and `.gwei` names in address fields | Forward lookup asked ENS for every name; the suffix now picks WNS or GNS (`regAddr`, split out of `regName`), and the five address-field placeholders name the three suffixes. | A fix to the port m02-t03 landed, not M04 work arriving early: decision 13 and `ROADMAP.md:164` put the code in m02-t03 and the *exercise* in M04, and this task's § Out of scope defers the exercise. M04 still exercises it; this is the first bug that exercise would have found. Not re-run here against a registry. |
+| `c85cd5c` close the queue drawer once a proposal lands | `bindWrites` passes the write to its reload callback; a landed `propose(bytes)` clears the drawer state through a new `closeDrawer()` that `detail()` also uses. | UI state only. |
+
+Re-measured on `main` at `7be99fa`, one instrument, 2026-10-30: `node --test test/*.test.mjs` →
+`ℹ tests 62 · pass 62 · fail 0`; the three retired phrases still grep to nothing; `grep -c 'id="s-'`
+is still 13. `make dapp-nodev` → `dapp: raw 127532 bytes · gzip 40225 bytes`,
+`sha256sum app/dist/index.html` → `26609f14126cd1fac76ade978ad9b736c4669c35d5abfeae9df8ebc4982b8cdd`.
+§ Criterion 8's `dced6539…` is therefore `c27d466`'s page, not `main`'s; the chunk upload and the
+`make chain-doc` equality were not re-run, since they are measured against an anvil that no longer
+exists and the criterion is M04's to re-establish on a public chain.
