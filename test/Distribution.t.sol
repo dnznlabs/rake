@@ -5,10 +5,15 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {Distribution, DistributionFactory} from "../src/Distribution.sol";
 import {
+    BloatingReceiver,
+    CallbackToken,
+    GasBurnerAny,
+    HookRecipientToken,
     HookToken,
     MockERC20,
     MockERC721,
     PlainSender,
+    RawRevertReceiver,
     ReentrantDistributor,
     ReentrantReleaser,
     RevertingReceiver,
@@ -40,6 +45,18 @@ contract DistributionTest is Test {
     /// @dev Where `_capTable`'s rows start: clear of the precompiles, and clear of `A`/`B`/`C` so a
     /// cap-length table cannot collide with the addresses the rest of the suite pays.
     uint160 internal constant FIRST_CAP_ROW = 0x20000;
+
+    /// @dev Disjoint ranges for the two tables of etched rows F6 and F8 need, kept clear of
+    /// `FIRST_CAP_ROW`'s cap-length run so no row of one table is warm from another's.
+    uint160 internal constant FIRST_BLOAT_ROW = 0x30000;
+    uint160 internal constant FIRST_STARVE_ROW = 0x40000;
+
+    /// @dev F8's measurement: the first round thousand of gas at which a `distribute` over a
+    /// hook-recipient table completes. Bisected by hand, one limit per transaction.
+    uint256 internal constant F8_SUCCEEDS_AT = 95_049_000;
+
+    /// @dev Hands each starvation attempt its own disjoint range of row addresses.
+    uint160 internal starveRanges;
 
     function setUp() public {
         factory = new DistributionFactory();
@@ -786,6 +803,338 @@ contract DistributionTest is Test {
         vm.prank(STRANGER);
         vm.expectRevert(Distribution.NotOwner.selector);
         d.cancel(hash);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // F1 — no configuration change lands while a money path runs.
+    // ---------------------------------------------------------------------------------------------
+
+    /// @notice A hook token's recipient cannot apply a matured `setBeneficiaries` from inside the
+    /// payout, so the rows after it are paid from the table `distribute` started on.
+    /// @dev Leg 2's PoC from `audits/2026-10-30/AUDIT.md` F1. On `ede55c3` the hook's `applyQueued`
+    /// succeeds, the loop's second pass reads the *new* `_table[1]`, and B — a row of the table in
+    /// force when `distribute` was called — is paid nothing.
+    function test_applyQueuedRefusedDuringDistribute() public {
+        // Arrange — a clone on a real delay, so the swap has to be queued and matured.
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](2);
+        t[0] = _row(A, 5000);
+        t[1] = _row(B, 5000);
+        Distribution d = _deploy(WEEK, t);
+
+        CallbackToken tk = new CallbackToken(address(d));
+        tk.mint(address(d), 10_000);
+
+        // The swap the hook will try to land: A moves to the last row, where the remainder is paid.
+        // `_asc` puts it in the order `_set` demands; what matters is that B is not in it.
+        Distribution.Beneficiary[] memory swapped = new Distribution.Beneficiary[](2);
+        swapped[0] = _row(C, 5000);
+        swapped[1] = _row(A, 5000);
+        bytes memory action = abi.encodeCall(Distribution.setBeneficiaries, (_asc(swapped)));
+
+        vm.prank(OWNER);
+        bytes32 hash = d.propose(action);
+        tk.setAction(abi.encodeCall(Distribution.applyQueued, (action, 1)));
+        vm.warp(block.timestamp + WEEK);
+        assertEq(d.queued(hash), block.timestamp, "the action is matured and waiting");
+
+        // Act
+        d.distribute(address(tk));
+
+        // Assert — the hook got in and was turned away by the lock, not by anything else.
+        assertFalse(tk.hookOk(), "the reentrant applyQueued failed");
+        assertEq(tk.hookData(), abi.encodeWithSelector(Distribution.Locked.selector), "and failed on the lock");
+
+        // Assert — the payout used the table it started on.
+        assertEq(tk.balanceOf(B), 5000, "B is paid from the table distribute started on");
+        assertEq(tk.balanceOf(A), 5000);
+        assertEq(tk.balanceOf(C), 0, "and a row nobody in that table had seen is paid nothing");
+
+        // Assert — the refusal cost the queue nothing, and the action still applies from outside.
+        assertEq(d.queued(hash), block.timestamp, "the action is still queued");
+        assertEq(d.pendingCount(), 1);
+        d.applyQueued(action, 1);
+        assertEq(d.beneficiaries()[1].account, C, "and applies once no money path is running");
+    }
+
+    /// @notice The owner cannot `propose` from inside the payout either, even at zero delay where a
+    /// proposal applies inline.
+    /// @dev Leg 1 named `propose` as the second re-entry point. The owner here is the token itself,
+    /// so the hook arrives with the one authority `propose` checks. On `ede55c3` the inline
+    /// `setBeneficiaries` lands and the table after `distribute` is not the table before it.
+    function test_proposeRefusedDuringDistribute() public {
+        // Arrange — the clone's owner must be the token, and the token's target must be the clone,
+        // so the address is predicted and the clone created at it.
+        bytes32 salt = _salt();
+        address predicted = factory.predict(salt);
+        CallbackToken tk = new CallbackToken(predicted);
+
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](2);
+        t[0] = _row(A, 5000);
+        t[1] = _row(B, 5000);
+        Distribution d = Distribution(payable(factory.create(address(tk), 0, "desc", t, salt)));
+        assertEq(address(d), predicted, "the clone landed where the token was told to look");
+        assertEq(d.owner(), address(tk), "and the hook carries the owner's authority");
+        tk.mint(address(d), 10_000);
+
+        Distribution.Beneficiary[] memory swapped = new Distribution.Beneficiary[](2);
+        swapped[0] = _row(C, 5000);
+        swapped[1] = _row(A, 5000);
+        tk.setAction(
+            abi.encodeCall(Distribution.propose, (abi.encodeCall(Distribution.setBeneficiaries, (_asc(swapped)))))
+        );
+
+        // Act
+        d.distribute(address(tk));
+
+        // Assert
+        assertFalse(tk.hookOk(), "the reentrant propose failed");
+        assertEq(tk.hookData(), abi.encodeWithSelector(Distribution.Locked.selector), "and failed on the lock");
+
+        Distribution.Beneficiary[] memory after_ = d.beneficiaries();
+        assertEq(after_.length, 2, "the table after distribute is the table before it");
+        assertEq(after_[0].account, A);
+        assertEq(after_[1].account, B);
+        assertEq(d.nonce(), 0, "and nothing was queued");
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // F2 — a handover or a renounce clears the queue it inherits.
+    // ---------------------------------------------------------------------------------------------
+
+    /// @notice Taking ownership drops every action the previous owner queued.
+    /// @dev On `ede55c3` the queue hash carries no owner, so `setDelay(1)` survives the handover and
+    /// anyone can apply it against the new owner.
+    function test_acceptOwnershipClearsQueue() public {
+        // Arrange
+        Distribution d = _deploy(WEEK, _defaultTable());
+        bytes memory handover = abi.encodeCall(Distribution.transferOwnership, (B));
+        bytes memory setDelay = abi.encodeCall(Distribution.setDelay, (1));
+
+        vm.prank(OWNER);
+        d.propose(handover);
+        vm.prank(OWNER);
+        bytes32 delayHash = d.propose(setDelay);
+        assertEq(d.pendingCount(), 2);
+
+        vm.warp(block.timestamp + WEEK);
+        d.applyQueued(handover, 1);
+        assertEq(d.pendingOwner(), B, "the handover is nominated, not yet taken");
+        assertEq(d.queued(delayHash), block.timestamp, "and the other action is still queued");
+
+        // Act — `Cancelled` once, for the one action left.
+        vm.expectEmit(true, false, false, true, address(d));
+        emit Distribution.Cancelled(delayHash);
+        vm.prank(B);
+        d.acceptOwnership();
+
+        // Assert
+        assertEq(d.owner(), B);
+        assertEq(d.pendingCount(), 0, "the previous owner's queue is empty");
+        assertEq(d.queued(delayHash), 0);
+
+        vm.expectRevert(abi.encodeWithSelector(Distribution.NotReady.selector, 0));
+        d.applyQueued(setDelay, 2);
+        assertEq(d.delay(), WEEK, "so the delay the old owner queued never landed");
+    }
+
+    /// @notice A renounce drops every queued action, so nothing the last owner queued can be applied
+    /// against a contract with no owner left to cancel it.
+    /// @dev Leg 2's PoC. On `ede55c3` the queued `transferOwnership(C)` still applies after the
+    /// renounce, C becomes pending owner of a renounced contract, and `acceptOwnership()` makes C
+    /// the owner — against `transferOwnership`'s own claim that a renounce freezes the thing.
+    function test_renounceClearsQueue() public {
+        // Arrange
+        Distribution d = _deploy(WEEK, _defaultTable());
+        bytes memory handover = abi.encodeCall(Distribution.transferOwnership, (C));
+        bytes memory renounce = abi.encodeCall(Distribution.transferOwnership, (address(0)));
+
+        vm.prank(OWNER);
+        bytes32 handoverHash = d.propose(handover);
+        vm.prank(OWNER);
+        d.propose(renounce);
+        assertEq(d.pendingCount(), 2);
+
+        vm.warp(block.timestamp + WEEK);
+
+        // Act
+        d.applyQueued(renounce, 2);
+
+        // Assert
+        assertEq(d.owner(), address(0), "the contract is renounced");
+        assertEq(d.pendingCount(), 0, "and carries no queue into that state");
+        assertEq(d.queued(handoverHash), 0);
+
+        vm.expectRevert(abi.encodeWithSelector(Distribution.NotReady.selector, 0));
+        d.applyQueued(handover, 1);
+        assertEq(d.pendingOwner(), address(0), "so C never becomes pending owner");
+
+        vm.prank(C);
+        vm.expectRevert(Distribution.Unauthorized.selector);
+        d.acceptOwnership();
+    }
+
+    /// @notice A renounce applied from a queue holding other actions clears them all without the pop
+    /// loop colliding with the action that is executing.
+    /// @dev `applyQueued` deletes its own entry and calls `_remove` *before* `_selfCall`, so the
+    /// renounce is already out of `_pending` when `_clearQueue` runs. The renounce is queued in the
+    /// middle on purpose: `_remove`'s swap-and-pop moves the last entry into its slot, so the loop
+    /// has to pop an entry that moved.
+    function test_renounceFromApplyClearsTheRest() public {
+        // Arrange
+        Distribution d = _deploy(WEEK, _defaultTable());
+        bytes memory setDelay = abi.encodeCall(Distribution.setDelay, (1));
+        bytes memory renounce = abi.encodeCall(Distribution.transferOwnership, (address(0)));
+        bytes memory setDescription = abi.encodeCall(Distribution.setDescription, ("after"));
+
+        vm.prank(OWNER);
+        bytes32 delayHash = d.propose(setDelay);
+        vm.prank(OWNER);
+        d.propose(renounce);
+        vm.prank(OWNER);
+        bytes32 descHash = d.propose(setDescription);
+        assertEq(d.pendingCount(), 3);
+
+        vm.warp(block.timestamp + WEEK);
+
+        // Act — the middle entry of the three.
+        d.applyQueued(renounce, 2);
+
+        // Assert
+        assertEq(d.owner(), address(0));
+        assertEq(d.pendingCount(), 0, "the executing action and both others are gone");
+        assertEq(d.queued(delayHash), 0);
+        assertEq(d.queued(descHash), 0);
+        assertEq(d.delay(), WEEK, "and neither of the other two ran");
+        assertEq(d.description(), "desc");
+
+        vm.expectRevert(abi.encodeWithSelector(Distribution.NotReady.selector, 0));
+        d.applyQueued(setDescription, 3);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // F6 — `distribute` copies no return data from a failed ETH push.
+    // ---------------------------------------------------------------------------------------------
+
+    /// @notice Twenty rows that each revert with 0x31000 bytes cost `distribute` none of the memory
+    /// to hold them.
+    /// @dev Leg 2 measured the old shape at 10.6M gas over ten such rows and 35.3M over twenty, which
+    /// breaks the half-block property decision 27 rests on at about eleven rows. The rows are etched
+    /// at their own range the way `TableCapTest._prepare` etches burners.
+    function test_distributeDiscardsEthReturnData() public {
+        // Arrange
+        uint96 rows = 20;
+        bytes memory code = address(new BloatingReceiver()).code;
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](rows);
+        uint96 each = BPS_TOTAL / rows;
+        for (uint96 i; i < rows; ++i) {
+            address account = address(FIRST_BLOAT_ROW + uint160(i));
+            vm.etch(account, code);
+            t[i] = _row(account, i + 1 == rows ? BPS_TOTAL - each * (rows - 1) : each);
+        }
+        Distribution d = _deploy(0, t);
+        _send(d, 20_000);
+
+        // Act — nothing between the two reads but the call itself.
+        uint256 before = gasleft();
+        d.distribute(address(0));
+        uint256 gasUsed = before - gasleft();
+        emit log_named_uint("rows                   ", rows);
+        emit log_named_uint("gas over bloating rows ", gasUsed);
+
+        // Assert — every row failed and was escrowed, so the figure is of the right thing.
+        assertEq(d.reserved(address(0)), 20_000, "every row was escrowed");
+        assertEq(address(d).balance, 20_000, "and none of it left the contract");
+        for (uint96 i; i < rows; ++i) {
+            assertGt(d.escrowed(address(0), address(FIRST_BLOAT_ROW + uint160(i))), 0, "row escrowed");
+        }
+
+        // Assert — and the caller paid for none of the return data. On `ede55c3` this is above 30M.
+        assertLt(gasUsed, 3_000_000, "the return data of a failed ETH push costs distribute nothing");
+    }
+
+    /// @notice `release` still bubbles a real reason from an ETH recipient: decision 24 holds on the
+    /// path F6 changed.
+    /// @dev `distribute` is the only caller that discards the return data. `release` asks for it, so a
+    /// payload over the word it sorts by is bubbled rather than named `ReleaseFailed`. This is the
+    /// guard on F6's fix, not a test of the finding, so it holds on `ede55c3` too.
+    function test_releaseStillBubblesEthReason() public {
+        // Arrange
+        RawRevertReceiver bad = new RawRevertReceiver();
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](2);
+        t[0] = _row(address(bad), 5000);
+        t[1] = _row(A, 5000);
+        Distribution d = _deploy(0, _asc(t));
+        _send(d, 10_000);
+
+        d.distribute(address(0));
+        assertEq(d.escrowed(address(0), address(bad)), 5000, "the push failed, so the row is escrowed");
+
+        // Act / assert — the 33 bytes themselves, not `ReleaseFailed(token)`.
+        bytes memory raw = bad.rawRevertData();
+        assertEq(raw.length, 33, "the payload is over the word release sorts by");
+        vm.expectRevert(raw);
+        d.release(address(0), address(bad));
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // F8 — the ERC-20 push passes no gas (sized here, ruled by D14).
+    // ---------------------------------------------------------------------------------------------
+
+    /// @notice What a hook token's recipient can do to the rows after it when the ERC-20 push passes
+    /// no gas: it takes 63/64 of the frame, and the 1/64 left cannot pay the rest of the table at any
+    /// block gas limit a chain actually has.
+    /// @dev F8, measured rather than predicted, and the measurement is what D14 is ruled on. The
+    /// first row is a `GasBurnerAny` reached through the token's `transfer`; the rest are plain rows.
+    /// Bisected by hand to the round thousand: **95,049,000** gas is the first at which `distribute`
+    /// completes, and 95,048,000 still reverts. A 30,000,000-gas block is barely a third of that, so
+    /// a `distribute(token)` for this token cannot be mined until the owner re-tables through the
+    /// delay — which is the remedy `SECURITY.md`'s F8 row names.
+    ///
+    /// Each limit is attempted in its own sub-call because `call{gas: n}` forwards only 63/64 of what
+    /// the frame still holds: several ~95M attempts in one transaction starve each other and report a
+    /// threshold that is an artefact of their position rather than of the contract. That is why the
+    /// bisection ran one limit per test and this test spends three sub-calls, not eight.
+    function test_hookRecipientStarvesLaterRows() public {
+        // A whole 30M block is not enough: the rows after the burner are starved.
+        assertFalse(_starvationSucceedsAt(30_000_000), "a 30,000,000-gas distribute is starved");
+
+        // And the figure it does need, pinned from both sides at the round thousand.
+        assertTrue(_starvationSucceedsAt(F8_SUCCEEDS_AT), "it first completes at 95,049,000");
+        assertFalse(_starvationSucceedsAt(F8_SUCCEEDS_AT - 1_000), "and not at 95,048,000");
+
+        emit log_named_uint("F8 distribute completes at   ", F8_SUCCEEDS_AT);
+        emit log_named_uint("blocks of 30M that would take", F8_SUCCEEDS_AT / 30_000_000 + 1);
+    }
+
+    /// @dev One `distribute` over a table whose first row burns everything the token hands it,
+    /// attempted under `limit` gas. Returns whether the call completed. `external` so the harness can
+    /// catch the out-of-gas revert rather than die with it.
+    function _starvationSucceedsAt(uint256 limit) internal returns (bool ok) {
+        HookRecipientToken tk = new HookRecipientToken();
+
+        // The burner is etched at the bottom of the range rather than deployed, so it is the first
+        // row of an already-ascending table: a deployed address would sort somewhere in the middle
+        // and the burner would no longer be the row that starves the others.
+        //
+        // Each attempt takes its own disjoint range, for the reason `TableCap.t.sol`'s docstring
+        // gives: two attempts in one transaction over shared rows would find the second's rows warm
+        // from the first, and EIP-2929's 2,600 a row across a cap-length table is far more than the
+        // thousand this figure is bisected to.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint96 rows = uint96(impl.MAX_BENEFICIARIES());
+        uint160 base = FIRST_STARVE_ROW + uint160(starveRanges++) * 0x1000;
+        vm.etch(address(base), address(new GasBurnerAny()).code);
+
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](rows);
+        uint96 each = BPS_TOTAL / rows;
+        for (uint96 i; i < rows; ++i) {
+            uint96 bps = i + 1 == rows ? BPS_TOTAL - each * (rows - 1) : each;
+            t[i] = _row(address(base + uint160(i)), bps);
+        }
+        Distribution d = _deploy(0, t);
+        tk.mint(address(d), uint256(10_000) * rows);
+
+        (ok,) = address(d).call{gas: limit}(abi.encodeCall(Distribution.distribute, (address(tk))));
     }
 
     function _row(address account, uint96 bps) internal pure returns (Distribution.Beneficiary memory) {
