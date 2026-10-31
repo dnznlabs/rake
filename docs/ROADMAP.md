@@ -430,6 +430,20 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     by six chains; the chain, not the roster, is the source for deployment state (handbook#32
     corrects the row). Rejected: Denizen's EOA as owner on chains without a vault, handed over
     later (two owners to keep straight, and `App` at a different address on one testnet).
+36. **F8 is documented, not capped: the ERC-20 push keeps all its gas.** D14, opened at m03-t05's
+    scoping on [#123](https://github.com/dnznlabs/rake/issues/123), ruled by Denizen on 2026-10-31
+    ("Select Option 1"). The grief needs a hook token (ERC-777-style `transfer` callbacks, a
+    non-goal in the overview) *and* an owner-chosen hostile row; its effect is a `distribute(token)`
+    for that token that cannot be mined until a re-table through the delay, and nothing is lost.
+    t05 measured it on the branch at `b0fb4e3`: with a `GasBurner` first in a full table under a
+    hook token, `distribute` first succeeds at 95,049,000 gas (reverts at 95,048,000), over three
+    30M blocks — read the handoff, not this line, before quoting it. `SECURITY.md`'s F8 row states
+    the shape, its two preconditions and the owner's remedy; `test_hookRecipientStarvesLaterRows`
+    asserts the measurement. Rejected: `gas: PUSH_GAS` on the ERC-20 call (an honest token whose
+    `transfer` needs more — proxied tokens with pause and blocklist checks on cold slots, rebasing
+    or reward-bearing tokens — would be escrowed on every push and never releasable under the
+    same cap: the #95 shape, permanent, for a compliant token); a 500k cap (bounds nothing the
+    half-block rule cares about and keeps the same failure above it).
 
 ## Findings carried forward
 
