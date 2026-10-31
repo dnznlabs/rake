@@ -105,6 +105,13 @@ contract Distribution {
         locked = false;
     }
 
+    /// @dev Refuses entry while a money path holds the lock; does not take it. A configuration change
+    /// landing between two rows of `distribute` would pay the rest from a table nobody has seen.
+    modifier notLocked() {
+        if (locked) revert Locked();
+        _;
+    }
+
     /// @dev The timelock reaches state only through a self-call, so every mutator is `onlySelf`.
     modifier onlySelf() {
         if (msg.sender != address(this)) revert Unauthorized();
@@ -143,7 +150,7 @@ contract Distribution {
             uint256 share = i + 1 == n ? amount - paid : (uint256(b.bps) * amount) / BPS_TOTAL;
             paid += share;
             address account = b.account;
-            (bool ok,) = _push(token, account, share);
+            (bool ok,) = _push(token, account, share, false);
             if (!ok) {
                 escrowed[token][account] += share;
                 reserved[token] += share;
@@ -160,7 +167,7 @@ contract Distribution {
 
         escrowed[token][account] = 0;
         reserved[token] -= amount;
-        (bool ok, bytes memory data) = _push(token, account, amount);
+        (bool ok, bytes memory data) = _push(token, account, amount, true);
         // A word or less is the bare `false` of a non-reverting token, empty revert data, or an
         // argument-less custom error: no reason worth bubbling, so name the failure instead
         // (decision 24). Anything longer carries its own reason and keeps it.
@@ -171,9 +178,10 @@ contract Distribution {
         emit Released(token, account, amount);
     }
 
-    /// @notice Queue a self-call, or run it now when `delay` is zero.
+    /// @notice Queue a self-call, or run it now when `delay` is zero. Refused while `distribute` or
+    /// `release` is running.
     /// @param action Calldata for one of this contract's `onlySelf` functions.
-    function propose(bytes calldata action) external returns (bytes32 hash) {
+    function propose(bytes calldata action) external notLocked returns (bytes32 hash) {
         if (msg.sender != owner) revert NotOwner();
 
         uint32 n = ++nonce;
@@ -193,7 +201,8 @@ contract Distribution {
     }
 
     /// @notice Run a queued action once its eta has passed. A failing action stays queued for a retry.
-    function applyQueued(bytes calldata action, uint32 nonce_) external {
+    /// Refused while `distribute` or `release` is running.
+    function applyQueued(bytes calldata action, uint32 nonce_) external notLocked {
         bytes32 hash = keccak256(abi.encode(action, nonce_));
         uint256 eta = queued[hash];
         // A timelock is a timestamp comparison; a validator's few seconds of drift is not the threat.
@@ -230,24 +239,27 @@ contract Distribution {
 
     /// @notice Name the next owner, who must call `acceptOwnership()` before anything changes; until
     /// then the current owner keeps every power. `address(0)` renounces at once — nothing can be
-    /// proposed or cancelled again — and drops any pending transfer with it. Naming the current owner
-    /// withdraws a pending transfer.
+    /// proposed or cancelled again, and drops every queued action — and drops any pending transfer
+    /// with it. Naming the current owner withdraws a pending transfer.
     function transferOwnership(address owner_) external onlySelf {
         if (owner_ == address(0)) {
             owner = address(0);
             pendingOwner = address(0);
+            _clearQueue();
             return;
         }
         pendingOwner = owner_ == owner ? address(0) : owner_;
     }
 
-    /// @notice Take ownership after the owner named you with `transferOwnership`.
+    /// @notice Take ownership after the owner named you with `transferOwnership`, and drops every
+    /// action the previous owner queued.
     function acceptOwnership() external {
         if (msg.sender != pendingOwner) revert Unauthorized();
 
         emit OwnershipTransferred(owner, msg.sender);
         owner = msg.sender;
         pendingOwner = address(0);
+        _clearQueue();
     }
 
     /// @notice Everything a reader needs in one call.
@@ -284,6 +296,20 @@ contract Distribution {
         if (sum != BPS_TOTAL) revert BadTable();
     }
 
+    /// @dev Drops every queued action, newest first, emitting `Cancelled` for each so a log reader's
+    /// pending list empties the way it would have by hand. Runs on a handover and on a renounce:
+    /// what the previous owner queued was queued under an authority that no longer exists.
+    function _clearQueue() private {
+        uint256 n = _pending.length;
+        while (n > 0) {
+            bytes32 hash = _pending[--n].hash;
+            delete queued[hash];
+            delete _pendingIndex[hash];
+            _pending.pop();
+            emit Cancelled(hash);
+        }
+    }
+
     /// @dev Swap-and-pop, so `_pending` stays iterable and the surviving order is stable otherwise.
     function _remove(bytes32 hash) private {
         uint256 i = _pendingIndex[hash];
@@ -316,9 +342,28 @@ contract Distribution {
     /// @dev ETH is capped so one hostile recipient cannot burn the whole distribution; an ERC-20 push
     /// is bounded by the token. A no-return token (mainnet USDT) counts as success; anything else must
     /// answer with a word equal to one, decoded as a `uint256` so hostile return data cannot revert here.
-    function _push(address token, address to, uint256 amount) private returns (bool ok, bytes memory data) {
+    ///
+    /// `keepData` buys the ETH branch's return data. `distribute` passes false and calls with a
+    /// zero-length output area, so a recipient reverting with megabytes costs it one `RETURNDATASIZE`
+    /// it never reads instead of the memory to hold them — unbounded copying inside the loop broke the
+    /// half-block property decision 27 rests on at about eleven hostile rows. `release` passes true,
+    /// because decision 24 bubbles a reason longer than a word and cannot name one it did not copy.
+    /// The ERC-20 branch ignores the flag: it needs the return word below, and the token is the one
+    /// `distribute(token)` was called with, so a hostile token's return data costs only the caller who
+    /// named it.
+    function _push(address token, address to, uint256 amount, bool keepData)
+        private
+        returns (bool ok, bytes memory data)
+    {
         if (token == address(0)) {
-            (ok, data) = to.call{value: amount, gas: PUSH_GAS}("");
+            if (keepData) {
+                (ok, data) = to.call{value: amount, gas: PUSH_GAS}("");
+            } else {
+                uint256 gasCap = PUSH_GAS;
+                assembly ("memory-safe") {
+                    ok := call(gasCap, to, amount, 0, 0, 0, 0)
+                }
+            }
             return (ok, data);
         }
         (ok, data) = token.call(abi.encodeWithSelector(TRANSFER, to, amount));
