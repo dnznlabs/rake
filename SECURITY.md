@@ -149,6 +149,11 @@ The remaining 21 `AppTest` tests: `test_gzipBootstrap`, `test_lock`,
   "Two legs from two labs is the whole independence claim. Both are language models trained on
   overlapping public Solidity; correlated blind spots are likely and unmeasured. The mitigation is
   method diversity — property tests, a static analyser, a human reading the diff — not more models."
+- **Leg independence on this run was not clean.** Leg 2's second agent read part of leg 1's
+  harvested report inside the tree it ran in
+  ([`audits/2026-10-30/BLIND.md`](audits/2026-10-30/BLIND.md) § The one breach), so F3's two-lab
+  agreement is discounted and the run counts three clean agreements, not four; the harvest order
+  that allows it is carried as [#119](https://github.com/dnznlabs/rake/issues/119).
 
 ---
 
