@@ -58,7 +58,7 @@ If it works for DNZN it should work for anyone, so it's built as a public primit
 
 These were worked through and should not be relitigated without reason.
 
-- **Sink + permissionless drain, not push-on-receive.** `receive()` only accumulates (stays under a 2,300-gas stipend). `distribute(token)` splits. Pass-through is achieved by the payer calling `distribute` after paying. ERC-20 has no receive hook, so this is the floor anyway.
+- **Sink + permissionless drain, not push-on-receive.** `receive()` only accumulates (stays under a 2,300-gas stipend). `distribute(token)` splits. Pass-through is achieved by the payer calling `distribute` after paying. ERC-20 has no receive hook, so this is the floor anyway. That stipend figure holds while the implementation is warm: a cold `DELEGATECALL` adds 2,600 gas, so a contract paying in with `transfer`/`send` can fail — see [`SECURITY.md`](../../SECURITY.md).
 - **Push with escrow fallback.** Each share is pushed; if the push fails it's escrowed for that beneficiary and the rest still go out. `release(token, account)` retries. A `reserved[token]` total keeps escrowed funds out of the next split.
 - **Basis points, sum = 10,000, last recipient takes the remainder.** No dust.
 - **Table is strictly ascending by address.** Dedupe for free (same trick as the multisig's signer loop). Consequence: "last" is by address, not list order; document it.
