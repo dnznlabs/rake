@@ -1,6 +1,6 @@
 # m03-t03 — handoff
 
-PR: #<n> · Branch: `m03/t03-dapp` · 2026-10-30
+PR: #109 · Branch: `m03/t03-dapp` · 2026-10-30
 
 The dapp follows the two-step ABI. The detail page takes a fourth read, `pendingOwner()`, because
 nothing else makes a nomination legible — the struct does not carry it and only acceptance emits an
