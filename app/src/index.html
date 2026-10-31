@@ -379,15 +379,23 @@ function who() {
 }
 
 /* ---- reading the chain ---------------------------------------------------------------------- */
-const S = { featured: null, loaded: false, error: null, tab: 'recent' };
+const S = { featured: null, maxRows: null, loaded: false, error: null, tab: 'recent' };
 async function load() {
   CHAIN = parseInt(await P.request({ method: 'eth_chainId' }), 16);
   // The same address on another network is another contract, or none: do not read it.
   if (wrongChain()) return;
   await readClock();
   // Read once at boot: the featured distribution is a salt in the build, never an address.
-  const [a] = await call(CFG.factory, 'predict(bytes32)', [CFG.featuredSalt], ['address']);
-  S.featured = a; S.loaded = true;
+  const [[a], [impl]] = await Promise.all([
+    call(CFG.factory, 'predict(bytes32)', [CFG.featuredSalt], ['address']),
+    call(CFG.factory, 'implementation()', [], ['address']),
+  ]);
+  /* The row cap the editor refuses past (decision 27, ruling 4): read, never a literal, because the
+     editor also runs on create, where no distribution exists to ask — so it is asked of the
+     implementation behind the factory, which is the code every clone runs. A failure here is a failed
+     boot like any other and the page says so; no editor falls back to a number of its own. */
+  const [max] = await call(impl, 'MAX_BENEFICIARIES()', [], ['uint256']);
+  S.featured = a; S.maxRows = Number(max); S.loaded = true;
 }
 
 /* One distribution, in four reads: code first, so an address with nothing on it is "could not read"
@@ -597,10 +605,12 @@ const rowsFrom = table => table.map(b => ({ name: b[2], note: b[3], addr: b[0], 
    the share and the name only, and a half-typed address must not stop the preview from painting. */
 const barRows = rows => rows.filter(r => (parseFloat(r.pct) || 0) > 0).map(r => [ZERO, Math.round((parseFloat(r.pct) || 0) * 100), r.name, r.note]);
 const pctTotal = rows => rows.reduce((s, r) => s + (parseFloat(r.pct) || 0), 0);
-/* Valid means the contract will take it. The first two refusals are the prototype's; the third is
-   here because `propose` does not validate the action it queues — a table with a duplicate account or
-   a zero share queues happily and then reverts `BadTable` on apply, where it stays stuck for the
-   whole delay with only a cancel to clear it. The sort is stated rather than performed on screen:
+/* Valid means the contract will take it. The first two refusals are the prototype's; the third and
+   the fourth are here because `propose` does not validate the action it queues — a table with a
+   duplicate account or a zero share, or one longer than `MAX_BENEFICIARIES`, queues happily and then
+   reverts `BadTable` on apply, where it stays stuck for the whole delay with only a cancel to clear
+   it. The cap is `S.maxRows`, read at boot: this is the one validator both write paths use, so the
+   refusal covers create and propose together. The sort is stated rather than performed on screen:
    silently reordering a table someone is typing is worse than saying which order it goes in. */
 function editorState(rows) {
   const total = pctTotal(rows), off = Math.round((100 - total) * 100) / 100;
@@ -609,6 +619,7 @@ function editorState(rows) {
   const seen = new Set(rows.map(r => r.addr.toLowerCase()));
   if (seen.size !== rows.length) return { ok: false, total, why: 'two rows cannot share an address — the contract refuses that table' };
   if (rows.some(r => Math.round((parseFloat(r.pct) || 0) * 100) === 0)) return { ok: false, total, why: 'every row needs a share above zero — the contract refuses that table' };
+  if (rows.length > S.maxRows) return { ok: false, total, why: `at most ${S.maxRows} beneficiaries — the contract refuses a longer table` };
   return { ok: true, total, why: 'sent ascending by address — the only order the contract accepts' };
 }
 function editorHTML(rows) {
@@ -628,7 +639,7 @@ function editorPaint(rows) {
   const el = document.getElementById('ed-bar');
   if (el) el.innerHTML = bar(preview, {}) + ticks(preview, {});
   const sum = document.getElementById('ed-sum');
-  if (sum) { sum.className = st.ok ? 'ok' : 'bad'; sum.innerHTML = `${rows.length} beneficiar${rows.length === 1 ? 'y' : 'ies'} · total <b>${+st.total.toFixed(2)}%</b>`; }
+  if (sum) { sum.className = st.ok ? 'ok' : 'bad'; sum.innerHTML = `${rows.length} of ${S.maxRows} beneficiar${S.maxRows === 1 ? 'y' : 'ies'} · total <b>${+st.total.toFixed(2)}%</b>`; }
   return st;
 }
 function editorBind(rows, redraw, after) {
@@ -643,7 +654,9 @@ function editorBind(rows, redraw, after) {
   });
   V.querySelectorAll('[data-edrm]').forEach(b => { b.onclick = () => { if (rows.length > 1) { rows.splice(+b.dataset.edrm, 1); redraw(); } }; });
   const add = V.querySelector('[data-edadd]');
-  if (add) add.onclick = () => { rows.push(EMPTY_ROW()); redraw(); };
+  // Bounded at both ends, and each end the same way: the row the contract would refuse is never added,
+  // as the last row is never removed. The count line beside this button says where the ceiling is.
+  if (add) add.onclick = () => { if (rows.length < S.maxRows) { rows.push(EMPTY_ROW()); redraw(); } };
   after(editorPaint(rows));
 }
 
