@@ -1,6 +1,6 @@
 # m03-t04 — handoff
 
-PR: #<n> · Branch: `m03/t04-review` · 2026-10-30
+PR: #117 · Branch: `m03/t04-review` · 2026-10-30
 
 Two models from two labs read `src/Distribution.sol`, `src/App.sol` and the two deploy scripts at `ede55c3` in a blinded tree holding nothing but the code, their reports were reconciled into `audits/2026-10-30/AUDIT.md` with a provenance block, and `SECURITY.md` now dispositions all ten findings and all ten carried issues, states the invariants the suite holds, and says what the review did not cover. The plan was amended twice mid-task, both times on a stop I raised: the known answer could not be both inside the blinded tree (where the runner read it) and unreadable by the legs, so it stays in this checkout and reaches the rollup through a one-line `KNOWN_ANSWER_FILE` override (#112 later made that the prescribed form); and #111 arrived as an issue rather than as a plan, which I declined to act on until #112 put it in `TASK.md`. No contract changed. Five findings are accepted as changes for m03-t05, so t05 stands.
 
