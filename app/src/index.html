@@ -708,7 +708,7 @@ function bindWrites(reload) {
       if (!args) return;
       all().forEach(x => { x.disabled = true; });
       const r = await tx(w.to, w.sig, args, { value: w.value && w.value(), label: w.label });
-      if (r.ok) reload(); else all().forEach(x => { x.disabled = false; });
+      if (r.ok) reload(w); else all().forEach(x => { x.disabled = false; });
     };
     if (WRITES.get(b.dataset.send)?.hold) holdToFire(b, fire); else b.onclick = fire;
   });
@@ -874,7 +874,10 @@ let DS = { d: null, next: null, heir: null, nonces: null, qtx: null, failed: fal
 let PROPOSE = null, DRAWER = false, OWNOPEN = false;
 // The distribution `#/docs#widget` embeds: set only where the owner bar paints, cleared by every route but the docs.
 let EMBED = null;
-const bindAll = () => bindWrites(() => detail(DS.d.addr));
+// The drawer's state outlives a repaint by design, so a landed proposal has to clear it here or the
+// form still holds what was just queued.
+const closeDrawer = () => { PROPOSE = null; DRAWER = false; OWNOPEN = false; ACK = 0; OWNMODE = 'transfer'; OWNER_IN = ''; };
+const bindAll = () => bindWrites(w => { if (w.sig === 'propose(bytes)') closeDrawer(); detail(DS.d.addr); });
 
 /* Decision 7: who this page is for is decided once per load. The owner's own account sends directly;
    a contract owner that answers `isOwner(ACC)` gets the same view with every owner write rendered as
@@ -905,7 +908,7 @@ async function ownerView(d) {
 
 async function detail(addr) {
   const t = TOKEN;
-  if (!DS.d || DS.d.addr !== addr) { V.innerHTML = notice(`reading ${esc(short(addr))}…`); PROPOSE = null; DRAWER = false; OWNOPEN = false; ACK = 0; OWNMODE = 'transfer'; OWNER_IN = ''; }
+  if (!DS.d || DS.d.addr !== addr) { V.innerHTML = notice(`reading ${esc(short(addr))}…`); closeDrawer(); }
   // The clock is read again here, not only at boot: every countdown on this page is measured against
   // it, and a write that lands moves the chain's.
   const [d] = await Promise.all([loadDistro(addr), readClock()]);
