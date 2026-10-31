@@ -180,8 +180,12 @@ ChatGPT`, meeting the method's minimums of 2.1.268 and 0.158.0). Branch `m03/t04
      closed by #103), [#74](https://github.com/dnznlabs/rake/issues/74) (decision 21, closed by
      #103), [#95](https://github.com/dnznlabs/rake/issues/95) (a known shape beside decision 25's:
      an escrow is recoverable only if the recipient becomes payable; the owner's remedy is a
-     re-table, decision 6). Where the legs found one, the row says which leg (from `AUDIT.md`'s
-     grading section).
+     re-table, decision 6), [#111](https://github.com/dnznlabs/rake/issues/111) (the two halves
+     of the handover leave different traces: `acceptOwnership` emits `OwnershipTransferred`,
+     `renounceOwnership` does not, so a renounce is observable only through `snapshot()`;
+     documented, decision 21 and m03-t02's deviation 11; not an invariant, since no test asserts
+     the absence of an event — added 2026-10-30 at t03's review, a tenth row). Where the legs
+     found one, the row says which leg (from `AUDIT.md`'s grading section).
    - **Invariants the suite holds.** From `forge test --list` on `ede55c3` (63 tests), grouped, with
      the test names: the table (sums to 10,000, ascending, no zero share, at most 107 rows), the
      owner (setters `onlySelf`, two-step transfer, renounce immediate, cap of one pending owner),
@@ -195,8 +199,8 @@ ChatGPT`, meeting the method's minimums of 2.1.268 and 0.158.0). Branch `m03/t04
      commit `main` carries when M03 closes, or an ancestor whose diff to it touches nothing under
      `src/`.
 
-   Check: for every `n` in `18 19 20 22 23 54 61 74 95`, `grep -c "rake/issues/$n\b\|#$n\b" SECURITY.md`
-   ≥ 1 (criterion 4 names eight; #23 is the carried table's addition); `grep -c 'two-model agent review' SECURITY.md`
+   Check: for every `n` in `18 19 20 22 23 54 61 74 95 111`, `grep -c "rake/issues/$n\b\|#$n\b" SECURITY.md`
+   ≥ 1 (criterion 4 names eight; #23 is the carried table's addition, #111 t03's review's); `grep -c 'two-model agent review' SECURITY.md`
    ≥ 1; `grep -c 'ede55c3' SECURITY.md` ≥ 1; `grep -ci 'independent audit' SECURITY.md` hits only
    in the sentence saying it is not one.
 
@@ -244,11 +248,14 @@ ChatGPT`, meeting the method's minimums of 2.1.268 and 0.158.0). Branch `m03/t04
 - `grep -c 'rake/issues/' audits/KNOWN_ANSWER.md` → 8, and `AUDIT.md`'s grading section says per
   leg which of the in-code five it found.
 - The legs could not have read the answer: `BLIND.md`'s `ls -A` shows no `audits/KNOWN_ANSWER.md`,
-  and `grep -c 'KNOWN_ANSWER_FILE' scripts/audit.sh` ≥ 1 with `git diff --stat origin/main -- scripts/audit.sh`
-  listing that one file and the diff touching only the § rollup read (the one runner change
-  step 5 allows).
-- For every `n` in `18 19 20 22 23 54 61 74 95`, `grep -c "rake/issues/$n\b\|#$n\b" SECURITY.md` ≥ 1
-  (criterion 4's eight plus #23); every finding in `AUDIT.md` has a row in `SECURITY.md`
+  and `grep -c 'KNOWN_ANSWER_FILE' scripts/audit.sh` ≥ 1 with
+  `diff ../shared/templates/forge-audit/files/scripts/audit.sh scripts/audit.sh` showing only the
+  § rollup read (the one runner change step 5 allows). The comparison is against the fragment's
+  pristine copy, not `origin/main`: step 1 installs the file on this branch, so `main` has no copy
+  and a diff against it is the whole file (corrected 2026-10-30; the engineer ran both and the
+  handoff shows both).
+- For every `n` in `18 19 20 22 23 54 61 74 95 111`, `grep -c "rake/issues/$n\b\|#$n\b" SECURITY.md` ≥ 1
+  (criterion 4's eight plus #23 and #111); every finding in `AUDIT.md` has a row in `SECURITY.md`
   § Findings — disposition (count both, state both); `grep -c 'two-model agent review' SECURITY.md`
   ≥ 1; `grep -c 'ede55c3' SECURITY.md` ≥ 1.
 - `grep -n '2,300' docs/brainstorming/PROJECT_OVERVIEW.md` finds the § 5 line followed by a
@@ -295,6 +302,11 @@ the legs to be unable to read it (step 4's reason) and forbidding any runner cha
 scope), and the runner reads the file from the tree it runs in. Ruled: the file stays out of the
 tree and the rollup reads it through `KNOWN_ANSWER_FILE`, one line in this repo's `scripts/audit.sh`.
 Steps 3, 4 and 5, one acceptance criterion and the out-of-scope clause changed; nothing else.
+
+**Amended again 2026-10-30, after t03's review and before the legs ran:** #111, filed at that
+review, gets a tenth carried-issues row in step 7 and in both checks (it was offered by message
+first, which the engineer correctly refused: an issue is not a plan). The `scripts/audit.sh`
+criterion compares against the fragment's copy, not `origin/main`, for the reason stated there.
 
 ## Context
 
