@@ -304,13 +304,16 @@ async function ensName(acc) {
 async function regName(reg, acc) {
   const [name] = await call(reg.at, 'reverseResolve(address)', [acc], ['string']);
   if (!name) return null;                // an absent record and an address with no code both decode to ''
+  return same(await regAddr(reg, name), acc) ? name : null;
+}
+async function regAddr(reg, name) {
   // computeId(string) is the one call that cannot go through Eth.enc: Eth.pad does BigInt(v) on every
   // argument and throws on a string. Hand-built, as the probe builds it.
   const u = Eth.utf8(name), body = [...u].map(x => x.toString(16).padStart(2, '0')).join('');
   const data = '0x' + Eth.sel('computeId(string)') + Eth.pad(32) + Eth.pad(u.length) + body.padEnd(Math.ceil(u.length / 32) * 64, '0');
   const [id] = Eth.dec(['uint256'], await P.request({ method: 'eth_call', params: [{ to: reg.at, data }, 'latest'] }));
   const [owner] = await call(reg.at, 'resolve(uint256)', [id], ['address']);
-  return same(owner, acc) ? name : null;
+  return owner;
 }
 /* `call` goes through `P`, so this reads whichever chain the WALLET is on — CHAIN, not CFG.chainId.
    Only mainnet and Sepolia can answer, and anvil must spend no round trips. A registry absent from a
@@ -331,12 +334,16 @@ async function nameSweep() {
   await Promise.all(fresh.map(async a => { NAMED.set(a, null); NAMED.set(a, await resolveName(a)); }));
   for (const n of marked) { const name = NAMED.get(n.dataset.addr.toLowerCase()); if (name) n.textContent = name; }
 }
-/* Forward (name → address), for every field that takes one: the ENS registry's own resolver, then its
-   `addr`, under the same gate. Elsewhere it answers null and the field says where names work. */
+/* Forward (name → address), for every field that takes one, under the same gate. The suffix picks the
+   registry — `.wei` WNS, `.gwei` GNS, anything else ENS through its own resolver and `addr`. Elsewhere it
+   answers null and the field says where names work. */
+const SUFFIX = { wei: NAMES[1], gwei: NAMES[2] };
 async function resolveAddr(name) {
   if (CHAIN !== 1 && CHAIN !== 11155111) return null;
   try {
-    const node = Model.namehash(String(name).trim().toLowerCase());
+    const n = String(name).trim().toLowerCase(), reg = SUFFIX[n.split('.').pop()];
+    if (reg) { const a = await regAddr(reg, n); return a === ZERO ? null : a; }
+    const node = Model.namehash(n);
     const [res] = await call(NAMES[0].at, 'resolver(bytes32)', [node], ['address']);
     if (res === ZERO) return null;
     const [a] = await call(res, 'addr(bytes32)', [node], ['address']);
@@ -631,7 +638,7 @@ function editorHTML(rows) {
     + rows.map((r, i) => `<div class="erow">`
       + `<input aria-label="name" data-ed="name" data-i="${i}" value="${esc(r.name)}" placeholder="name">`
       + `<input aria-label="note" class="note-in" data-ed="note" data-i="${i}" value="${esc(r.note)}" placeholder="note (prose)">`
-      + `<div><input aria-label="address or name" data-ed="addr" data-i="${i}" value="${esc(r.addr)}" placeholder="0x… or a name"><div class="res" data-edres="${i}"></div></div>`
+      + `<div><input aria-label="address or name" data-ed="addr" data-i="${i}" value="${esc(r.addr)}" placeholder="0x… or .eth / .wei / .gwei"><div class="res" data-edres="${i}"></div></div>`
       + `<input aria-label="percent" class="bps" data-ed="pct" data-i="${i}" value="${esc(r.pct)}" inputmode="decimal">`
       + `<button class="rm" data-edrm="${i}" title="remove" aria-label="remove this row">×</button></div>`).join('')
     + `</div><div class="sum"><button class="link" data-edadd="1">+ add a beneficiary</button><span id="ed-sum"></span></div>`;
@@ -749,7 +756,7 @@ async function landing() {
   <div class="actions"><a class="btn" href="#/create">Create a distribution</a><a class="btn sec" href="#/docs">Read the docs</a></div>
   </div><div class="side"><div id="featured"></div>
   <div class="sechead"><b>view a distribution</b></div>
-  <div class="load"><input id="load-in" placeholder="0x… or a name" aria-label="address or name"><button class="btn sec" id="load-go">view</button></div>
+  <div class="load"><input id="load-in" placeholder="0x… or .eth / .wei / .gwei" aria-label="address or name"><button class="btn sec" id="load-go">view</button></div>
   <div class="res" id="load-res"></div>
   </div></div>
   <div class="sechead"><b>use cases</b><span>any share a project has promised in public</span></div>
@@ -1101,7 +1108,7 @@ function ownershipHTML(d) {
     + `<div class="tabs">${[['transfer', 'change owner'], ['renounce', 'renounce ownership']].map(([k, l]) => `<button class="tab${OWNMODE === k ? ' on' : ''}" data-own="${k}">${l}</button>`).join('')}</div>`
     + (t
       ? `<p class="help">Nominates another address as the next owner, which becomes the owner only when it calls <code>acceptOwnership()</code> itself. Your own address withdraws a nomination. Enter it, confirm each statement in turn${hold}.</p>`
-        + (n => `<div class="field"><input id="q-owner" aria-label="new owner" placeholder="new owner — 0x… or a name" value="${esc(OWNER_IN)}"><div class="res${n.cls ? ' ' + n.cls : ''}" id="q-ownerres">${esc(n.text)}</div></div>`)(ownerNote())
+        + (n => `<div class="field"><input id="q-owner" aria-label="new owner" placeholder="new owner — 0x… or .eth / .wei / .gwei" value="${esc(OWNER_IN)}"><div class="res${n.cls ? ' ' + n.cls : ''}" id="q-ownerres">${esc(n.text)}</div></div>`)(ownerNote())
       : `<p class="help">Transfers ownership to nobody. Confirm each statement in turn${hold}.</p>`)
     + acks.map((x, i) => `<label class="ack"><input type="checkbox" data-ack="${i}"${ACK > i ? ' checked' : ''}${ACK < i || !ok ? ' disabled' : ''}><span>${x}</span></label>`).join('')
     + wctl(OWNMODE, t ? 'hold to nominate' : 'hold to renounce', {
@@ -1268,7 +1275,7 @@ function createOne() {
     + '<h1>Who controls it, and how slowly.</h1>'
     + field('name', `<input id="c-desc" aria-label="name" value="${esc(D.desc)}" placeholder="e.g. dnzn labs distribution">`,
       "The distribution's display name, stored on chain as its description — shown everywhere it appears.")
-    + field('owner', `<input id="c-owner" aria-label="owner" value="${esc(D.owner)}" placeholder="0x… or a name"><div class="res" id="c-ownerres"></div>`,
+    + field('owner', `<input id="c-owner" aria-label="owner" value="${esc(D.owner)}" placeholder="0x… or .eth / .wei / .gwei"><div class="res" id="c-ownerres"></div>`,
       'Defaults to the connected wallet. A vault address here owns the distribution from its first block, and the salt stays yours (decision 10).')
     + field('delay', `<input id="c-delay" class="narrow" aria-label="delay" value="${esc(D.delay)}">`,
       'How long every future change waits in public. Accepts 7d, 48h, 0. Zero means changes apply instantly, and is flagged everywhere it shows.')
@@ -1388,7 +1395,7 @@ async function list() {
       ? `nothing on ${cname(CFG.chainId)} is owned by ${ext('address', ACC, short(ACC))}.`
       : 'no distribution opened yet. Paste an address below, or <a href="#/create">create one</a>.')
       + (ACC ? '' : notice('<b>mine</b> needs a connected wallet.'))
-      + `<div class="load"><input id="load-in" placeholder="0x… or a name" aria-label="address or name"><button class="btn sec" id="load-go">view</button></div><div class="res" id="load-res"></div>`;
+      + `<div class="load"><input id="load-in" placeholder="0x… or .eth / .wei / .gwei" aria-label="address or name"><button class="btn sec" id="load-go">view</button></div><div class="res" id="load-res"></div>`;
     loadField();
     return;
   }
@@ -1451,7 +1458,7 @@ function widgetDocs() {
   const tag = rpc => `&lt;script src="${esc(src)}"&gt;&lt;/script&gt;\n&lt;div` + at('data-rake', `<span class="wd-a">${addr}</span>`)
     + at('data-chain', id) + at('data-link') + (rpc ? at('data-rpc', esc(rpc)) : '') + '\n&gt;&lt;/div&gt;';
   const rpc = PUBLIC_RPC[id];
-  return `<div class="wdemo"><div class="load"><input id="wd-in" value="${mine || S.featured ? addr : ''}" placeholder="0x… or a name" aria-label="distribution to preview"><button class="btn sec" id="wd-go">preview</button></div>
+  return `<div class="wdemo"><div class="load"><input id="wd-in" value="${mine || S.featured ? addr : ''}" placeholder="0x… or .eth / .wei / .gwei" aria-label="distribution to preview"><button class="btn sec" id="wd-go">preview</button></div>
   <div class="res" id="wd-res"></div>
   <div class="wdgrid"><div><div class="cap">full</div><div id="wd-full"></div></div><div><div class="cap">compact</div><div id="wd-compact"></div></div></div></div>
   <p>Paste the following into any page. It displays <span id="wd-what">${mine ? esc(mine.description) : S.featured ? 'the featured distribution' : 'the distribution at the address given in <code>data-rake</code>'}</span> on ${cname(id)}, read through the visitor's wallet, and shows a failure state if no wallet is present or the wallet is on another chain.</p>
