@@ -98,9 +98,9 @@
 - Every write goes through `tx(to, sig, args, {value, label})`: an `eth_call` preflight on exactly the
   transaction about to be sent, then `eth_sendTransaction`, then `waitReceipt`, then the receipt's
   `status`. A revert is therefore a sentence before anything is paid for, and `Model.revertMessage`
-  turns the bytes into it — the eight custom errors by selector, a bare 32-byte word as `retry failed`
-  (that is the `false` a token returned, bubbled with no selector in front of it), no bytes as
-  `reverted`. The bytes themselves sit at `error.data` for the dev `rpcProvider`, which throws the
+  turns the bytes into it — the nine custom errors by selector, a bare 32-byte word as the token
+  refusing the call (that is whatever a token's `balanceOf` reverted with, bubbled by `_balance` with
+  no selector in front of it), no bytes as `reverted`. The bytes themselves sit at `error.data` for the dev `rpcProvider`, which throws the
   JSON-RPC error object, and at `error.data.data` for a MetaMask-class wallet, so both are read.
   `create` is the one write with no preflight: a second `create` on a used salt burns the whole gas
   limit before `DeploymentFailed`, so the page reads `eth_getCode` on the predicted address and
@@ -111,7 +111,10 @@
   a selector (`OWNMODE`). Each carries `hold: true`, which `holdToFire` turns into a 3-second press of
   pointer or Enter/Space (a click does nothing), behind three chained checkboxes (`ACKS`), and the
   button is `--err` red — red for an irreversible action, beyond the base's "red means error". Both are
-  patterns to propose to `design-base`.
+  patterns to propose to `design-base`. The owner's own address in the change-owner field is the
+  withdraw arm of the same call, admitted only while `pendingOwner()` is non-zero. The fourth
+  ownership write is the nominee's, not the owner's: `acceptOwnership()` is its own bar on the detail
+  page, in the two `VIEW` values (`pending`, `pending-vault`) the nominee and its signers get.
 - Every address and hash the page prints goes through `ext(kind, value, text)`: the shortened value,
   then a `.cp` copy icon that copies the full value on click or Enter (`copyClick`, one capturing
   listener), then a `↗` to the explorer only where `EXPLORER` names one. Never print `short(addr)` bare.

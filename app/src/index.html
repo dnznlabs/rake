@@ -304,13 +304,16 @@ async function ensName(acc) {
 async function regName(reg, acc) {
   const [name] = await call(reg.at, 'reverseResolve(address)', [acc], ['string']);
   if (!name) return null;                // an absent record and an address with no code both decode to ''
+  return same(await regAddr(reg, name), acc) ? name : null;
+}
+async function regAddr(reg, name) {
   // computeId(string) is the one call that cannot go through Eth.enc: Eth.pad does BigInt(v) on every
   // argument and throws on a string. Hand-built, as the probe builds it.
   const u = Eth.utf8(name), body = [...u].map(x => x.toString(16).padStart(2, '0')).join('');
   const data = '0x' + Eth.sel('computeId(string)') + Eth.pad(32) + Eth.pad(u.length) + body.padEnd(Math.ceil(u.length / 32) * 64, '0');
   const [id] = Eth.dec(['uint256'], await P.request({ method: 'eth_call', params: [{ to: reg.at, data }, 'latest'] }));
   const [owner] = await call(reg.at, 'resolve(uint256)', [id], ['address']);
-  return same(owner, acc) ? name : null;
+  return owner;
 }
 /* `call` goes through `P`, so this reads whichever chain the WALLET is on — CHAIN, not CFG.chainId.
    Only mainnet and Sepolia can answer, and anvil must spend no round trips. A registry absent from a
@@ -331,12 +334,16 @@ async function nameSweep() {
   await Promise.all(fresh.map(async a => { NAMED.set(a, null); NAMED.set(a, await resolveName(a)); }));
   for (const n of marked) { const name = NAMED.get(n.dataset.addr.toLowerCase()); if (name) n.textContent = name; }
 }
-/* Forward (name → address), for every field that takes one: the ENS registry's own resolver, then its
-   `addr`, under the same gate. Elsewhere it answers null and the field says where names work. */
+/* Forward (name → address), for every field that takes one, under the same gate. The suffix picks the
+   registry — `.wei` WNS, `.gwei` GNS, anything else ENS through its own resolver and `addr`. Elsewhere it
+   answers null and the field says where names work. */
+const SUFFIX = { wei: NAMES[1], gwei: NAMES[2] };
 async function resolveAddr(name) {
   if (CHAIN !== 1 && CHAIN !== 11155111) return null;
   try {
-    const node = Model.namehash(String(name).trim().toLowerCase());
+    const n = String(name).trim().toLowerCase(), reg = SUFFIX[n.split('.').pop()];
+    if (reg) { const a = await regAddr(reg, n); return a === ZERO ? null : a; }
+    const node = Model.namehash(n);
     const [res] = await call(NAMES[0].at, 'resolver(bytes32)', [node], ['address']);
     if (res === ZERO) return null;
     const [a] = await call(res, 'addr(bytes32)', [node], ['address']);
@@ -379,36 +386,50 @@ function who() {
 }
 
 /* ---- reading the chain ---------------------------------------------------------------------- */
-const S = { featured: null, loaded: false, error: null, tab: 'recent' };
+const S = { featured: null, maxRows: null, loaded: false, error: null, tab: 'recent' };
 async function load() {
   CHAIN = parseInt(await P.request({ method: 'eth_chainId' }), 16);
   // The same address on another network is another contract, or none: do not read it.
   if (wrongChain()) return;
   await readClock();
   // Read once at boot: the featured distribution is a salt in the build, never an address.
-  const [a] = await call(CFG.factory, 'predict(bytes32)', [CFG.featuredSalt], ['address']);
-  S.featured = a; S.loaded = true;
+  const [[a], [impl]] = await Promise.all([
+    call(CFG.factory, 'predict(bytes32)', [CFG.featuredSalt], ['address']),
+    call(CFG.factory, 'implementation()', [], ['address']),
+  ]);
+  /* The row cap the editor refuses past (decision 27, ruling 4): read, never a literal, because the
+     editor also runs on create, where no distribution exists to ask — so it is asked of the
+     implementation behind the factory, which is the code every clone runs. A failure here is a failed
+     boot like any other and the page says so; no editor falls back to a number of its own. */
+  const [max] = await call(impl, 'MAX_BENEFICIARIES()', [], ['uint256']);
+  S.featured = a; S.maxRows = Number(max); S.loaded = true;
 }
 
-/* One distribution, in three reads: code first, so an address with nothing on it is "could not read"
-   rather than a decode error; then the snapshot; then the two numbers behind "waiting to distribute".
+/* One distribution, in four reads: code first, so an address with nothing on it is "could not read"
+   rather than a decode error; then the snapshot; then the two numbers behind "waiting to distribute";
+   then `pendingOwner()`, which the struct deliberately does not carry (ruling 3) and no event
+   announces, so a transfer waiting to be accepted is legible from nothing else. It goes beside the
+   balance reads and is guarded no more than they are: an RPC that cannot answer it could not answer
+   `snapshot()` either, and a zero here means "nothing pending", which a failure must never read as.
    ETH only in v1 — a token balance needs a token list, which the chain does not carry. */
 async function loadDistro(addr) {
   const code = await P.request({ method: 'eth_getCode', params: [addr, 'latest'] });
   if (!code || code === '0x') return { addr, missing: true };
   const [snap] = Eth.dec([Model.SNAPSHOT_T], await P.request({ method: 'eth_call', params: [{ to: addr, data: Eth.enc('snapshot()', []) }, 'latest'] }));
-  const [reserved, balance] = await Promise.all([
+  const [reserved, balance, nominee] = await Promise.all([
     call(addr, 'reserved(address)', [ZERO], ['uint256']),
     P.request({ method: 'eth_getBalance', params: [addr, 'latest'] }),
+    call(addr, 'pendingOwner()', [], ['address']),
   ]);
   const [owner, delay, nonce, description, table, pending] = snap;
   const waiting = BigInt(balance) - reserved[0];
-  return { addr, owner, delay, nonce, description, table, pending, waiting: waiting > 0n ? waiting : 0n };
+  return { addr, owner, delay, nonce, description, table, pending, pendingOwner: nominee[0], waiting: waiting > 0n ? waiting : 0n };
 }
 
 /* The histories, as two log queries with their topic0s OR'd. `from` is the distribution's own first
    block when the `Created` scan found it, else the factory's — never genesis. */
-const CHANGE_EVENTS = [['Queued(bytes32,uint32,uint256,bytes)', 'queued'], ['Applied(bytes32)', 'applied'], ['Cancelled(bytes32)', 'cancelled']];
+const CHANGE_EVENTS = [['Queued(bytes32,uint32,uint256,bytes)', 'queued'], ['Applied(bytes32)', 'applied'], ['Cancelled(bytes32)', 'cancelled'],
+  ['OwnershipTransferred(address,address)', 'accepted']];
 const FUND_EVENTS = [['Received(address,uint256)', 'in'], ['Distributed(address,uint256)', 'distributed'], ['Escrowed(address,address,uint256)', 'escrowed'], ['Released(address,address,uint256)', 'released']];
 /* Filled by the `Created` scan: a distribution's own first block, which is a better `fromBlock` than
    the factory's for anything created long after it. */
@@ -460,6 +481,9 @@ function entry(log) {
   } else if (kind === 'applied' || kind === 'cancelled') {
     e.hash = log.topics[1];
     e.what = ext('hash', log.topics[1], short(log.topics[1]));
+  } else if (kind === 'accepted') {
+    // The nomination's `Applied` is not the handover; this is, and it is the only log the nominee's call leaves.
+    e.what = `owner · ${ext('address', at(1), short(at(1)))} → ${ext('address', at(2), short(at(2)))}`;
   } else if (kind === 'in') {
     e.what = `${eth(log.data)} from ${ext('address', at(1), short(at(1)))}`;
   } else if (kind === 'distributed') {
@@ -480,12 +504,21 @@ const fundWhat = (e, dec, known = true) => e.kind === 'distributed' ? `${money(e
   : e.kind === 'in' ? `${money(e.amount, e.token, dec, known)} from ${ext('address', e.from, short(e.from))}`
   : `${money(e.amount, e.token, dec)} · ${ext('address', e.account, short(e.account))}`;
 /* A decoded pending action as one line, named by the setter it calls. `setBeneficiaries` is also
-   drawn as a second bar; the other three say everything they do here. */
-function describe(p) {
+   drawn as a second bar; the other three say everything they do here. `transferOwnership` has three
+   readings, so it is the one line that needs to know whose distribution this is: `owner` is passed
+   where the page knows it, which is every live pending entry. A `Queued` log does not carry the owner
+   of the moment it was written, so a history row is read without one and says `nominates`, which is
+   what the call did whether or not it also withdrew something. */
+function describe(p, owner) {
   if (p.kind === 'setBeneficiaries') return `${p.kind} · new table · ${p.table.map(b => Model.pct(b[1])).join(' / ')}`;
   if (p.kind === 'setDescription') return `${p.kind} · new name · ${esc(p.description)}`;
   if (p.kind === 'setDelay') return `${p.kind} · new delay · ${delayText(p.delay)}`;
-  if (p.kind === 'transferOwnership') return p.owner === ZERO ? `${p.kind} · renounced · nothing can be proposed again` : `${p.kind} · new owner · ${ext('address', p.owner, short(p.owner))}`;
+  if (p.kind === 'transferOwnership') {
+    const eff = Model.ownerChange(p, owner);
+    if (eff === 'renounce') return `${p.kind} · renounced · nothing can be proposed again`;
+    if (eff === 'withdraw') return `${p.kind} · withdraws the pending transfer`;
+    return `${p.kind} · nominates · ${ext('address', p.owner, short(p.owner))}`;
+  }
   return 'unknown action · selector ' + esc(p.selector);
 }
 const delayText = d => Number(d) === 0 ? 'none — changes apply instantly' : Number(d) % 86400 === 0 ? Number(d) / 86400 + 'd' : Math.round(Number(d) / 3600) + 'h';
@@ -525,13 +558,17 @@ function histFill(id, items, empty) {
   const b = document.getElementById(id + '-more');
   if (b) b.onclick = () => fill(id, histRows(items));
 }
-const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow${e.kind === 'escrowed' ? ' err' : e.kind === 'queued' && !e.closed ? ' amber' : e.kind === 'applied' ? ' done' : ''}"><b>${e.kind}</b><span class="w">${e.what}</span><span class="t">block ${e.block} · ${ext('tx', e.tx, short(e.tx))}</span></div>`).join('')}</div>`;
+const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow${e.kind === 'escrowed' ? ' err' : e.kind === 'queued' && !e.closed ? ' amber' : e.kind === 'applied' || e.kind === 'accepted' ? ' done' : ''}"><b>${e.kind}</b><span class="w">${e.what}</span><span class="t">block ${e.block} · ${ext('tx', e.tx, short(e.tx))}</span></div>`).join('')}</div>`;
 const eyebrow = (text, cls) => `<div class="eyebrow${cls ? ' ' + cls : ''}">${text}</div>`;
 const notice = (text, cls) => `<div class="notice${cls ? ' ' + cls : ''}">${text}</div>`;
 const unreadable = addr => notice(`could not read a distribution at ${ext('address', addr, short(addr))} on ${cname(CFG.chainId)} — nothing is deployed there.`, 'err');
 
-/* Owner, delay and the balance behind `distribute`. Writing it is t03; reading it is this task. */
-const meta = d => `<div class="meta"><div><div class="k">owner</div><div class="v">${d.owner === ZERO ? 'renounced' : ext('address', d.owner, esc(short(d.owner)))}${ACC && d.owner.toLowerCase() === ACC.toLowerCase() ? ' · you' : ''}</div></div>`
+/* Owner, delay and the balance behind `distribute`. The owner cell takes a second line while a
+   transfer is waiting for its nominee to accept (decision 21): the current owner above it still holds
+   every power, which is why the pending address is a line of its own and not a replacement. */
+const meta = d => `<div class="meta"><div><div class="k">owner</div><div class="v">${d.owner === ZERO ? 'renounced' : ext('address', d.owner, esc(short(d.owner)))}${ACC && d.owner.toLowerCase() === ACC.toLowerCase() ? ' · you' : ''}</div>`
+  + (d.pendingOwner && d.pendingOwner !== ZERO ? `<div class="v amber">transfer pending to ${ext('address', d.pendingOwner, esc(short(d.pendingOwner)))}</div>` : '')
+  + `</div>`
   + `<div><div class="k">delay</div><div class="v${Number(d.delay) ? '' : ' amber'}">${delayText(d.delay)}</div></div>`
   + `<div><div class="k">waiting to distribute</div><div class="v">${eth(d.waiting)}</div></div></div>`;
 
@@ -543,7 +580,7 @@ function pendingBlock(d, acts) {
     const decoded = Model.decodePending(p[2]);
     // The tx that queued it comes from the logs, so it appears once `history` has landed.
     const tx = DS.qtx && DS.qtx.get(p[0]);
-    const head = eyebrow(`change queued · ${Model.countdown(p[1], secs())}`, 'amber') + `<div class="status warn">${describe(decoded)}${tx ? ` · queued in ${ext('tx', tx, short(tx))}` : ''}</div>`;
+    const head = eyebrow(`change queued · ${Model.countdown(p[1], secs())}`, 'amber') + `<div class="status warn">${describe(decoded, d.owner)}${tx ? ` · queued in ${ext('tx', tx, short(tx))}` : ''}</div>`;
     const body = decoded.kind === 'setBeneficiaries' ? bar(decoded.table, { pending: true }) + ticks(decoded.table, { pending: true }) : '';
     return head + body + (acts ? pendingActs(d, p, i) : '');
   }).join('');
@@ -562,7 +599,7 @@ function pendingActs(d, p, i) {
       ? sctl(`apply:${i}`, 'apply', { to: d.addr, sig: 'applyQueued(bytes,uint32)', args: () => [p[2], nonce], label: 'applyQueued' })
         + `<span class="status">the delay has passed — anyone can land it${ACC ? '' : ' · connect a wallet to send it'}</span>`
       : '<button class="btn off sm" disabled>apply</button><span class="status">anyone can apply once the delay passes</span>';
-  const cancel = VIEW === 'visitor' ? ''
+  const cancel = !OWNS() ? ''
     : wctl(`cancel:${i}`, 'cancel', { to: d.addr, sig: 'cancel(bytes32)', args: () => [p[0]], label: 'cancel' })
       + '<span class="status">cancel is owner-only and immediate</span>';
   return `<div class="acts">${cancel}${apply}</div>`;
@@ -579,10 +616,12 @@ const rowsFrom = table => table.map(b => ({ name: b[2], note: b[3], addr: b[0], 
    the share and the name only, and a half-typed address must not stop the preview from painting. */
 const barRows = rows => rows.filter(r => (parseFloat(r.pct) || 0) > 0).map(r => [ZERO, Math.round((parseFloat(r.pct) || 0) * 100), r.name, r.note]);
 const pctTotal = rows => rows.reduce((s, r) => s + (parseFloat(r.pct) || 0), 0);
-/* Valid means the contract will take it. The first two refusals are the prototype's; the third is
-   here because `propose` does not validate the action it queues — a table with a duplicate account or
-   a zero share queues happily and then reverts `BadTable` on apply, where it stays stuck for the
-   whole delay with only a cancel to clear it. The sort is stated rather than performed on screen:
+/* Valid means the contract will take it. The first two refusals are the prototype's; the third and
+   the fourth are here because `propose` does not validate the action it queues — a table with a
+   duplicate account or a zero share, or one longer than `MAX_BENEFICIARIES`, queues happily and then
+   reverts `BadTable` on apply, where it stays stuck for the whole delay with only a cancel to clear
+   it. The cap is `S.maxRows`, read at boot: this is the one validator both write paths use, so the
+   refusal covers create and propose together. The sort is stated rather than performed on screen:
    silently reordering a table someone is typing is worse than saying which order it goes in. */
 function editorState(rows) {
   const total = pctTotal(rows), off = Math.round((100 - total) * 100) / 100;
@@ -591,6 +630,7 @@ function editorState(rows) {
   const seen = new Set(rows.map(r => r.addr.toLowerCase()));
   if (seen.size !== rows.length) return { ok: false, total, why: 'two rows cannot share an address — the contract refuses that table' };
   if (rows.some(r => Math.round((parseFloat(r.pct) || 0) * 100) === 0)) return { ok: false, total, why: 'every row needs a share above zero — the contract refuses that table' };
+  if (rows.length > S.maxRows) return { ok: false, total, why: `at most ${S.maxRows} beneficiaries — the contract refuses a longer table` };
   return { ok: true, total, why: 'sent ascending by address — the only order the contract accepts' };
 }
 function editorHTML(rows) {
@@ -598,7 +638,7 @@ function editorHTML(rows) {
     + rows.map((r, i) => `<div class="erow">`
       + `<input aria-label="name" data-ed="name" data-i="${i}" value="${esc(r.name)}" placeholder="name">`
       + `<input aria-label="note" class="note-in" data-ed="note" data-i="${i}" value="${esc(r.note)}" placeholder="note (prose)">`
-      + `<div><input aria-label="address or name" data-ed="addr" data-i="${i}" value="${esc(r.addr)}" placeholder="0x… or a name"><div class="res" data-edres="${i}"></div></div>`
+      + `<div><input aria-label="address or name" data-ed="addr" data-i="${i}" value="${esc(r.addr)}" placeholder="0x… or .eth / .wei / .gwei"><div class="res" data-edres="${i}"></div></div>`
       + `<input aria-label="percent" class="bps" data-ed="pct" data-i="${i}" value="${esc(r.pct)}" inputmode="decimal">`
       + `<button class="rm" data-edrm="${i}" title="remove" aria-label="remove this row">×</button></div>`).join('')
     + `</div><div class="sum"><button class="link" data-edadd="1">+ add a beneficiary</button><span id="ed-sum"></span></div>`;
@@ -610,7 +650,7 @@ function editorPaint(rows) {
   const el = document.getElementById('ed-bar');
   if (el) el.innerHTML = bar(preview, {}) + ticks(preview, {});
   const sum = document.getElementById('ed-sum');
-  if (sum) { sum.className = st.ok ? 'ok' : 'bad'; sum.innerHTML = `${rows.length} beneficiar${rows.length === 1 ? 'y' : 'ies'} · total <b>${+st.total.toFixed(2)}%</b>`; }
+  if (sum) { sum.className = st.ok ? 'ok' : 'bad'; sum.innerHTML = `${rows.length} of ${S.maxRows} beneficiar${S.maxRows === 1 ? 'y' : 'ies'} · total <b>${+st.total.toFixed(2)}%</b>`; }
   return st;
 }
 function editorBind(rows, redraw, after) {
@@ -625,21 +665,28 @@ function editorBind(rows, redraw, after) {
   });
   V.querySelectorAll('[data-edrm]').forEach(b => { b.onclick = () => { if (rows.length > 1) { rows.splice(+b.dataset.edrm, 1); redraw(); } }; });
   const add = V.querySelector('[data-edadd]');
-  if (add) add.onclick = () => { rows.push(EMPTY_ROW()); redraw(); };
+  // Bounded at both ends, and each end the same way: the row the contract would refuse is never added,
+  // as the last row is never removed. The count line beside this button says where the ceiling is.
+  if (add) add.onclick = () => { if (rows.length < S.maxRows) { rows.push(EMPTY_ROW()); redraw(); } };
   after(editorPaint(rows));
 }
 
 /* ---- the writes, and who may send them ------------------------------------------------------- */
 /* Every write a view offers is registered here under the key its button carries, with its arguments
    as a thunk so an input is read when the button is pressed and not when it was drawn. Two kinds:
-   `wctl` is owner-gated, and in the vault view decision 7 turns it into calldata to copy rather than
-   a transaction this page could not sign; `sctl` is permissionless — `distribute`, `release` and
-   `applyQueued` are anyone's, whoever the owner is — and always sends. */
+   `wctl` is for the writes one named account may send, and where that account is a contract decision 7
+   turns the control into calldata to copy rather than a transaction this page could not sign; `sctl`
+   is permissionless — `distribute`, `release` and `applyQueued` are anyone's, whoever the owner is —
+   and always sends. The five `VIEW` values answer two different questions, so each has its own
+   reading: `OWNS` is who may propose and cancel, and `COPIES` is who acts through a contract. A
+   nominee's vault is the second without being the first — it may accept, and nothing else. */
 const WRITES = new Map();
 let VIEW = 'visitor';
+const OWNS = () => VIEW === 'owner' || VIEW === 'vault';
+const COPIES = () => VIEW === 'vault' || VIEW === 'pending-vault';
 function wctl(key, label, w) {
   WRITES.set(key, w);
-  return VIEW === 'vault'
+  return COPIES()
     ? `<button class="btn sec sm" data-copy="${key}"${w.locked ? ' disabled' : ''}>copy calldata for your vault</button>`
     : w.hold ? `<button class="btn sec sm hold" data-send="${key}"${w.locked ? ' disabled' : ''}><span>${label}</span></button>` : `<button class="btn sm" data-send="${key}">${label}</button>`;
 }
@@ -661,7 +708,7 @@ function bindWrites(reload) {
       if (!args) return;
       all().forEach(x => { x.disabled = true; });
       const r = await tx(w.to, w.sig, args, { value: w.value && w.value(), label: w.label });
-      if (r.ok) reload(); else all().forEach(x => { x.disabled = false; });
+      if (r.ok) reload(w); else all().forEach(x => { x.disabled = false; });
     };
     if (WRITES.get(b.dataset.send)?.hold) holdToFire(b, fire); else b.onclick = fire;
   });
@@ -709,7 +756,7 @@ async function landing() {
   <div class="actions"><a class="btn" href="#/create">Create a distribution</a><a class="btn sec" href="#/docs">Read the docs</a></div>
   </div><div class="side"><div id="featured"></div>
   <div class="sechead"><b>view a distribution</b></div>
-  <div class="load"><input id="load-in" placeholder="0x… or a name" aria-label="address or name"><button class="btn sec" id="load-go">view</button></div>
+  <div class="load"><input id="load-in" placeholder="0x… or .eth / .wei / .gwei" aria-label="address or name"><button class="btn sec" id="load-go">view</button></div>
   <div class="res" id="load-res"></div>
   </div></div>
   <div class="sechead"><b>use cases</b><span>any share a project has promised in public</span></div>
@@ -724,7 +771,7 @@ async function landing() {
   <div class="verbs">
   ${verb('01', 'receive', 'ETH and ERC-20 funds accumulate at the address. Nothing moves on its own.', 'anyone can send')}
   ${verb('02', 'distribute', 'Splits the waiting balance across the table. Push, with escrow fallback.', 'callable by anyone')}
-  ${verb('03', 'queue', 'Changes to the beneficiaries, owner or delay are staged in public first.', 'owner only · waits the delay')}
+  ${verb('03', 'queue', 'Changes to the beneficiaries, owner or delay are staged in public first. An owner change also needs the new owner to accept it.', 'owner only · waits the delay')}
   ${verb('04', 'apply', 'Once the time lock passes, anyone can land the queued change.', 'anyone · after the eta')}
   </div></div>`;
   loadField();
@@ -827,25 +874,41 @@ let DS = { d: null, next: null, heir: null, nonces: null, qtx: null, failed: fal
 let PROPOSE = null, DRAWER = false, OWNOPEN = false;
 // The distribution `#/docs#widget` embeds: set only where the owner bar paints, cleared by every route but the docs.
 let EMBED = null;
-const bindAll = () => bindWrites(() => detail(DS.d.addr));
+// The drawer's state outlives a repaint by design, so a landed proposal has to clear it here or the
+// form still holds what was just queued.
+const closeDrawer = () => { PROPOSE = null; DRAWER = false; OWNOPEN = false; ACK = 0; OWNMODE = 'transfer'; OWNER_IN = ''; };
+const bindAll = () => bindWrites(w => { if (w.sig === 'propose(bytes)') closeDrawer(); detail(DS.d.addr); });
 
 /* Decision 7: who this page is for is decided once per load. The owner's own account sends directly;
    a contract owner that answers `isOwner(ACC)` gets the same view with every owner write rendered as
    calldata to copy; anything else is a visitor. The probe is a raw `eth_call` rather than `call()`,
    because an EOA owner has no code and answers `0x` — which has to read as "not a vault", and so does
    a revert from a contract that has no such function. */
-async function ownerView(d) {
-  if (!ACC || d.owner === ZERO) return 'visitor';
-  if (same(ACC, d.owner)) return 'owner';
+const signsFor = async addr => {
+  if (!addr || addr === ZERO) return false;
   try {
-    const r = await P.request({ method: 'eth_call', params: [{ to: d.owner, data: Eth.enc('isOwner(address)', [ACC]) }, 'latest'] });
-    return r && r !== '0x' && BigInt(r) === 1n ? 'vault' : 'visitor';
-  } catch (e) { return 'visitor'; }
+    const r = await P.request({ method: 'eth_call', params: [{ to: addr, data: Eth.enc('isOwner(address)', [ACC]) }, 'latest'] });
+    return !!r && r !== '0x' && BigInt(r) === 1n;
+  } catch (e) { return false; }
+};
+/* The two pending views are additive: they are what an account that reads as a `visitor` today gets
+   when the two-step ABI has named it, or a vault it signs for, as the next owner. The owner views
+   keep their precedence — an account that is both a signer of the owning vault and the nominee is
+   shown the bar with more power on it, and accepting is still one route away. */
+async function ownerView(d) {
+  if (!ACC) return 'visitor';
+  if (d.owner !== ZERO) {
+    if (same(ACC, d.owner)) return 'owner';
+    if (await signsFor(d.owner)) return 'vault';
+  }
+  if (same(ACC, d.pendingOwner)) return 'pending';
+  if (await signsFor(d.pendingOwner)) return 'pending-vault';
+  return 'visitor';
 }
 
 async function detail(addr) {
   const t = TOKEN;
-  if (!DS.d || DS.d.addr !== addr) { V.innerHTML = notice(`reading ${esc(short(addr))}…`); PROPOSE = null; DRAWER = false; OWNOPEN = false; ACK = 0; OWNMODE = 'transfer'; OWNER_IN = ''; }
+  if (!DS.d || DS.d.addr !== addr) { V.innerHTML = notice(`reading ${esc(short(addr))}…`); closeDrawer(); }
   // The clock is read again here, not only at boot: every countdown on this page is measured against
   // it, and a write that lands moves the chain's.
   const [d] = await Promise.all([loadDistro(addr), readClock()]);
@@ -916,15 +979,30 @@ function paintDetail() {
 }
 
 /* The owner's one control, in both owner views. The drawer is the same either way: in the vault view
-   the writes inside it are calldata rather than transactions, and that is the whole difference. */
+   the writes inside it are calldata rather than transactions, and that is the whole difference.
+   `'you own this distribution'` is still right for an owner with a transfer pending against them,
+   because it is: nothing moves until the nominee accepts. */
 function ownerBar(d) {
-  EMBED = VIEW === 'visitor' ? null : d;
-  if (!EMBED) return '';
+  EMBED = OWNS() ? d : null;
+  if (!EMBED) return acceptBar(d);
   return '<div class="actions">'
     + `<button class="btn" id="queue">${DRAWER ? 'Close' : 'Queue a change'}</button><a class="btn sec" href="#/docs#widget">Embed the widget</a>`
     + `<span class="status">${VIEW === 'vault'
       ? `you are a signer on ${ext('address', d.owner, esc(short(d.owner)))}, which owns this distribution — every change below is calldata to submit through it`
       : 'you own this distribution'}</span></div>`;
+}
+/* The other half of a two-step transfer, and the only control the nominee is offered: a transfer this
+   dapp starts can be finished in it (ruling 2). `acceptOwnership()` takes no argument and is refused
+   for anyone but the nominee, so the account is the whole of the authorisation — which is why the
+   status line names it rather than describing a rule. A nominee that is a contract gets the calldata
+   to submit through it, like every other write a contract owner makes (decision 7). */
+function acceptBar(d) {
+  if (VIEW !== 'pending' && VIEW !== 'pending-vault') return '';
+  return '<div class="actions">'
+    + wctl('accept', 'accept ownership', { to: d.addr, sig: 'acceptOwnership()', args: () => [], label: 'acceptOwnership' })
+    + `<span class="status">${VIEW === 'pending-vault'
+      ? `you are a signer on ${ext('address', d.pendingOwner, esc(short(d.pendingOwner)))}, which is the pending owner — accepting makes it the owner at once; nothing changes until it does`
+      : 'you are the pending owner — accepting makes you the owner at once; nothing changes until you do'}</span></div>`;
 }
 
 /* The prototype's "Queue a change" (`rake-dapp.html:408-425`), less the four rows it carried that this
@@ -964,26 +1042,40 @@ function drawerHTML(d) {
     + ownershipHTML(d)
     + '</div>';
 }
-/* Both ownership writes sit collapsed under one disclosure, behind a selector: each has its own
-   three acknowledgements (`ACKS`), each enabled only once the one above it is checked, and a hold
-   button that unlocks after the last. `ACK` is how many are checked, so a repaint keeps them; a switch
-   of mode, or a new address typed, clears them. */
+/* There are four ownership writes and the owner sends three of them: `transferOwnership(address)`
+   nominates, the zero address renounces, and the owner's own address withdraws a nomination in flight.
+   The fourth is the nominee's `acceptOwnership()`, which is the other bar on the page, not this
+   disclosure. The three the owner sends sit collapsed here behind a selector — nominate and withdraw
+   are one field, since they are one call (ruling 5) — each mode with its own three acknowledgements
+   (`ACKS`), each enabled only once the one above it is checked, and a hold button that unlocks after
+   the last. `ACK` is how many are checked, so a repaint keeps them; a switch of mode, or a new address
+   typed, clears them. */
 const ACKS = {
   transfer: [
-    'Once this is applied, the new owner alone can propose and cancel changes, unless they change the owner back to me.',
-    'I have checked the address. A mistyped address, or one nobody controls, loses control of this distribution permanently.',
-    'After the delay anyone can apply it. I can cancel it only until then.',
+    'Applying this names the address as the pending owner. I keep every power over this distribution until that address calls acceptOwnership() itself.',
+    'I have checked the address. One that cannot accept takes nothing, and until it accepts I can withdraw the nomination by proposing my own address.',
+    'After the delay anyone can apply it. I can cancel it until then, and withdraw the nomination after.',
   ],
   renounce: [
-    'Once this is applied, no change to this distribution can be proposed or cancelled again, by anyone.',
+    'Once this is applied, no change to this distribution can be proposed or cancelled again, by anyone. A transfer waiting to be accepted is destroyed with it.',
     'The table, the delay and the name become permanent, mistakes included, once nothing else is queued. Funds keep going to the addresses in the table.',
     'After the delay anyone can apply it. I can cancel it only until then.',
   ],
 };
 let ACK = 0, OWNMODE = 'transfer', OWNER_IN = '';
-// Change owner's statements stay locked until the field holds an address that is neither zero nor the
-// current owner; a name counts once resolved.
-const ownReady = () => { const v = OWNER_IN.trim(); return OWNMODE !== 'transfer' || (isAddr(v) && checksumOk(v) && ![ZERO, DS.d.owner].includes(Eth.checksum(v))); };
+/* The current owner's own address is the one way to withdraw a nomination (ruling 5), so the field
+   admits it while a transfer is pending and refuses it otherwise, where it would queue a call that
+   does nothing. */
+const withdrawing = a => same(a, DS.d.owner) && DS.d.pendingOwner !== ZERO;
+// Change owner's statements stay locked until the field holds an address that is not zero and is
+// either not the current owner or a withdrawal; a name counts once resolved.
+const ownReady = () => {
+  const v = OWNER_IN.trim();
+  if (OWNMODE !== 'transfer') return true;
+  if (!isAddr(v) || !checksumOk(v)) return false;
+  const a = Eth.checksum(v);
+  return a !== ZERO && (a !== DS.d.owner || withdrawing(a));
+};
 /* What the proposed owner is, read once per address and kept so a repaint shows it again: a contract,
    an account with a history, or one that has never sent a transaction here — legitimate for a new key,
    and also what a mistyped address looks like, so it is amber rather than refused. */
@@ -1007,7 +1099,9 @@ function ownerNote() {
   if (!checksumOk(v)) return { text: BAD_SUM, cls: 'bad' };
   const a = Eth.checksum(v);
   if (a === ZERO) return { text: 'the zero address — renouncing is the other tab', cls: 'bad' };
-  if (a === DS.d.owner) return { text: 'that is the current owner', cls: 'bad' };
+  if (a === DS.d.owner) return withdrawing(a)
+    ? { text: 'withdraws the pending transfer', cls: 'warn' }
+    : { text: 'that is the current owner', cls: 'bad' };
   return PROBE.get(a) || { text: 'reading the address…', cls: '' };
 }
 function ownershipHTML(d) {
@@ -1016,11 +1110,11 @@ function ownershipHTML(d) {
   return `<details class="danger" id="ownership"${OWNOPEN ? ' open' : ''}><summary>ownership</summary>`
     + `<div class="tabs">${[['transfer', 'change owner'], ['renounce', 'renounce ownership']].map(([k, l]) => `<button class="tab${OWNMODE === k ? ' on' : ''}" data-own="${k}">${l}</button>`).join('')}</div>`
     + (t
-      ? `<p class="help">Hands this distribution to another address. Enter it, confirm each statement in turn${hold}.</p>`
-        + (n => `<div class="field"><input id="q-owner" aria-label="new owner" placeholder="new owner — 0x… or a name" value="${esc(OWNER_IN)}"><div class="res${n.cls ? ' ' + n.cls : ''}" id="q-ownerres">${esc(n.text)}</div></div>`)(ownerNote())
+      ? `<p class="help">Nominates another address as the next owner, which becomes the owner only when it calls <code>acceptOwnership()</code> itself. Your own address withdraws a nomination. Enter it, confirm each statement in turn${hold}.</p>`
+        + (n => `<div class="field"><input id="q-owner" aria-label="new owner" placeholder="new owner — 0x… or .eth / .wei / .gwei" value="${esc(OWNER_IN)}"><div class="res${n.cls ? ' ' + n.cls : ''}" id="q-ownerres">${esc(n.text)}</div></div>`)(ownerNote())
       : `<p class="help">Transfers ownership to nobody. Confirm each statement in turn${hold}.</p>`)
     + acks.map((x, i) => `<label class="ack"><input type="checkbox" data-ack="${i}"${ACK > i ? ' checked' : ''}${ACK < i || !ok ? ' disabled' : ''}><span>${x}</span></label>`).join('')
-    + wctl(OWNMODE, t ? 'hold to change owner' : 'hold to renounce', {
+    + wctl(OWNMODE, t ? 'hold to nominate' : 'hold to renounce', {
       to: d.addr, sig: 'propose(bytes)', label: t ? 'propose transferOwnership' : 'propose renounce', hold: true, locked: ACK < acks.length || !ok,
       args: () => {
         if (!t) return [Eth.enc('transferOwnership(address)', [ZERO])];
@@ -1054,6 +1148,9 @@ function bindDrawer(d) {
         const n = ownerNote();
         res.className = 'res' + (n.cls ? ' ' + n.cls : ''); res.textContent = n.text;
         if (!ownReady()) return;
+        /* A withdrawal keeps the line `ownerNote` wrote: the probe would answer with the owner's own
+           transaction count, which replaces what the call does with something the owner knows. */
+        if (withdrawing(Eth.checksum(OWNER_IN.trim()))) return;
         const v = OWNER_IN, p = await probeOwner(Eth.checksum(v.trim()));
         if (OWNER_IN === v) { res.className = 'res' + (p.cls ? ' ' + p.cls : ''); res.textContent = p.text; }
       };
@@ -1181,7 +1278,7 @@ function createOne() {
     + '<h1>Who controls it, and how slowly.</h1>'
     + field('name', `<input id="c-desc" aria-label="name" value="${esc(D.desc)}" placeholder="e.g. dnzn labs distribution">`,
       "The distribution's display name, stored on chain as its description — shown everywhere it appears.")
-    + field('owner', `<input id="c-owner" aria-label="owner" value="${esc(D.owner)}" placeholder="0x… or a name"><div class="res" id="c-ownerres"></div>`,
+    + field('owner', `<input id="c-owner" aria-label="owner" value="${esc(D.owner)}" placeholder="0x… or .eth / .wei / .gwei"><div class="res" id="c-ownerres"></div>`,
       'Defaults to the connected wallet. A vault address here owns the distribution from its first block, and the salt stays yours (decision 10).')
     + field('delay', `<input id="c-delay" class="narrow" aria-label="delay" value="${esc(D.delay)}">`,
       'How long every future change waits in public. Accepts 7d, 48h, 0. Zero means changes apply instantly, and is flagged everywhere it shows.')
@@ -1301,7 +1398,7 @@ async function list() {
       ? `nothing on ${cname(CFG.chainId)} is owned by ${ext('address', ACC, short(ACC))}.`
       : 'no distribution opened yet. Paste an address below, or <a href="#/create">create one</a>.')
       + (ACC ? '' : notice('<b>mine</b> needs a connected wallet.'))
-      + `<div class="load"><input id="load-in" placeholder="0x… or a name" aria-label="address or name"><button class="btn sec" id="load-go">view</button></div><div class="res" id="load-res"></div>`;
+      + `<div class="load"><input id="load-in" placeholder="0x… or .eth / .wei / .gwei" aria-label="address or name"><button class="btn sec" id="load-go">view</button></div><div class="res" id="load-res"></div>`;
     loadField();
     return;
   }
@@ -1364,7 +1461,7 @@ function widgetDocs() {
   const tag = rpc => `&lt;script src="${esc(src)}"&gt;&lt;/script&gt;\n&lt;div` + at('data-rake', `<span class="wd-a">${addr}</span>`)
     + at('data-chain', id) + at('data-link') + (rpc ? at('data-rpc', esc(rpc)) : '') + '\n&gt;&lt;/div&gt;';
   const rpc = PUBLIC_RPC[id];
-  return `<div class="wdemo"><div class="load"><input id="wd-in" value="${mine || S.featured ? addr : ''}" placeholder="0x… or a name" aria-label="distribution to preview"><button class="btn sec" id="wd-go">preview</button></div>
+  return `<div class="wdemo"><div class="load"><input id="wd-in" value="${mine || S.featured ? addr : ''}" placeholder="0x… or .eth / .wei / .gwei" aria-label="distribution to preview"><button class="btn sec" id="wd-go">preview</button></div>
   <div class="res" id="wd-res"></div>
   <div class="wdgrid"><div><div class="cap">full</div><div id="wd-full"></div></div><div><div class="cap">compact</div><div id="wd-compact"></div></div></div></div>
   <p>Paste the following into any page. It displays <span id="wd-what">${mine ? esc(mine.description) : S.featured ? 'the featured distribution' : 'the distribution at the address given in <code>data-rake</code>'}</span> on ${cname(id)}, read through the visitor's wallet, and shows a failure state if no wallet is present or the wallet is on another chain.</p>
@@ -1411,7 +1508,7 @@ function docs() {
   <p>A distribution is defined by three parameters: an owner, a delay and a table.</p>
   <p>The owner is the address permitted to propose and cancel changes. The create screen defaults to the connected wallet. A multisig, a DAO or any other contract may be the owner.</p>
   <p>The delay is the period a proposed change must wait before it can be applied. The create screen defaults to seven days. A delay of zero is permitted, and a distribution without one is marked as such wherever it is displayed.</p>
-  <p>The table holds one row per beneficiary: an address, a share, a name and a note. Shares are set in steps of 0.01% and must total exactly 100%. Every share must be greater than zero, no address may appear twice, and the zero address may not appear at all. Where a payout does not divide evenly, the remainder is assigned to the last row, which is the row with the highest address because the contract requires the table in ascending address order. The remainder is less than one base unit per row; assigning it to one row means every payout leaves a zero balance behind rather than accumulating dust.</p>
+  <p>The table holds one row per beneficiary: an address, a share, a name and a note. Shares are set in steps of 0.01% and must total exactly 100%. Every share must be greater than zero, no address may appear twice, and the zero address may not appear at all. A table holds at most 107 rows (<code>MAX_BENEFICIARIES</code>), which the create screen and the propose drawer both refuse to exceed before any transaction is sent. Where a payout does not divide evenly, the remainder is assigned to the last row, which is the row with the highest address because the contract requires the table in ascending address order. The remainder is less than one base unit per row; assigning it to one row means every payout leaves a zero balance behind rather than accumulating dust.</p>
   <p>The address of a distribution is determined before it is deployed and is displayed on the create screen, so that it can be written into a contract or an invoice in advance. The create screen refuses an address at which code already exists. ETH sent with the creation transaction is deposited into the distribution.</p>
 
   <h2 id="s-payin">Receiving funds</h2>
@@ -1425,14 +1522,16 @@ function docs() {
   <p>ETH is sent with a gas allowance of 100,000. A beneficiary that requires more than that to receive ETH is always held.</p>
 
   <h2 id="s-change">Changing a distribution</h2>
-  <p>The table, the description, the delay and the owner may each be changed. Each change is a separate proposal.</p>
+  <p>The table, the description, the delay and the owner may each be changed. Each change is a separate proposal. An owner change is the one that is not finished when its proposal is applied: the address it names must also accept it.</p>
   <p>A proposed change is displayed as pending, with a countdown, beside the current table. When the countdown ends, anyone may apply it. Until then the owner may cancel it, and the current configuration remains in force. No change applies automatically.</p>
   <p>A change to the delay is itself subject to the current delay. Where the delay is zero, a change applies in the same transaction as its proposal.</p>
-  <p>In a wallet, these operations appear as <code>propose</code>, <code>applyQueued</code> and <code>cancel</code>.</p>
+  <p>In a wallet, these operations appear as <code>propose</code>, <code>applyQueued</code> and <code>cancel</code>. An owner change adds <code>acceptOwnership</code>, the one operation the incoming owner signs; it is neither owner-only nor subject to the delay.</p>
 
   <h2 id="s-owner">Ownership</h2>
-  <p>Ownership is transferred by proposing a new owner, waiting out the delay, and applying the change. Ownership is held separately on each chain.</p>
-  <p>Transferring ownership to the zero address renounces it. Thereafter no change can be proposed or cancelled. A change queued before the renunciation can still be applied by anyone, and once none remains the configuration is permanent.</p>
+  <p>An owner change takes two steps. The owner proposes the new owner, and once the delay has passed anyone may apply that proposal — which only nominates the address. The owner keeps every power until the nominated address calls <code>acceptOwnership()</code>. Any wallet may send that call; only the nominee's succeeds, and it takes effect in that transaction. Ownership is held separately on each chain.</p>
+  <p>A nomination can be withdrawn until it is accepted: the owner proposes its own address, and applying that proposal clears the nomination. The owner may also cancel the original proposal before it is applied, as with any other change.</p>
+  <p>The two steps leave different traces. Acceptance emits <code>OwnershipTransferred(previousOwner, newOwner)</code>. The nomination has no event of its own and travels in the calldata of the <code>Queued</code> event, so a transfer waiting to be accepted is read from <code>pendingOwner()</code>, which this page displays beside the owner.</p>
+  <p>Transferring ownership to the zero address renounces it. That needs no acceptance, takes effect when the proposal is applied, and destroys a nomination in flight. Thereafter no change can be proposed or cancelled. A change queued before the renunciation can still be applied by anyone, and once none remains the configuration is permanent.</p>
 
   <h2 id="s-widget">The widget</h2>
   <p>The widget is a script that displays a distribution on any web page: its allocation, its beneficiaries, its owner, its delay and any pending change, read directly from the chain. It adopts the host page's font and text colour, and is available in a full and a compact form.</p>
