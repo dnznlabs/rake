@@ -421,7 +421,8 @@ async function loadDistro(addr) {
 
 /* The histories, as two log queries with their topic0s OR'd. `from` is the distribution's own first
    block when the `Created` scan found it, else the factory's — never genesis. */
-const CHANGE_EVENTS = [['Queued(bytes32,uint32,uint256,bytes)', 'queued'], ['Applied(bytes32)', 'applied'], ['Cancelled(bytes32)', 'cancelled']];
+const CHANGE_EVENTS = [['Queued(bytes32,uint32,uint256,bytes)', 'queued'], ['Applied(bytes32)', 'applied'], ['Cancelled(bytes32)', 'cancelled'],
+  ['OwnershipTransferred(address,address)', 'accepted']];
 const FUND_EVENTS = [['Received(address,uint256)', 'in'], ['Distributed(address,uint256)', 'distributed'], ['Escrowed(address,address,uint256)', 'escrowed'], ['Released(address,address,uint256)', 'released']];
 /* Filled by the `Created` scan: a distribution's own first block, which is a better `fromBlock` than
    the factory's for anything created long after it. */
@@ -473,6 +474,9 @@ function entry(log) {
   } else if (kind === 'applied' || kind === 'cancelled') {
     e.hash = log.topics[1];
     e.what = ext('hash', log.topics[1], short(log.topics[1]));
+  } else if (kind === 'accepted') {
+    // The nomination's `Applied` is not the handover; this is, and it is the only log the nominee's call leaves.
+    e.what = `owner · ${ext('address', at(1), short(at(1)))} → ${ext('address', at(2), short(at(2)))}`;
   } else if (kind === 'in') {
     e.what = `${eth(log.data)} from ${ext('address', at(1), short(at(1)))}`;
   } else if (kind === 'distributed') {
@@ -547,7 +551,7 @@ function histFill(id, items, empty) {
   const b = document.getElementById(id + '-more');
   if (b) b.onclick = () => fill(id, histRows(items));
 }
-const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow${e.kind === 'escrowed' ? ' err' : e.kind === 'queued' && !e.closed ? ' amber' : e.kind === 'applied' ? ' done' : ''}"><b>${e.kind}</b><span class="w">${e.what}</span><span class="t">block ${e.block} · ${ext('tx', e.tx, short(e.tx))}</span></div>`).join('')}</div>`;
+const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow${e.kind === 'escrowed' ? ' err' : e.kind === 'queued' && !e.closed ? ' amber' : e.kind === 'applied' || e.kind === 'accepted' ? ' done' : ''}"><b>${e.kind}</b><span class="w">${e.what}</span><span class="t">block ${e.block} · ${ext('tx', e.tx, short(e.tx))}</span></div>`).join('')}</div>`;
 const eyebrow = (text, cls) => `<div class="eyebrow${cls ? ' ' + cls : ''}">${text}</div>`;
 const notice = (text, cls) => `<div class="notice${cls ? ' ' + cls : ''}">${text}</div>`;
 const unreadable = addr => notice(`could not read a distribution at ${ext('address', addr, short(addr))} on ${cname(CFG.chainId)} — nothing is deployed there.`, 'err');
