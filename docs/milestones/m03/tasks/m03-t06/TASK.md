@@ -38,7 +38,14 @@ commit's and are re-run, not quoted.
    - `scripts/forge/Deploy.s.sol`: `new DistributionFactory{salt: salt}()` where
      `bytes32 salt = vm.envOr("FACTORY_SALT", bytes32(0))`. Log the salt beside the two addresses.
    - `scripts/forge/DeployApp.s.sol`: `new App{salt: salt}(owner, ver)` where
-     `salt = vm.envOr("APP_SALT", bytes32(0))`. `App`'s address depends on `OWNER` and
+     `salt = vm.envOr("APP_SALT", bytes32(0))`. **This also closes t04's F3** (`SECURITY.md`
+     § Findings): `vm.envOr("OWNER", msg.sender)` is read at `:11`, before `vm.startBroadcast()`,
+     so with no `OWNER` the owner is Foundry's `DEFAULT_SENDER`, not the broadcaster the comment
+     at `:8` promises. Make `OWNER` required (`vm.envAddress("OWNER")`, no default): the runbook
+     always exports it, `mk/10-forge.mk`'s `deploy::` passes it from `SENDER`, and a missing value
+     fails before any transaction instead of handing `App` to an address nobody holds. Change the
+     `SECURITY.md` F3 row from `accepted → m03-t05` to `accepted → m03-t06`, closed by this PR,
+     one line; nothing else in that file moves. `App`'s address depends on `OWNER` and
      `APP_VERSION` as well as the salt, so the same-address property holds only while those two
      are the same on every chain; the runbook's § 0 says so.
    - Spiked the other way too: `cast send $PROXY "${SALT}${INIT#0x}"` with the 9,978-byte init
@@ -255,6 +262,7 @@ commit's and are re-run, not quoted.
   only inside § Not in this runbook.
 - M03 criterion 7: `grep -ci 'unrecoverable' RUNBOOK.md`, `grep -c 'cast code\|eth_getCode' RUNBOOK.md`,
   `grep -c 'PUSH0\|cancun' RUNBOOK.md` all ≥ 1, and § 1's table lists the eight chains with IDs.
+- `grep -c 'DEFAULT_SENDER\|envAddress("OWNER")' scripts/forge/DeployApp.s.sol` ≥ 1 and `grep -c 'accepted → m03-t06' SECURITY.md` → 1 (F3).
 - `git diff --stat origin/main -- src/ test/*.t.sol .gas-snapshot` prints nothing; `forge test`
   63 passed; `forge snapshot --check` exit 0; `forge fmt --check` and `forge lint` silent; `node --test test/*.test.mjs` 62 passed.
 - `make serve` on a fresh anvil deploys and `make addresses` lists `DistributionFactory` and `App`
@@ -273,7 +281,7 @@ commit's and are re-run, not quoted.
 - Vanity-mining `FACTORY_SALT` or `APP_SALT` — open question 2; this task uses the zero salt and
   the runbook takes the salt as a variable, so a mined value is a one-line change at M04.
 - `lock()`, ownership renounce or transfer on `App` or any distribution — M05, § Not in this runbook.
-- `SECURITY.md`, `audits/`, `AGENTS.md` § The dapp (#110), the overview — t04 and close-out.
+- `SECURITY.md` beyond the one F3 row, `audits/`, `AGENTS.md` § The dapp (#110), the overview — t04, t05 and close-out.
 - `Seed.s.sol`, `Fixtures.s.sol`, the dapp, the widget, `procs/` — none needs a change; if one
   turns out to, say so in the handoff and stop.
 
