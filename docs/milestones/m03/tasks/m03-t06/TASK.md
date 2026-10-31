@@ -42,7 +42,8 @@ commit's and are re-run, not quoted.
      § Findings): `vm.envOr("OWNER", msg.sender)` is read at `:11`, before `vm.startBroadcast()`,
      so with no `OWNER` the owner is Foundry's `DEFAULT_SENDER`, not the broadcaster the comment
      at `:8` promises. Make `OWNER` required (`vm.envAddress("OWNER")`, no default): the runbook
-     always exports it, `mk/10-forge.mk`'s `deploy::` passes it from `SENDER`, and a missing value
+     always exports it; add `OWNER ?= $(SENDER)` beside `SENDER` in `mk/10-forge.mk` and export it,
+     so `make deploy` keeps working on anvil (it does not pass `OWNER` today); and a missing value
      fails before any transaction instead of handing `App` to an address nobody holds. Change the
      `SECURITY.md` F3 row from `accepted → m03-t05` to `accepted → m03-t06`, closed by this PR,
      one line; nothing else in that file moves. `App`'s address depends on `OWNER` and
