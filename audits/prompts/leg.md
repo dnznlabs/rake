@@ -47,8 +47,11 @@ The scan writes `.solidity-auditor/runs/<stamp>/` inside the repo — `full-repo
 `audits/<date>/pashov/solidity-auditor/<model>/` and asserts it is non-empty; you do not need to
 move or copy anything.
 
-If your harness cannot run some part of the skill's orchestration — it has no sub-agent tool, no
-network for the upstream version check, whatever it is — **do the review anyway and still write
+**Skip the skill's upstream version check.** The pin is deliberate, this leg has no network to run
+the check, and the runner reads upstream's version itself and records it beside the pin.
+
+If your harness cannot run some part of the skill's orchestration — it has no sub-agent tool,
+whatever it is — **do the review anyway and still write
 those three files**, and say plainly at the top of `full-report.md` what you could not run. A leg
 that degrades and says so is evidence. A leg that produces nothing is a failed audit, and the runner
 will treat it as one.

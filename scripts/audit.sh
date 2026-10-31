@@ -19,13 +19,15 @@ CODEX_MODEL="${CODEX_MODEL:-gpt-5.6-sol}"
 AUDIT_DATE="${AUDIT_DATE:-$(date +%Y-%m-%d)}"
 LEG_TIMEOUT="${LEG_TIMEOUT:-5400}"   # seconds, per leg and for the rollup
 
-SKILL_DIR="$REPO_ROOT/audits/.skills/pashov"
-SKILL_PATH="$SKILL_DIR/solidity-auditor"
+SKILL_CACHE="${FORGE_AUDIT_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/forge-audit}"
 OUT_DIR="$REPO_ROOT/audits/$AUDIT_DATE"
 LEGS_DIR="$OUT_DIR/pashov/solidity-auditor"
 SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/audit-XXXXXX")"
+# Each leg's harvest waits here until both legs have run: a leg harvested into $OUT_DIR is a file the
+# next leg can grep, and on 2026-10-30 one did.
+STAGE="$SCRATCH/legs"
 
-# The scratch holds claude.json, codex.log and provenance.txt — the evidence a failed run has to be
+# The scratch holds claude.jsonl, codex.log and provenance.txt — the evidence a failed run has to be
 # diagnosed from. Removing it unconditionally deletes that evidence at exactly the moment it is
 # needed: on 2026-09-28 the rollup failed and the trap took claude.json with it, so the one open
 # question about that run — which model leg 2 actually used — became unanswerable. Kept on any
@@ -50,6 +52,13 @@ die()  { printf '\n\033[1;31maudit: %s\033[0m\n' "$*" >&2; exit 1; }
 # none of them is checked again later by inference.
 
 say "preflight"
+
+# The scratch holds the staged legs, both transcripts and, once the rollup prompt is built, the known
+# answer. Inside the tree the legs run in, it would hand a leg every one of those, so TMPDIR pointed at
+# a kept place under the repo is refused rather than trusted.
+case "$(realpath "$SCRATCH")/" in
+  "$(realpath "$REPO_ROOT")"/*) die "scratch $SCRATCH is inside the repo — point TMPDIR outside it" ;;
+esac
 
 # The scope, named file by file, read from audits/SCOPE. audits/README.md § Scope has both reasons
 # the skill's own file discovery is not trusted. This one list is what the leg prompt names and what
@@ -84,6 +93,13 @@ case "$SKILL_COMMIT" in
 esac
 info "pin     $SKILL_REPO @ ${SKILL_COMMIT:0:12}"
 
+# One checkout per pin, in a machine cache rather than the project: the skill links below point at
+# it, and a link into a project dangles for every agent on the machine once that tree is deleted.
+# Keyed by commit, so a different pin is a different directory and never a checkout moved underneath
+# another project's link.
+SKILL_DIR="$SKILL_CACHE/$(printf '%s' "$SKILL_REPO" | sed -E 's#\.git$##; s#.*[:/]([^/]+)/([^/]+)$#\1-\2#')@$SKILL_COMMIT"
+SKILL_PATH="$SKILL_DIR/solidity-auditor"
+
 # An existing checkout at the wrong commit is a hard stop, not something to silently reset: a
 # finding has to be attributable to a skill version, and a runner that quietly moves the checkout
 # under you makes that untrue. A missing checkout is fine — skill sync clones it below.
@@ -91,8 +107,7 @@ if [ -d "$SKILL_DIR/.git" ]; then
   HAVE="$(git -C "$SKILL_DIR" rev-parse HEAD)"
   [ "$HAVE" = "$SKILL_COMMIT" ] || die \
     "skill checkout is at ${HAVE:0:12}, SKILL_PIN says ${SKILL_COMMIT:0:12}
-       fix: git -C audits/.skills/pashov fetch origin && git -C audits/.skills/pashov checkout $SKILL_COMMIT
-       or delete audits/.skills/pashov and re-run to re-clone at the pin"
+       fix: delete $SKILL_DIR and re-run to re-clone at the pin"
 fi
 
 for f in "${SCOPE[@]}"; do
@@ -128,11 +143,15 @@ info "commit  ${CODE_COMMIT:0:12} (dirty: $DIRTY)"
 
 say "skill sync"
 
+# Cloned beside its final name and moved into place, so a clone that dies halfway is never mistaken
+# for a checkout by the next run.
 if [ ! -d "$SKILL_DIR/.git" ]; then
   info "cloning $SKILL_REPO"
-  mkdir -p "$(dirname "$SKILL_DIR")"
-  git clone --quiet "$SKILL_REPO" "$SKILL_DIR"
-  git -C "$SKILL_DIR" checkout --quiet "$SKILL_COMMIT"
+  mkdir -p "$SKILL_CACHE"
+  rm -rf "$SKILL_DIR.partial"
+  git clone --quiet "$SKILL_REPO" "$SKILL_DIR.partial"
+  git -C "$SKILL_DIR.partial" checkout --quiet "$SKILL_COMMIT"
+  mv -T "$SKILL_DIR.partial" "$SKILL_DIR"
 fi
 
 # Re-checked after the clone, so the assertion covers the fresh-clone path too and is not a check
@@ -143,6 +162,17 @@ HAVE="$(git -C "$SKILL_DIR" rev-parse HEAD)"
 [ -f "$SKILL_PATH/SKILL.md" ] || die "$SKILL_PATH/SKILL.md is missing — the checkout is not the skill"
 SKILL_VERSION="$(cat "$SKILL_PATH/VERSION" 2>/dev/null || echo "unknown")"
 info "skill   solidity-auditor VERSION $SKILL_VERSION at ${HAVE:0:12}"
+
+# The skill checks itself against upstream, and the legs have no network to do it. The runner does,
+# so it reads upstream's VERSION and records it beside the pin; a deliberate pin that is behind is a
+# fact in the provenance block, not a warning a leg could not verify. Fetched into FETCH_HEAD only:
+# the checkout stays at the pin.
+if git -C "$SKILL_DIR" fetch --quiet origin HEAD 2>/dev/null; then
+  SKILL_UPSTREAM="$(git -C "$SKILL_DIR" show FETCH_HEAD:solidity-auditor/VERSION 2>/dev/null || echo "unknown")"
+else
+  SKILL_UPSTREAM="unreachable"
+fi
+info "upstream solidity-auditor VERSION $SKILL_UPSTREAM"
 
 # ~/.claude and ~/.codex belong to the OS user and are shared with other sessions: add one entry
 # each, never replace the directory, and refuse rather than clobber something that is not ours.
@@ -159,8 +189,6 @@ done
 
 # ---- legs ---------------------------------------------------------------------------------------
 
-mkdir -p "$LEGS_DIR"
-
 # The skill writes .solidity-auditor/runs/{stamp}/ into the repo on every scan, whatever flags it
 # gets. Harvest only the run directories a leg actually created — snapshot before, diff after — so
 # nothing pre-existing is destroyed and an empty harvest is visible rather than inferred.
@@ -169,6 +197,7 @@ snapshot_runs() {
 }
 
 # harvest <before-file> <leg-dir> <leg-name>
+# <leg-dir> is under $STAGE, outside the tree: legs land in $LEGS_DIR only once both have run.
 # A failed leg is a failed audit: this exits non-zero rather than leaving an empty directory for the
 # rollup to read as "no findings".
 harvest() {
@@ -189,7 +218,7 @@ harvest() {
   local lines
   lines="$(wc -l < "$dest/full-report.md")"
   [ "$lines" -gt 0 ] || die "$name: full-report.md has no lines"
-  info "$name: $lines lines of report, $(ls -1 "$dest" | wc -l) files in $(realpath --relative-to="$REPO_ROOT" "$dest")"
+  info "$name: $lines lines of report, $(ls -1 "$dest" | wc -l) files staged"
 }
 
 # The one substitution any prompt gets: the line that is exactly the SCOPE marker becomes the scope,
@@ -214,7 +243,7 @@ CODEX_RC=${PIPESTATUS[0]}
 set -e
 CODEX_SECONDS=$(( $(date +%s) - CODEX_START ))
 [ "$CODEX_RC" -eq 0 ] || die "codex leg exited $CODEX_RC after ${CODEX_SECONDS}s — a failed leg is a failed audit"
-harvest "$SCRATCH/before-codex" "$CODEX_LEG" "leg 1"
+harvest "$SCRATCH/before-codex" "$STAGE/$CODEX_MODEL" "leg 1"
 
 # Observed, from the session header the run actually printed — not from CODEX_MODEL, which is what
 # was asked for rather than what answered.
@@ -227,14 +256,18 @@ info "wall ${CODEX_SECONDS}s · model ${CODEX_MODEL_OBSERVED:-not reported} · e
 say "leg 2 — claude $CLAUDE_MODEL, 1 pass"
 CLAUDE_LEG="$LEGS_DIR/$CLAUDE_MODEL"
 snapshot_runs > "$SCRATCH/before-claude"
-CLAUDE_JSON="$SCRATCH/claude.json"
+# stream-json, not json: json is the final result alone, and a leg whose tool calls are not on disk
+# cannot evidence what it read. stream-json needs --verbose under -p, and ends with the same result
+# object json would have printed.
+CLAUDE_LOG="$SCRATCH/claude.jsonl"
 CLAUDE_START=$(date +%s)
 set +e
 timeout "$LEG_TIMEOUT" claude -p \
   --model "$CLAUDE_MODEL" \
   --dangerously-skip-permissions \
-  --output-format json \
-  "$LEG_PROMPT" < /dev/null > "$CLAUDE_JSON" 2>"$SCRATCH/claude.err"
+  --verbose \
+  --output-format stream-json \
+  "$LEG_PROMPT" < /dev/null > "$CLAUDE_LOG" 2>"$SCRATCH/claude.err"
 CLAUDE_RC=$?
 set -e
 CLAUDE_SECONDS=$(( $(date +%s) - CLAUDE_START ))
@@ -242,7 +275,12 @@ if [ "$CLAUDE_RC" -ne 0 ]; then
   sed -n '1,40p' "$SCRATCH/claude.err" >&2 || true
   die "claude leg exited $CLAUDE_RC after ${CLAUDE_SECONDS}s — a failed leg is a failed audit"
 fi
-harvest "$SCRATCH/before-claude" "$CLAUDE_LEG" "leg 2"
+harvest "$SCRATCH/before-claude" "$STAGE/$CLAUDE_MODEL" "leg 2"
+
+# Both legs have run, so neither can read the other any more.
+mkdir -p "$LEGS_DIR"
+mv -T "$STAGE/$CODEX_MODEL" "$CODEX_LEG"
+mv -T "$STAGE/$CLAUDE_MODEL" "$CLAUDE_LEG"
 
 # node, not jq: jq is not in devbox.json, so it is not a dependency this repo may assume.
 #
@@ -254,13 +292,14 @@ harvest "$SCRATCH/before-claude" "$CLAUDE_LEG" "leg 2"
 # whole set and lets a disagreement stay visible rather than be resolved by array order.
 read -r CLAUDE_MODEL_OBSERVED CLAUDE_TOKENS <<EOF
 $(node -e '
-  const j = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  const j = require("fs").readFileSync(process.argv[1], "utf8").trim().split("\n")
+    .map(l => { try { return JSON.parse(l); } catch { return {}; } }).findLast(m => m.type === "result");
   const u = j.usage || {};
   const models = Object.keys(j.modelUsage || {}).sort();
   const tok = ["input_tokens","output_tokens","cache_creation_input_tokens","cache_read_input_tokens"]
     .map(k => u[k]).filter(n => typeof n === "number").reduce((a,b) => a+b, 0);
   console.log((models.join(",") || "not-reported") + " " + (tok || "not-reported"));
-' "$CLAUDE_JSON" 2>/dev/null || echo "not-reported not-reported")
+' "$CLAUDE_LOG" 2>/dev/null || echo "not-reported not-reported")
 EOF
 info "wall ${CLAUDE_SECONDS}s · model ${CLAUDE_MODEL_OBSERVED} · tokens ${CLAUDE_TOKENS}"
 
@@ -274,7 +313,7 @@ PROVENANCE="$SCRATCH/provenance.txt"
   printf 'code commit       %s  (dirty: %s)\n' "$CODE_COMMIT" "$DIRTY"
   printf 'scope             %s\n' "${SCOPE[0]}"
   for f in "${SCOPE[@]:1}"; do printf '                  %s\n' "$f"; done
-  printf 'skill             %s @ %s  · solidity-auditor VERSION %s\n' "$SKILL_REPO" "$SKILL_COMMIT" "$SKILL_VERSION"
+  printf 'skill             %s @ %s  · solidity-auditor VERSION %s · upstream %s\n' "$SKILL_REPO" "$SKILL_COMMIT" "$SKILL_VERSION" "$SKILL_UPSTREAM"
   printf 'leg 1             codex %s · requested %s → observed %s · effort %s · 1 pass · %ss wall\n' \
     "$CODEX_VERSION" "$CODEX_MODEL" "${CODEX_MODEL_OBSERVED:-not reported}" "${CODEX_EFFORT_OBSERVED:-not reported}" "$CODEX_SECONDS"
   printf 'leg 2             claude %s · requested %s → observed %s · 1 pass · %ss wall\n' \
@@ -300,12 +339,10 @@ ROLLUP_PROMPT="$SCRATCH/rollup-prompt.md"
   printf -- '- write the document to: `%s`\n' "audits/$AUDIT_DATE/AUDIT.md"
   # Optional. audits/prompts/rollup.md § 4 grades the legs against it when present.
   #
-  # The path is overridable because a blinded tree deliberately does not hold this file. The runner
-  # reads it from the tree the legs ran in, and a prompt cannot keep a leg from reading what is on
-  # the filesystem it was pointed at (audits/README.md § Re-running one leg after a fix) — so a tree
-  # that holds the answer cannot grade the legs that read it. The read below is the shell's, inlined
-  # into the rollup prompt as text, so the key reaches the rollup without ever being in that tree.
-  # The default is unchanged: a tree that does hold the file behaves exactly as it did before.
+  # Overridable because a blinded tree deliberately does not hold this file: a prompt cannot keep a
+  # leg from reading what is on the filesystem it was pointed at (audits/README.md § Running blind),
+  # so a tree that holds the answer cannot grade the legs that ran in it. The shell reads it here and
+  # inlines it as prompt text, so the key reaches the rollup without ever being in that tree.
   KNOWN_ANSWER="${KNOWN_ANSWER_FILE:-$REPO_ROOT/audits/KNOWN_ANSWER.md}"
   if [ -s "$KNOWN_ANSWER" ]; then
     printf '\n## Known answer\n\n'
@@ -340,9 +377,18 @@ for leg in "$CODEX_LEG" "$CLAUDE_LEG"; do
   [ -d "$leg" ] || die "missing leg directory: $leg"
   [ "$(ls -A "$leg" | wc -l)" -gt 0 ] || die "empty leg directory: $leg — an empty leg is a failed audit, not a clean one"
 done
+
+# The transcripts are the only record of what each leg read, and the scratch they sit in is removed
+# on success. Moved in last, after the rollup, so no leg and no rollup ever had them in the tree.
+# rollup-prompt.md stays behind: it carries the known answer.
+mkdir -p "$OUT_DIR/transcripts"
+mv "$CODEX_LOG" "$OUT_DIR/transcripts/leg-1-codex.log"
+mv "$CLAUDE_LOG" "$OUT_DIR/transcripts/leg-2-claude.jsonl"
+
 info "AUDIT.md    $(wc -l < "$OUT_DIR/AUDIT.md") lines"
 info "leg 1       $(ls -1 "$CODEX_LEG" | wc -l) files"
 info "leg 2       $(ls -1 "$CLAUDE_LEG" | wc -l) files"
 info "rollup      ${ROLLUP_SECONDS}s wall"
+info "transcripts $(du -sh "$OUT_DIR/transcripts" | cut -f1) in audits/$AUDIT_DATE/transcripts"
 
 printf '\n\033[1maudit complete: audits/%s/AUDIT.md\033[0m\n' "$AUDIT_DATE"
