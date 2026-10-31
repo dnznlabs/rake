@@ -57,7 +57,10 @@ ChatGPT`, meeting the method's minimums of 2.1.268 and 0.158.0). Branch `m03/t04
 
 3. **`audits/KNOWN_ANSWER.md`: what the legs are not told.** Appended to the rollup prompt only
    (`scripts/audit.sh` § rollup), never to the leg prompt, so the rollup records per leg whether
-   each was found. Two sections.
+   each was found. **It lives in this checkout and never enters the blinded tree** (ruled
+   2026-10-30, after the engineer found that the runner reads it from the tree the legs run in,
+   `audit.sh:302-305`, where a prompt cannot keep a leg from reading it, `audits/README.md:218-219`;
+   step 5 says how the rollup reaches it). Two sections.
    - **Still in the code at `ede55c3`**, each with file, line and mechanism, which is what the
      rollup grades on: [#19](https://github.com/dnznlabs/rake/issues/19) `reserved[token]` above
      the balance (`distribute`, `:134`, the unchecked `balance − reserved`; decision 23 documents
@@ -90,33 +93,53 @@ ChatGPT`, meeting the method's minimums of 2.1.268 and 0.158.0). Branch `m03/t04
      forge does not mind); `src/Distribution.sol`, `src/App.sol`;
      `scripts/forge/Deploy.s.sol`, `scripts/forge/DeployApp.s.sol` (their imports are
      `forge-std/Script.sol` and `../../src/…`, nothing else); `lib` as a symlink to this repo's
-     `lib/`; `Makefile`, `mk/20-audit.mk`, `scripts/audit.sh`, `audits/SCOPE`, `audits/SKILL_PIN`,
-     `audits/KNOWN_ANSWER.md`, `audits/prompts/`, `.gitignore` (the audit block only).
+     `lib/`; `Makefile`, `mk/20-audit.mk`, `scripts/audit.sh` (as amended in step 5, so both
+     trees hold the same script), `audits/SCOPE`, `audits/SKILL_PIN`, `audits/prompts/`,
+     `.gitignore` (the audit block only). **Not `audits/KNOWN_ANSWER.md`**: the tree the legs run
+     in holds nothing a leg could read as the answer.
    - `git init`, one commit whose message names `ede55c3` and the four sha256s (`codex exec`
      refuses a non-repo, and the provenance block needs a `HEAD` with `dirty: no`).
    - `forge build` succeeds there (same `solc 0.8.34`, `via_ir`, `cancun`), so a leg that compiles
      can; `sha256sum` of the four files matches step 0 byte for byte.
    - `ls -A` of the tree is recorded for the handoff: nothing under `docs/`, `test/`, `app/`, no
-     `README.md`, no `SECURITY.md`, no `.solidity-auditor/` from an earlier run.
+     `README.md`, no `SECURITY.md`, no `audits/KNOWN_ANSWER.md`, no `.solidity-auditor/` from an
+     earlier run.
 
-   Check: `diff <(cd <blind> && sha256sum src/*.sol scripts/forge/*.sol) <(sha256sum src/Distribution.sol src/App.sol scripts/forge/Deploy.s.sol scripts/forge/DeployApp.s.sol)`
-   is empty; `git -C <blind> status --porcelain` is empty.
+   Check: `diff <(cd <blind> && sha256sum src/*.sol scripts/forge/*.sol | sort) <(sha256sum src/Distribution.sol src/App.sol scripts/forge/Deploy.s.sol scripts/forge/DeployApp.s.sol | sort)`
+   is empty (sorted on both sides: glob order and the plan's order differ, and an unsorted `diff`
+   reports a difference that is not one); `git -C <blind> status --porcelain` is empty;
+   `test ! -e <blind>/audits/KNOWN_ANSWER.md`.
 
-5. **`make audit`, in the blinded tree, not here.** `cd <blind> && make audit` with the defaults
-   (`CLAUDE_MODEL=opus`, `CODEX_MODEL=gpt-5.6-sol`); it runs the Codex leg, the Claude leg, then
-   the rollup, each at `--loop 1`, and refuses to start if `audits/<date>/` already exists there.
-   `state-collection`'s legs took 696 s and 1,084 s on 2026-09-28 (its `AUDIT.md` § Provenance);
-   expect an hour, labelled an estimate, and `LEG_TIMEOUT` is 5,400 s per leg. The runner
-   symlinks `~/.claude/skills/solidity-auditor` and `~/.codex/skills/solidity-auditor` into the
-   pinned clone; both directories are shared with the other agent on this VM, and the runner adds
-   one link each and refuses to replace anything that is not a symlink. Do not read the leg
-   reports before the rollup finishes, and do not edit anything in the blinded tree while a leg
-   runs. If a leg fails, the run is void (`audits/README.md` § Running it): fix the cause, move
-   `audits/<date>/` aside, re-run; never hand-assemble a rollup.
+5. **`make audit`, in the blinded tree, not here.** First, one change to this repo's installed
+   `scripts/audit.sh` § rollup, committed on the branch before step 4 copies the script: the
+   known answer is read from `${KNOWN_ANSWER_FILE:-$REPO_ROOT/audits/KNOWN_ANSWER.md}` instead of
+   the hardcoded `$REPO_ROOT/audits/KNOWN_ANSWER.md` (`:302-305` on the fragment's copy), with the
+   default unchanged so a tree that holds the file behaves as before. That is the whole change;
+   nothing else in the runner moves (ruled 2026-10-30: the plan's step 4 put the file in the
+   blinded tree and its § Out of scope forbade the runner change, and the two cannot both hold
+   — the override is the one reading that keeps the legs blind *and* grades both of them. The
+   alternative, running without a known answer and recording "not graded", loses the grading
+   criterion below; measuring reads after the fact was rejected because the Claude leg's reads
+   are unrecoverable from anything the runner keeps, so it would grade one leg and assume the
+   other). Then `cd <blind> && KNOWN_ANSWER_FILE=<this checkout>/audits/KNOWN_ANSWER.md make audit`
+   with the defaults (`CLAUDE_MODEL=opus`, `CODEX_MODEL=gpt-5.6-sol`); it runs the Codex leg, the
+   Claude leg, then the rollup, each at `--loop 1`, and refuses to start if `audits/<date>/`
+   already exists there. `state-collection`'s legs took 696 s and 1,084 s on 2026-09-28 (its
+   `AUDIT.md` § Provenance); expect an hour, labelled an estimate, and `LEG_TIMEOUT` is 5,400 s
+   per leg. The runner re-points `~/.claude/skills/solidity-auditor` and
+   `~/.codex/skills/solidity-auditor` at the pinned clone with `ln -sfn` on every run
+   (`audit.sh:155`); both directories are shared with the other agent on this VM, and the runner
+   dies only if a path is occupied by something that is not a symlink (`:152-153`). Record where
+   both links pointed before and after. Do not read the leg reports before the rollup finishes,
+   and do not edit anything in the blinded tree while a leg runs. If a leg fails, the run is void
+   (`audits/README.md` § Running it): fix the cause, move `audits/<date>/` aside, re-run; never
+   hand-assemble a rollup.
 
    Check: the runner prints `audit complete: audits/<date>/AUDIT.md`; its provenance block has
    `dirty: no` and both leg directories under `audits/<date>/pashov/solidity-auditor/` are
-   non-empty (milestone criterion 4's definition of complete).
+   non-empty (milestone criterion 4's definition of complete); `test ! -e <blind>/audits/KNOWN_ANSWER.md`
+   still holds after the run; `AUDIT.md`'s grading section names both legs;
+   `sha256sum scripts/audit.sh <blind>/scripts/audit.sh` prints one hash twice.
 
 6. **Harvest into this repo, with the mapping.** `cp -a <blind>/audits/<date> audits/<date>` here.
    `AUDIT.md` is not edited: its `code commit` is the blinded tree's `HEAD`, and that is correct —
@@ -220,6 +243,10 @@ ChatGPT`, meeting the method's minimums of 2.1.268 and 0.158.0). Branch `m03/t04
   `grep -c '#' audits/SCOPE` ≥ 6 (an exclusion block with reasons).
 - `grep -c 'rake/issues/' audits/KNOWN_ANSWER.md` → 8, and `AUDIT.md`'s grading section says per
   leg which of the in-code five it found.
+- The legs could not have read the answer: `BLIND.md`'s `ls -A` shows no `audits/KNOWN_ANSWER.md`,
+  and `grep -c 'KNOWN_ANSWER_FILE' scripts/audit.sh` ≥ 1 with `git diff --stat origin/main -- scripts/audit.sh`
+  listing that one file and the diff touching only the § rollup read (the one runner change
+  step 5 allows).
 - For every `n` in `18 19 20 22 23 54 61 74 95`, `grep -c "rake/issues/$n\b\|#$n\b" SECURITY.md` ≥ 1
   (criterion 4's eight plus #23); every finding in `AUDIT.md` has a row in `SECURITY.md`
   § Findings — disposition (count both, state both); `grep -c 'two-model agent review' SECURITY.md`
@@ -242,8 +269,14 @@ ChatGPT`, meeting the method's minimums of 2.1.268 and 0.158.0). Branch `m03/t04
 - A second full audit, or a re-run because the findings disappoint. One run; if a leg fails the
   run is void and is re-run as step 5 says.
 - Generalising the blinded tree into `scripts/audit.sh` or the shared fragment. The method moves
-  prose into the runner after it has run twice; this is the first full run. Say in the handoff
-  what the fragment would need.
+  prose into the runner after it has run twice; this is the first full run. The one exception is
+  step 5's `KNOWN_ANSWER_FILE` read, in this repo's copy only; the shared fragment is Denizen's
+  and is not edited from here. Say in the handoff what the fragment would need, which already
+  includes three things found before the run: the same override upstream; `codex.log` lives in
+  `$SCRATCH`, which `cleanup()` removes on exit 0, so the Codex leg's transcript survives a
+  successful run only if `TMPDIR` points somewhere kept; and the Claude leg runs
+  `--output-format json`, so it leaves no tool-call transcript at all and its reads cannot be
+  measured after the fact.
 - `RUNBOOK.md` and the runbook's `cast code` steps (#22, #23) — t06. `#/docs` — t03.
 - The paid external review (decision 20): a spend, M05's go/no-go input, not started here.
 
@@ -255,6 +288,13 @@ closed as closed (step 3); `AUDIT.md`'s provenance names the blinded commit and 
 the mapping to `ede55c3`, rather than the artifact being edited after the run (step 6);
 `SECURITY.md` has a #23 row the criterion does not require, because the carried table says it does
 (step 7); the PR closes #18, #19, #54 and #95 and leaves #22 and #23 to t06 (step 10).
+
+**Amended 2026-10-30, before any leg ran**, on the engineer's stop (relayed by Elanik): the plan
+as merged in #105 put `audits/KNOWN_ANSWER.md` inside the blinded tree (step 4) while requiring
+the legs to be unable to read it (step 4's reason) and forbidding any runner change (§ Out of
+scope), and the runner reads the file from the tree it runs in. Ruled: the file stays out of the
+tree and the rollup reads it through `KNOWN_ANSWER_FILE`, one line in this repo's `scripts/audit.sh`.
+Steps 3, 4 and 5, one acceptance criterion and the out-of-scope clause changed; nothing else.
 
 ## Context
 
