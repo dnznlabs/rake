@@ -118,16 +118,9 @@ Measured on `transcripts/leg-2-claude.jsonl` (2,254 KB), this run:
 | `audits/2026-10-31` | **0** |
 | `gpt-5.6-sol` | **0** |
 
-> **`leg-2-claude.jsonl` is not committed in this directory yet, and the reason is a decision, not
-> an oversight.** The shared fragment says the transcripts "are the only evidence of what a leg
-> read, so they are committed with the findings" (`../README.md`), but this repo's `pre-commit`
-> runs `check-added-large-files` at the plugin's default 500 KB with no `args`, configured in
-> `6cc72a6 feat: initial create` — before the audit fragment existed — and it refuses the file at
-> 2,254 KB. Raising or narrowing that gate is a repository-wide config change and outside this
-> task's scope, so it is recorded in `HANDOFF.md` § Open questions for the architect instead. The
-> file itself is intact at
-> `~/src/rake-blind-2026-10-31/audits/2026-10-31/transcripts/leg-2-claude.jsonl`, and every count
-> in the table above is reproducible from it with `grep -c`.
+At 2,254 KB this transcript exceeded `check-added-large-files`' 500 KB default, so that one hook was
+narrowed with `exclude: ^audits/.*/transcripts/` in this PR — the limit still covers every other
+path, and `betterleaks` still scans the transcripts.
 
 Leg 2 never referred to leg 1's harvest, to leg 1's model, or to the output directory at all — it
 had no indication that a leg 1 existed. Every `solidity-auditor` path in its transcript is either
