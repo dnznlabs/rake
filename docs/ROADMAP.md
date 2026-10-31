@@ -416,6 +416,20 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     contract change would re-open a review already run; t02's handoff swept all of `app/` and
     found none, and `app/` depends on the struct and the ABI only. Rejected: serialising (a
     review that waits for a dapp task reads the same bytes a week later).
+35. **`OWNER` is the Ops vault on every target chain; Base Sepolia got the vaults rather than an
+    exception.** D-question opened at m03-t06's scoping on
+    [#114](https://github.com/dnznlabs/rake/issues/114), ruled by Denizen on 2026-10-30 by doing
+    it: Treasury `0x00b6E7D12EdE9Ca4A74fE69be758aAB1ee02cFb9` and Ops
+    `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790` were created on Base Sepolia (84532) at their
+    addresses — same factory `0x000000000e8CB9ed9DC2114d79d9215eacb9cB07`, same sender-bound
+    salts, so the same `create2` — and re-read the same night: both vaults carry the same 45-byte
+    code, the same three owners, 2-of-3, delays 86,400 s and 3,600 s, Ops's fast path on, on all
+    eight chains of M03 criterion 7. So `App`'s owner and the owner passed to DNZN's `create` are
+    one constant, the Ops vault, on every chain, and `App` is same-address on all eight. The
+    question existed because the handbook's vault table said "mainnet + Sepolia", which was stale
+    by six chains; the chain, not the roster, is the source for deployment state (handbook#32
+    corrects the row). Rejected: Denizen's EOA as owner on chains without a vault, handed over
+    later (two owners to keep straight, and `App` at a different address on one testnet).
 
 ## Findings carried forward
 
