@@ -299,9 +299,17 @@ ROLLUP_PROMPT="$SCRATCH/rollup-prompt.md"
   printf -- '- provenance file (reproduce verbatim): `%s`\n' "$PROVENANCE"
   printf -- '- write the document to: `%s`\n' "audits/$AUDIT_DATE/AUDIT.md"
   # Optional. audits/prompts/rollup.md § 4 grades the legs against it when present.
-  if [ -s "$REPO_ROOT/audits/KNOWN_ANSWER.md" ]; then
+  #
+  # The path is overridable because a blinded tree deliberately does not hold this file. The runner
+  # reads it from the tree the legs ran in, and a prompt cannot keep a leg from reading what is on
+  # the filesystem it was pointed at (audits/README.md § Re-running one leg after a fix) — so a tree
+  # that holds the answer cannot grade the legs that read it. The read below is the shell's, inlined
+  # into the rollup prompt as text, so the key reaches the rollup without ever being in that tree.
+  # The default is unchanged: a tree that does hold the file behaves exactly as it did before.
+  KNOWN_ANSWER="${KNOWN_ANSWER_FILE:-$REPO_ROOT/audits/KNOWN_ANSWER.md}"
+  if [ -s "$KNOWN_ANSWER" ]; then
     printf '\n## Known answer\n\n'
-    cat "$REPO_ROOT/audits/KNOWN_ANSWER.md"
+    cat "$KNOWN_ANSWER"
   fi
 } > "$ROLLUP_PROMPT"
 
