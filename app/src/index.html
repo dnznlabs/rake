@@ -760,7 +760,7 @@ async function landing() {
   <div class="verbs">
   ${verb('01', 'receive', 'ETH and ERC-20 funds accumulate at the address. Nothing moves on its own.', 'anyone can send')}
   ${verb('02', 'distribute', 'Splits the waiting balance across the table. Push, with escrow fallback.', 'callable by anyone')}
-  ${verb('03', 'queue', 'Changes to the beneficiaries, owner or delay are staged in public first.', 'owner only · waits the delay')}
+  ${verb('03', 'queue', 'Changes to the beneficiaries, owner or delay are staged in public first. An owner change also needs the new owner to accept it.', 'owner only · waits the delay')}
   ${verb('04', 'apply', 'Once the time lock passes, anyone can land the queued change.', 'anyone · after the eta')}
   </div></div>`;
   loadField();
@@ -1491,7 +1491,7 @@ function docs() {
   <p>A distribution is defined by three parameters: an owner, a delay and a table.</p>
   <p>The owner is the address permitted to propose and cancel changes. The create screen defaults to the connected wallet. A multisig, a DAO or any other contract may be the owner.</p>
   <p>The delay is the period a proposed change must wait before it can be applied. The create screen defaults to seven days. A delay of zero is permitted, and a distribution without one is marked as such wherever it is displayed.</p>
-  <p>The table holds one row per beneficiary: an address, a share, a name and a note. Shares are set in steps of 0.01% and must total exactly 100%. Every share must be greater than zero, no address may appear twice, and the zero address may not appear at all. Where a payout does not divide evenly, the remainder is assigned to the last row, which is the row with the highest address because the contract requires the table in ascending address order. The remainder is less than one base unit per row; assigning it to one row means every payout leaves a zero balance behind rather than accumulating dust.</p>
+  <p>The table holds one row per beneficiary: an address, a share, a name and a note. Shares are set in steps of 0.01% and must total exactly 100%. Every share must be greater than zero, no address may appear twice, and the zero address may not appear at all. A table holds at most 107 rows (<code>MAX_BENEFICIARIES</code>), which the create screen and the propose drawer both refuse to exceed before any transaction is sent. Where a payout does not divide evenly, the remainder is assigned to the last row, which is the row with the highest address because the contract requires the table in ascending address order. The remainder is less than one base unit per row; assigning it to one row means every payout leaves a zero balance behind rather than accumulating dust.</p>
   <p>The address of a distribution is determined before it is deployed and is displayed on the create screen, so that it can be written into a contract or an invoice in advance. The create screen refuses an address at which code already exists. ETH sent with the creation transaction is deposited into the distribution.</p>
 
   <h2 id="s-payin">Receiving funds</h2>
@@ -1505,14 +1505,16 @@ function docs() {
   <p>ETH is sent with a gas allowance of 100,000. A beneficiary that requires more than that to receive ETH is always held.</p>
 
   <h2 id="s-change">Changing a distribution</h2>
-  <p>The table, the description, the delay and the owner may each be changed. Each change is a separate proposal.</p>
+  <p>The table, the description, the delay and the owner may each be changed. Each change is a separate proposal. An owner change is the one that is not finished when its proposal is applied: the address it names must also accept it.</p>
   <p>A proposed change is displayed as pending, with a countdown, beside the current table. When the countdown ends, anyone may apply it. Until then the owner may cancel it, and the current configuration remains in force. No change applies automatically.</p>
   <p>A change to the delay is itself subject to the current delay. Where the delay is zero, a change applies in the same transaction as its proposal.</p>
-  <p>In a wallet, these operations appear as <code>propose</code>, <code>applyQueued</code> and <code>cancel</code>.</p>
+  <p>In a wallet, these operations appear as <code>propose</code>, <code>applyQueued</code> and <code>cancel</code>. An owner change adds <code>acceptOwnership</code>, the one operation the incoming owner signs; it is neither owner-only nor subject to the delay.</p>
 
   <h2 id="s-owner">Ownership</h2>
-  <p>Ownership is transferred by proposing a new owner, waiting out the delay, and applying the change. Ownership is held separately on each chain.</p>
-  <p>Transferring ownership to the zero address renounces it. Thereafter no change can be proposed or cancelled. A change queued before the renunciation can still be applied by anyone, and once none remains the configuration is permanent.</p>
+  <p>An owner change takes two steps. The owner proposes the new owner, and once the delay has passed anyone may apply that proposal — which only nominates the address. The owner keeps every power until the nominated address calls <code>acceptOwnership()</code>. Any wallet may send that call; only the nominee's succeeds, and it takes effect in that transaction. Ownership is held separately on each chain.</p>
+  <p>A nomination can be withdrawn until it is accepted: the owner proposes its own address, and applying that proposal clears the nomination. The owner may also cancel the original proposal before it is applied, as with any other change.</p>
+  <p>The two steps leave different traces. Acceptance emits <code>OwnershipTransferred(previousOwner, newOwner)</code>. The nomination has no event of its own and travels in the calldata of the <code>Queued</code> event, so a transfer waiting to be accepted is read from <code>pendingOwner()</code>, which this page displays beside the owner.</p>
+  <p>Transferring ownership to the zero address renounces it. That needs no acceptance, takes effect when the proposal is applied, and destroys a nomination in flight. Thereafter no change can be proposed or cancelled. A change queued before the renunciation can still be applied by anyone, and once none remains the configuration is permanent.</p>
 
   <h2 id="s-widget">The widget</h2>
   <p>The widget is a script that displays a distribution on any web page: its allocation, its beneficiaries, its owner, its delay and any pending change, read directly from the chain. It adopts the host page's font and text colour, and is available in a full and a compact form.</p>
