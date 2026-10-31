@@ -69,11 +69,18 @@ contract GasBurnerAny {
 /// move if it grew, so the `applyQueued` and `propose` re-entries of F1 live here instead. The
 /// callback's outcome is recorded rather than bubbled, exactly as `HookToken` does it: the outer
 /// `distribute` then takes its success path and the test reads the refusal out of `hookData`.
+///
+/// The action fires on the **first** `transfer` only. `distribute` calls `transfer` once per row, so
+/// an unguarded hook would run again on the second row and overwrite `hookOk`/`hookData` with the
+/// outcome of a re-entry whose target state the first one had already consumed — on `ede55c3` the
+/// first `applyQueued` succeeds and the second reports `NotReady(0)`, which reads as a refusal
+/// without being one. One attempt per payout is also the shape leg 2's PoC had.
 contract CallbackToken {
     error InsufficientBalance();
 
     bool public hookOk;
     bytes public hookData;
+    bool public fired;
 
     /// @dev What `transfer` calls the target with. Set after deployment, because an `applyQueued`
     /// action's hash depends on a nonce the queue hands out after the table naming this token exists.
@@ -96,7 +103,10 @@ contract CallbackToken {
     }
 
     function transfer(address to, uint256 amount) external returns (bool) {
-        (hookOk, hookData) = target.call(action);
+        if (!fired) {
+            fired = true;
+            (hookOk, hookData) = target.call(action);
+        }
 
         if (balanceOf[msg.sender] < amount) revert InsufficientBalance();
         balanceOf[msg.sender] -= amount;
