@@ -145,10 +145,16 @@ a t05 single-leg re-check that t05's close-out made moot. The third review is m0
    unreachable there. `SECURITY.md` F12 is updated at close-out, not here.
    **Re-measured for this round** at block 158,979,851: `balanceOf(0x4200…0016)` and `cast balance`
    both `92688343257757826764769`, and `transfer(…, 1)` reverts `LegacyERC20ETH: transfer is
-   disabled`. **One figure reconciled with the reviewer's independent run:** his 3,672 bytes against
-   my 3,671. `cast code` returns **7,344 characters including the `0x`**, so halving the string gives
-   3,672 and the code is **3,671 bytes**. Mine stands, and the runbook now says why the other figure
-   arises so the next reader does not re-open it.
+   disabled`. **One figure reconciled with the reviewer's independent run:** the reviewer's 3,672
+   bytes against my 3,671. `cast code` returns **7,344 characters including the `0x`**, so halving
+   the string gives 3,672 and the code is **3,671 bytes**. The reviewer has confirmed 3,671 and
+   attributes their 3,672 to `wc -c` counting the trailing newline. Measured, so the note is exact:
+   `cast code … | wc -c` is **7,345**, `${#C}` on the captured string is **7,344**, and the hex
+   digits number **7,342** — so `7342 / 2 = 3671` is the only route that drops both the `0x` and the
+   newline. Every near miss lands on the same wrong answer: `7344 / 2`, `7345 / 2` and
+   `(7345 − 1) / 2` are all **3,672** under integer division, which is why the discrepancy was one
+   byte rather than two and why it is worth writing down instead of splitting. The runbook says where
+   the other figure comes from so the next reader does not re-open it.
 5. **Open question 2 ruled (a): make the `app/build.mjs` one-liner here.** See § Deviations 4 for
    what changed and why it is not scope creep.
 

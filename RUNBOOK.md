@@ -119,11 +119,12 @@ and the deploy does not proceed on it.
 
 The wording is deliberate: F12's loss needs an alias that both *reads* the native balance and can
 *move* value. An alias that reads it while every mutator reverts cannot reach the loss, and under
-decision 38's ruling on [#127](https://github.com/dnznlabs/rake/issues/127) (2026-11-01) that is a
-pass with the measurement as its source — see OP Mainnet below. The residual is that any caller can
-book un-releasable phantom credits into `escrowed[alias][*]` and emit misleading
-`Escrowed`/`Distributed` events; `reserved[address(0)]` is untouched, so no native wei is at risk and
-the caller pays the gas.
+the architect's ruling on [#127](https://github.com/dnznlabs/rake/issues/127) (2026-11-01) that is a
+pass with the measurement as its source — see OP Mainnet below. That ruling carries no decision
+number and is recorded on the issue itself; decision 38 is a different ruling (D15, `App.lock`). The
+residual is that any caller can book un-releasable phantom credits into `escrowed[alias][*]` and
+emit misleading `Escrowed`/`Distributed` events; `reserved[address(0)]` is untouched, so no native
+wei is at risk and the caller pays the gas.
 
 The check, per chain, against a probe address whose native balance is non-zero — a comparison that
 cannot tell "equal" from "empty" is not a check:
