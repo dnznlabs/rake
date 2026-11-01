@@ -36,7 +36,9 @@ function deployed() {
     /* Matched by hash rather than by index: the receipt order is forge's, not this file's contract. */
     const blocks = new Map((log.receipts || []).map(r => [r.transactionHash, r.blockNumber]));
     for (const t of log.transactions) {
-      if (t.transactionType !== 'CREATE' || !t.contractName) continue;
+      /* CREATE2 as well as CREATE: a salted `new` is routed through the keyless proxy, so the
+         deploys this reads are logged CREATE2 and a CREATE-only filter resolves nothing. */
+      if ((t.transactionType !== 'CREATE' && t.transactionType !== 'CREATE2') || !t.contractName) continue;
       const name = t.contractName.toUpperCase();
       /* Checksummed: the log is lowercase, and the same address two ways gzips to two sizes. */
       out[name] = Eth.checksum(t.contractAddress);
