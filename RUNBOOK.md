@@ -339,8 +339,12 @@ forge verify-contract $APP src/App.sol:App \
 ```
 
 `DistributionFactory` and `Distribution` take no constructor arguments; `App` takes two. `--watch` so
-the command's own exit code carries the result rather than a submission receipt. `--constructor-args`
-goes **last**: it is variadic and eats any flag placed after it.
+the command's own exit code carries the result rather than a submission receipt. Here
+`--constructor-args` takes **one** ABI-encoded value — `forge verify-contract --help` gives it as
+`--constructor-args <ARGS>` — so its position among the flags does not matter, which is why the
+`cast abi-encode` is quoted as a single argument. The variadic spelling is `forge create`'s
+(`<ARGS>...`), where the flag must go last because it swallows anything after it; that command is
+not used in this runbook.
 
 ### Step 6 — DNZN's `create`
 
