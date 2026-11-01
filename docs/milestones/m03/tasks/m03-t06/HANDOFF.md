@@ -57,13 +57,17 @@ review did not cover names the salted placement.
 2. **The plan's test count is pre-t05.** Step 1's check and the AC both say `forge test` → "63
    passed". On `main` it is **72** — t05 added nine tests. Nothing was done about it; the gates were
    run against the real count, and `.gas-snapshot` has 72 rows to match.
-3. **Two additions were taken from PR #128 before it merged**, at the architect's direction relayed
-   through my requester: the #115 ruling under open question 2 (decision 37 — nothing changes here,
-   the rehearsal still runs zero salts, mining is M04's) and the new open question 3 / #127
-   precondition. **Both have since merged**, and I re-read `TASK.md` from `main` to reconcile:
-   `git diff` between the PR branch's `TASK.md` and `main`'s is **empty**, so the text I implemented
-   against is the merged text and there is nothing to reconcile. Recorded here because the brief
-   asked for it; the merged text wins and it does not differ.
+3. **Two additions were implemented from PR #128 before it merged, and have since been reconciled
+   against the merged text at `67146a7`** — the wording is **identical, byte for byte**. The two are
+   the #115 ruling under open question 2 (decision 37 — nothing changes here, the rehearsal still
+   runs zero salts, mining is M04's) and the new open question 3 / #127 precondition. Measured, not
+   assumed: `git diff 4ddab68 67146a7 -- docs/milestones/m03/tasks/m03-t06/TASK.md` is **empty**, so
+   the merge took #128's branch text unchanged and what I built against *is* the merged text.
+   `TASK.md` on `main` is **338 lines** (325 before #128). It has not moved since either —
+   `git diff 67146a7 ae0c30a -- <the same path>` is also empty, so #130 (decision 38, t07's plan)
+   left this task's authority untouched. Nothing in the implementation had to follow the merged
+   text anywhere. Recorded because the distinction between "built from a pre-merge PR" and
+   "reconciled against the merged text" is the whole value of the note, not because the text moved.
 4. **Runbook step 4 was not rehearsed, and step 7's end state is therefore partial on anvil.** Same
    cause as the AC row above — § Open questions 2. Steps 1, 2, 3, 6 and 7 ran start to finish on both
    chains; step 5 is named and not run by design.
@@ -110,6 +114,49 @@ review did not cover names the salted placement.
 7. **The architect's `cdfaa0a` factory address moved, exactly as the plan predicted.** The spike's
    `0x2cF9C0d9…cb7a18` is now `0x550f3bE1…Dcb66a` at `5ed1ed2`; the init-code hash is
    `0xb28d5fcc…f7c35904`. Nothing in the runbook quotes either — step 1f computes them.
+
+## For close-out
+
+1. **Every `App` address rehearsed here is superseded by m03-t07, by design.** Decision 38 (ruled on
+   [#126](https://github.com/dnznlabs/rake/issues/126) on 2026-11-01, scoped in #130, task
+   [#132](https://github.com/dnznlabs/rake/issues/132)) puts a first-code-byte `0x00` check into
+   `App.lock`, which **changes `App`'s bytecode and therefore its init-code hash and its CREATE2
+   address**. So `APP = 0x9fFEe2c1C0c79C81DFCc4E9e3A1007407D39E2A1` in the criterion-6 row above is
+   a reading taken at `5ed1ed2` against `App` as it stood at `b0fb4e3`, **not a value to carry
+   forward**. Criterion 6 re-runs at close-out on the final `main` per `TASK.md:16`, and that re-run
+   is the authoritative set. Nothing in `RUNBOOK.md` quotes an `App` address — step 1f computes it,
+   which is why t07 costs the runbook nothing. **An `App` address that differs from this handoff's
+   after t07 merges is the expected outcome, not a defect**, and no address here was pinned or
+   future-proofed against it. The factory and implementation addresses are unaffected: t07's change
+   is confined to `src/App.sol` and `src/Distribution.sol` stays byte-identical to `b0fb4e3`.
+
+2. **Merge order against m03-t07: measured, and there is no file overlap.** The dependency was
+   flagged to me as `SECURITY.md` (F3's row against t07's F11 row and § Prior reviews) and possibly
+   `.gas-snapshot`. **Neither applies to this branch.** `git diff --name-only origin/main...HEAD`
+   returns exactly six paths — `README.md`, `RUNBOOK.md`, this handoff, `mk/10-forge.mk`,
+   `scripts/forge/Deploy.s.sol`, `scripts/forge/DeployApp.s.sol` — and **none** of `SECURITY.md`,
+   `.gas-snapshot` or anything under `src/` is among them. t05's close-out flipped F3's row itself in
+   #128 (§ Deviations 1), so this task's one assigned `SECURITY.md` line was already on `main` before
+   the branch existed and the branch holds zero `SECURITY.md` bytes. Consequences for whoever merges
+   second:
+   - **If t07 merges first**, this branch needs no `SECURITY.md` or `.gas-snapshot` resolution, and
+     its gated criterion survives unchanged: `git diff --stat origin/main -- src/ test/*.t.sol
+     .gas-snapshot` stays empty against the *new* `main` precisely because this branch touches none
+     of those three paths, whatever t07 does to them. `forge snapshot --check` is re-run on the
+     rebase as a matter of course, but no row of `.gas-snapshot` is this task's to own or update.
+   - **If t06 merges first**, t07 rebases and re-runs `forge snapshot --check` for its own `App`
+     bytecode change; nothing this task leaves behind conflicts with it.
+   The only true coupling is item 1 — t07 moves the `App` address this task rehearsed — and that is
+   a re-measurement at close-out, not a merge conflict.
+
+3. **`main` moved to `ae0c30a` after this branch was last rebased, and I did not chase it.** The
+   branch sits on `67146a7` as instructed; `ae0c30a` adds only #130's docs (t07's `TASK.md`,
+   `ROADMAP.md`, `MILESTONE.md` and F11's `SECURITY.md` row), none of which this branch touches, and
+   GitHub reports #131 `MERGEABLE`. Rebasing again is deliberately *not* free: the criterion-6
+   evidence is pinned to a commit — both broadcast logs read `commit: 5ed1ed2` — so moving the branch
+   invalidates that hash and the honest response is a third full two-anvil rehearsal, not an edited
+   figure. Left to the reviewer to call, since criterion 6 re-runs at close-out regardless and t07
+   will move the `App` address anyway.
 
 ## Open questions
 
