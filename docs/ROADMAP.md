@@ -457,6 +457,28 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     t06's two-anvil rehearsal runs with zero salts in every case (the issue's default), since the
     runbook takes the salt as a variable and the rehearsal proves the method, not the address.
     Rejected: zero salts (nothing gained, and the house style already has the prefix).
+38. **`App.lock` is fixed before M04: a t07 refuses any chunk pointer whose code can change.** D15,
+    opened at m03-t05's second review on [#126](https://github.com/dnznlabs/rake/issues/126), ruled
+    by Denizen on 2026-11-01 ("Option 1"). The issue's § Record said decision 37; #115 took that
+    number first, so this is 38. The finding (`SECURITY.md` F11, leg 2's F4 of 2026-10-31,
+    confidence 80): `setChunks`, `setWidgetChunks` and `lock` admit a pointer on `code.length`
+    alone, and an EIP-7702 delegation designator (`0xef0100‖address`, 23 bytes) has code, so its
+    key holder can re-point or clear what a locked `App` serves. Rehearsed at scoping with
+    `vm.signDelegation`/`vm.attachDelegation` on `67146a7`: `code.length` 23, first byte `0xef`,
+    and today's `setChunks` then `lock` both succeed. The fix is one private check — non-empty code
+    whose first byte is the `STOP` `SSTORE2.write` prefixes (`lib/solady/src/utils/SSTORE2.sol:52`);
+    EIP-3541 means no deployed contract begins `0xef`, and `SSTORE2.read` discards byte 0, so a
+    pointer the check refuses could never have been served correctly — plus one error,
+    `ForeignChunk(address)`, and a third two-leg review, since criterion 4 wants `SECURITY.md` to
+    name a commit with no `src/` diff to the one M04 deploys. Why before M04 and not in the next
+    version: `App` is placed at one same-address on every chain (decision 5), so a fix after M04 is
+    a new address on eight chains, and this version's `lock()` could never be called — a one-way
+    door with a known defect behind it. Scoped as m03-t07 the same day; runs beside t06, and
+    `APP_SALT` (decision 37) is mined against the hash t07's merge produces. Rejected: carrying all
+    three new findings (option 2) for the reason above; a t07 for all three (option 3), because F12
+    has no contract fix the contract can tell from an honest token — it is a chain precondition,
+    [#127](https://github.com/dnznlabs/rake/issues/127) — and F13 is F9's mechanism, whose
+    mitigation stands; both were dispositioned at t05's close-out and neither row moves.
 
 ## Findings carried forward
 
