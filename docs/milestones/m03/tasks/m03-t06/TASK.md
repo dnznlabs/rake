@@ -306,6 +306,19 @@ commit's and are re-run, not quoted.
    **Default and deadline.** (a) for this task's rehearsal in every case; the ruling decides what
    M04 exports before step 1. Deadline: M04's scoping.
    **Record.** `ROADMAP.md` § Decisions; issue [#115](https://github.com/dnznlabs/rake/issues/115).
+   *Ruled (b) by Denizen on 2026-10-31 on #115; recorded as decision 37 at t05's close-out
+   (2026-11-01). Nothing in this task changes: the rehearsal still runs with zero salts. Mining is
+   M04's step, with one sequencing rule from the decision — `FACTORY_SALT` can be mined once t05's
+   `src/` is final (it is, at `b0fb4e3`); `APP_SALT` waits until D15
+   ([#126](https://github.com/dnznlabs/rake/issues/126)) rules whether a t07 touches `App.sol`.*
+
+3. *Added 2026-11-01 at t05's close-out, not a question but a precondition the runbook gains:*
+   **[#127](https://github.com/dnznlabs/rake/issues/127) (`SECURITY.md` F12).** A token whose
+   balance is the chain's native balance (Celo's GoldToken; any double-entry-point token) lets any
+   caller pay escrowed ETH out twice. Before the first deploy on a chain of criterion 7's table, the
+   runbook records that the chain carries no such token — one line per chain, with the source
+   checked. A chain that fails the check is not a runbook variable: it is a contract change and a
+   new version (decision 5), and this task stops and says so.
 
 ## Context
 

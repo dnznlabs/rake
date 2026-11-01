@@ -184,7 +184,10 @@ numbers below are `src/Distribution.sol` at `ede55c3`, which is what `main` stil
    as this list. Each must **fail on `ede55c3`'s `src/`** before it passes on the branch: write
    them first, run `git stash push -- src/` then `forge build --force && forge test --mt <name>`,
    watch each fail for the finding's reason, then `git stash pop`. The handoff quotes the failing
-   assertion of each.
+   assertion of each. *Amended 2026-11-01 at close-out: six of the seven fail on `ede55c3`;
+   `test_releaseStillBubblesEthReason` passes on both trees by design — it is the decision-24
+   regression guard that F6's change must not break, not a test of F6 — so "each must fail" was
+   wrong by one. The handoff's § The six failing assertions is the record.*
    - `test_applyQueuedRefusedDuringDistribute` (F1): leg 2's PoC. Table `[A 5000, B 5000]`, a
      matured `setBeneficiaries([C 5000, A 5000])` in the queue, A a `HookToken` recipient whose
      hook calls `applyQueued(action, nonce)` (a third `Hook` arm, `ApplyQueued`, carrying the
