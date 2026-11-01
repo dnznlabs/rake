@@ -112,9 +112,18 @@ improvisation here.
 `reserved` is keyed by token address, so on a chain carrying an ERC-20 whose `balanceOf` **is** the
 native balance — a double-entry-point token, Celo's `GoldToken` being the named example —
 `distribute(alias)` reads the same balance that `distribute(address(0))` escrowed and can pay it to
-the table a second time. **This is checked and recorded per chain before the first deploy on that
-chain.** A chain that fails is **not a runbook variable**: it is a contract change and a new version
-(decision 5), and the deploy does not proceed on it.
+the table a second time. **The requirement is that the chain carries no alias through which value
+can move**, and it is checked and recorded per chain before the first deploy on that chain. A chain
+that fails is **not a runbook variable**: it is a contract change and a new version (decision 5),
+and the deploy does not proceed on it.
+
+The wording is deliberate: F12's loss needs an alias that both *reads* the native balance and can
+*move* value. An alias that reads it while every mutator reverts cannot reach the loss, and under
+decision 38's ruling on [#127](https://github.com/dnznlabs/rake/issues/127) (2026-11-01) that is a
+pass with the measurement as its source — see OP Mainnet below. The residual is that any caller can
+book un-releasable phantom credits into `escrowed[alias][*]` and emit misleading
+`Escrowed`/`Distributed` events; `reserved[address(0)]` is untouched, so no native wei is at risk and
+the caller pays the gas.
 
 The check, per chain, against a probe address whose native balance is non-zero — a comparison that
 cannot tell "equal" from "empty" is not a check:
@@ -125,7 +134,15 @@ P=<any address with a non-zero native balance on this chain>
 cast balance $P --rpc-url "$RPC"                                   # must be non-zero: the denominator
 cast code $ALIAS --rpc-url "$RPC"                                  # 0x means the alias does not exist here
 cast call $ALIAS "balanceOf(address)(uint256)" $P --rpc-url "$RPC"  # must NOT equal the balance above
+
+# Only where $ALIAS has code and its balanceOf DID equal the balance: the alias must not be movable.
+# This must REVERT. A success is a movable alias, and the chain fails the check.
+cast call $ALIAS 'transfer(address,uint256)(bool)' $P 1 --from $P --rpc-url "$RPC"
 ```
+
+The `transfer` assertion is re-run per chain **before each deploy**, not once: it is the only thing
+standing between "the alias cannot move value" and a future upgrade that re-enables it, and the
+check is a one-way door on eight chains.
 
 Read 2026-11-01 at the commit in § Record, four known alias families probed on each chain
 (OP `LegacyERC20ETH`, Celo `GoldToken`, Polygon's `0x…1010`, `0x…0001`) — 32 alias-chain checks,
@@ -136,7 +153,7 @@ native balance), so a clean row below means the check ran and missed, not that i
 | chain | native-balance / double-entry-point token | source checked |
 |:------|:------------------------------------------|:---------------|
 | Ethereum | none — no alias has code; ETH is only ever wrapped, and WETH holds its own balance | measured, all four aliases `0x` |
-| OP Mainnet | **`LegacyERC20ETH` `0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000` is live on the read side** — 3,671 bytes, `name()` "Ether", `symbol()` "ETH", `balanceOf(x)` equal to x's native balance. **Every stateful method reverts** (`transfer`, `transferFrom`, `approve` — all "disabled"), so no value can move through it. **Disposition pending the architect's ruling — see § Open questions in this task's `HANDOFF.md`; do not deploy to chain 10 before it is ruled.** | measured at block 158,978,665, and [OP Stack spec § Predeploys](https://specs.optimism.io/protocol/predeploys.html#legacyerc20eth): LegacyERC20ETH is **Deprecated**, "All of the stateful methods in this contract will revert after the Bedrock upgrade" |
+| OP Mainnet | **`LegacyERC20ETH` `0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000` is live on the read side** — 3,671 bytes, `name()` "Ether", `symbol()` "ETH", `balanceOf(x)` equal to x's native balance. **Every stateful method reverts** (`transfer`, `transferFrom`, `approve` — all "disabled"), so no value can move through it. **Passes: ruled on [#127](https://github.com/dnznlabs/rake/issues/127) on 2026-11-01**, because the requirement is no alias through which value *can move* and nothing moves through this one. The `transfer` assertion above is what keeps that true, and it is re-run before each deploy to chain 10. | measured at block 158,979,851: `balanceOf(0x4200…0016)` and `cast balance` both `92688343257757826764769`, and `transfer(…,1)` reverts `LegacyERC20ETH: transfer is disabled`. Code size is **3,671 bytes** — `cast code` returns 7,344 characters including the `0x`, so a figure of 3,672 is that string halved. Corroborated by the [OP Stack spec § Predeploys](https://specs.optimism.io/protocol/predeploys.html#legacyerc20eth): LegacyERC20ETH is **Deprecated**, "All of the stateful methods in this contract will revert after the Bedrock upgrade" |
 | Base | none — post-Bedrock OP Stack chain, so the legacy alias was never deployed | measured, `0x` at the legacy address |
 | Arbitrum One | none — no native-balance ERC-20; the Arbitrum precompiles are not tokens | measured, all four aliases `0x` |
 | MegaETH | none | measured, all four aliases `0x` |
