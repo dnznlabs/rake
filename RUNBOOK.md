@@ -344,19 +344,31 @@ anvil marks its own values as the rehearsal's placeholders.
 ```sh
 export DNZN_DELAY=<uint32 seconds>
 export DNZN_DESCRIPTION="<string>"
-export DNZN_TABLE='[(<address>,<bps>,"<name>","<note>"),(…)]'   # bps must sum to 10000
+export DNZN_TABLE='[(<address>,<bps>,"<name>","<note>"),(…)]'   # see the two rules below
 
 cast send $FACTORY \
   'create(address,uint32,string,(address,uint96,string,string)[],bytes32)' \
   $OWNER $DNZN_DELAY "$DNZN_DESCRIPTION" "$DNZN_TABLE" $DNZN_SALT \
-  --rpc-url "$RPC" $SIGNER
+  --rpc-url "$RPC" --unlocked --from <address>    # or: --account <keystore> --from <address>
 
 cast call $DISTRO "owner()(address)" --rpc-url "$RPC"    # must equal OWNER
+cast call $DISTRO "delay()(uint32)" --rpc-url "$RPC"     # must equal DNZN_DELAY
 ```
 
+**`cast send` takes `--from` where `forge script` takes `--sender`.** `$SIGNER` as § 0 defines it is
+a `forge script` spelling and `cast send` rejects `--sender` outright, so this is the one step that
+writes its signer flags out rather than reusing the variable. A paste of `$SIGNER` here fails with
+`unexpected argument '--sender' found`.
+
+**Two rules on the table, both enforced by `_set` with the same error.** `BadTable()` —
+selector `0x40da0647`, which is what a revert here decodes to — covers both: the `bps` must sum to
+exactly 10,000, **and the rows must be sorted strictly ascending by `account`** (`b.account <= prev`
+reverts, so duplicates fail too). A correct table in the wrong order is rejected, and the error does
+not say which rule was broken. There is a maximum of 107 rows (`MAX_BENEFICIARIES`).
+
 The salt's top 20 bytes must be the sending key's own address or the call reverts with
-`SaltDoesNotStartWith` — open salts are refused (decision 10), which is what stops anyone else
-putting a different table at this address on a chain DNZN has not reached yet.
+`SaltDoesNotStartWith` (`0x0c4549ef`) — open salts are refused (decision 10), which is what stops
+anyone else putting a different table at this address on a chain DNZN has not reached yet.
 
 **Losing the creator key is unrecoverable.** Under decision 10 that key is part of this
 distribution's address on every chain: ownership can be transferred per chain, but no other sender
@@ -402,5 +414,55 @@ blank transaction hash is a step that did not run.
 
 ## Rehearsed on anvil
 
-Filled by the two-anvil rehearsal of M03 criterion 6. See this task's
-`docs/milestones/m03/tasks/m03-t06/HANDOFF.md` for the full transcript.
+Steps 1, 2, 3, 6 and 7 were run start to finish on **two anvils at once** — `--chain-id 31337` on
+port 8555 and `--chain-id 31338` on port 8556 — at commit `2a7f485`, forge `1.7.1-dev`, node
+`v24.12.0`, on 2026-11-01. Both chains used the same `FACTORY_SALT` and `APP_SALT` (zero), the same
+`APP_VERSION` (`v0.1`), and the same `OWNER`: anvil's first account
+`0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`, standing in for the Ops vault, which also stands in
+for the DNZN Creator key until [#90](https://github.com/dnznlabs/rake/issues/90) names it. So
+`DNZN_SALT` was `0xf39f…2266` + `000000000000000000000001`, its top 20 bytes the signing account's
+as decision 10 requires.
+
+**Neither anvil needed `anvil_setCode`.** Both carried the proxy at its canonical address in
+genesis: 69 bytes, keccak `0x2fa86add…f7e4989`, identical to all eight chains in § 1.
+
+**The four addresses are identical on both chains, and the factory's was predicted before any
+transaction was sent:**
+
+| | value | 31337 | 31338 |
+|:--|:--|:--|:--|
+| `FACTORY` predicted offline (step 1f) | `0x550f3bE16E83388a73BFE09B05D6c4fED2Dcb66a` | — | — |
+| `FACTORY` landed | `0x550f3bE16E83388a73BFE09B05D6c4fED2Dcb66a` | equal | equal |
+| `IMPL` via `implementation()` | `0xB083aE8539E71D74679BFcFb0A0D9F45549359a9` | equal | equal |
+| `APP` predicted, and landed | `0x9fFEe2c1C0c79C81DFCc4E9e3A1007407D39E2A1` | equal | equal |
+| `predict($DNZN_SALT)` | `0x55410930023a7019AF4960f5Dbb1891DB9A53472` | equal | equal |
+| `DISTRO` the create landed | `0x55410930023a7019AF4960f5Dbb1891DB9A53472` | equal to `predict` | equal to `predict` |
+
+Both deploys were recorded `transactionType: "CREATE2"` with `to` the proxy
+`0x4e59b448…0b4956c`, and both broadcast logs carry `commit: 2a7f485` — the commit above, read
+rather than assumed. The clone's runtime on both chains is the 45-byte PUSH0 proxy
+`0x5f5f365f5f37365f73b083ae8539e71d74679bfcfb0a0d9f45549359a95af43d5f5f3e6029573d5ffd5b3d5ff3`,
+carrying `IMPL` inside it exactly as `docs/REFERENCE.md:110-116` documents. The implementation's
+deployed code is 8,729 bytes on both.
+
+| step | 31337 | 31338 |
+|:--|:--|:--|
+| factory tx | `0x2df5664b…ce661973` | `0xff90f12b…d02a19f5` |
+| factory gas | 2,262,485 | 2,262,485 |
+| `App` tx | `0x566e4a63…27c58cdc` | `0x45c05b93…7289f045` |
+| `App` gas | 1,648,295 | 1,648,295 |
+| `create` tx | `0x…446d9` run, gas 280,281 | `0x28ab844c…34224f4c`, gas 280,437 |
+| `App` `owner()` / `version()` / `locked()` | `0xf39F…2266` · `v0.1` · `false` | same |
+| `DISTRO` `owner()` / `delay()` | `0xf39F…2266` · 3600 | same |
+
+The two `create` gas figures differ by 156 because the two runs passed descriptions of different
+lengths; the description is not an input to the address, so the `DISTRO` equality above is
+unaffected. `cast estimate --create` on the factory's init code read **2,258,236** on both chains.
+
+**Step 1g's collision check was exercised in both directions.** On a fresh chain `cast code` at the
+predicted factory, `App` and `DISTRO` all printed `0x`. Re-running the create on 31337 after it had
+landed found 45 bytes at `predict($DNZN_SALT)` and **did not resend**, which is the #22 path the
+step exists for.
+
+**Step 4 was not rehearsed.** It is blocked on a defect outside this task's scope — see
+`docs/milestones/m03/tasks/m03-t06/HANDOFF.md` § Deviations. Step 5 is named and not run by design.
