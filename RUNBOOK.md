@@ -436,8 +436,9 @@ blank transaction hash is a step that did not run.
 ## Rehearsed on anvil
 
 Steps 1, 2, 3, 6 and 7 were run start to finish on **two anvils at once** — `--chain-id 31337` on
-port 8555 and `--chain-id 31338` on port 8556 — at commit `5ed1ed2`, forge `1.7.1-dev`, node
-`v24.12.0`, on 2026-11-01. Both chains used the same `FACTORY_SALT` and `APP_SALT` (zero), the same
+port 8555 and `--chain-id 31338` on port 8556 — at commit `d75b664`, forge `1.7.1-dev`, node
+`v24.12.0`, on 2026-11-01. **Step 4 was rehearsed on the 31337 chain** (below); step 5 is named and
+not run by design. Both chains used the same `FACTORY_SALT` and `APP_SALT` (zero), the same
 `APP_VERSION` (`v0.1`), and the same `OWNER`: anvil's first account
 `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`, standing in for the Ops vault, which also stands in
 for the DNZN Creator key until [#90](https://github.com/dnznlabs/rake/issues/90) names it. So
@@ -460,7 +461,7 @@ transaction was sent:**
 | `DISTRO` the create landed | `0x55410930023a7019AF4960f5Dbb1891DB9A53472` | equal to `predict` | equal to `predict` |
 
 Both deploys were recorded `transactionType: "CREATE2"` with `to` the proxy
-`0x4e59b448…0b4956c`, and both broadcast logs carry `commit: 5ed1ed2` — the commit above, read
+`0x4e59b448…0b4956c`, and both broadcast logs carry `commit: d75b664` — the commit above, read
 rather than assumed. The clone's runtime on both chains is the 45-byte PUSH0 proxy
 `0x5f5f365f5f37365f73b083ae8539e71d74679bfcfb0a0d9f45549359a95af43d5f5f3e6029573d5ffd5b3d5ff3`,
 carrying `IMPL` inside it exactly as `docs/REFERENCE.md:110-116` documents. The implementation's
@@ -472,7 +473,7 @@ deployed code is 8,729 bytes on both.
 | factory gas | 2,262,485 | 2,262,485 |
 | `App` tx | `0x566e4a63…27c58cdc` | `0x45c05b93…7289f045` |
 | `App` gas | 1,648,295 | 1,648,295 |
-| `create` tx | `0xbb0c424e…326378bc` | `0x54f7d93e…6db58923` |
+| `create` tx | `0x90314d96…cdcbec00` | `0xd604f884…e1123260` |
 | `create` gas | 280,281 | 280,281 |
 | `App` `owner()` / `version()` / `locked()` | `0xf39F…2266` · `v0.1` · `false` | same |
 | `DISTRO` `owner()` / `delay()` | `0xf39F…2266` · 3600 | same |
@@ -487,5 +488,52 @@ run, the same three addresses carry 1,320, 7,118 and 45 bytes, so the step repor
 already carries the deploy* and the operator does not resend — the #22 path it exists for, and the
 reason the check is not decoration.
 
-**Step 4 was not rehearsed.** It is blocked on a defect outside this task's scope — see
-`docs/milestones/m03/tasks/m03-t06/HANDOFF.md` § Deviations. Step 5 is named and not run by design.
+**Step 6's table and description are the rehearsal's placeholders**, named here so the figures are
+reproducible: `DNZN_DELAY=3600`, `DNZN_DESCRIPTION="rehearsal placeholder"`, and a two-row
+`DNZN_TABLE` of `0x3C44CdDd…4293BC` at 6,000 bps and `0x70997970…dc79C8` at 4,000 bps, both named
+`A`/`B` with note `rehearsal placeholder` — sorted strictly ascending by account and summing to
+10,000, as `BadTable()` requires. M05 fills the real 60/40 table. The `create` transaction hashes
+above are this run's and move with those placeholder strings; the three addresses do not, because
+the salt and the factory determine them.
+
+### Step 4, rehearsed on 31337
+
+Run on the 31337 chain only — the document is the same artifact on every chain, and uploading it
+twice proves nothing the sha256 equality does not. `make dapp-nodev` first, never `make dapp`.
+
+| what | value |
+|:--|:--|
+| bundle built | `dapp: raw 127,578 bytes · gzip 40,241 bytes · chain 31337`; `widget: raw 7,920 · budget 10,240 · 2,320 left` |
+| unsubstituted `__NAME__` tokens in `app/dist/index.html` | **none** |
+| document chunk pointers | `0x56C9358a2805F54287356317A3DD4CeB58F2489f` (**24,001** bytes on chain), `0x5B039B1D8a6bB94e6c860508e6967384A68f2902` (**16,242**) |
+| widget chunk pointer | `0x2e25e351B14928fBE5FB735a07d6DCC1aB7Dbdec` (**7,921** bytes on chain) |
+| `html()` payload read back | 54,333 bytes stored · `sha256 bee088a8…70ec129b`; payload 40,241 bytes |
+| **`inflated sha256`** | `6b48db1aed7a9e7130c7b0cb89d11ba5fcf9389a03d120561ccc10dcafe71063` — **equals `sha256sum app/dist/index.html`** |
+| **`widget sha256`** | `e45088fc647b806977931274d4bc99f9a027f71009f0d9af3584eb5ba18bf22b` — **equals `sha256sum app/dist/widget.js`** |
+| byte counts, both ways | inflated 127,578 = `wc -c app/dist/index.html`; widget 7,920 = `wc -c app/dist/widget.js` |
+| `App.locked()` after step 4 | `false`, and it stays false |
+
+The pointer sizes are their own check: 24,001 + 16,242 = **40,243** = the 40,241-byte payload plus
+SSTORE2's one leading `0x00` byte per pointer, and the widget's 7,921 is 7,920 + 1 the same way.
+
+Step 4's five transactions, **read from the chain rather than from the broadcast log** — see the
+handoff's § Discoveries for why that distinction is not pedantry:
+
+| nonce | call | gas |
+|--:|:--|--:|
+| 3 | `addChunk(bytes)` | 5,300,226 |
+| 4 | `addChunk(bytes)` | 3,603,200 |
+| 5 | `setChunks(address[],bool)` | 62,555 |
+| 6 | `addWidgetChunk(bytes)` | 1,819,075 |
+| 7 | `setWidgetChunks(address[])` | 35,819 |
+| | **total** | **10,820,875** |
+
+**The dev stack runs end to end on a fresh anvil.** `make serve` brought up anvil on 8545, ran
+`make deploy` to completion — four broadcast scripts (`Deploy`, `DeployApp`, `Seed`, `Chunks`), each
+reporting `ONCHAIN EXECUTION COMPLETE & SUCCESSFUL`, plus `dapp-nodev` and `dapp` — and
+`make addresses` then listed `DistributionFactory 0x550f3bE1…Dcb66a` (1,320 bytes of
+code) and `App 0x9fFEe2c1…D39E2A1` (7,118 bytes), neither carrying the `no code … stale, redeploy`
+note. `make chain-doc` exits 0 and its `inflated sha256` is the one above. Note that `make deploy`
+rebuilds the **dev** bundle last, so `app/dist/index.html` afterwards is the dev build (128,047
+bytes) and will not match the chain's hash — which is exactly why step 4 checks the equality
+immediately after `dapp-nodev` and `chunks`, and why this document says `dapp-nodev`, never `dapp`.
