@@ -415,7 +415,7 @@ blank transaction hash is a step that did not run.
 ## Rehearsed on anvil
 
 Steps 1, 2, 3, 6 and 7 were run start to finish on **two anvils at once** — `--chain-id 31337` on
-port 8555 and `--chain-id 31338` on port 8556 — at commit `2a7f485`, forge `1.7.1-dev`, node
+port 8555 and `--chain-id 31338` on port 8556 — at commit `5ed1ed2`, forge `1.7.1-dev`, node
 `v24.12.0`, on 2026-11-01. Both chains used the same `FACTORY_SALT` and `APP_SALT` (zero), the same
 `APP_VERSION` (`v0.1`), and the same `OWNER`: anvil's first account
 `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`, standing in for the Ops vault, which also stands in
@@ -439,7 +439,7 @@ transaction was sent:**
 | `DISTRO` the create landed | `0x55410930023a7019AF4960f5Dbb1891DB9A53472` | equal to `predict` | equal to `predict` |
 
 Both deploys were recorded `transactionType: "CREATE2"` with `to` the proxy
-`0x4e59b448…0b4956c`, and both broadcast logs carry `commit: 2a7f485` — the commit above, read
+`0x4e59b448…0b4956c`, and both broadcast logs carry `commit: 5ed1ed2` — the commit above, read
 rather than assumed. The clone's runtime on both chains is the 45-byte PUSH0 proxy
 `0x5f5f365f5f37365f73b083ae8539e71d74679bfcfb0a0d9f45549359a95af43d5f5f3e6029573d5ffd5b3d5ff3`,
 carrying `IMPL` inside it exactly as `docs/REFERENCE.md:110-116` documents. The implementation's
@@ -451,18 +451,20 @@ deployed code is 8,729 bytes on both.
 | factory gas | 2,262,485 | 2,262,485 |
 | `App` tx | `0x566e4a63…27c58cdc` | `0x45c05b93…7289f045` |
 | `App` gas | 1,648,295 | 1,648,295 |
-| `create` tx | `0x…446d9` run, gas 280,281 | `0x28ab844c…34224f4c`, gas 280,437 |
+| `create` tx | `0xbb0c424e…326378bc` | `0x54f7d93e…6db58923` |
+| `create` gas | 280,281 | 280,281 |
 | `App` `owner()` / `version()` / `locked()` | `0xf39F…2266` · `v0.1` · `false` | same |
 | `DISTRO` `owner()` / `delay()` | `0xf39F…2266` · 3600 | same |
 
-The two `create` gas figures differ by 156 because the two runs passed descriptions of different
-lengths; the description is not an input to the address, so the `DISTRO` equality above is
-unaffected. `cast estimate --create` on the factory's init code read **2,258,236** on both chains.
+`cast estimate --create` on the factory's init code read **2,258,236** on both chains, and the
+factory's returned runtime was **1,320 bytes** on both — the EVM check of § 1, executed rather than
+read off a feature list.
 
-**Step 1g's collision check was exercised in both directions.** On a fresh chain `cast code` at the
-predicted factory, `App` and `DISTRO` all printed `0x`. Re-running the create on 31337 after it had
-landed found 45 bytes at `predict($DNZN_SALT)` and **did not resend**, which is the #22 path the
-step exists for.
+**Step 1g's collision check was exercised in both directions.** Before the sends, `cast code` at
+the predicted `FACTORY`, `APP` and `DISTRO` printed `0x` on both chains. Re-read on 31337 after the
+run, the same three addresses carry 1,320, 7,118 and 45 bytes, so the step reports *this chain
+already carries the deploy* and the operator does not resend — the #22 path it exists for, and the
+reason the check is not decoration.
 
 **Step 4 was not rehearsed.** It is blocked on a defect outside this task's scope — see
 `docs/milestones/m03/tasks/m03-t06/HANDOFF.md` § Deviations. Step 5 is named and not run by design.
