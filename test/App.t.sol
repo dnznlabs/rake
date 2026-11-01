@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {App} from "../src/App.sol";
 import {LibString} from "solady/utils/LibString.sol";
 
@@ -138,6 +138,34 @@ contract AppTest is Test {
         assertEq(app.html(), "<p>x</p>");
     }
 
+    /// @dev The pointer that has code and still is not a chunk: an EIP-7702 delegation designator,
+    ///      `0xef0100‖address`. `code.length` is 23, so the old guard admitted it, and the key holder
+    ///      can re-point or clear it afterwards. Etched here rather than signed so the shape is the
+    ///      subject; `test_lockRejectsRealDelegation` does it with the chain's own designator.
+    function test_setChunksRejectsDelegationDesignator() public {
+        address p = makeAddr("designator");
+        vm.etch(p, abi.encodePacked(hex"ef0100", address(app)));
+        assertEq(p.code.length, 23);
+        address[] memory ptrs = new address[](1);
+        ptrs[0] = p;
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(App.ForeignChunk.selector, p));
+        app.setChunks(ptrs, false);
+    }
+
+    /// @dev A deployed contract is not a chunk either. `SSTORE2.read` copies from offset 1 and reports
+    ///      `extcodesize - 1`, so any pointer whose byte 0 is not the `STOP` the library prefixes would
+    ///      be served shifted by one byte and a byte short. Rejecting it is the same check, and this is
+    ///      the case that needs no cheatcode at all: today's code accepts `address(app)`.
+    function test_setChunksRejectsNonChunkContract() public {
+        assertGt(address(app).code.length, 0);
+        address[] memory ptrs = new address[](1);
+        ptrs[0] = address(app);
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(App.ForeignChunk.selector, address(app)));
+        app.setChunks(ptrs, false);
+    }
+
     /// @dev `setChunks([])` is indistinguishable from a mistake, and `html()` would return an empty
     ///      document. Rejected at both doors, not only at `lock()`.
     function test_setChunksRejectsEmptyList() public {
@@ -178,6 +206,40 @@ contract AppTest is Test {
         vm.expectRevert(abi.encodeWithSelector(App.CodelessChunk.selector, ptr));
         app.lock();
         vm.stopPrank();
+        assertFalse(app.locked());
+    }
+
+    /// @dev The finding itself, at the door it is about: a real chunk is stored, then the pointer is
+    ///      re-pointed to a delegation designator before the lock. `lock()` must refuse it, because a
+    ///      lock over a pointer whose bytes the key holder still controls is not a lock. Same shape as
+    ///      `test_lockRejectsCodelessPointer`, one step less destructive — the pointer still has code.
+    function test_lockRejectsDelegationDesignator() public {
+        vm.startPrank(owner);
+        address ptr = app.addChunk("<p>x</p>");
+        assertGt(ptr.code.length, 0);
+        vm.etch(ptr, abi.encodePacked(hex"ef0100", address(app)));
+        assertEq(ptr.code.length, 23);
+        vm.expectRevert(abi.encodeWithSelector(App.ForeignChunk.selector, ptr));
+        app.lock();
+        vm.stopPrank();
+        assertFalse(app.locked());
+    }
+
+    /// @dev F11 as leg 2 stated it, with the chain's own designator rather than an etched one: a fresh
+    ///      key signs an EIP-7702 authorization, the delegation is attached, and the resulting account
+    ///      is offered as a chunk. Before this PR `setChunks` and then `lock()` both succeeded on it
+    ///      (m03-t07 step 1). `vm.etch` proves the byte check; this proves the byte it checks is the
+    ///      one a real delegation actually puts on chain.
+    function test_lockRejectsRealDelegation() public {
+        (address acct, uint256 pk) = makeAddrAndKey("delegated");
+        Vm.SignedDelegation memory d = vm.signDelegation(address(app), pk);
+        vm.attachDelegation(d);
+        assertEq(acct.code, abi.encodePacked(hex"ef0100", address(app)));
+        address[] memory ptrs = new address[](1);
+        ptrs[0] = acct;
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(App.ForeignChunk.selector, acct));
+        app.setChunks(ptrs, false);
         assertFalse(app.locked());
     }
 
@@ -325,6 +387,20 @@ contract AppTest is Test {
         ptrs[0] = codeless;
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(App.CodelessChunk.selector, codeless));
+        app.setWidgetChunks(ptrs);
+    }
+
+    /// @dev The designator reaches the widget list through the same calldata door, and `widget()` is
+    ///      served to a `<script src>` through a gateway — so the bytes a locked `App` promises for
+    ///      widget.js have to be as frozen as the dapp's.
+    function test_setWidgetChunksRejectsDelegationDesignator() public {
+        address p = makeAddr("widgetDesignator");
+        vm.etch(p, abi.encodePacked(hex"ef0100", address(app)));
+        assertEq(p.code.length, 23);
+        address[] memory ptrs = new address[](1);
+        ptrs[0] = p;
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(App.ForeignChunk.selector, p));
         app.setWidgetChunks(ptrs);
     }
 
