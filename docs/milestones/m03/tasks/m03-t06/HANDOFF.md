@@ -1,6 +1,6 @@
 # m03-t06 — handoff
 
-PR: #130 · Branch: `m03/t06-runbook` · 2026-11-01
+PR: #131 · Branch: `m03/t06-runbook` · 2026-11-01
 
 `RUNBOOK.md` is at the repo root: one ordered list parameterised by network, modelled on
 `state-collection`'s, that places `DistributionFactory`, its implementation and `App` at the same
