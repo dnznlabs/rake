@@ -11,9 +11,12 @@ and the init code rather than the sender's nonce; `DeployApp` requires `OWNER` w
 is `SECURITY.md` F3; and `DEPLOYED` in `mk/10-forge.mk` accepts `CREATE2`, without which
 `make addresses` and the `deploy::` guard would both go blind. Criterion 6 was rehearsed on two
 anvils at once and every address matched the offline prediction and matched across the two chains.
-**Two things need a ruling before this is done**, both in § Open questions: the #127 precondition
-hits on OP Mainnet in a way F12's mechanism does not actually reach, and step 1's change breaks the
-dapp's address lookup through a defect in a file this task puts out of scope.
+**Both of this task's open questions have since been ruled** (§ Decisions 4 and 5): the #127
+precondition now reads "no alias through which value can move", so OP Mainnet passes with a
+`transfer`-must-revert assertion added per chain; and the one-line `CREATE2` fix in `app/build.mjs`
+was ruled into scope, which unblocked runbook step 4, the `make serve` criterion and the criterion-8
+sequence — all three now rehearsed rather than deferred. **Nothing in this task waits on a
+decision.**
 
 ## Acceptance criteria
 
@@ -27,11 +30,11 @@ jq `1.8.2`). Re-run, not quoted.
 | `grep -c 'DEFAULT_SENDER\|envAddress("OWNER")' scripts/forge/DeployApp.s.sol` ≥ 1 and `grep -c 'accepted → m03-t06' SECURITY.md` → 1 | **pass**, the second one satisfied by `main` | DeployApp grep → **2**. SECURITY.md grep → **1**. **`SECURITY.md` is byte-identical to `main`** on this branch (`git diff origin/main -- SECURITY.md` empty) — t05's close-out flipped the F3 row itself in #128, so the one-line change the plan assigned here was already done. See § Deviations 1. |
 | `git diff --stat origin/main -- src/ test/*.t.sol .gas-snapshot` prints nothing; `forge test` passes; `forge snapshot --check` exit 0; `forge fmt --check` and `forge lint` silent; `node --test` passes | **pass**, with one figure corrected | Diff is **empty**. `forge build --force` → 39 files, **0** `warning[` and **0** `Warning (` lines. `forge test` → **72 passed, 0 failed**; `forge snapshot --check` → **exit 0** with all 72 run; `.gas-snapshot` **72 rows** (`grep -c ''`). `forge fmt --check` exit 0 silent, `forge lint` exit 0 silent, both run **after** the counts. `node --test test/*.test.mjs` → **62 pass, 0 fail**. The plan says "63 passed" — that is a pre-t05 figure; see § Deviations 2. |
 | `make serve` on a fresh anvil deploys and `make addresses` lists `DistributionFactory` and `App` with code | **fail — blocked, not by this branch's code** | `make addresses` **passes**: it lists `App 0x9fFEe2c1…D39E2A1` and `DistributionFactory 0x550f3bE1…Dcb66a`, which is the `CREATE2` filter working. `make deploy` **does not complete**: `Deploy`, `DeployApp` and `Seed` all succeed, then `mk/20-dapp.mk:7` fails with `build: nothing to substitute for __DISTRIBUTIONFACTORY__, __DISTRIBUTIONFACTORY_BLOCK__, __APP__`, exit 2. The cause is `app/build.mjs:39`, which carries the same CREATE-only filter this task fixed in `DEPLOYED`. `app/` is out of scope. **§ Open questions 2.** |
-| PR description has an `Audit scope touched` heading naming both scripts, and § For t05 names them with both paths | **pass** | Both in the PR body and in § For t05 below. |
+| PR description has an `Audit scope touched` heading naming both scripts, and the audit-scope section names them with both paths | **pass** | Both in the PR body and in § For the third review (t07) below. The section was titled "For t05" in the first round; t05 has closed, so it is retitled and now states the ordering it depends on — this PR merges before t07 freezes. |
 | #22 and #23 close on merge, each by a sentence a reviewer can point at | **pass** | #22: `RUNBOOK.md` step 1g (`cast code $FACTORY` / `$APP` must print `0x`, with what it means if they do not) and step 6 (`cast code $DISTRO` before the `create`) — plus the rewritten `deploy::` comment in `mk/10-forge.mk`, which now gives the collision as the reason the guard exists. #23: step 6's closing paragraph, carrying the word **unrecoverable**, the once-per-chain-while-the-key-is-live rule, and the backup requirement before step 6 runs anywhere. |
 | `git status --porcelain` empty after the criterion-8 sequence | **not run — same block as above** | `git status --porcelain` is **empty** after `forge build --force`, `forge test`, `forge snapshot` and the full two-anvil rehearsal. The criterion-8 sequence itself (`make deploy`, `make chain-doc`) is unreachable for the reason in § Open questions 2. `broadcast/`, `cache/` and `app/dist/` are gitignored and nothing from the rehearsal is committed. |
 
-## For t05 — the audit-scope re-check (plan step 2)
+## For the third review (t07) — the audit-scope re-check (plan step 2)
 
 Two of the four files in `audits/SCOPE` (decision 29) changed on this branch, **after** t04's legs
 read them at `ede55c3` and after t05's review read `b0fb4e3`:
@@ -41,10 +44,22 @@ read them at `ede55c3` and after t05's review read `b0fb4e3`:
 - `scripts/forge/DeployApp.s.sol` — `OWNER` is now `vm.envAddress` with **no default** (F3);
   takes `APP_SALT`; `new App{salt: salt}(owner, ver)`; logs the salt and the owner.
 
-Neither change touches `src/`, so criterion 4's letter holds (`git diff --stat origin/main -- src/
-test/ .gas-snapshot` is empty). t05's single-leg re-check should read both with its own diff; if t05
-retires on a clean review, the architect reads them at this PR's review and `SECURITY.md` § What the
-review did not cover names the salted placement.
+**No leg has read either file in its salted form.** t04's two legs read them at `ede55c3` and t05's
+review read `b0fb4e3`, both before this branch existed, and this section was originally addressed to
+a t05 single-leg re-check that t05's close-out made moot. The third review is m03-t07's
+([#132](https://github.com/dnznlabs/rake/issues/132)) and it reads the whole of `audits/SCOPE` **from
+`main`**, which fixes the ordering:
+
+- **This PR merges before t07 freezes its code (its step 5).** t07's blinded tree is built at its
+  frozen head, so the salted scripts are only in the tree the third review reads if they are on
+  `main` first. The architect has told t07 to hold its freeze for this.
+- **t07's known answer carries the salted placement**, so the third review is graded knowing the
+  scripts route through the keyless proxy rather than meeting it as an unexplained diff.
+- Neither change touches `src/`, so criterion 4's letter holds: `git diff --stat b0fb4e3 HEAD --
+  src/` is empty and `src/Distribution.sol` is byte-identical to the reviewed commit. The one
+  thing moving under `src/` before the third review is t07's own `App.lock` change.
+
+`SECURITY.md` § What the review did not cover names the salted placement at close-out.
 
 ## Deviations from the plan
 
@@ -68,14 +83,18 @@ review did not cover names the salted placement.
    left this task's authority untouched. Nothing in the implementation had to follow the merged
    text anywhere. Recorded because the distinction between "built from a pre-merge PR" and
    "reconciled against the merged text" is the whole value of the note, not because the text moved.
-4. **Runbook step 4 was not rehearsed, and step 7's end state is therefore partial on anvil.** Same
-   cause as the AC row above — § Open questions 2. Steps 1, 2, 3, 6 and 7 ran start to finish on both
-   chains; step 5 is named and not run by design.
-5. **`app/build.mjs` was edited temporarily and reverted by path.** To establish that the blocker in
-   § Open questions 2 is one line and not a design problem, I applied the parallel `CREATE2` fix,
-   measured it (`make dapp-nodev` exit 0, `dapp: raw 127,578 B · gzip 40,241 B`, the factory address
-   appearing once in `app/dist/index.html` and zero unsubstituted `__NAME__` tokens), then reverted
-   with `git checkout -- app/build.mjs`. `git diff origin/main -- app/` is empty.
+4. **`app/build.mjs:39` was changed, and `app/` was ruled into scope for that one line.** Not scope
+   creep taken on my own judgement: § Out of scope said "the dapp … none needs a change; if one turns
+   out to, say so in the handoff and stop," which is what the first round did. The architect **ruled
+   option (a) on this PR** — the filter is the same defect, with the same cause and the same remedy,
+   as the `DEPLOYED` change plan step 1 orders twenty lines earlier, it sits in a build script rather
+   than in the dapp's behaviour, and `app/` is not in `audits/SCOPE` so no review surface moves. The
+   change accepts `CREATE2` beside `CREATE`; nothing else in `app/` is touched. `TASK.md` is amended
+   at close-out, as t05's step 7 was. This supersedes the first round's temporary measurement, where
+   I applied the same line, measured it, and reverted it by path rather than keep it.
+5. **The plan's step 4 and criterion 8 are now rehearsed, which the first round could not do.** They
+   were blocked by the same filter; with it fixed, step 4 ran on anvil and the criterion-8 sequence
+   completed. See the AC table and `RUNBOOK.md` § Rehearsed on anvil for the figures.
 
 ## Decisions
 
@@ -89,7 +108,25 @@ review did not cover names the salted placement.
 3. **The #127 check is recorded with a positive control.** A per-chain "none found" row is
    indistinguishable from a check that never ran, so the same commands were run against Celo
    mainnet, where they fire on `GoldToken`. The runbook says so, so a future reader can tell a miss
-   from a no-op.
+   from a no-op. The control is kept now that the precondition's wording has changed.
+4. **#127 ruled (c): the precondition is "no alias through which value can move", and OP Mainnet
+   passes.** Ruled by the architect on this PR on 2026-11-01, recorded on
+   [#127](https://github.com/dnznlabs/rake/issues/127), Denizen able to override there. I had
+   recommended (c) and did not fill it myself. What changed in `RUNBOOK.md` § 1: the requirement is
+   reworded, OP Mainnet's row says **passes** with its measurement as the source instead of
+   "disposition pending", and a **`transfer`-must-revert assertion** is added to the per-chain
+   command block — run against any alias that has code and whose `balanceOf` matched, and **re-run
+   before each deploy**, not once, because it is the only thing standing between "cannot move value"
+   and a future upgrade that re-enables it. Rejected: (a), retiring a mainnet against a mechanism
+   unreachable there. `SECURITY.md` F12 is updated at close-out, not here.
+   **Re-measured for this round** at block 158,979,851: `balanceOf(0x4200…0016)` and `cast balance`
+   both `92688343257757826764769`, and `transfer(…, 1)` reverts `LegacyERC20ETH: transfer is
+   disabled`. **One figure reconciled with the reviewer's independent run:** his 3,672 bytes against
+   my 3,671. `cast code` returns **7,344 characters including the `0x`**, so halving the string gives
+   3,672 and the code is **3,671 bytes**. Mine stands, and the runbook now says why the other figure
+   arises so the next reader does not re-open it.
+5. **Open question 2 ruled (a): make the `app/build.mjs` one-liner here.** See § Deviations 4 for
+   what changed and why it is not scope creep.
 
 ## Discoveries
 
@@ -160,85 +197,7 @@ review did not cover names the salted placement.
 
 ## Open questions
 
-### 1. Does OP Mainnet fail #127's precondition, when the alias cannot move value?
-
-**Question.** The #127 precondition says the runbook must record that each chain of criterion 7's
-table carries **no native-balance or double-entry-point token**, and that a chain which fails is not
-a runbook variable but a contract change and a new version (decision 5). OP Mainnet carries
-`LegacyERC20ETH` at `0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000`: 3,671 bytes of live code,
-`name()` "Ether", `symbol()` "ETH", `decimals()` 18, and `balanceOf(x)` **equal to x's native
-balance** for all five addresses probed, including a zero-balance one. By the literal text, that is
-a double-entry-point token. But **every stateful method reverts** — `transfer`, `transferFrom` and
-`approve` all answer "disabled" — so no value can move through it. Measured at block 158,978,665;
-the [OP Stack spec](https://specs.optimism.io/protocol/predeploys.html#legacyerc20eth) lists it
-**Deprecated**, "All of the stateful methods in this contract will revert after the Bedrock
-upgrade". The other seven chains are clean: four alias families × eight chains = 32 checks, this one
-hit, with the method validated against Celo mainnet where it fires on `GoldToken`.
-
-Traced through `src/Distribution.sol` at this commit: `distribute(alias)` has `_balance` staticcall
-`balanceOf(this)`, which succeeds and returns the native balance, so `amount` is the whole native
-balance; then every `_push` reverts and the share is booked into `escrowed[alias][account]` and
-`reserved[alias]`. **No native wei moves.** `reserved` is keyed by token (`:87`), so
-`reserved[address(0)]` is untouched and `release(address(0), …)` still pays in full.
-`release(alias, …)` reverts and rolls back. So **F12's loss — escrowed ETH paid out a second time —
-is unreachable on OP Mainnet**; the residual is that any caller can inflate `escrowed[alias][*]`
-with un-releasable phantom credits and emit misleading `Escrowed`/`Distributed` events, with no ETH
-at risk.
-
-**Options.** (a) **Read it literally**: OP Mainnet fails, and under decision 5 that is a contract
-change and a new version, so chain 10 leaves the table until a version that keys escrow differently.
-Costs the most and buys protection against a mechanism that is already unreachable there. (b) **Read
-it as "no alias through which value can move"**: OP Mainnet passes; its row keeps the measurement,
-the three disabled mutators and the deprecation as its source, and the runbook carries the residual
-as a named caveat. Costs nothing and leaves a true row. (c) **(b) plus a deploy-time assertion** that
-the alias's `transfer` still reverts, re-checked per chain before each deploy, so a future OP
-upgrade that re-enabled it would be caught.
-
-**Recommendation.** (c). The mechanism F12 describes needs a movable alias and this one is not
-movable, so (a) retires a mainnet for nothing; but (b) alone rests on a property of a deprecated
-contract that nobody has promised to keep, and the whole point of the precondition is that this is a
-one-way door on eight chains. (c) is (b) with the assumption written down as a command.
-
-**Default and deadline.** None — I did not fill it. `RUNBOOK.md` § 1's OP Mainnet row records the
-measurement and says the disposition is pending this ruling and not to deploy to chain 10 before it
-is ruled. Every other chain's row is final either way. Blocks: the first deploy on OP Mainnet, which
-is M05's, so it does not block this PR's merge. Deadline: M05's scoping, or M03's close-out if the
-close-out wants F12's row final.
-
-**Record.** `SECURITY.md` F12 and [#127](https://github.com/dnznlabs/rake/issues/127);
-`docs/ROADMAP.md` § Decisions if it rules on the reading rather than on the chain.
-
-### 2. May `app/build.mjs:39` take the same one-line `CREATE2` fix the plan ordered for `DEPLOYED`?
-
-**Question.** The plan's step 1 requires `DEPLOYED` in `mk/10-forge.mk` to accept `CREATE2` "or
-`make addresses` and the `deploy::` guard both go blind". `app/build.mjs:39` carries the identical
-filter — `if (t.transactionType !== 'CREATE' || !t.contractName) continue;` — and goes blind the
-same way, so once the deploys are salted the dapp can no longer resolve
-`__DISTRIBUTIONFACTORY__`, `__DISTRIBUTIONFACTORY_BLOCK__` or `__APP__`. `make dapp-nodev` and
-`make deploy` both exit 2. But § Out of scope says "`Seed.s.sol`, `Fixtures.s.sol`, the dapp, the
-widget, `procs/` — none needs a change; if one turns out to, say so in the handoff and stop," and
-that is what this is. It collides with the AC "`make serve` on a fresh anvil deploys" and with
-runbook step 4 and criterion 8, none of which can pass without it.
-
-**Options.** (a) **One line in `app/build.mjs`**, accepting `CREATE2` beside `CREATE`. Measured
-working: `make dapp-nodev` exit 0, the factory address substituted once into
-`app/dist/index.html`, zero `__NAME__` tokens left. Costs one line in a file this task was told not
-to touch, and the dapp is not in `audits/SCOPE`. (b) **Pass the three values from `mk/20-dapp.mk`
-with `--set`**, keeping `app/` untouched. Needs the creation block as well as the two addresses, so
-it duplicates the block lookup in make, where `DEPLOYED` does not carry it — more code, in a worse
-place, to protect a scope line. (c) **Leave it and descope** the `make serve` AC, runbook step 4 and
-criterion 8 from this task, as a t07 or a close-out item.
-
-**Recommendation.** (a). It is the same defect, the same fix and the same reason as the change the
-plan explicitly orders twenty lines earlier; "the dapp" in § Out of scope reads naturally as the
-dapp's UI and behaviour, not a broadcast-log filter in its build script. It is one line, it is
-measured, and it is the difference between a runbook whose step 4 has been rehearsed and one whose
-step 4 has not.
-
-**Default and deadline.** None — I did not make the change, and reverted the measurement by path.
-Blocks: the `make serve` AC, runbook step 4, criterion 8's sequence, and therefore this PR's
-completeness. Deadline: this PR's review — it is the one thing standing between the task and a full
-pass.
-
-**Record.** `docs/ROADMAP.md` § Decisions if it rules on scope; otherwise the ruling is just an
-amended `TASK.md` and a commit on this branch.
+**None.** Both of this task's open questions were ruled by the architect on 2026-11-01 on this PR,
+and neither was filled by me: #127 / OP Mainnet ruled **(c)** and `app/build.mjs:39` ruled **(a)**.
+The rulings and what each changed are § Decisions 4 and 5; the one `app/` line is § Deviations 4.
+Nothing in this task now waits on a decision.
