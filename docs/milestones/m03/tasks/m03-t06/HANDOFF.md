@@ -215,9 +215,11 @@ a t05 single-leg re-check that t05's close-out made moot. The third review is m0
 2. **Merge order against m03-t07: measured, and there is no file overlap.** The dependency was
    flagged to me as `SECURITY.md` (F3's row against t07's F11 row and § Prior reviews) and possibly
    `.gas-snapshot`. **Neither applies to this branch.** `git diff --name-only origin/main...HEAD`
-   returns exactly six paths — `README.md`, `RUNBOOK.md`, this handoff, `mk/10-forge.mk`,
-   `scripts/forge/Deploy.s.sol`, `scripts/forge/DeployApp.s.sol` — and **none** of `SECURITY.md`,
-   `.gas-snapshot` or anything under `src/` is among them. t05's close-out flipped F3's row itself in
+   returns **eight** paths — `README.md`, `RUNBOOK.md`, this handoff, `app/build.mjs`,
+   `mk/10-forge.mk`, `mk/30-onchain.mk`, `scripts/forge/Deploy.s.sol`,
+   `scripts/forge/DeployApp.s.sol` — and **none** of `SECURITY.md`, `.gas-snapshot` or anything under
+   `src/` is among them. Re-enumerated after this round added `app/build.mjs` and `mk/30-onchain.mk`;
+   the conclusion is unchanged. t05's close-out flipped F3's row itself in
    #128 (§ Deviations 1), so this task's one assigned `SECURITY.md` line was already on `main` before
    the branch existed and the branch holds zero `SECURITY.md` bytes. Consequences for whoever merges
    second:
