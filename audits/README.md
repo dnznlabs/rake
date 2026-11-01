@@ -42,9 +42,15 @@ audits/
     AUDIT.md                         the rollup — findings, severities, provenance
     pashov/
       solidity-auditor/
-        opus/                        leg 1 — full-report.md, run-1.md, scope.tsv
-        gpt-5.6-sol/                 leg 2 — same shape
+        gpt-5.6-sol/                 leg 1 — full-report.md, run-1.md, scope.tsv
+        opus/                        leg 2 — same shape
+    transcripts/
+      leg-1-codex.log                everything leg 1 printed, tool calls included
+      leg-2-claude.jsonl             leg 2's stream-json, tool calls included
 ```
+
+The transcripts are the only evidence of what a leg read, so they are committed with the findings.
+They land last, after the rollup, and never while a leg or the rollup could read them.
 
 One directory per audit date. **Audits are append-only: a past audit is never edited**, because the
 rollup of a later audit cites it. A finding that turns out to be wrong is corrected in the *next*
@@ -65,16 +71,18 @@ existing directory aside, or pass `AUDIT_DATE`.
 |:--|:--|:--|
 | `claude` | 2.1.268 or later | `claude --version` |
 | `codex` | 0.158.0 or later, authenticated | `codex --version`, `codex login status` |
-| audit skill | the commit in `SKILL_PIN` | `git -C audits/.skills/pashov rev-parse HEAD` |
+| audit skill | the commit in `SKILL_PIN` | `git -C ~/.cache/forge-audit/pashov-skills@<commit> rev-parse HEAD` |
 
 Where both CLIs are subscription-authenticated, an audit costs rate limits and wall
 clock, not money. Neither credential is pinned by the repo — `~/.codex` and `~/.claude` are the
 user's. That is why the provenance block records the **observed** versions rather than asserting the
 required ones.
 
-`audits/.skills/` is gitignored. The skill is cloned at the pinned commit rather than vendored: it is
-someone else's prose, MIT-licensed, and 40-odd files of it in a repo that may go public is a footprint
-with no upside. Pinning gets the reproducibility; vendoring only adds bulk.
+The skill is cloned at the pinned commit rather than vendored: it is someone else's prose,
+MIT-licensed, and 40-odd files of it in a repo that may go public is a footprint with no upside.
+Pinning gets the reproducibility; vendoring only adds bulk. The clone lives in a machine cache,
+`${XDG_CACHE_HOME:-~/.cache}/forge-audit/<owner>-<repo>@<commit>/` (`FORGE_AUDIT_CACHE` overrides the
+root), one directory per pin and never inside a project.
 
 ### How each CLI finds the skill
 
@@ -82,8 +90,8 @@ with no upside. Pinning gets the reproducibility; vendoring only adds bulk.
 harnesses, before anything was built on top of it:**
 
 ```
-~/.claude/skills/solidity-auditor -> audits/.skills/pashov/solidity-auditor
-~/.codex/skills/solidity-auditor  -> audits/.skills/pashov/solidity-auditor
+~/.claude/skills/solidity-auditor -> ~/.cache/forge-audit/pashov-skills@<commit>/solidity-auditor
+~/.codex/skills/solidity-auditor  -> ~/.cache/forge-audit/pashov-skills@<commit>/solidity-auditor
 ```
 
 Each CLI, invoked non-interactively with no tools, was asked whether the skill was available and to
@@ -96,9 +104,11 @@ run, so a fresh clone needs no setup step.
 
 Two consequences worth knowing before they bite:
 
-- **The link points at a working tree.** Run the audit from a git worktree and the link outlives it;
-  the next run from any checkout re-points it, but until then a deleted worktree leaves a dangling
-  link. The runner asserts the link resolves to a `SKILL.md` rather than assuming it does.
+- **The link follows the last run's pin.** It used to point into the project that ran last, so
+  deleting that tree — a worktree, a blinded copy — broke the skill for every agent on the machine
+  (2026-10-30). It now points into the cache, which no project owns. A project on a different pin
+  still re-points it, always at a checkout that exists. The runner asserts the link resolves to a
+  `SKILL.md` rather than assuming it does.
 - **`~/.claude` and `~/.codex` belong to the OS user**, and on a machine with other agents they are
   shared. The runner adds one entry to each directory and never replaces either, and it refuses
   outright if `solidity-auditor` is already there as something other than a symlink.
@@ -161,6 +171,12 @@ Order: **Codex leg, then Claude leg, then the rollup under `CLAUDE_MODEL`.** The
 shell. The shell's job is to run the legs, put the bytes in the right directory, and record what
 happened.
 
+**Leg 2 never sees leg 1.** Each leg's harvest is staged in the runner's scratch, outside the tree,
+and both move into `audits/<date>/` only after leg 2 has finished. On 2026-10-30 leg 1 was harvested
+into the tree before leg 2 ran there, and leg 2 grepped it; the rollup had to discount one cross-leg
+agreement. The scratch is `mktemp -d` under `TMPDIR`, and the runner refuses a `TMPDIR` inside the
+repo: the scratch holds the staged legs, both transcripts and the known answer.
+
 `make audit` is complete when `audits/<date>/AUDIT.md` exists and every leg directory under it is
 non-empty. **An empty leg directory is a failed audit, not a clean one** — a rollup assembled over
 nothing would otherwise read as "no findings".
@@ -174,11 +190,14 @@ copied from this file:
 audit date        2026-09-28
 code commit       <git rev-parse HEAD>  (dirty: yes/no)
 scope             <the file list actually passed, one per line>
-skill             pashov/skills @ <SKILL_PIN>  · solidity-auditor VERSION <n>
+skill             pashov/skills @ <SKILL_PIN>  · solidity-auditor VERSION <n> · upstream <n|unreachable>
 leg 1             codex <version> · <model as the session header reported it> · effort high · 1 pass
 leg 2             claude <version> · <model> · 1 pass
 tokens            <per leg, if the harness reports them>
 ```
+
+`upstream` is the VERSION on the skill repo's default branch, read by the runner, which has network
+the legs do not. The legs are told to skip the skill's own upstream check.
 
 `code commit` carries a dirty flag because an audit of an uncommitted tree cannot be re-run by anyone
 else, and that fact belongs in the artifact rather than in someone's memory.
@@ -211,7 +230,7 @@ has to get right, each learned from the run that established the shape:
 - **Check the tree after the run.** The leg runs with write access and is told not to fix anything;
   `git status --porcelain` is what turns that instruction into a fact.
 
-- **Run it outside the repo.** This is the one that cost a whole run to learn. A leg started inside
+- **Run it outside the repo** — § Running blind. This is the one that cost a whole run to learn. A leg started inside
   the checkout reads the checkout: on 2026-09-30 the first attempt grepped the task file 62 times, the
   previous `AUDIT.md` 60 times, and — because the engineer was writing the triage into the same tree
   while the leg was running — the triage itself. It then reported no findings, which is the result a
@@ -226,6 +245,19 @@ has to get right, each learned from the run that established the shape:
 A re-check does **not** replace the next full audit, and its AUDIT.md says so in its first line. Two
 legs from two labs over the whole scope is the method; this is a spot check on a diff.
 
+## Running blind
+
+A full audit can run blind too, and the first did on 2026-10-30: the legs ran in a separate tree
+holding only `foundry.toml`, `src/`, the deploy scripts, a `lib` symlink and `audits/` (`SCOPE`,
+`SKILL_PIN`, `prompts/`), committed as one commit so `codex exec` would start. `make audit` runs
+there unchanged. Three things make it hold:
+
+- **The known answer stays out of that tree.** `KNOWN_ANSWER_FILE=<path>` points the runner at it
+  instead of `audits/KNOWN_ANSWER.md`; the shell reads it into the rollup prompt, so no leg can open it.
+- **The tree's commit is not the project's.** Record the `sha256` of every scoped file in both trees,
+  sorted, beside the `AUDIT.md` — the hashes, not the commit, tie the run to the reviewed source.
+- **Copy `audits/<date>/` back** into the project. The transcripts come with it.
+
 ## Adding a review
 
 A new review type is a new directory under `audits/<date>/` and a new leg in the runner. It does not
@@ -237,11 +269,14 @@ need a new document. It needs: a name, what it reads, what it writes, and a line
 - **Two legs from two labs is the whole independence claim.** Both are language models trained on
   overlapping public Solidity; correlated blind spots are likely and unmeasured. The mitigation is
   method diversity — property tests, a static analyser, a human reading the diff — not more models.
+- **A leg can still read outside its tree.** Both run with write access and no sandbox on reads, so
+  a leg that went looking in `TMPDIR` could find the other's staged output. Nothing has done it; the
+  transcripts are what would show it.
 - **A leg is only graded against a known answer.** Write one to `KNOWN_ANSWER.md` — a finding
   found by hand before the audit, with file, line and mechanism — and the rollup records, per leg,
   whether it was found. Whether a leg finds a bug that was already known is the only evidence about
   this method that isn't an assertion. Without one, the rollup says the run was not graded.
 - **The skill self-reports a version and warns when it is behind.** That warning fires against
   upstream `main`, not against `SKILL_PIN`, so it will eventually tell you to upgrade a deliberate pin.
-  Upgrading is a decision, not a chore: bump `SKILL_PIN` in its own commit so an audit's findings can
+  The provenance block's `upstream` field is where that shows. Upgrading is a decision, not a chore: bump `SKILL_PIN` in its own commit so an audit's findings can
   be attributed to a skill version.

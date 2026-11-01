@@ -19,14 +19,14 @@ round. `self` means the function is reachable only as a queued action, the contr
 |:--|:--|:--|
 | `distribute(address token)` | anyone | splits the balance that is not escrowed across the table, in table order; a push that fails is escrowed instead |
 | `release(address token, address account)` | anyone | retries one escrowed share; a retry that fails reverts and the share stays escrowed |
-| `propose(bytes action)` | owner | queues a self-call at now + delay, or runs it inline when the delay is zero |
-| `applyQueued(bytes action, uint32 nonce)` | anyone | runs a queued action once its eta has passed; an action that reverts stays queued |
+| `propose(bytes action)` | owner | queues a self-call at now + delay, or runs it inline when the delay is zero; refused while `distribute` or `release` is running |
+| `applyQueued(bytes action, uint32 nonce)` | anyone | runs a queued action once its eta has passed; an action that reverts stays queued; refused while `distribute` or `release` is running |
 | `cancel(bytes32 hash)` | owner | drops a queued action, immediately — the delay guards applying, not cancelling |
 | `setBeneficiaries(Beneficiary[] table)` | self | replaces the table; reachable only as a queued action |
 | `setDescription(string description)` | self | replaces the label; reachable only as a queued action |
 | `setDelay(uint32 delay)` | self | changes the delay, through the delay in force |
-| `transferOwnership(address owner)` | self | names the next owner, who must call acceptOwnership() before anything changes; the zero address renounces at once and clears any pending transfer; naming the current owner withdraws one |
-| `acceptOwnership()` | pending owner | takes ownership after transferOwnership named the caller, and clears the pending transfer |
+| `transferOwnership(address owner)` | self | names the next owner, who must call acceptOwnership() before anything changes; the zero address renounces at once, clears any pending transfer and drops every queued action; naming the current owner withdraws one |
+| `acceptOwnership()` | pending owner | takes ownership after transferOwnership named the caller, clears the pending transfer, and drops every queued action |
 | `init(address owner, uint32 delay, string description, Beneficiary[] table)` | factory | initialises a clone, once, as part of the create transaction |
 | `snapshot()` | view | owner, delay, nonce, description, table and pending in one call |
 | `beneficiaries()` | view | the table as stored, which is ascending by account |

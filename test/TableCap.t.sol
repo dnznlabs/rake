@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {Distribution, DistributionFactory} from "../src/Distribution.sol";
-import {GasBurner, PlainSender} from "./mocks/Mocks.sol";
+import {BloatingReceiver, GasBurner, PlainSender} from "./mocks/Mocks.sol";
 
 /// @notice What a row costs `distribute` in the worst case, and therefore how long the table may be.
 /// @dev The worst case is not a row that refuses ETH — that reverts in a few hundred gas and escrows
@@ -67,8 +67,16 @@ contract TableCapTest is Test {
     /// @dev `GasBurner`'s runtime code, deployed once and etched everywhere.
     bytes internal burner;
 
+    /// @dev `BloatingReceiver`'s runtime code: a row that spends the cap *and* hands back 0x31000
+    /// bytes, which is the worst case F6 made cheap. Etched the same way the burner is.
+    bytes internal bloater;
+
     /// @dev Row count to a funded clone whose table is that many burners, all built in `setUp`.
     mapping(uint256 => Distribution) internal prepared;
+
+    /// @dev The same, for tables of bloaters. A separate mapping rather than a second key on
+    /// `prepared`, so neither kind's figures can be read off a clone of the other.
+    mapping(uint256 => Distribution) internal preparedBloat;
 
     /// @dev Hands out each table's disjoint range of row addresses.
     uint160 internal nextRow = FIRST_ROW;
@@ -82,11 +90,14 @@ contract TableCapTest is Test {
         vm.deal(address(sender), 1000 ether);
         burner = address(new GasBurner()).code;
         assertGt(burner.length, 0, "the burner has runtime code to etch");
+        bloater = address(new BloatingReceiver()).code;
+        assertGt(bloater.length, 0, "the bloater has runtime code to etch");
 
         _prepare(1);
         _prepare(8);
         _prepare(64);
         _prepare(CAP);
+        _prepareBloat(CAP);
         // No `_prepare(CAP + 1)`. `_prepare` reaches its table through `factory.create` → `init` →
         // `_set`; `_set` is now what rejects `n > MAX_BENEFICIARIES` and is the only writer of
         // `_table`, so a 108-row table cannot be built at all — the measurement that justified the
@@ -145,6 +156,19 @@ contract TableCapTest is Test {
         assertLt(gasUsed, HALF_BLOCK, "CAP rows stay under half a 30M block");
     }
 
+    /// @notice `CAP` rows that each spend the cap *and* revert with 0x31000 bytes also fit in half a
+    /// block, which is what F6's fix bought: before it, eleven such rows broke the property.
+    /// @dev Decision 27 says re-measure the cap when the worst case changes, and F6 changed what the
+    /// worst case is. The figure is logged beside the burner's so the handoff can say which row is the
+    /// worst case now and whether `MAX_BENEFICIARIES` has to be re-derived from the larger of the two.
+    function test_capBloatingRowsStayUnderHalfABlock() public {
+        uint256 gasUsed = _measureBloat(CAP);
+        emit log_named_uint("rows        ", CAP);
+        emit log_named_uint("gas at CAP  ", gasUsed);
+        emit log_named_uint("per bloating row", gasUsed / CAP);
+        assertLt(gasUsed, HALF_BLOCK, "CAP bloating rows stay under half a 30M block");
+    }
+
     // There is no `CAP + 1` test here. `_set` refuses that table, so the upper side of the cap is a
     // validation rule rather than a measurement, and it is pinned where the other `_set` rules are:
     // `DistributionTest.test_tableCapBoundary`, which takes both sides — a table of exactly the cap
@@ -184,6 +208,19 @@ contract TableCapTest is Test {
         assertEq(address(d).balance, FUNDING, "and none of it left the contract");
     }
 
+    /// @dev `_measure` for a table of bloaters. Same shape, a different mapping, so the two kinds of
+    /// row cannot be measured off one another's clone.
+    function _measureBloat(uint256 n) internal returns (uint256 gasUsed) {
+        Distribution d = preparedBloat[n];
+
+        vm.recordLogs();
+        uint256 before = gasleft();
+        d.distribute(address(0));
+        gasUsed = before - gasleft();
+
+        this.assertAllEscrowed(d, n);
+    }
+
     /// @dev A funded clone whose table is `n` burners at their own range of addresses, with equal
     /// `bps` and the remainder on the last row.
     function _prepare(uint256 n) internal {
@@ -208,6 +245,29 @@ contract TableCapTest is Test {
         Distribution d = Distribution(payable(factory.create(OWNER, 0, "burners", t, _salt())));
         sender.send(address(d), FUNDING);
         prepared[n] = d;
+    }
+
+    /// @dev `_prepare` for bloaters, drawing from the same `nextRow` cursor so the two kinds of table
+    /// never share a row address and neither is warm from the other.
+    function _prepareBloat(uint256 n) internal {
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint96 rows = uint96(n);
+
+        uint160 base = nextRow;
+        nextRow = base + rows;
+
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](rows);
+        uint96 each = BPS_TOTAL / rows;
+        for (uint96 i; i < rows; ++i) {
+            address account = address(base + i);
+            vm.etch(account, bloater);
+            uint96 bps = i + 1 == rows ? BPS_TOTAL - each * (rows - 1) : each;
+            t[i] = Distribution.Beneficiary({account: account, bps: bps, name: "", note: ""});
+        }
+
+        Distribution d = Distribution(payable(factory.create(OWNER, 0, "bloaters", t, _salt())));
+        sender.send(address(d), FUNDING);
+        preparedBloat[n] = d;
     }
 
     /// @dev The codehash is returned, and asserted on by the caller, so that the touch cannot be

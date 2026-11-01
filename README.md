@@ -12,7 +12,7 @@ A distribution is one address with a published table of beneficiaries. Anything 
 
 | STATUS | VERSION | AUDIT |
 |:---|:---|:---|
-| `pre-mvp` | unreleased | two-model agent review, 2026-10-30 ([SECURITY.md](SECURITY.md)) |
+| `pre-mvp` | unreleased | two-model agent review, 2026-10-31 ([SECURITY.md](SECURITY.md)) |
 
 This is pre-release software. The contracts are unaudited and deployed only to a local dev chain. Milestones and their status are in the [roadmap](docs/ROADMAP.md).
 
