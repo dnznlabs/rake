@@ -36,6 +36,7 @@ No warranty.
 ```bash
 make init           # Initialize the development environment (devbox, git hooks)
 make serve          # Start anvil, deploy, and serve the dapp on :3000
+                    # Deploying to a real chain is RUNBOOK.md, not make serve
 make test           # Run the contract and node tests
 make addresses      # Print deployed addresses
 make dapp-nodev     # Build the bundle that ships
