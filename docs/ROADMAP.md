@@ -444,6 +444,19 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     or reward-bearing tokens — would be escrowed on every push and never releasable under the
     same cap: the #95 shape, permanent, for a compliant token); a 500k cap (bounds nothing the
     half-block rule cares about and keeps the same failure above it).
+37. **`FACTORY_SALT` and `APP_SALT` are mined for a vanity prefix, not zero.** Opened at m03-t06's
+    scoping on [#115](https://github.com/dnznlabs/rake/issues/115), ruled by Denizen on 2026-10-31
+    ("Option 2 is fine"); recorded at t05's close-out on 2026-11-01. Mined with
+    `cast create2 --starts-with <hex>` against the final init-code hash, four to six hex digits,
+    matching the vaults' addresses (`0x00b6…`, `0x00c0…`). A mined salt is tied to one bytecode, so
+    each is mined once, after the contract it places is final and before M04's first public deploy;
+    any later change to that contract mines again (decision 5: a new version is a new factory
+    anyway). Sequencing that follows: `DistributionFactory` and its implementation are final at
+    `b0fb4e3` (m03-t05, #124), so `FACTORY_SALT` can be mined now; `APP_SALT` waits until D15
+    ([#126](https://github.com/dnznlabs/rake/issues/126)) rules whether a t07 touches `App.sol`.
+    t06's two-anvil rehearsal runs with zero salts in every case (the issue's default), since the
+    runbook takes the salt as a variable and the rehearsal proves the method, not the address.
+    Rejected: zero salts (nothing gained, and the house style already has the prefix).
 
 ## Findings carried forward
 
