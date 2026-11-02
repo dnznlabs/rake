@@ -33,13 +33,15 @@ contract Distribution {
     event Distributed(address indexed token, uint256 amount);
     event Escrowed(address indexed token, address indexed account, uint256 amount);
     event Released(address indexed token, address indexed account, uint256 amount);
+    event Claimed(address indexed token, address indexed account, address to, uint256 amount);
     event Queued(bytes32 indexed hash, uint32 nonce, uint256 eta, bytes action);
     event Applied(bytes32 indexed hash);
     event Cancelled(bytes32 indexed hash);
 
-    /// @dev Ownable2Step's name and shape. Emitted on acceptance only: the nomination already rides
-    /// in `Queued`'s calldata, so without this a log reader sees "B was nominated" and never "B took
-    /// it" — the one state change in the contract with no trace of its own.
+    /// @dev Ownable2Step's name and shape. Emitted on acceptance and on a renounce: the nomination
+    /// already rides in `Queued`'s calldata, so without this a log reader sees "B was nominated" and
+    /// never "B took it" — the one state change in the contract with no trace of its own. A renounce
+    /// is the other, and it emits `newOwner == address(0)`.
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     error NotOwner();
@@ -49,12 +51,18 @@ contract Distribution {
     error Locked();
     error Unauthorized();
     error ReleaseFailed(address token);
+    error Expired(uint256 eta);
 
     /// @dev Measured in m03-t01 (`test/PushGas.t.sol`, cold): a Safe v1.4.1 proxy receives in 4,029
     /// gas and a multisig.software vault clone in 404, so 100_000 is 23x the larger need and was kept
     /// under decision 30.
     uint256 private constant PUSH_GAS = 100_000;
     uint256 private constant BPS_TOTAL = 10_000;
+
+    /// @notice How long after its eta a matured action stays applicable. Past it, `applyQueued`
+    /// reverts `Expired` and anyone may `cancel` the entry. Compound's Timelock shape: a change nobody
+    /// applied inside the window lapses instead of waiting as a permanent option held by the public.
+    uint256 public constant GRACE = 14 days;
 
     /// @dev Measured in m03-t01 (`test/TableCap.t.sol`): a worst-case row, where the recipient burns
     /// the whole push cap and then fails, costs 138,917 gas, so 107 rows distribute in 14,896,325 and
@@ -118,7 +126,11 @@ contract Distribution {
         _;
     }
 
-    /// @notice Initialise a clone. Callable once, by whoever deployed the implementation.
+    /// @notice Initialise a clone. Callable once, by whoever deployed the implementation. Any value
+    /// present at this point is logged as `Received(address(0), balance)` — the sentinel for "present
+    /// at init, sender unknown" — which covers both value that rode the `create` and value sent to the
+    /// counterfactual address before any code existed there. Forced sends after deployment stay
+    /// unlogged; `docs/REFERENCE.md` says so.
     function init(address owner_, uint32 delay_, string calldata description_, Beneficiary[] calldata table_)
         external
         payable
@@ -128,6 +140,7 @@ contract Distribution {
         delay = delay_;
         description = description_;
         _set(table_);
+        if (address(this).balance != 0) emit Received(address(0), address(this).balance);
     }
 
     /// @dev Must run under a 2,300-gas `transfer` stipend, so it does nothing but the guard and the log.
@@ -178,6 +191,29 @@ contract Distribution {
         emit Released(token, account, amount);
     }
 
+    /// @notice The escrowed account takes its own escrow, to an address it names, with the caller's
+    /// gas: no `PUSH_GAS` cap, because the beneficiary is paying for its own receive. Only
+    /// `msg.sender`'s escrow moves, so neither the owner nor anyone else gains a path to funds.
+    /// @param token The escrowed ERC-20, or `address(0)` for ETH.
+    /// @param to Where to send it. Not validated: it is the beneficiary's own money.
+    function claim(address token, address to) external nonReentrant {
+        uint256 amount = escrowed[token][msg.sender];
+        if (amount == 0) revert NothingToDo();
+
+        escrowed[token][msg.sender] = 0;
+        reserved[token] -= amount;
+        bool ok;
+        bytes memory data;
+        if (token == address(0)) (ok, data) = to.call{value: amount}("");
+        else (ok, data) = _push(token, to, amount, true);
+        // `release`'s failure path (decision 24): a word or less is named, a longer reason bubbles.
+        if (!ok) {
+            if (data.length <= 32) revert ReleaseFailed(token);
+            _bubble(data);
+        }
+        emit Claimed(token, msg.sender, to, amount);
+    }
+
     /// @notice Queue a self-call, or run it now when `delay` is zero. Refused while `distribute` or
     /// `release` is running.
     /// @param action Calldata for one of this contract's `onlySelf` functions.
@@ -200,14 +236,17 @@ contract Distribution {
         }
     }
 
-    /// @notice Run a queued action once its eta has passed. A failing action stays queued for a retry.
-    /// Refused while `distribute` or `release` is running.
+    /// @notice Run a queued action once its eta has passed, and only until `GRACE` after it: past that
+    /// the action has expired, this reverts `Expired`, and anyone may `cancel` the entry. A failing
+    /// action stays queued for a retry. Refused while `distribute` or `release` is running.
     function applyQueued(bytes calldata action, uint32 nonce_) external notLocked {
         bytes32 hash = keccak256(abi.encode(action, nonce_));
         uint256 eta = queued[hash];
         // A timelock is a timestamp comparison; a validator's few seconds of drift is not the threat.
         // forge-lint: disable-next-line(block-timestamp)
         if (eta == 0 || block.timestamp < eta) revert NotReady(eta);
+        // forge-lint: disable-next-line(block-timestamp)
+        if (block.timestamp > eta + GRACE) revert Expired(eta);
 
         delete queued[hash];
         _remove(hash);
@@ -215,10 +254,17 @@ contract Distribution {
         emit Applied(hash);
     }
 
-    /// @notice Drop a queued action. Immediate: the delay guards applying, not cancelling.
+    /// @notice Drop a queued action. Immediate: the delay guards applying, not cancelling. The owner's
+    /// while the action can still be applied; once it has expired — more than `GRACE` after its eta —
+    /// anyone may drop it, so a renounced or inattentive owner cannot leave the queue uncleanable.
     function cancel(bytes32 hash) external {
-        if (msg.sender != owner) revert NotOwner();
-        if (queued[hash] == 0) revert NothingToDo();
+        uint256 eta = queued[hash];
+        // Anyone may drop an expired action; everything else stays the owner's. This order matters:
+        // a non-owner must still see `NotOwner` for an entry that does not exist or has not expired,
+        // which checking `NothingToDo` first would turn into `NothingToDo`.
+        // forge-lint: disable-next-line(block-timestamp)
+        if (msg.sender != owner && (eta == 0 || block.timestamp <= eta + GRACE)) revert NotOwner();
+        if (eta == 0) revert NothingToDo();
 
         delete queued[hash];
         _remove(hash);
@@ -239,10 +285,12 @@ contract Distribution {
 
     /// @notice Name the next owner, who must call `acceptOwnership()` before anything changes; until
     /// then the current owner keeps every power. `address(0)` renounces at once — nothing can be
-    /// proposed or cancelled again, and drops every queued action — and drops any pending transfer
-    /// with it. Naming the current owner withdraws a pending transfer.
+    /// proposed again, it drops every queued action, and it emits `OwnershipTransferred(owner,
+    /// address(0))`, so a renounce leaves the same trace a handover does — and drops any pending
+    /// transfer with it. Naming the current owner withdraws a pending transfer.
     function transferOwnership(address owner_) external onlySelf {
         if (owner_ == address(0)) {
+            emit OwnershipTransferred(owner, address(0));
             owner = address(0);
             pendingOwner = address(0);
             _clearQueue();
