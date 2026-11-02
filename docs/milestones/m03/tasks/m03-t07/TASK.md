@@ -172,7 +172,7 @@ This task runs beside t06 (see § Sequencing at the end of the plan).
      stop and say so rather than widening the hook.
 
    Check: `AUDIT.md`'s provenance block has `dirty: no`; both leg directories and `transcripts/`
-   non-empty; § 4 grades both legs against all fifteen known-answer entries, F11 among the closed;
+   non-empty; § 4 grades both legs against all sixteen known-answer entries (six present, ten closed — amended 2026-11-01), F11 and t08's three among the closed;
    `test ! -e <blind>/audits/KNOWN_ANSWER.md` before and after; the blinded tree's
    `git status --porcelain` empty after the run.
 
@@ -205,7 +205,7 @@ This task runs beside t06 (see § Sequencing at the end of the plan).
    unchanged — no `app/` byte moves in this task); `git status --porcelain` empty. `HANDOFF.md` from
    the template: the AC table with evidence, step 1's three figures, the five failing assertions
    from step 3, step 4's count, the snapshot rows that moved, the bytecode sizes, the provenance
-   block verbatim, per-leg grading against all fifteen entries, § Deviations, § Discoveries, and a
+   block verbatim, per-leg grading against all sixteen entries, § Deviations, § Discoveries, and a
    § For M04 naming the final `App` init-code hash (`cast keccak $(forge inspect App bytecode)` is
    not it — the constructor arguments are appended; say so and give the command t06's runbook uses)
    so `APP_SALT` can be mined against it (decision 37). PR title
@@ -253,7 +253,7 @@ produces, which is why the hash is in the handoff.
   `README.md`'s `AUDIT` cell dated to the new run; `git diff --stat <head> HEAD -- src/` empty at the
   PR's final commit.
 - `audits/KNOWN_ANSWER.md` names the step 5 head, lists F11 as closed with its mechanism, and carries
-  #127 and F13/F9 as still present; `AUDIT.md` § 4 grades all fifteen entries.
+  #127 as still present and F13/F9 among the closed (t08's expiry; *amended 2026-11-01* — this read "still present" before decision 39); `AUDIT.md` § 4 grades all sixteen entries.
 - `forge build --force` prints zero `warning[` / `Warning (` lines; `forge lint` and
   `forge fmt --check` silent; `forge snapshot --check` exit 0; `node --test test/*.test.mjs` 62 pass;
   `git status --porcelain` empty.
