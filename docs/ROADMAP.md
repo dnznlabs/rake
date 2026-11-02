@@ -15,7 +15,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 |:----------|:-----|:-------|
 | [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | done 2026-10-11 — t01 (#6), t02 (#11), t03 (#14) and the decision-10 follow-up (#24) merged; every criterion re-run and passing on `main` at `c292106` |
 | [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain, and Denizen has ironed out the experience against it | done 2026-10-26 — t01 (#33), t02 (#40), t03 (#52), t04 (#60), t05 (#65), t06 done; Phase 5 signed off by Denizen in [#73](https://github.com/dnznlabs/rake/pull/73) |
-| [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | in progress — Phase 1 closed 2026-10-30 (decisions 20–33); Phase 2 done 2026-10-30: t01 (#94), t02 ([#103](https://github.com/dnznlabs/rake/pull/103)), t03 ([#109](https://github.com/dnznlabs/rake/pull/109)); t04 merged 2026-10-30 ([#117](https://github.com/dnznlabs/rake/pull/117)): ten findings over `ede55c3`, five accepted, so t05 stands — scoped 2026-10-31, three contract fixes and a second two-leg run on the final code; t06 scoped 2026-10-30, running beside it; D14 (F8) open |
+| [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | in progress — Phase 1 closed 2026-10-30 (decisions 20–33); Phase 2 done 2026-10-30: t01 (#94), t02 ([#103](https://github.com/dnznlabs/rake/pull/103)), t03 ([#109](https://github.com/dnznlabs/rake/pull/109)); t04 merged 2026-10-30 ([#117](https://github.com/dnznlabs/rake/pull/117)): ten findings over `ede55c3`, five accepted, so t05 stands — scoped 2026-10-31, three contract fixes and a second two-leg run on the final code; t06 done 2026-11-01 ([#131](https://github.com/dnznlabs/rake/pull/131): `RUNBOOK.md`, salted scripts through the keyless proxy, criterion 6 rehearsed; closes #22, #23, #129); D14 ruled as decision 36; Phase 3 reopened — t07 (`App.lock`, decision 38) live, and t08 (expiry and `claim`, decisions 39–40 from the #133 triage) scoped 2026-11-01 to merge before t07 freezes, so the third review reads both; dapp follow-up t09 scoped at t08's merge |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | not started |
 | [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; DNZN's own 60/40 distribution live under the Ops multisig with a 7-day delay; dapp mirrored and widget embedded in one DNZN app | not started |
 | [M06 — Owner integrations](milestones/m06/MILESTONE.md) | Optional, after mainnet. When the connected wallet is a member of the owner rather than the owner, route `propose`/`cancel` into the multisig vault's or Majeur DAO's own submit flow instead of copy-calldata. UI only; no contract change | not started |
@@ -479,6 +479,34 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     has no contract fix the contract can tell from an honest token — it is a chain precondition,
     [#127](https://github.com/dnznlabs/rake/issues/127) — and F13 is F9's mechanism, whose
     mitigation stands; both were dispositioned at t05's close-out and neither row moves.
+39. **Queued actions expire: a matured action is applicable for `GRACE` after its eta, then anyone
+    may drop it.** D16, opened at the #133 triage on [#134](https://github.com/dnznlabs/rake/issues/134),
+    ruled by Denizen on 2026-11-01 ("Option 1"). Reverses F9/F13's "none needed" (reconciled the
+    same morning) on the third independent raise of the shape: the 2026-10-30 leg (F9), the
+    2026-10-31 leg 2 (F13) and DNZN // RESEARCH's source analysis (#133 item 1). `queued[hash]` held
+    only an eta, so a forgotten proposal was a permanent option held by the public and whoever
+    called `applyQueued` chose the order. The fix is `uint256 public constant GRACE = 14 days`, an
+    `Expired(eta)` revert in `applyQueued` past `eta + GRACE`, and `cancel` accepting an expired hash
+    from anyone — Compound's Timelock shape; one new error and one new view in the ABI. Rejected:
+    nonce ordering (a never-applicable entry, decision 25's shape, would block everything behind
+    it); an owner epoch (t05's queue clear already covers handovers and renounces); keeping "none
+    needed" with a dapp warning (ships a three-times-flagged shape at a permanent address). Decision
+    25 is not reopened: it rejected cancel-by-anyone on a revert test, which is not always decidable;
+    an expiry is a timestamp comparison. Built as [m03-t08](milestones/m03/tasks/m03-t08/TASK.md),
+    which merges before t07 freezes so the third review reads both changes once.
+40. **The escrowed account can claim its escrow, to an address it names, with its own gas.** D17,
+    opened at the #133 triage on [#135](https://github.com/dnznlabs/rake/issues/135), ruled by
+    Denizen on 2026-11-01 ("Option 1"). Reverses F5/#95's "documented" on #133 item 2's correction
+    of the documented remedy: `release` retried through the same `_push` under the same `PUSH_GAS`,
+    so a recipient needing more than 100,000 gas to accept ETH, or a token that refuses the account,
+    could never be paid — and a re-table stops further escrow but recovers nothing already held, which
+    `SECURITY.md`'s F5 row and #95 claimed it did. The fix is `claim(address token, address to)`,
+    `nonReentrant`, moving only `msg.sender`'s escrow with the caller's gas and emitting
+    `Claimed(token, account, to, amount)`; `release` stays as the permissionless push. Two shapes it
+    does not rescue are stated in the row: a contract recipient with no outgoing-call ability, and
+    the fact that an issuer-frozen beneficiary can redirect tokens the Distribution holds. Rejected:
+    keeping it documented (a permanent loss for an honest recipient with an expensive `receive`).
+    Same m03-t08.
 
 ## Findings carried forward
 

@@ -19,7 +19,10 @@ This task runs beside t06 (see § Sequencing at the end of the plan).
 
 0. **The code is where the second review left it.** `git diff --stat b0fb4e3 origin/main -- src/`
    prints nothing. If it does not, stop: something under `src/` moved after the 2026-10-31 review and
-   this plan is stale. Record the baselines the handoff compares against: `forge build --force`, then
+   this plan is stale. *Amended 2026-11-01 (decisions 39–40):* once [m03-t08](../m03-t08/TASK.md)
+   has merged, that diff prints **`src/Distribution.sol` and nothing else**, and this plan is not
+   stale — t08's change is the one this task's review is meant to read alongside its own. Rebase
+   onto that `main` before step 5; `App.sol` is untouched by t08, so every line number here holds. Record the baselines the handoff compares against: `forge build --force`, then
    `App`'s deployed bytecode (**7,118 bytes** at `67146a7`, from `forge inspect App deployedBytecode`
    with the hex length halved; `Distribution` 8,729, the factory 1,320), `forge test` (72 passed, 22
    of them `AppTest`), `grep -c '' .gas-snapshot` (72).
@@ -126,17 +129,20 @@ This task runs beside t06 (see § Sequencing at the end of the plan).
    with before and after in the handoff, and a sentence for any that moves by more than a few hundred
    gas), then `forge lint` and `forge fmt --check` last (`AGENTS.md` § Contracts: lint poisons the
    cache). `App`'s deployed bytecode against step 0's 7,118; `Distribution` and the factory
-   byte-identical (`git diff --stat b0fb4e3 -- src/Distribution.sol` empty). Push, open the PR as a
+   byte-identical **to t08's merge commit** (`git diff --stat <t08 merge> HEAD -- src/Distribution.sol`
+   empty — amended 2026-11-01; it was `b0fb4e3`). Push, open the PR as a
    draft with `Audit scope touched: src/App.sol`, and message the architect with the head commit.
    **No commit under `src/`, `test/*.t.sol` or `.gas-snapshot` after this point** unless the
    architect sends the diff back. Then rewrite `audits/KNOWN_ANSWER.md` for that head, titled with
    the short sha, in its two sections: *still in the code* keeps #19, #54, #95, #18, #22 and F8
-   (#123) and **adds two** — F12 ([#127](https://github.com/dnznlabs/rake/issues/127), `reserved`
-   keyed by token so a native-balance alias double-pays, `distribute` `:141-146`) and F13/F9
-   (`applyQueued` orders nothing and expires nothing, `:205-216`), both ruled and documented, both
-   gradable; *closed before this audit* keeps #20, #61, #74, F1, F2, F6 and **adds F11** — the
-   mechanism that is no longer there, with `_requireChunk` and the four call sites named. The known
-   answer now grades eight shapes still present and seven closed.
+   (#123) and **adds one** — F12 ([#127](https://github.com/dnznlabs/rake/issues/127), `reserved`
+   keyed by token so a native-balance alias double-pays, `distribute` `:141-146`), ruled and
+   documented, gradable — **and drops #95** (*amended 2026-11-01*: decisions 39–40 moved it); *closed
+   before this audit* keeps #20, #61, #74, F1, F2, F6 and **adds four** — F11 (the mechanism that is
+   no longer there, with `_requireChunk` and the four call sites named), and t08's three: F9/F13
+   (`GRACE`, `Expired`, cancel-by-anyone once expired), F5/#95 (`claim`) and #111's renounce event.
+   The known answer now grades six shapes still present and ten closed; t08's handoff § For t07
+   names the `src/Distribution.sol` hash the blinded tree must carry.
 
    Check: `grep -c '<head sha>' audits/KNOWN_ANSWER.md` ≥ 2; `grep -c '#127' audits/KNOWN_ANSWER.md`
    ≥ 1; `grep -c 'ForeignChunk' audits/KNOWN_ANSWER.md` ≥ 1.
@@ -207,7 +213,16 @@ This task runs beside t06 (see § Sequencing at the end of the plan).
    t07 task issue. `Carries forward:` filled at review. Review: architect first against this file
    and the step 5 head, Product Owner second.
 
-**Sequencing.** t06 runs beside this task and neither waits for the other. This task changes `App`'s
+**Amended 2026-11-01 — the freeze waits.** Decisions 39 and 40 ([#134](https://github.com/dnznlabs/rake/issues/134),
+[#135](https://github.com/dnznlabs/rake/issues/135)) opened [m03-t08](../m03-t08/TASK.md), which
+changes `src/Distribution.sol`. Steps 1–4 proceed; **step 5 does not run until t08 has merged and
+this branch is rebased onto it**, so the third review reads `App.lock`'s fix and t08's changes in
+one run instead of two. t06 (#131) merged 2026-11-01 and its salted deploy scripts are on `main`;
+the blinded tree carries them. t08 touches `test/`, `.gas-snapshot` and `SECURITY.md` rows, so the
+rebase re-runs `forge snapshot` for this task's own `App` rows (its `Distribution` rows are t08's)
+and takes `main`'s `SECURITY.md` before step 7 edits it.
+
+**Sequencing, as first written.** t06 runs beside this task and neither waits for the other. This task changes `App`'s
 bytecode, so t06's rehearsal addresses for `App` move with it — by design (t06 TASK.md § Sequencing;
 criterion 6 is re-run at close-out on the final `main`). Files both touch: `SECURITY.md` (t06 edits
 F3's row, this task F11's and § Prior reviews) and possibly `.gas-snapshot` if t06 adds a test;
@@ -217,10 +232,11 @@ produces, which is why the hash is in the handoff.
 
 ## Acceptance criteria
 
-- `git diff --stat b0fb4e3 HEAD -- src/Distribution.sol` is empty at the PR's final commit (`src/`
-  holds two files, `App.sol` and `Distribution.sol`, the factory inside the latter) — the only
-  contract that moves is `App`. `forge inspect Distribution abi --json` is byte-identical to
-  `origin/main`'s.
+- `git diff --stat <t08 merge commit> HEAD -- src/Distribution.sol` is empty at the PR's final
+  commit (`src/` holds two files, `App.sol` and `Distribution.sol`, the factory inside the latter) —
+  the only contract **this task** moves is `App`; `Distribution.sol` is t08's, already on `main`
+  (*amended 2026-11-01: this read `b0fb4e3` before decisions 39–40*). `forge inspect Distribution
+  abi --json` is byte-identical to `origin/main`'s.
 - `forge inspect App abi --json | jq -r '.[]|select(.type!="constructor")|.name' | sort` on the branch,
   diffed against `origin/main`'s, shows **exactly one added line, `ForeignChunk`, and nothing
   removed**; both lists have a non-zero count stated in the handoff (a diff of two empty lists is
