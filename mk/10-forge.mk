@@ -5,11 +5,16 @@ RPC        ?= http://127.0.0.1:$(ANVIL_PORT)
 CHAIN_ID   ?= 31337
 SENDER     ?= 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 SEND_FLAGS ?= --unlocked --sender $(SENDER)
-export ANVIL_PORT
+# `DeployApp.s.sol` requires OWNER with no default (`SECURITY.md` F3), and `make deploy` passes no
+# environment, so default it to the dev sender here. A real deploy exports it (RUNBOOK.md § 0).
+OWNER      ?= $(SENDER)
+export ANVIL_PORT OWNER
 
 FORGE_SEND := --rpc-url $(RPC) --broadcast $(SEND_FLAGS)
-# "Name address" for every contract created by any deploy script on this chain.
-DEPLOYED    = jq -r '.transactions[]|select(.transactionType=="CREATE")|"\(.contractName) \(.contractAddress)"' broadcast/*/$(CHAIN_ID)/run-latest.json
+# "Name address" for every contract created by any deploy script on this chain. Both creation types:
+# the deploy scripts place through a deterministic deployer, which the broadcast log records as
+# CREATE2, and a CREATE-only filter would leave `addresses` and the `deploy::` guard below blind.
+DEPLOYED    = jq -r '.transactions[]|select(.transactionType=="CREATE" or .transactionType=="CREATE2")|"\(.contractName) \(.contractAddress)"' broadcast/*/$(CHAIN_ID)/run-latest.json
 
 .PHONY: serve build test fmt clean deploy addresses
 
@@ -32,11 +37,13 @@ clean:: ## Remove build artifacts
 # Every scripts/forge/Deploy*.s.sol, each with its own broadcast log. LC_ALL=C because glob order is
 # locale-dependent, and deploy order decides the addresses.
 #
-# The second recipe line refuses a chain that already carries the factory. A second deploy is not a
-# refresh: the factory is placed by plain CREATE from the deployer's nonce, so it, the implementation
-# and every `predict()` move together, and the featured distribution's address moves with them while
-# the first one still holds the ETH (#35). The log is read the way `addresses` reads it, and the
-# logged address is checked for code, so an anvil that has restarted falls through and deploys.
+# The second recipe line refuses a chain that already carries the factory. The reason is no longer
+# that the address would move — the factory is placed through a deterministic deployer now, so the
+# same salt and init code give the same address every time. It is #22's: a second deploy is a CREATE2
+# collision, and a collision burns every unit of gas forwarded to it before anything can revert, so
+# the refusal is what keeps a re-run from costing the whole gas limit. The log is read the way
+# `addresses` reads it, and the logged address is checked for code, so an anvil that has restarted
+# falls through and deploys.
 # `deploy::` is double-colon, so this `exit 1` stops `make` before the seed, fixtures and dapp
 # recipes in the later mk/ files run — which is the point.
 deploy:: ## Deploy to the chain at RPC (anvil by default)
