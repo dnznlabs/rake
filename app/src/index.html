@@ -1501,7 +1501,7 @@ function docs() {
   <h2 id="s-how">Mechanism</h2>
   <p>Funds sent to the address remain there until <code>distribute</code> is called. Each call divides the available balance of one asset according to the table and sends each beneficiary its share. A share that cannot be delivered is held in the contract for that beneficiary and may be released later.</p>
   ${figSeq()}
-  <p>Changes follow a fixed sequence. The owner proposes a change, and it is queued with the time from which it may be applied. Once that time has passed, anyone may apply it. Until it is applied, the owner may cancel it.</p>
+  <p>Changes follow a fixed sequence. The owner proposes a change, and it is queued with the time from which it may be applied. Once that time has passed, anyone may apply it, for a window of fourteen days (<code>GRACE</code>). Until it is applied, the owner may cancel it; once the window has closed the change has expired, can no longer be applied, and anyone may cancel it.</p>
   ${figState()}
 
   <h2 id="s-create">Creating a distribution</h2>
@@ -1519,11 +1519,12 @@ function docs() {
   <h2 id="s-payout">Distributing funds</h2>
   <p>Anyone may call <code>distribute</code>, and the caller pays the gas. Each call distributes one asset, ETH counting as one. Beneficiaries are paid in table order.</p>
   <p>If a beneficiary cannot receive its share, that share is held in the contract and the remaining beneficiaries are still paid. Held funds are excluded from later distributions until <code>release</code> is called for that beneficiary. Anyone may call <code>release</code>; it pays the beneficiary, never the caller. If the release fails, the funds remain held. Removing a beneficiary from the table does not affect funds already held for it.</p>
-  <p>ETH is sent with a gas allowance of 100,000. A beneficiary that requires more than that to receive ETH is always held.</p>
+  <p>A beneficiary can also take what is held for it itself, by calling <code>claim</code> with an address to send it to. Only the caller's own held funds move, and the caller pays the gas, so the gas allowance below does not apply. This is the exit for a beneficiary that <code>release</code> can never pay.</p>
+  <p>ETH is sent with a gas allowance of 100,000. A beneficiary that requires more than that to receive ETH is always held, and <code>release</code> cannot pay it at any gas limit, because the allowance is on the gas forwarded rather than on the limit the caller sets. Such a beneficiary is paid by <code>claim</code>.</p>
 
   <h2 id="s-change">Changing a distribution</h2>
   <p>The table, the description, the delay and the owner may each be changed. Each change is a separate proposal. An owner change is the one that is not finished when its proposal is applied: the address it names must also accept it.</p>
-  <p>A proposed change is displayed as pending, with a countdown, beside the current table. When the countdown ends, anyone may apply it. Until then the owner may cancel it, and the current configuration remains in force. No change applies automatically.</p>
+  <p>A proposed change is displayed as pending, with a countdown, beside the current table. When the countdown ends, anyone may apply it, for fourteen days. Until then the owner may cancel it, and the current configuration remains in force. No change applies automatically. A change nobody applies within those fourteen days expires: it can no longer be applied, and anyone may cancel it to clear the queue. Proposing it again starts a fresh delay.</p>
   <p>A change to the delay is itself subject to the current delay. Where the delay is zero, a change applies in the same transaction as its proposal.</p>
   <p>In a wallet, these operations appear as <code>propose</code>, <code>applyQueued</code> and <code>cancel</code>. An owner change adds <code>acceptOwnership</code>, the one operation the incoming owner signs; it is neither owner-only nor subject to the delay.</p>
 
@@ -1531,7 +1532,7 @@ function docs() {
   <p>An owner change takes two steps. The owner proposes the new owner, and once the delay has passed anyone may apply that proposal — which only nominates the address. The owner keeps every power until the nominated address calls <code>acceptOwnership()</code>. Any wallet may send that call; only the nominee's succeeds, and it takes effect in that transaction. Acceptance also drops every change the previous owner had queued. Ownership is held separately on each chain.</p>
   <p>A nomination can be withdrawn until it is accepted: the owner proposes its own address, and applying that proposal clears the nomination. The owner may also cancel the original proposal before it is applied, as with any other change.</p>
   <p>The two steps leave different traces. Acceptance emits <code>OwnershipTransferred(previousOwner, newOwner)</code>. The nomination has no event of its own and travels in the calldata of the <code>Queued</code> event, so a transfer waiting to be accepted is read from <code>pendingOwner()</code>, which this page displays beside the owner.</p>
-  <p>Transferring ownership to the zero address renounces it. That needs no acceptance, takes effect when the proposal is applied, and destroys a nomination in flight. Thereafter no change can be proposed or cancelled. Renouncing also drops every change still queued, so the configuration is permanent from that transaction.</p>
+  <p>Transferring ownership to the zero address renounces it. That needs no acceptance, takes effect when the proposal is applied, and destroys a nomination in flight. Thereafter no change can be proposed. Renouncing also drops every change still queued, so the configuration is permanent from that transaction. A renounce emits <code>OwnershipTransferred(previousOwner, 0x0)</code>, so it leaves the same trace in the log that an acceptance does.</p>
 
   <h2 id="s-widget">The widget</h2>
   <p>The widget is a script that displays a distribution on any web page: its allocation, its beneficiaries, its owner, its delay and any pending change, read directly from the chain. It adopts the host page's font and text colour, and is available in a full and a compact form.</p>
