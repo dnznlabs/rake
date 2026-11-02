@@ -109,7 +109,7 @@ Three things t07's third two-leg review reads as **closed** rather than still in
 
 `src/App.sol` is **byte-identical to `b0fb4e3`** (`git diff --stat b0fb4e3 HEAD -- src/App.sol` is empty), so t07's work is untouched and this PR's line numbers for `App.sol` are still t07's.
 
-The `src/Distribution.sol` t07's blinded tree must carry, at this branch's head `f9af0e1`:
+The `src/Distribution.sol` t07's blinded tree must carry. The file is unchanged from `fb82136`, the first commit on this branch, through every commit after it, so these identify it at any head of this branch:
 
 - git blob: **`224167d72a40807545d1e148acbea8f6d7ae51ce`**
 - sha256: **`ef5f089fca97e07f83a01f040676a2d60ba9ad7c384f3ba9eca82588e3b45be0`**
