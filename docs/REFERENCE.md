@@ -18,16 +18,17 @@ round. `self` means the function is reachable only as a queued action, the contr
 | function | caller | effect |
 |:--|:--|:--|
 | `distribute(address token)` | anyone | splits the balance that is not escrowed across the table, in table order; a push that fails is escrowed instead |
-| `release(address token, address account)` | anyone | retries one escrowed share; a retry that fails reverts and the share stays escrowed |
+| `release(address token, address account)` | anyone | retries one escrowed share under the same push gas cap; a retry that fails reverts and the share stays escrowed |
+| `claim(address token, address to)` | the escrowed account | sends the caller's own escrow to an address it names, with the caller's gas and no push cap; only `msg.sender`'s escrow moves, and `to` is not validated |
 | `propose(bytes action)` | owner | queues a self-call at now + delay, or runs it inline when the delay is zero; refused while `distribute` or `release` is running |
-| `applyQueued(bytes action, uint32 nonce)` | anyone | runs a queued action once its eta has passed; an action that reverts stays queued; refused while `distribute` or `release` is running |
-| `cancel(bytes32 hash)` | owner | drops a queued action, immediately — the delay guards applying, not cancelling |
+| `applyQueued(bytes action, uint32 nonce)` | anyone | runs a queued action once its eta has passed and until `GRACE` after it; past that it has expired and this reverts; an action that reverts stays queued; refused while `distribute` or `release` is running |
+| `cancel(bytes32 hash)` | owner; anyone once the action has expired | drops a queued action, immediately — the delay guards applying, not cancelling |
 | `setBeneficiaries(Beneficiary[] table)` | self | replaces the table; reachable only as a queued action |
 | `setDescription(string description)` | self | replaces the label; reachable only as a queued action |
 | `setDelay(uint32 delay)` | self | changes the delay, through the delay in force |
 | `transferOwnership(address owner)` | self | names the next owner, who must call acceptOwnership() before anything changes; the zero address renounces at once, clears any pending transfer and drops every queued action; naming the current owner withdraws one |
 | `acceptOwnership()` | pending owner | takes ownership after transferOwnership named the caller, clears the pending transfer, and drops every queued action |
-| `init(address owner, uint32 delay, string description, Beneficiary[] table)` | factory | initialises a clone, once, as part of the create transaction |
+| `init(address owner, uint32 delay, string description, Beneficiary[] table)` | factory | initialises a clone, once, as part of the create transaction; any balance present at that point is logged as `Received(address(0), balance)` |
 | `snapshot()` | view | owner, delay, nonce, description, table and pending in one call |
 | `beneficiaries()` | view | the table as stored, which is ascending by account |
 | `pendingCount()` | view | how many actions are queued |
@@ -40,30 +41,33 @@ round. `self` means the function is reachable only as a queued action, the contr
 | `nonce()` | view | proposals made so far; it is hashed into every queued action |
 | `description()` | view | the label the distribution carries for itself |
 | `MAX_BENEFICIARIES()` | view | the most rows a table may carry — measured so that a worst-case split stays under half a block |
+| `GRACE()` | view | how long after its eta a matured action stays applicable; past it the action has expired and anyone may cancel it |
 
 ### Events
 
 | event | emitted by | when |
 |:--|:--|:--|
-| `Received(address indexed from, uint256 amount)` | receive | ETH arrived; the ERC-20 path has no hook and emits nothing |
+| `Received(address indexed from, uint256 amount)` | receive, init | ETH arrived; the ERC-20 path has no hook and emits nothing. From `init`, `from` is `address(0)` — the sentinel for "present at init, sender unknown" — which covers value that rode the create and value sent to the counterfactual address before any code existed there. A forced send after deployment stays unlogged |
 | `Distributed(address indexed token, uint256 amount)` | distribute | a split completed, for the amount it moved |
 | `Escrowed(address indexed token, address indexed account, uint256 amount)` | distribute | a push failed, so that share is held for its account |
 | `Released(address indexed token, address indexed account, uint256 amount)` | release | an escrowed share was retried and paid |
+| `Claimed(address indexed token, address indexed account, address to, uint256 amount)` | claim | an escrowed account took its own escrow; `to` is where it sent it, which is why this is not a `Released` |
 | `Queued(bytes32 indexed hash, uint32 nonce, uint256 eta, bytes action)` | propose | an action was staged, with its calldata in the log |
 | `Applied(bytes32 indexed hash)` | applyQueued, propose | the action ran — from propose when the delay is zero |
-| `Cancelled(bytes32 indexed hash)` | cancel | the owner withdrew a queued action |
-| `OwnershipTransferred(address indexed previousOwner, address indexed newOwner)` | acceptOwnership | the named owner took it — the only trace of the handover, since the nomination rides in Queued's calldata |
+| `Cancelled(bytes32 indexed hash)` | cancel | a queued action was withdrawn — by the owner, or by anyone once it had expired |
+| `OwnershipTransferred(address indexed previousOwner, address indexed newOwner)` | acceptOwnership, transferOwnership | the named owner took it, or the owner renounced and `newOwner` is the zero address. Either way it is the only trace of the change, since the nomination rides in Queued's calldata |
 
 ### Errors
 
 | error | thrown by | when |
 |:--|:--|:--|
-| `NotOwner()` | propose, cancel | the caller is not the owner |
+| `NotOwner()` | propose, cancel | the caller is not the owner — from `cancel`, for any action that has not expired, including one that does not exist |
 | `BadTable()` | init, setBeneficiaries | empty or more than 107 rows, not ascending by account, a zero share, or shares that do not sum to 10,000 |
 | `NotReady(uint256 eta)` | applyQueued | nothing is queued under that hash, or its eta has not passed |
-| `NothingToDo()` | distribute, release, cancel | there is nothing to split, retry or withdraw |
-| `Locked()` | distribute, release | re-entered while a push was still in flight |
-| `ReleaseFailed(address token)` | release | the retry failed with no reason of its own — a bare false, empty revert data, or an argument-less custom error |
+| `Expired(uint256 eta)` | applyQueued | the action matured more than `GRACE` ago, so it can no longer be applied and anyone may cancel it |
+| `NothingToDo()` | distribute, release, claim, cancel | there is nothing to split, retry, claim or withdraw |
+| `Locked()` | distribute, release, claim | re-entered while a push was still in flight |
+| `ReleaseFailed(address token)` | release, claim | the push failed with no reason of its own — a bare false, empty revert data, or an argument-less custom error |
 | `Unauthorized()` | init, the setters, acceptOwnership, receive | not the factory, not a self-call, not the pending owner, or ETH sent to the implementation itself |
 
 ### The snapshot struct
