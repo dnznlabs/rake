@@ -159,12 +159,53 @@ contract DistributionFactoryTest is Test {
         // Assert
         assertEq(d.balance, 1 ether, "the deposit rode the CREATE2");
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        assertEq(logs.length, 1, "one log, so the loop below has something to look at");
-        for (uint256 i; i < logs.length; ++i) {
-            assertTrue(logs[i].topics[0] != Distribution.Received.selector, "no Received log");
-        }
-        assertEq(logs[0].topics[0], DistributionFactory.Created.selector);
-        assertEq(logs[0].emitter, address(factory));
+        assertEq(logs.length, 2, "two logs: the clone's Received, then the factory's Created");
+
+        // `init` logs value present at initialisation, with `address(0)` for "sender unknown" (#136).
+        assertEq(logs[0].topics[0], Distribution.Received.selector);
+        assertEq(logs[0].emitter, d, "the clone emitted it, not the factory");
+        assertEq(address(uint160(uint256(logs[0].topics[1]))), address(0), "the sentinel sender");
+        assertEq(abi.decode(logs[0].data, (uint256)), 1 ether);
+
+        assertEq(logs[1].topics[0], DistributionFactory.Created.selector);
+        assertEq(logs[1].emitter, address(factory));
+    }
+
+    /// @notice The other half of #136 item 7, and #133's `test_counterfactualFundsFollowCreatorTable`:
+    /// ETH sent to the address `predict` names before any code exists there is present when `init`
+    /// runs, so it reaches the log too — the case a `create`-value-only log would miss entirely.
+    /// It then distributes to the creator's table, which is the cross-chain trust property the
+    /// `create` NatSpec documents.
+    function test_prefundedAddressLogsReceivedAtInit() public {
+        // Arrange — fund the counterfactual address first, with no code at it.
+        DistributionFactory factory = new DistributionFactory();
+        bytes32 salt = bytes32(uint256(uint160(address(this))) << 96) | bytes32(uint256(7));
+        address predicted = factory.predict(salt);
+        assertEq(predicted.code.length, 0, "nothing is deployed there yet");
+        vm.deal(address(this), 3 ether);
+        (bool funded,) = predicted.call{value: 3 ether}("");
+        assertTrue(funded, "a plain send to an address with no code");
+        assertEq(predicted.balance, 3 ether);
+
+        Distribution.Beneficiary[] memory t = _table(A, 6000, B, 4000);
+
+        // Act
+        vm.recordLogs();
+        address d = factory.create(OWNER, 0, "desc", t, salt);
+
+        // Assert
+        assertEq(d, predicted, "the clone landed on the funded address");
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(logs.length, 2, "two logs, so the indices below mean something");
+        assertEq(logs[0].topics[0], Distribution.Received.selector);
+        assertEq(logs[0].emitter, d);
+        assertEq(address(uint160(uint256(logs[0].topics[1]))), address(0), "the sentinel sender");
+        assertEq(abi.decode(logs[0].data, (uint256)), 3 ether, "the whole pre-funded balance");
+
+        // And the funds follow the creator's table, not the funder's intent.
+        Distribution(payable(d)).distribute(address(0));
+        assertEq(A.balance, 1.8 ether);
+        assertEq(B.balance, 1.2 ether);
     }
 
     function _table(address first, uint96 firstBps, address second, uint96 secondBps)

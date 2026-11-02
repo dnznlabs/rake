@@ -1,23 +1,29 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, stdError} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {Distribution, DistributionFactory} from "../src/Distribution.sol";
 import {
+    BigToken,
+    BlocklistToken,
     BloatingReceiver,
     CallbackToken,
     GasBurnerAny,
     HookRecipientToken,
     HookToken,
+    HungryReceiver,
     MockERC20,
     MockERC721,
+    PlainNFT,
     PlainSender,
     RawRevertReceiver,
+    ReentrantClaimer,
     ReentrantDistributor,
     ReentrantReleaser,
     RevertingReceiver,
-    RevertingToken
+    RevertingToken,
+    SweepingOwner
 } from "./mocks/Mocks.sol";
 
 /// @dev Every case runs against a clone the factory deployed, because `receive()` rejects ETH on the
@@ -53,7 +59,11 @@ contract DistributionTest is Test {
 
     /// @dev F8's measurement: the first round thousand of gas at which a `distribute` over a
     /// hook-recipient table completes. Bisected by hand, one limit per transaction.
-    uint256 internal constant F8_SUCCEEDS_AT = 95_049_000;
+    /// @dev Bytecode-dependent, so it is re-bisected whenever `Distribution` moves: m03-t08's
+    /// `GRACE`/`claim` changes added 542 bytes of deployed code and moved it from **95,049,000** to
+    /// **95,237,000** (+188,000) — the implementation the clone delegates into is bigger, so every
+    /// row of the table costs a little more to pay.
+    uint256 internal constant F8_SUCCEEDS_AT = 95_237_000;
 
     /// @dev Hands each starvation attempt its own disjoint range of row addresses.
     uint160 internal starveRanges;
@@ -181,6 +191,126 @@ contract DistributionTest is Test {
         d.applyQueued(action, 1);
         assertEq(d.snapshot().pending.length, 0);
         assertEq(d.description(), "desc", "unchanged");
+    }
+
+    /// @notice F9/F13, decision 39: a matured action is applicable for `GRACE` after its eta and no
+    /// longer. The boundary instant itself still applies — the window is closed above it, not at it.
+    function test_applyQueuedExpires() public {
+        // Arrange — two actions on one clone, so the same eta can be met and then missed.
+        Distribution d = _deploy(WEEK, _defaultTable());
+        bytes memory inside = abi.encodeCall(Distribution.setDescription, ("inside"));
+        bytes memory outside = abi.encodeCall(Distribution.setDescription, ("outside"));
+        vm.startPrank(OWNER);
+        d.propose(inside);
+        d.propose(outside);
+        vm.stopPrank();
+        uint256 eta = block.timestamp + WEEK;
+
+        // Act / assert — the last applicable instant.
+        vm.warp(eta + d.GRACE());
+        d.applyQueued(inside, 1);
+        assertEq(d.description(), "inside", "eta + GRACE is still inside the window");
+
+        // And one second past it.
+        vm.warp(eta + d.GRACE() + 1);
+        vm.expectRevert(abi.encodeWithSelector(Distribution.Expired.selector, eta));
+        d.applyQueued(outside, 2);
+        assertEq(d.description(), "inside", "the expired action changed nothing");
+        assertEq(d.queued(keccak256(abi.encode(outside, uint32(2)))), eta, "and it is still queued");
+    }
+
+    /// @notice F13, decision 39: once the window has passed the entry is nobody's option to hold, so
+    /// anyone may drop it — which is also what makes a renounced contract's queue cleanable.
+    function test_strangerCancelsExpired() public {
+        // Arrange
+        Distribution d = _deploy(WEEK, _defaultTable());
+        bytes memory action = abi.encodeCall(Distribution.setDescription, ("changed"));
+        vm.prank(OWNER);
+        bytes32 hash = d.propose(action);
+        uint256 eta = block.timestamp + WEEK;
+
+        // Act
+        vm.warp(eta + d.GRACE() + 1);
+        vm.expectEmit(true, false, false, true, address(d));
+        emit Distribution.Cancelled(hash);
+        vm.prank(STRANGER);
+        d.cancel(hash);
+
+        // Assert
+        assertEq(d.queued(hash), 0, "the entry is gone");
+        assertEq(d.pendingCount(), 0);
+        assertEq(d.description(), "desc", "and cancelling is not applying");
+    }
+
+    /// @notice The regression guard for the order of `cancel`'s two checks. A stranger must see
+    /// `NotOwner` — not `NothingToDo` — for anything that is not an expired entry, at every instant
+    /// up to and including the boundary, while the owner's `cancel` works at all of them.
+    function test_strangerCannotCancelUnexpired() public {
+        Distribution d = _deploy(WEEK, _defaultTable());
+        uint256 start = block.timestamp;
+        uint256 eta = start + WEEK;
+
+        // All three entries are proposed at the same instant, so all three share one eta — proposing
+        // inside the loop below would date each one from the instant the previous iteration warped to.
+        bytes32[3] memory hashes;
+        for (uint256 i; i < hashes.length; ++i) {
+            vm.prank(OWNER);
+            hashes[i] = d.propose(abi.encodeCall(Distribution.setDescription, (vm.toString(i))));
+        }
+
+        // Before the eta, at the eta, and at exactly eta + GRACE: three instants, each proved twice —
+        // refused for the stranger, allowed for the owner — on its own entry, since the owner's
+        // cancel consumes one.
+        uint256[3] memory instants = [start, eta, eta + d.GRACE()];
+        for (uint256 i; i < instants.length; ++i) {
+            vm.warp(instants[i]);
+            vm.prank(STRANGER);
+            vm.expectRevert(Distribution.NotOwner.selector);
+            d.cancel(hashes[i]);
+            assertEq(d.queued(hashes[i]), eta, "the stranger changed nothing");
+
+            vm.prank(OWNER);
+            d.cancel(hashes[i]);
+            assertEq(d.queued(hashes[i]), 0, "the owner may cancel at the same instant");
+        }
+
+        // A stranger's cancel of an entry that never existed is `NotOwner` too, not `NothingToDo`:
+        // `test_renounceFreezes` asserts exactly this for a renounced owner.
+        vm.prank(STRANGER);
+        vm.expectRevert(Distribution.NotOwner.selector);
+        d.cancel(bytes32(0));
+    }
+
+    /// @notice F13's concrete cost, which is #133's `test_staleMaturedActionResurrects` inverted: a
+    /// beneficiary removed by a newer table could apply the older one it was still listed in, months
+    /// later, and then `distribute`. Past the window that action is dead.
+    function test_staleActionExpires() public {
+        // Arrange — two tables queued, the newer applied first.
+        Distribution d = _deploy(WEEK, _defaultTable());
+        Distribution.Beneficiary[] memory older = new Distribution.Beneficiary[](1);
+        older[0] = _row(C, 10_000);
+        Distribution.Beneficiary[] memory newer = new Distribution.Beneficiary[](1);
+        newer[0] = _row(B, 10_000);
+        bytes memory x = abi.encodeCall(Distribution.setBeneficiaries, (older));
+        bytes memory y = abi.encodeCall(Distribution.setBeneficiaries, (newer));
+        vm.startPrank(OWNER);
+        d.propose(x); // nonce 1
+        d.propose(y); // nonce 2
+        vm.stopPrank();
+        uint256 eta = block.timestamp + WEEK;
+
+        // Act
+        vm.warp(eta);
+        d.applyQueued(y, 2);
+        assertEq(d.beneficiaries()[0].account, B, "the newer table is live");
+
+        // Assert — 180 days on, the older action is not a standing option any caller may take.
+        vm.warp(eta + 180 days);
+        vm.prank(STRANGER);
+        vm.expectRevert(abi.encodeWithSelector(Distribution.Expired.selector, eta));
+        d.applyQueued(x, 1);
+        assertEq(d.beneficiaries()[0].account, B, "and the table did not revert to the older one");
+        assertEq(d.beneficiaries().length, 1);
     }
 
     function test_setDelayZeroDoesNotShortcutQueued() public {
@@ -520,6 +650,25 @@ contract DistributionTest is Test {
         assertEq(B.balance, 4000);
     }
 
+    /// @notice #111's code half, from #136: a renounce is a state change with an owner, so it leaves
+    /// the same trace a handover does. Ownable2Step's shape — `newOwner` is `address(0)`.
+    function test_renounceEmitsOwnershipTransferred() public {
+        // Arrange — a delay, so the renounce is applied rather than run inline, which is the path
+        // a reader of the logs actually meets.
+        Distribution d = _deploy(WEEK, _defaultTable());
+        bytes memory action = abi.encodeCall(Distribution.transferOwnership, (address(0)));
+        vm.prank(OWNER);
+        d.propose(action);
+        vm.warp(block.timestamp + WEEK);
+
+        // Act / assert
+        vm.expectEmit(true, true, false, true, address(d));
+        emit Distribution.OwnershipTransferred(OWNER, address(0));
+        d.applyQueued(action, 1);
+
+        assertEq(d.owner(), address(0), "and the renounce took effect");
+    }
+
     /// @notice Naming a successor moves nothing on its own. The owner keeps every power until the
     /// successor turns up, which is the whole of what the two-step buys.
     function test_transferOwnershipIsPending() public {
@@ -774,6 +923,138 @@ contract DistributionTest is Test {
 
         assertEq(d.escrowed(address(0), address(bad)), 5000, "and the escrow stays put");
         assertEq(d.reserved(address(0)), 5000);
+    }
+
+    /// @notice F5 / #95, decision 40. `release` retries under `PUSH_GAS`, so a recipient that needs
+    /// more gas than the cap to accept ETH can never be pushed to — at *any* outer gas limit, because
+    /// the cap is on the gas forwarded, not on the limit the caller sets. `claim` is the exit: the
+    /// beneficiary pays for its own receive, so the same `receive()` is paid in full.
+    /// This is #133's `test_escrowNeverReleasableForHungryRecipient` with the companion it asks for.
+    function test_claimEthToSelfUncapped() public {
+        // Arrange
+        HungryReceiver h = new HungryReceiver();
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](2);
+        t[0] = _row(address(h), 5000);
+        t[1] = _row(A, 5000);
+        Distribution d = _deploy(0, _asc(t));
+        _send(d, 1 ether);
+        d.distribute(address(0));
+        assertEq(d.escrowed(address(0), address(h)), 0.5 ether, "the capped push could not pay it");
+        assertEq(d.reserved(address(0)), 0.5 ether);
+        assertEq(A.balance, 0.5 ether, "the other row was paid");
+
+        // Act / assert — ten million gas on the outside changes nothing, because the cap is inside.
+        vm.expectRevert(abi.encodeWithSelector(Distribution.ReleaseFailed.selector, address(0)));
+        d.release{gas: 10_000_000}(address(0), address(h));
+        assertEq(d.escrowed(address(0), address(h)), 0.5 ether, "the escrow survived the retry");
+
+        // And the account takes it itself, with its own gas.
+        vm.expectEmit(true, true, false, true, address(d));
+        emit Distribution.Claimed(address(0), address(h), address(h), 0.5 ether);
+        h.take(d, address(0), address(h));
+
+        assertEq(address(h).balance, 0.5 ether, "paid in full");
+        assertEq(d.escrowed(address(0), address(h)), 0, "and the escrow is cleared");
+        assertEq(d.reserved(address(0)), 0, "and no longer reserved");
+        assertEq(address(d).balance, 0);
+
+        // A second claim has nothing to move.
+        vm.expectRevert(Distribution.NothingToDo.selector);
+        h.take(d, address(0), address(h));
+    }
+
+    /// @notice The `to` of a claim is the account's choice, which is the half that rescues a recipient
+    /// whose own `receive` is the problem. Not validated: it is the beneficiary's own money.
+    function test_claimEthToOtherAddress() public {
+        // Arrange
+        HungryReceiver h = new HungryReceiver();
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](2);
+        t[0] = _row(address(h), 5000);
+        t[1] = _row(A, 5000);
+        Distribution d = _deploy(0, _asc(t));
+        _send(d, 1 ether);
+        d.distribute(address(0));
+        assertEq(d.escrowed(address(0), address(h)), 0.5 ether);
+
+        // Act
+        h.take(d, address(0), C);
+
+        // Assert
+        assertEq(C.balance, 0.5 ether, "the named address holds the share");
+        assertEq(address(h).balance, 0, "and the escrowed account itself was not paid");
+        assertEq(d.escrowed(address(0), address(h)), 0);
+        assertEq(d.reserved(address(0)), 0);
+    }
+
+    /// @notice F5's second mechanism: an issuer blocklist on the beneficiary makes every token retry
+    /// revert, so `release` can never clear the escrow. `claim` moves the tokens the Distribution
+    /// holds to an address the issuer's freeze did not reach — a property `SECURITY.md` states rather
+    /// than hides, because it is the same mechanism that rescues an honest blocked recipient.
+    function test_claimErc20() public {
+        // Arrange — the token refuses `A`, so `A`'s row is escrowed by the token's own revert.
+        BlocklistToken tk = new BlocklistToken(A);
+        Distribution d = _deploy(0, _defaultTable());
+        tk.mint(address(d), 10_000);
+        d.distribute(address(tk));
+        assertEq(d.escrowed(address(tk), A), 6000, "the blocked row is escrowed");
+        assertEq(tk.balanceOf(B), 4000, "the unblocked row was paid");
+        assertEq(d.reserved(address(tk)), 6000);
+
+        // `release` cannot clear it: the token refuses `A` on every retry, with 36 bytes of reason.
+        vm.expectRevert(abi.encodeWithSelector(BlocklistToken.Blocked.selector, A));
+        d.release(address(tk), A);
+        assertEq(d.escrowed(address(tk), A), 6000, "the escrow stays put");
+
+        // Act — the blocked account claims to an address the token does not refuse.
+        vm.expectEmit(true, true, false, true, address(d));
+        emit Distribution.Claimed(address(tk), A, C, 6000);
+        vm.prank(A);
+        d.claim(address(tk), C);
+
+        // Assert
+        assertEq(tk.balanceOf(C), 6000, "the named address holds the tokens");
+        assertEq(tk.balanceOf(A), 0, "the blocked account still holds none");
+        assertEq(d.escrowed(address(tk), A), 0);
+        assertEq(d.reserved(address(tk)), 0);
+        assertEq(tk.balanceOf(address(d)), 0);
+    }
+
+    /// @notice `claim` takes the shared transient lock, so it is refused from inside a money path and
+    /// refuses one from inside itself, exactly as `release` is (#21).
+    /// @dev Two halves, because the reason and the sort are different facts. The recording half reads
+    /// the refusal byte for byte out of a `CallbackToken` hook, which proves it is `Locked()` and
+    /// **four bytes long**; the propagating half then shows what the outer `claim` does with four
+    /// bytes, which by decision 24 is to *name* the failure, not to bubble it.
+    function test_claimReentrancyLocked() public {
+        // Arrange — a hook token whose `transfer` calls `claim` while `distribute` holds the lock.
+        Distribution d = _deploy(0, _defaultTable());
+        CallbackToken tk = new CallbackToken(address(d));
+        tk.setAction(abi.encodeCall(Distribution.claim, (address(0), A)));
+        tk.mint(address(d), 10_000);
+
+        // Act / assert — the outer distribute succeeds and the refusal is readable.
+        d.distribute(address(tk));
+        assertFalse(tk.hookOk(), "the reentrant claim was refused");
+        assertEq(tk.hookData(), abi.encodeWithSelector(Distribution.Locked.selector), "with Locked()");
+        assertEq(tk.hookData().length, 4, "which is four bytes, at or under the word decision 24 sorts by");
+
+        // And the other direction: a recipient that re-enters `claim` from inside its own claim.
+        bytes32 salt = _salt();
+        Distribution e = Distribution(payable(factory.predict(salt)));
+        ReentrantClaimer r = new ReentrantClaimer(e);
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](2);
+        t[0] = _row(address(r), 5000);
+        t[1] = _row(A, 5000);
+        assertEq(factory.create(OWNER, 0, "desc", _asc(t), salt), address(e));
+        _send(e, 10_000);
+        e.distribute(address(0));
+        assertEq(e.escrowed(address(0), address(r)), 5000, "the reentrant push failed, so it escrowed");
+
+        // Four bytes of `Locked()` come back through the failed send, so decision 24 names it.
+        vm.expectRevert(abi.encodeWithSelector(Distribution.ReleaseFailed.selector, address(0)));
+        r.take(address(0), address(r));
+        assertEq(e.escrowed(address(0), address(r)), 5000, "and nothing was lost");
+        assertEq(e.reserved(address(0)), 5000);
     }
 
     function test_nftTransferReverts() public {
@@ -1085,8 +1366,8 @@ contract DistributionTest is Test {
     /// block gas limit a chain actually has.
     /// @dev F8, measured rather than predicted, and the measurement is what D14 is ruled on. The
     /// first row is a `GasBurnerAny` reached through the token's `transfer`; the rest are plain rows.
-    /// Bisected by hand to the round thousand: **95,049,000** gas is the first at which `distribute`
-    /// completes, and 95,048,000 still reverts. A 30,000,000-gas block is barely a third of that, so
+    /// Bisected by hand to the round thousand: **95,237,000** gas is the first at which `distribute`
+    /// completes, and 95,236,000 still reverts. A 30,000,000-gas block is barely a third of that, so
     /// a `distribute(token)` for this token cannot be mined until the owner re-tables through the
     /// delay — which is the remedy `SECURITY.md`'s F8 row names.
     ///
@@ -1099,8 +1380,8 @@ contract DistributionTest is Test {
         assertFalse(_starvationSucceedsAt(30_000_000), "a 30,000,000-gas distribute is starved");
 
         // And the figure it does need, pinned from both sides at the round thousand.
-        assertTrue(_starvationSucceedsAt(F8_SUCCEEDS_AT), "it first completes at 95,049,000");
-        assertFalse(_starvationSucceedsAt(F8_SUCCEEDS_AT - 1_000), "and not at 95,048,000");
+        assertTrue(_starvationSucceedsAt(F8_SUCCEEDS_AT), "it first completes at 95,237,000");
+        assertFalse(_starvationSucceedsAt(F8_SUCCEEDS_AT - 1_000), "and not at 95,236,000");
 
         emit log_named_uint("F8 distribute completes at   ", F8_SUCCEEDS_AT);
         emit log_named_uint("blocks of 30M that would take", F8_SUCCEEDS_AT / 30_000_000 + 1);
@@ -1135,6 +1416,93 @@ contract DistributionTest is Test {
         tk.mint(address(d), uint256(10_000) * rows);
 
         (ok,) = address(d).call{gas: limit}(abi.encodeCall(Distribution.distribute, (address(tk))));
+    }
+
+    /// @notice #133 item 3, rejected as a contract change: with `delay == 0` an owner contract can
+    /// re-table to itself and `distribute` in one transaction. `PROJECT_OVERVIEW.md` § 5 decides a
+    /// zero delay executes inline and is allowed, and the dapp, widget and `#/docs` flag it — this
+    /// pins the shape so the flag is never quietly the only thing standing between the two.
+    function test_delayZeroOwnerSweepsAtomically() public {
+        // Arrange
+        SweepingOwner o = new SweepingOwner();
+        Distribution d = _deploy(address(o), 0, _defaultTable());
+        _send(d, 10 ether);
+
+        // Act
+        o.sweep(d);
+
+        // Assert
+        assertEq(address(o).balance, 10 ether, "the owner swept the whole balance in one call");
+        assertEq(A.balance, 0, "and the table it replaced was never paid");
+        assertEq(B.balance, 0);
+    }
+
+    /// @notice #133 item 5, unchanged: an ERC-721 has `balanceOf` and no `transfer`, so `_balance`
+    /// reads a *count* of NFTs, every push fails, and `distribute` escrows that count as if it were
+    /// an amount. Accepted under F4's decision 23 — the escrow is phantom, and no NFT moves.
+    function test_nftViaTransferFromPhantomEscrow() public {
+        // Arrange
+        Distribution d = _deploy(0, _defaultTable());
+        PlainNFT nft = new PlainNFT();
+        nft.mint(address(this), 1);
+        nft.mint(address(this), 2);
+        nft.transferFrom(address(this), address(d), 1);
+        nft.transferFrom(address(this), address(d), 2);
+
+        // Act
+        d.distribute(address(nft));
+
+        // Assert — two NFTs read as an amount of 2, split 6000/4000 bps over two rows.
+        assertEq(d.reserved(address(nft)), 2, "the count was escrowed, not the tokens");
+        assertEq(d.escrowed(address(nft), A), 1);
+        assertEq(d.escrowed(address(nft), B), 1);
+        assertEq(nft.ownerOf(1), address(d), "and the NFTs never moved");
+        assertEq(nft.ownerOf(2), address(d));
+
+        // The phantom escrow is self-limiting: the whole balance is reserved, so there is no second.
+        vm.expectRevert(Distribution.NothingToDo.selector);
+        d.distribute(address(nft));
+    }
+
+    /// @notice #133 item 5, unchanged (accepted edge): a balance above 2²⁵⁶ ÷ `bps` overflows the
+    /// share multiply. The arithmetic is checked, so it panics rather than wrapping, and the only
+    /// loss is that `distribute` cannot be called for that token at that balance.
+    function test_hugeBalanceOverflowsShareMath() public {
+        // Arrange
+        Distribution d = _deploy(0, _defaultTable());
+        BigToken tk = new BigToken();
+        tk.mint(address(d), type(uint256).max / 4_000);
+
+        // Act / assert
+        vm.expectRevert(stdError.arithmeticError);
+        d.distribute(address(tk));
+    }
+
+    /// @notice #133 item 5, unchanged: the contract listed as its own row keeps that share, which
+    /// then re-enters the next `distribute` as part of the balance. `_set` rejecting `address(this)`
+    /// was one of the two optional hardenings #136 declines, with its reasons.
+    function test_selfRowRecycles() public {
+        // Arrange — the clone must be in its own table, so the salt is picked before the table is.
+        bytes32 salt = _salt();
+        Distribution d = Distribution(payable(factory.predict(salt)));
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](2);
+        t[0] = _row(address(d), 5000);
+        t[1] = _row(A, 5000);
+        assertEq(factory.create(OWNER, 0, "desc", _asc(t), salt), address(d));
+        _send(d, 1 ether);
+
+        // Act
+        d.distribute(address(0));
+
+        // Assert — its own share stayed put, and nothing is reserved against it.
+        assertEq(address(d).balance, 0.5 ether, "the self row kept its share");
+        assertEq(A.balance, 0.5 ether);
+        assertEq(d.reserved(address(0)), 0, "the push to itself succeeded, so nothing was escrowed");
+
+        // And it recycles: the retained half is the whole of the next distribute's amount.
+        d.distribute(address(0));
+        assertEq(A.balance, 0.75 ether, "half of what was left went out again");
+        assertEq(address(d).balance, 0.25 ether);
     }
 
     function _row(address account, uint96 bps) internal pure returns (Distribution.Beneficiary memory) {
@@ -1202,7 +1570,15 @@ contract DistributionTest is Test {
     }
 
     function _deploy(uint32 delay_, Distribution.Beneficiary[] memory t) internal returns (Distribution d) {
-        d = Distribution(payable(factory.create(OWNER, delay_, "desc", t, _salt())));
+        d = _deploy(OWNER, delay_, t);
+    }
+
+    /// @dev The owner-naming form, for the cases where the owner is a contract of the test's own.
+    function _deploy(address owner_, uint32 delay_, Distribution.Beneficiary[] memory t)
+        internal
+        returns (Distribution d)
+    {
+        d = Distribution(payable(factory.create(owner_, delay_, "desc", t, _salt())));
     }
 
     /// @dev Bound to this contract, which is what calls `create` in this suite, with a counter below

@@ -425,3 +425,127 @@ contract DevToken {
         return true;
     }
 }
+
+/// @notice A beneficiary that accepts ETH only when handed far more gas than `PUSH_GAS` forwards, so
+/// an escrow it is owed can never be pushed to it and `claim` is its only exit (F5, [#95]).
+/// @dev The `receive()` writes one storage slot 600 times: the first write to a zero slot costs
+/// 20,000 and each dirty rewrite 100, so the frame needs more than the 100,000 the push forwards.
+/// `release` therefore fails at *any* outer gas limit — the cap is on the gas forwarded, not on the
+/// limit the caller sets — which is the whole of F5. `take` is how the account calls `claim` for
+/// itself: the cap is gone, so the same `receive()` that cannot be pushed to can be paid.
+/// Its own contract rather than an arm on `GasBurner`: that one is etched at every row of four
+/// tables by `TableCap.t.sol`, so growing it would move every figure in that file.
+contract HungryReceiver {
+    uint256 public sink;
+
+    function take(Distribution d, address token, address to) external {
+        d.claim(token, to);
+    }
+
+    receive() external payable {
+        for (uint256 i; i < 600; ++i) {
+            sink = i; // 600 iterations: well over the 100,000-gas push cap
+        }
+    }
+}
+
+/// @notice An ERC-20 that refuses exactly one recipient — the issuer-blocklist shape F5's second
+/// mechanism names (USDC, USDT) — so a row can be escrowed by the token's own refusal and then
+/// claimed to an address the token does not refuse.
+/// @dev Its own contract rather than a fourth `MockERC20.Ret` arm, for the reason `RevertingToken`'s
+/// docstring gives: `test_usdtStyleNoReturnToken` deploys two `MockERC20`s, so growing that contract
+/// moved an unrelated M01 row by 260,510 gas. `Blocked(address)` is 36 bytes of revert data, over the
+/// word `release` and `claim` sort failures by, which is why the blocked push bubbles rather than
+/// being named — in `distribute` it is escrowed either way.
+contract BlocklistToken {
+    error Blocked(address account);
+
+    address public immutable blocked;
+
+    mapping(address => uint256) public balanceOf;
+
+    constructor(address blocked_) {
+        blocked = blocked_;
+    }
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        if (to == blocked) revert Blocked(to);
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+}
+
+/// @notice An escrowed account whose `receive()` re-enters `claim`, so the shared transient lock is
+/// proved to refuse a second money path from inside the first.
+/// @dev The re-entry's reason is propagated, not recorded: that is what makes the push fail during
+/// `distribute` (so there is an escrow to claim at all) and what the outer `claim` then sorts by
+/// decision 24. `CallbackToken` is the recording half, for reading the reason byte for byte.
+contract ReentrantClaimer {
+    Distribution private immutable target;
+
+    constructor(Distribution target_) {
+        target = target_;
+    }
+
+    function take(address token, address to) external {
+        target.claim(token, to);
+    }
+
+    receive() external payable {
+        target.claim(address(0), address(this));
+    }
+}
+
+/// @notice An owner contract that re-tables to itself and distributes in one transaction — the
+/// atomic sweep a zero delay allows, which `docs/brainstorming/PROJECT_OVERVIEW.md` § 5 decides is
+/// allowed and the UI flags (#133 item 3, rejected as a contract change).
+contract SweepingOwner {
+    function sweep(Distribution d) external {
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](1);
+        t[0] = Distribution.Beneficiary(address(this), 10_000, "name", "note");
+        d.propose(abi.encodeCall(Distribution.setBeneficiaries, (t)));
+        d.distribute(address(0));
+    }
+
+    receive() external payable {}
+}
+
+/// @notice ERC-721-shaped: `balanceOf` and `transferFrom`, and no `transfer` at all, so every push
+/// fails and `distribute` escrows a *count* of NFTs as if it were an amount (F4's decision 23).
+contract PlainNFT {
+    mapping(address => uint256) public balanceOf;
+    mapping(uint256 => address) public ownerOf;
+
+    function mint(address to, uint256 id) external {
+        ownerOf[id] = to;
+        balanceOf[to]++;
+    }
+
+    function transferFrom(address from, address to, uint256 id) external {
+        require(ownerOf[id] == from);
+        ownerOf[id] = to;
+        balanceOf[from]--;
+        balanceOf[to]++;
+    }
+}
+
+/// @notice An ERC-20 that can hold a balance large enough to overflow the share arithmetic, so the
+/// accepted edge above 2²⁵⁶ ÷ `bps` can be pinned (#133 item 5, unchanged).
+contract BigToken {
+    mapping(address => uint256) public balanceOf;
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+}
