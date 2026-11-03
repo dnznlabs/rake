@@ -48,7 +48,7 @@ function widget() {
     addEventListener() {},
   };
   const win = {};
-  const api = new Function('window', 'document', `${body}\nreturn { decode, SNAP, SETBEN };`)(win, doc);
+  const api = new Function('window', 'document', `${body}\nreturn { decode, SNAP, SETBEN, etaText, GRACE };`)(win, doc);
   assert.deepEqual(Object.keys(win.RakeWidget), ['mount', 'refresh'], 'the widget\'s public surface changed');
   return api;
 }
@@ -139,6 +139,32 @@ test('the two selector literals are the ones cast recorded', () => {
   assert.match(setBeneficiaries ?? '', /^0x[0-9a-f]{8}$/, 'selectors.txt carries no setBeneficiaries(…)');
   assert.equal(SNAP, snapshot);
   assert.equal(SETBEN, setBeneficiaries);
+});
+
+/* The queued line's far end. Before t08 a matured entry read `ready to apply` for ever, which the
+   contract stops being true fourteen days after the eta (`src/Distribution.sol:249`). The fixture's
+   own eta is years past, so this is a decoded pending entry rather than a bare number. */
+test('a decoded pending entry past the window renders expired', () => {
+  const { decode, etaText } = widget();
+  const snap = decode(fixture('snapshot.return'));
+  const now = Math.floor(Date.now() / 1000);
+
+  /* Without this the assertion below would pass on an eta that merely matured, which is the bug. */
+  assert.ok(snap.pending[0].eta + 14 * 86400 < now, 'the fixture\'s eta is no longer past the window');
+  assert.equal(etaText(snap.pending[0].eta), 'expired');
+  // The two phases it must not swallow: still waiting, and matured but inside the window.
+  assert.equal(etaText(now + 3 * 86400 + 14 * 3600), 'lands in 3d 14h');
+  assert.equal(etaText(now - 86400), 'ready to apply');
+});
+
+/* The one contract constant the widget copies rather than reads, because reading it would cost the
+   second `eth_call` the design forbids. Pinned here so moving `GRACE` fails a test rather than
+   shipping a widget that disagrees with the chain. */
+test('the widget\'s GRACE literal is the contract\'s fourteen days', () => {
+  assert.equal(widget().GRACE, 14 * 86400);
+  assert.equal(widget().GRACE, 1209600);
+  // And it is named in the source beside its home, so the next reader knows where to re-check it.
+  assert.match(SRC, /GRACE` in `src\/Distribution\.sol`/);
 });
 
 /* (c) */
