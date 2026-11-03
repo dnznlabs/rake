@@ -435,7 +435,8 @@ async function loadDistro(addr) {
    block when the `Created` scan found it, else the factory's — never genesis. */
 const CHANGE_EVENTS = [['Queued(bytes32,uint32,uint256,bytes)', 'queued'], ['Applied(bytes32)', 'applied'], ['Cancelled(bytes32)', 'cancelled'],
   ['OwnershipTransferred(address,address)', 'accepted']];
-const FUND_EVENTS = [['Received(address,uint256)', 'in'], ['Distributed(address,uint256)', 'distributed'], ['Escrowed(address,address,uint256)', 'escrowed'], ['Released(address,address,uint256)', 'released']];
+const FUND_EVENTS = [['Received(address,uint256)', 'in'], ['Distributed(address,uint256)', 'distributed'], ['Escrowed(address,address,uint256)', 'escrowed'], ['Released(address,address,uint256)', 'released'],
+  ['Claimed(address,address,address,uint256)', 'claimed']];
 /* Filled by the `Created` scan: a distribution's own first block, which is a better `fromBlock` than
    the factory's for anything created long after it. */
 const FIRST = new Map();
@@ -490,9 +491,22 @@ function entry(log) {
     // The nomination's `Applied` is not the handover; this is, and it is the only log the nominee's call leaves.
     e.what = `owner · ${ext('address', at(1), short(at(1)))} → ${ext('address', at(2), short(at(2)))}`;
   } else if (kind === 'in') {
-    e.what = `${eth(log.data)} from ${ext('address', at(1), short(at(1)))}`;
+    /* `init` logs `Received(address(0), balance)` for value already at the address when the clone was
+       initialised — value that rode the `create`, or a send to the counterfactual address before any
+       code was there (`src/Distribution.sol:128-131`). The sentinel has no sender to link, so it reads
+       as what it means rather than as a payment from `0x000…0`. An ERC-20 `Transfer` from the zero
+       address is a mint and keeps its link: that path is `tokenIn`'s, not this one. */
+    e.from = at(1);
+    e.what = `${eth(log.data)} ${e.from === ZERO ? 'present at creation' : `from ${ext('address', e.from, short(e.from))}`}`;
   } else if (kind === 'distributed') {
     e.token = at(1); e.amount = log.data;
+  } else if (kind === 'claimed') {
+    /* `Claimed(token, account, to, amount)` indexes the first two and carries the other two in its
+       data: it is the one fund log whose destination is not the account it is credited to, because
+       `claim` takes a `to` the escrowed account chooses. */
+    e.token = at(1); e.account = at(2);
+    const [to, amount] = Eth.dec(['address', 'uint256'], log.data);
+    e.to = to; e.amount = '0x' + amount.toString(16);
   } else {
     // `Escrowed` and `Released` both index the token then the account, which is the token list and the
     // escrow list the funds block reads: nothing on chain carries either one.
@@ -507,6 +521,7 @@ const token = (a, known = true) => a === ZERO ? 'ETH' : ext('address', a, known 
    `decimalsOf` found for the token, `null` included — `amt` prints that as raw units. */
 const fundWhat = (e, dec, known = true) => e.kind === 'distributed' ? `${money(e.amount, e.token, dec)} by the table`
   : e.kind === 'in' ? `${money(e.amount, e.token, dec, known)} from ${ext('address', e.from, short(e.from))}`
+  : e.kind === 'claimed' ? `${money(e.amount, e.token, dec)} · ${ext('address', e.account, short(e.account))} claimed to ${ext('address', e.to, short(e.to))}`
   : `${money(e.amount, e.token, dec)} · ${ext('address', e.account, short(e.account))}`;
 /* A decoded pending action as one line, named by the setter it calls. `setBeneficiaries` is also
    drawn as a second bar; the other three say everything they do here. `transferOwnership` has three
@@ -982,6 +997,7 @@ async function detail(addr) {
     if (stale(t)) return;
     fill('funds', fundsHTML(d, f, h.other));
     bindOthers(d, h.other, t);
+    bindClaims();
     bindAll();
   }).catch(() => {
     if (stale(t)) return;
@@ -1226,7 +1242,12 @@ async function readFunds(d, funds) {
   const escrows = await Promise.all(pairs.map(async k => {
     const [tk, ac] = k.split(' ');
     const [held] = await call(d.addr, 'escrowed(address,address)', [tk, ac], ['uint256']);
-    return { tk, ac, held, dec: await decimalsOf(tk) };
+    /* `claim` is self-only on chain, so the row's second control is offered to the escrowed account
+       and to a vault it signs for — decision 7's probe, the same one `ownerView` runs for the owner.
+       Asked here because `fundsHTML` is synchronous, and only where it can change the answer: the
+       connected account being the escrowed account is cheaper and takes precedence. */
+    const signs = !!ACC && !same(ACC, ac) && await signsFor(ac);
+    return { tk, ac, held, signs, dec: await decimalsOf(tk) };
   }));
   return { rows, escrows: escrows.filter(e => e.held > 0n) };
 }
@@ -1262,6 +1283,39 @@ function bindOthers(d, other, t) {
   };
 }
 const frow = (k, sub, n, ctl, cls) => `<div class="frow${cls ? ' ' + cls : ''}"><div><b>${k}</b>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="n">${n}</div><div class="c">${ctl}</div></div>`;
+/* An escrow row's controls. `release` is permissionless and on every row, as it has been: anyone may
+   retry the push the distribution owes. `claim` is the escrowed account's own exit (F5, #95) and the
+   contract takes it from that account only, so it appears for that account — as a transaction where
+   the connected wallet is it, and as calldata where the connected wallet merely signs for it
+   (decision 7). `to` is the one argument the contract does not check, so this field does: it defaults
+   to the account itself, resolves a name the way the owner field does, and an unusable value throws
+   out of the argument thunk, which lands on the status line and sends nothing. */
+function escrowActs(d, e) {
+  const rel = sctl(`rel:${e.tk}:${e.ac}`, 'release', { to: d.addr, sig: 'release(address,address)', args: () => [e.tk, e.ac], label: 'release' });
+  const mine = same(ACC, e.ac);
+  if (!mine && !e.signs) return rel;
+  const key = `claim:${e.tk}:${e.ac}`, to = `to:${key}`, res = `res:${key}`;
+  const w = {
+    to: d.addr, sig: 'claim(address,address)', label: 'claim',
+    args: () => {
+      const v = document.getElementById(to).value.trim();
+      if (!isAddr(v)) throw new Error('claim sends to an address — a name resolves on mainnet and Sepolia');
+      if (!checksumOk(v)) throw new Error(BAD_SUM);
+      return [e.tk, Eth.checksum(v)];
+    },
+  };
+  return `<div class="acts">${rel}`
+    + `<input class="narrow" id="${to}" data-claimto="${res}" aria-label="claim to" placeholder="to — 0x…" value="${esc(mine ? ACC : e.ac)}">`
+    + `${mine ? sctl(key, 'claim', w) : wctl(key, 'claim', w)}</div><div class="res" id="${res}"></div>`;
+}
+/* The `to` field's one behaviour beyond holding text: a name resolves on change, through the same
+   `addrField` the owner field uses, which writes its own line into the `.res` beside it. The value is
+   read out of the DOM when the button fires, so a typed address needs no state of its own. */
+function bindClaims() {
+  V.querySelectorAll('[data-claimto]').forEach(el => {
+    el.onchange = async () => { const a = await addrField(el.value, document.getElementById(el.dataset.claimto)); if (a) el.value = a; };
+  });
+}
 function fundsHTML(d, f, other) {
   const rows = f.rows.map(r => frow(
     token(r.tk),
@@ -1271,9 +1325,10 @@ function fundsHTML(d, f, other) {
   )).join('');
   const escrows = f.escrows.map(e => frow(
     `escrowed · ${token(e.tk)}`,
-    `${ext('address', e.ac, esc(short(e.ac)))} — the push failed, so this share waits here`,
+    `${ext('address', e.ac, esc(short(e.ac)))} — the push failed, so this share waits here`
+      + (e.signs || same(ACC, e.ac) ? ' · release retries the push under its gas cap; claim is the account\'s own exit, paid with its own gas' : ''),
     e.tk === ZERO ? eth(e.held) : amt(e.held, e.dec),
-    sctl(`rel:${e.tk}:${e.ac}`, 'release', { to: d.addr, sig: 'release(address,address)', args: () => [e.tk, e.ac], label: 'release' }),
+    escrowActs(d, e),
     'err',
   )).join('');
   const n = other && new Set(other.map(e => e.token)).size;
