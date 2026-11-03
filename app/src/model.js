@@ -4,15 +4,17 @@
    eth.js first, and test/model.test.mjs puts the same module on globalThis before calling anything
    here. Nothing at module scope reads it, so the order only matters at call time. */
 const Model = (() => {
-  const BENEFICIARY = '(address,uint96,string,string)';
+  /* The `Beneficiary` tuple, in one place: `SNAPSHOT_T` is built from it and `beneficiaries()` — the
+     one-view fallback for a provider that will not answer `snapshot()` — decodes with it directly. */
+  const BENEFICIARY_T = '(address,uint96,string,string)';
   /* The `snapshot()` return type, in one place: every reader of a distribution decodes with this. */
-  const SNAPSHOT_T = `(address,uint32,uint32,string,${BENEFICIARY}[],(bytes32,uint256,bytes)[])`;
+  const SNAPSHOT_T = `(address,uint32,uint32,string,${BENEFICIARY_T}[],(bytes32,uint256,bytes)[])`;
   /* The four `onlySelf` setters a pending action can carry. `transferOwnership(address)` is one call
      with three effects since decision 21 — it nominates, and `address(0)` renounces, and the current
      owner's own address withdraws a nomination still in flight — so it decodes as one and
      `ownerChange` below says which of the three a decoded action is. */
   const SETTERS = [
-    [`setBeneficiaries(${BENEFICIARY}[])`, 'setBeneficiaries', 'table'],
+    [`setBeneficiaries(${BENEFICIARY_T}[])`, 'setBeneficiaries', 'table'],
     ['setDescription(string)', 'setDescription', 'description'],
     ['setDelay(uint32)', 'setDelay', 'delay'],
     ['transferOwnership(address)', 'transferOwnership', 'owner'],
@@ -168,6 +170,6 @@ const Model = (() => {
     return '0x' + node;
   }
 
-  return { SNAPSHOT_T, pct, countdown, deadline, dateText, decodePending, ownerChange, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash };
+  return { SNAPSHOT_T, BENEFICIARY_T, pct, countdown, deadline, dateText, decodePending, ownerChange, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash };
 })();
 export default Model;

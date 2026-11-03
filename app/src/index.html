@@ -420,15 +420,42 @@ async function load() {
 async function loadDistro(addr) {
   const code = await P.request({ method: 'eth_getCode', params: [addr, 'latest'] });
   if (!code || code === '0x') return { addr, missing: true };
-  const [snap] = Eth.dec([Model.SNAPSHOT_T], await P.request({ method: 'eth_call', params: [{ to: addr, data: Eth.enc('snapshot()', []) }, 'latest'] }));
+  let snap = null;
+  try {
+    /*DEV*/
+    // The rehearsal's way into the fallback below without a hostile node; stripped from the bundle that ships.
+    if (Q.get('nosnapshot')) throw new Error('nosnapshot=1');
+    /*DEV*/
+    [snap] = Eth.dec([Model.SNAPSHOT_T], await P.request({ method: 'eth_call', params: [{ to: addr, data: Eth.enc('snapshot()', []) }, 'latest'] }));
+  } catch (e) { snap = null; }
   const [reserved, balance, nominee] = await Promise.all([
     call(addr, 'reserved(address)', [ZERO], ['uint256']),
     P.request({ method: 'eth_getBalance', params: [addr, 'latest'] }),
     call(addr, 'pendingOwner()', [], ['address']),
   ]);
-  const [owner, delay, nonce, description, table, pending] = snap;
   const waiting = BigInt(balance) - reserved[0];
-  return { addr, owner, delay, nonce, description, table, pending, pendingOwner: nominee[0], waiting: waiting > 0n ? waiting : 0n };
+  const d = { addr, pendingOwner: nominee[0], waiting: waiting > 0n ? waiting : 0n };
+  if (snap) {
+    const [owner, delay, nonce, description, table, pending] = snap;
+    return { ...d, owner, delay, nonce, description, table, pending };
+  }
+  /* #137 item 2. `snapshot()` is one call returning every list at once, so a provider that will not
+     answer it — a gas cap on `eth_call`, a result-size limit, a revert — takes the whole page down
+     with it. The same state comes back in five calls, each returning one bounded thing, and the one
+     member no single view returns is `_pending`: that list is rebuilt from the `Queued` logs in
+     `detail` below, which carry hash, eta and action. `pending: null` is the signal to do it, and
+     tells "not read yet" from the empty queue a `[]` would be indistinguishable from. #136 closed the
+     contract side — no paging, no cap on `_pending` — so this is the dapp's whole answer.
+     `beneficiaries()` is not guarded: a failed table read is a failed read like any other here, and a
+     distribution rendered without its table would be a lie rather than a degraded truth. */
+  const [[owner], [delay], [nonce], [description], [table]] = await Promise.all([
+    call(addr, 'owner()', [], ['address']),
+    call(addr, 'delay()', [], ['uint32']),
+    call(addr, 'nonce()', [], ['uint32']),
+    call(addr, 'description()', [], ['string']),
+    call(addr, 'beneficiaries()', [], [`${Model.BENEFICIARY_T}[]`]),
+  ]);
+  return { ...d, owner, delay, nonce, description, table, pending: null, rebuilt: true };
 }
 
 /* The histories, as two log queries with their topic0s OR'd. `from` is the distribution's own first
@@ -482,7 +509,9 @@ function entry(log) {
   if (kind === 'queued') {
     const [nonce, eta, action] = Eth.dec(['uint32', 'uint256', 'bytes'], log.data);
     // The `uint32 nonce` `applyQueued` takes: `snapshot()`'s struct does not carry it, this log does.
-    e.hash = log.topics[1]; e.nonce = Number(nonce); e.desc = describe(Model.decodePending(action));
+    // The eta and the action ride along for the fallback above, which rebuilds `_pending` from these.
+    e.hash = log.topics[1]; e.nonce = Number(nonce); e.eta = eta; e.action = action;
+    e.desc = describe(Model.decodePending(action));
     e.what = `${e.desc} · nonce ${nonce} · ${Model.countdown(eta, secs())}`;
   } else if (kind === 'applied' || kind === 'cancelled') {
     e.hash = log.topics[1];
@@ -612,7 +641,11 @@ const lowers = (d, p) => p.kind !== 'setDelay' || Number(p.delay) >= Number(d.de
    window, and expired, which only a cancel can clear. With `acts`, each row also carries what can be
    done to it — which is the detail page only. */
 function pendingBlock(d, acts) {
-  return d.pending.map((p, i) => {
+  /* The fallback's list is the queue log's, so the block says so: it is as fresh as the last log
+     query rather than as fresh as the call that could not be made. `d.pending` is null until that
+     query lands, which is why the map is guarded rather than the notice. */
+  const lag = d.rebuilt ? notice('the one-call view could not be read — this list is rebuilt from the queue log and may lag it by a block', 'warn') : '';
+  return lag + (d.pending || []).map((p, i) => {
     const decoded = Model.decodePending(p[2]);
     // The tx that queued it comes from the logs, so it appears once `history` has landed.
     const tx = DS.qtx && DS.qtx.get(p[0]);
@@ -982,6 +1015,10 @@ async function detail(addr) {
     if (stale(t)) return;
     DS.nonces = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.nonce]));
     DS.qtx = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.tx]));
+    /* The fallback's pending list, as `snapshot()` would have returned it: every `Queued` the history
+       pass did not find an `Applied` or a `Cancelled` for, oldest first — `h.changes` is newest-first
+       and `_pending` is the queue's own order. */
+    if (d.pending === null) d.pending = h.changes.filter(e => e.kind === 'queued' && !e.closed).reverse().map(e => [e.hash, e.eta, e.action]);
     histFill('h-changes', h.changes, 'no change has been queued yet.');
     fill('pending', pendingBlock(d, true));
     /* The fund rows carry amounts in their token's own units (#43), and the changes above do not, so
