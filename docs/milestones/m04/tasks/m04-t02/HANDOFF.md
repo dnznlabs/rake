@@ -1,6 +1,6 @@
 # m04-t02 — handoff
 
-PR: pending · Branch: `m04/t02-gateway` · 2026-11-07
+PR: #163 · Branch: `m04/t02-gateway` · 2026-11-07
 
 `make serve` now brings up a third process beside anvil and the dapp: `tools/gateway.sh` clones
 [ethstorage/web3url-gateway](https://github.com/ethstorage/web3url-gateway) at the pinned
