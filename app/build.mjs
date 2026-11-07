@@ -27,29 +27,32 @@ const chain = flag('chain', '31337');
 
 /* A contract's address, and the block it was created in as `<NAME>_BLOCK`: a log scan needs a
    `fromBlock`, and genesis is not one on a chain with a history. */
+/* A creation block is only as good as the receipt it was joined to, and that join is by transaction
+   hash — m03-t06 found `run-latest.json` filing a hash under the wrong transaction object. A
+   `fromBlock` off a mispaired receipt looks fine and silently starts a log scan in the wrong place,
+   so a log that cannot be paired yields its addresses (which come off the transactions, not the
+   join) and no block at all. `withheld` remembers which, so a bundle that turns out to need one of
+   them is refused with the reason rather than with "nothing to substitute" — see rake#140. */
 function deployed() {
-  const out = {}, dir = join(root, 'broadcast');
-  if (!existsSync(dir)) return out;
+  const out = {}, withheld = new Map(), dir = join(root, 'broadcast');
+  if (!existsSync(dir)) return { out, withheld };
   for (const script of readdirSync(dir).sort()) {
     const file = join(dir, script, chain, 'run-latest.json');
     if (!existsSync(file)) continue;
     const log = JSON.parse(readFileSync(file, 'utf8'));
-    /* Before the pairing is used, never after: the receipt a creation block comes from is joined to
-       its transaction by hash, and m03-t06 found `run-latest.json` filing a hash under the wrong
-       transaction object. A `fromBlock` off a mispaired receipt looks fine and silently starts a log
-       scan in the wrong place, so the build refuses the log rather than emit it — see rake#140. */
-    assertPairable(file, log);
     for (const c of creations(log)) {
       const name = c.name.toUpperCase();
       /* Checksummed: the log is lowercase, and the same address two ways gzips to two sizes. */
       out[name] = Eth.checksum(c.address);
       if (c.block != null) out[`${name}_BLOCK`] = '0x' + BigInt(c.block).toString(16);
+      else withheld.set(`${name}_BLOCK`, { file, log });
     }
   }
-  return out;
+  return { out, withheld };
 }
 
-const values = { VERSION: 'v0.1', ...deployed(), CHAIN_ID: chain };
+const { out: onchain, withheld } = deployed();
+const values = { VERSION: 'v0.1', ...onchain, CHAIN_ID: chain };
 argv.forEach((a, i) => {
   if (a !== '--set') return;
   const [k, ...v] = (argv[i + 1] || '').split('=');
@@ -61,6 +64,9 @@ function substitute(text, label) {
   const missing = new Set();
   const out = text.replace(/__([A-Z][A-Z0-9_]*)__/g, (m, k) => { if (k in values) return values[k]; missing.add(k); return m; });
   if (!missing.size) return out;
+  /* A block this build deliberately withheld is a different failure with a different fix, so it gets
+     its own message: the log is there, it just cannot say which receipt belongs to which contract. */
+  for (const k of missing) if (withheld.has(k)) assertPairable(withheld.get(k).file, withheld.get(k).log);
   console.error(`build: nothing to substitute for ${[...missing].map(k => `__${k}__`).join(', ')} in ${label} on chain ${chain}`);
   console.error("       'make deploy' writes the broadcast logs these come from, or pass --set NAME=value");
   process.exit(1);

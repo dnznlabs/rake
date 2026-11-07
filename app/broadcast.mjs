@@ -18,14 +18,16 @@ export const isCreate = t => t.transactionType === 'CREATE' || t.transactionType
 /** Throws unless `log`'s creation block can be trusted to the transaction that made it. `file` names
    the log in the message.
 
-   A log that created nothing is exempt, and that is not a loophole: `Chunks.s.sol`'s log is five
-   `addChunk` calls with no deploy in it, and nothing reads a creation block out of it. The check is
-   on the logs this module actually pairs. */
+   Called where a block from this log is actually *wanted*, not on every log read: a log that created
+   nothing has no block to misread (`Chunks.s.sol` is five `addChunk` calls, `Seed.s.sol` three
+   sends), and `Fixtures.s.sol` creates four test mocks in one broadcast whose blocks nothing has ever
+   asked for. Refusing those outright would make `make fixtures` fatal to the next `make dapp` while
+   protecting a figure no bundle reads. */
 export function assertPairable(file, log) {
   const txs = log.transactions || [], receipts = log.receipts || [];
   const creations = txs.filter(isCreate);
   if (!creations.length) return;
-  if (creations.length === 1 && receipts.length === txs.length) return;
+  if (pairable(log)) return;
   throw new Error(
     `build: ${file} has ${creations.length} creations and ${receipts.length} receipts for `
     + `${txs.length} transactions, so a creation block read from it cannot be trusted.\n`
@@ -37,14 +39,27 @@ export function assertPairable(file, log) {
   );
 }
 
-/** Every contract `log` created, as `{ name, address, block }`, with `block` null where no receipt
-   carries one. Call `assertPairable` first: this function is the pairing the assertion guards. */
+/** Whether a creation block read out of `log` can be trusted to its contract: one creation, and a
+   receipt for every transaction. `assertPairable` is the same question asked fatally. */
+export function pairable(log) {
+  const txs = log.transactions || [], receipts = log.receipts || [];
+  return txs.filter(isCreate).length === 1 && receipts.length === txs.length;
+}
+
+/** Every contract `log` created, as `{ name, address, block }`.
+
+   The address comes off the transaction itself, so it is sound whatever the receipts say. The block
+   does not — it comes off the hash join — so it is `null` unless the log is `pairable`, and `null`
+   again where the matched receipt carries no block. A withheld block is not a silent omission: the
+   caller offers no `<NAME>_BLOCK` for it, and a bundle that needs one then refuses by name rather
+   than substituting a figure nothing can stand behind. */
 export function creations(log) {
   /* Matched by hash rather than by index: the receipt order is forge's, not this file's contract. */
   const blocks = new Map((log.receipts || []).map(r => [r.transactionHash, r.blockNumber]));
+  const trust = pairable(log);
   return (log.transactions || []).filter(t => isCreate(t) && t.contractName).map(t => ({
     name: t.contractName,
     address: t.contractAddress,
-    block: blocks.has(t.hash) ? blocks.get(t.hash) : null,
+    block: trust && blocks.has(t.hash) ? blocks.get(t.hash) : null,
   }));
 }

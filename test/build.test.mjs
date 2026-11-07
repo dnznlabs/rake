@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assertPairable, creations, isCreate } from '../app/broadcast.mjs';
+import { assertPairable, creations, isCreate, pairable } from '../app/broadcast.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -98,14 +98,46 @@ test('CREATE2 counts as a creation, and a plain call does not', () => {
 });
 
 /* The assertion is only worth anything if the build actually calls it before it pairs. */
-test('build.mjs runs the assertion before it reads a block from the log', () => {
+test('an ambiguous log gives up its addresses but never a block', () => {
+  /* The address comes off the transaction and is sound whatever the receipts say; the block comes
+     off the hash join and is the only thing rake#140 can corrupt. So a two-creation log still
+     resolves `__APP__`, and withholds `__APP_BLOCK__`. */
+  assert.equal(pairable(TWO), false);
+
+  const got = creations(TWO);
+
+  assert.deepEqual(got.map(c => c.name), ['DistributionFactory', 'App']);
+  assert.deepEqual(got.map(c => c.address), ['0x' + '1'.repeat(40), '0x' + '2'.repeat(40)]);
+  assert.deepEqual(got.map(c => c.block), [null, null], 'a block was offered from a log that cannot be paired');
+});
+
+test('Fixtures.s.sol\'s four mocks do not make the next build fatal', () => {
+  /* `make fixtures` is a documented hand-run step (AGENTS.md § The dapp) and its broadcast log
+     creates four test mocks at once. Nothing substitutes a mock's block, so the build must keep
+     working: the addresses resolve and only the blocks are withheld. */
+  const fixtures = {
+    transactions: ['RevertingReceiver', 'MockERC20', 'MockVault', 'BlocklistToken']
+      .map((n, i) => tx('0x' + String(i).repeat(2), n, '0x' + String(i + 1).repeat(40), 'CREATE')),
+    receipts: [0, 1, 2, 3].map(i => receipt('0x' + String(i).repeat(2), '0x' + (i + 10).toString(16))),
+  };
+
+  const got = creations(fixtures);
+
+  assert.equal(got.length, 4);
+  assert.deepEqual(got.map(c => c.block), [null, null, null, null]);
+  // And the demand is what throws, so a build that *did* want one of these is still refused.
+  assert.throws(() => assertPairable('broadcast/Fixtures.s.sol/31337/run-latest.json', fixtures),
+    /4 creations and 4 receipts for 4 transactions/);
+});
+
+test('build.mjs refuses a withheld block by name rather than substituting one', () => {
   const src = readFileSync(join(root, 'app/build.mjs'), 'utf8');
 
-  const guard = src.indexOf('assertPairable(file, log)');
-  const use = src.indexOf('creations(log)');
-
-  assert.ok(guard > 0, 'app/build.mjs does not call assertPairable');
-  assert.ok(use > guard, 'app/build.mjs pairs the log before it asserts the log is pairable');
+  /* The wiring this depends on: a block the pairing could not give is remembered in `withheld`, and
+     `substitute` turns a demand for it into the rake#140 refusal instead of "nothing to substitute". */
+  assert.match(src, /else withheld\.set\(`\$\{name\}_BLOCK`/);
+  assert.match(src, /for \(const k of missing\) if \(withheld\.has\(k\)\) assertPairable\(/);
+  assert.ok(src.indexOf('creations(log)') > 0, 'app/build.mjs does not pair through creations()');
   // The AC's grep: one reference to the issue, in the file whose refusal it explains.
   assert.equal((src.match(/rake#140/g) || []).length, 1);
 });
@@ -123,7 +155,21 @@ test('every broadcast log in this working tree passes the assertion', () => {
     }
   }
 
-  for (const file of files) assertPairable(file, JSON.parse(readFileSync(file, 'utf8')));
+  /* Every `__NAME___BLOCK__` the three sources ask for, which is the only set that has to resolve.
+     `Fixtures.s.sol` creates four mocks in one log and so offers none of their blocks — that is the
+     design, and what must hold is that nothing the bundle reads is among them. */
+  const wanted = new Set();
+  for (const f of ['app/src/index.html', 'app/src/widget.js', 'app/src/host.html']) {
+    for (const m of readFileSync(join(root, f), 'utf8').matchAll(/__([A-Z][A-Z0-9_]*_BLOCK)__/g)) wanted.add(m[1]);
+  }
+  const offered = new Set();
+  for (const file of files) {
+    for (const c of creations(JSON.parse(readFileSync(file, 'utf8')))) {
+      if (c.block != null) offered.add(`${c.name.toUpperCase()}_BLOCK`);
+    }
+  }
 
-  assert.ok(files.length >= 0);
+  assert.ok(files.length > 0, 'no broadcast log in this tree — deploy first, or this proves nothing');
+  assert.ok(wanted.size > 0, 'no source asks for a creation block — this test has stopped measuring anything');
+  for (const k of wanted) assert.ok(offered.has(k), `__${k}__ is wanted by the bundle and no pairable log offers it`);
 });
