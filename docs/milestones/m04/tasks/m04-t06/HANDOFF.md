@@ -1,6 +1,6 @@
 # m04-t06 — handoff
 
-PR: pending · Branch: `m04/t06-slither` · 2026-11-07
+PR: #170 · Branch: `m04/t06-slither` · 2026-11-07
 
 Slither 0.11.5 is pinned in `devbox.lock`, configured by one tracked
 `slither.config.json`, gated by a tracked `slither.db.json`, wired to
