@@ -1,6 +1,6 @@
 # m04-t01 — handoff
 
-PR: pending · Branch: `m04/t01-dapp` · 2026-11-07
+PR: #164 · Branch: `m04/t01-dapp` · 2026-11-07
 
 Step 5 went first, as the plan instructed, and inverted the paragraph it was testing: on this host the
 cached Playwright chromium launches and the nix one does not exist, so every browser check below ran
