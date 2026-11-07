@@ -48,19 +48,26 @@ than quote. "Both chains" means Sepolia and Base Sepolia, every time.
 3. **The document on chain is the bundle, and the gateway serves it.** Per chain, after
    `make dapp-nodev` for that chain: `make chain-doc` reports `inflated sha256` equal to
    `sha256sum app/dist/index.html` and `widget sha256` equal to `sha256sum app/dist/widget.js`;
-   `curl -s https://0x00a90943f58b6ab7fde05aae01c13a80e6995bae.<chainId>.w3link.io/ | sha256sum`
-   equals `sha256sum` of the string `cast call <App> "html()(string)"` returns, and
-   `curl -sI …/widget.js` carries `content-type: application/javascript` with a body equal to
-   `app/dist/widget.js`. The gateway host form is decision 19's; if the hosted gateway's chain list
+   `curl -s https://0x00a90943f58b6ab7fde05aae01c13a80e6995bae.<chainId>.w3link.io/` is the string
+   `cast call <App> "html()(string)"` returns **plus the one `<script>` block the gateway injects
+   after `<body>`** (`cmd/server/html.patch`; 7,871 bytes at commit `c582671`, measured on anvil
+   2026-11-07 — `make gateway-check` from m04-t02 is the comparison, pointed at the hosted URL),
+   with the response headers `Web3-Resolve-Mode: resourceRequest` and `Web3-Mode-Auto-Method:
+   request`; and `curl -sI …/widget.js` carries `content-type: application/javascript` with a body
+   equal to `app/dist/widget.js`. *Amended 2026-11-07 at t02's rehearsal: the first wording asked
+   for byte equality of `/` with `html()`, which no gateway built from that code can give.* The gateway host form is decision 19's; if the hosted gateway's chain list
    differs from its README (both testnets are listed there, read 2026-11-07), the task says which
    gateway it used and why, and criterion 5's snippet names that one.
-4. **The history survives a capped provider.** `test/model.test.mjs` (or a sibling) holds a test
-   that the log reader splits a 100,000-block range into windows no larger than the limit the
-   dapp sets, and retries one window on the provider's "range too large" error class; and on
-   Sepolia through MetaMask's default RPC, the DNZN distribution's page shows its `Created` row
-   under changes and its `create` deposit under activity rather than `history unavailable`. This is
-   [#76](https://github.com/dnznlabs/rake/issues/76) closed; the window size is the task's to measure
-   against publicnode and Infura and record.
+4. **The history survives a capped provider.** `test/model.test.mjs` holds tests that the log
+   reader splits a range into windows, reads a provider's cap out of its error text (measured
+   2026-11-07: `exceed maximum block range: 50000` on publicnode's Sepolia, `eth_getLogs is
+   limited to a 200 range` on `sepolia.base.org`, `pruned history unavailable` behind publicnode's
+   horizon) and retries; the page stops after a bounded number of requests and says `history before
+   block N not loaded` with a working `load older`, rather than `history unavailable`. On both
+   chains through MetaMask's default RPC, the DNZN distribution's page shows its `Created` row
+   under changes and its `create` deposit under activity. This is
+   [#76](https://github.com/dnznlabs/rake/issues/76) closed; m04-t01 carries the measurements and
+   the constants.
 5. **The widget is embedded on a host we do not serve.** A page at a URL the handoff records, on
    the host decision M04-D1 names, contains the two-line snippet `#/docs` § the widget gives for
    Sepolia (`src="https://0x00a90943….11155111.w3link.io/widget.js"`, `data-rake` the DNZN
@@ -161,8 +168,8 @@ Everything `app/` owes before the bundle is uploaded to a public chain, with not
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m04-t01 | Log reading in provider-sized windows with a retry on the range error, sized against publicnode and Infura (#76); a `Received` whose `S.grace` is read before `txError` can need it (#148); the widget's expiry judged against the block timestamp it already decodes, or labelled as local time (#149); one sentence under `#/docs` § Limits naming tokens whose balance falls on its own beside the fee-on-transfer one (decision 23, reaffirmed 2026-11-07); `AGENTS.md`'s chromium paragraph re-tested and rewritten (#110); `app/build.mjs` asserting one creation per script before it reads a block from `run-latest.json` (#140). Closes #76, #110, #140, #148, #149 | not started — scoped at this file's merge |
-| m04-t02 | **The gateway in the dev stack, before a single testnet transaction.** [ethstorage/web3url-gateway](https://github.com/ethstorage/web3url-gateway) — the software behind w3link.io — as a third process `make serve` brings up beside anvil and the dapp: `go@1.27` added to `devbox.json` (nixpkgs has 1.27.1; the gateway's `go.mod` asks 1.27.3, so the first build fetches that toolchain the way Go does, or the task pins a commit that does not); a `tools/gateway.sh` that clones the repo at a pinned commit (`c5826718`, 2026-10-23, is `main` at scoping) into gitignored `cache/`, builds `./cmd/server`, and writes its `config.toml` from a tracked template — `RunAsHttp = true`, `ServerPort = $GATEWAY_PORT`, `CORS = "*"`, `pageCache.enabled = false` (a cache hides a re-upload), `defaultChain = 31337`, `[chainConfigs.31337]` at `http://127.0.0.1:$ANVIL_PORT`; a `procs/30-gateway.yml` that depends on `deploy` and probes readiness with a `curl` of the root. The URL form is four labels, `http://0x<App>.31337.w3.localhost:$GATEWAY_PORT/`, because `handleSubdomain` takes the last two labels as the gateway's own host and needs `<address>.<chain>` in front of them (`protocol.go:416-498`); Chrome resolves any `*.localhost` to loopback, `curl` needs `--resolve`. `AGENTS.md` § The dapp and the `#/docs` host page gain the local form. Measure the two things no client has measured yet: the ERC-5219 surface as a real gateway consumes it — `/` is `html()`'s bytes with `text/html`, `/widget.js` is `app/dist/widget.js` with `application/javascript` (Freedom reads `html()` for every path by design, decision 19, so it cannot test this); and wallet reach — the gateway URL opened in Chrome with MetaMask has `window.top === window`, `window.ethereum` present, and one transaction sent from it. Evidence: the `eth_call`s the gateway made, read from anvil's log, and the response headers. **If the 5219 shape fails here, stop:** the fix is a `src/App.sol` byte, which is M03 reopened and Denizen's decision, and it is the reason this task runs before t03 spends gas on an address that cannot move. Pass or fail, the handoff rewrites risks 1 and 2 below with what was measured | not started — scoped at this file's merge, beside t01; runs in parallel with it |
+| m04-t01 | Log reading in provider-sized windows with a retry on the range error, sized against publicnode and Infura (#76); a `Received` whose `S.grace` is read before `txError` can need it (#148); the widget's expiry judged against the block timestamp it already decodes, or labelled as local time (#149); one sentence under `#/docs` § Limits naming tokens whose balance falls on its own beside the fee-on-transfer one (decision 23, reaffirmed 2026-11-07); `AGENTS.md`'s chromium paragraph re-tested and rewritten (#110); `app/build.mjs` asserting one creation per script before it reads a block from `run-latest.json` (#140). Closes #76, #110, #140, #148, #149 | scoped 2026-11-07 ([TASK.md](tasks/m04-t01/TASK.md)); the provider caps measured at scoping — **200 blocks on `sepolia.base.org`**, 50,000 on publicnode's Sepolia — which turned #76 from a nicety into the item that decides whether the page works on Base Sepolia at all; task issue opens when this merges |
+| m04-t02 | **The gateway in the dev stack, before a single testnet transaction.** [ethstorage/web3url-gateway](https://github.com/ethstorage/web3url-gateway) — the software behind w3link.io — as a third process `make serve` brings up beside anvil and the dapp: `go@1.27` added to `devbox.json` (nixpkgs has 1.27.1; the gateway's `go.mod` asks 1.27.3, so the first build fetches that toolchain the way Go does, or the task pins a commit that does not); a `tools/gateway.sh` that clones the repo at a pinned commit (`c5826718`, 2026-10-23, is `main` at scoping) into gitignored `cache/`, builds `./cmd/server`, and writes its `config.toml` from a tracked template — `RunAsHttp = true`, `ServerPort = $GATEWAY_PORT`, `CORS = "*"`, `pageCache.enabled = false` (a cache hides a re-upload), `defaultChain = 31337`, `[chainConfigs.31337]` at `http://127.0.0.1:$ANVIL_PORT`; a `procs/30-gateway.yml` that depends on `deploy` and probes readiness with a `curl` of the root. The URL form is four labels, `http://0x<App>.31337.w3.localhost:$GATEWAY_PORT/`, because `handleSubdomain` takes the last two labels as the gateway's own host and needs `<address>.<chain>` in front of them (`protocol.go:416-498`); Chrome resolves any `*.localhost` to loopback, `curl` needs `--resolve`. `AGENTS.md` § The dapp and the `#/docs` host page gain the local form. Measure the two things no client has measured yet: the ERC-5219 surface as a real gateway consumes it — `/` is `html()`'s bytes with `text/html`, `/widget.js` is `app/dist/widget.js` with `application/javascript` (Freedom reads `html()` for every path by design, decision 19, so it cannot test this); and wallet reach — the gateway URL opened in Chrome with MetaMask has `window.top === window`, `window.ethereum` present, and one transaction sent from it. Evidence: the `eth_call`s the gateway made, read from anvil's log, and the response headers. **If the 5219 shape fails here, stop:** the fix is a `src/App.sol` byte, which is M03 reopened and Denizen's decision, and it is the reason this task runs before t03 spends gas on an address that cannot move. Pass or fail, the handoff rewrites risks 1 and 2 below with what was measured | scoped 2026-11-07 ([TASK.md](tasks/m04-t02/TASK.md)) — **and rehearsed by the architect the same day on a scratch build: the 5219 surface passes.** Go 1.27.1 from nixpkgs built `c582671` in 13 s; against a dev anvil, `/` answered 200 `text/html` with `Web3-Resolve-Mode: resourceRequest`, `/widget.js` 200 `application/javascript` byte-identical to `app/dist/widget.js`, `/nope` 404; the one surprise is a 7,871-byte script block the gateway injects after `<body>` (criterion 3 amended). What remains for the task is the stack integration and the wallet half; task issue opens when this merges, runs in parallel with t01 |
 
 ### Phase 2 — The runbook, for real
 
@@ -245,9 +252,12 @@ Things that would cost a redeploy or a re-upload to learn late. Each says what s
    Denizen's session. If the hosted one fails where anvil passed, the difference is the host's
    configuration and the fallback for Phase 4 is Freedom (a native client measured to inject a
    wallet); criterion 6 is then reworded by that finding, not quietly passed on `localhost`.
-3. **Provider log caps bite the DNZN page on day one.** MetaMask's default Sepolia RPC caps
-   `eth_getLogs` at 10,000 blocks; Sepolia adds about 7,000 blocks a day. Settled by t01 landing
-   before t03 uploads, which is why Phase 1 is first.
+3. **Provider log caps bite the DNZN page on day one.** Measured 2026-11-07: `sepolia.base.org`
+   caps `eth_getLogs` at **200 blocks** (and Base Sepolia mints 43,200 a day), publicnode's Sepolia
+   at 50,000 with pruned history behind its horizon; MetaMask's own endpoints are t01's to measure
+   in the browser. Settled by t01 landing before t03 uploads, which is why Phase 1 is first; the
+   residual risk is a wallet RPC stricter than 200, which the bounded-requests-plus-`load older`
+   shape degrades under rather than fails.
 4. **Sepolia gas.** The chunk upload is 10.8 M gas, and a testnet base fee is not a forecast: it
    read 15 wei on 2026-11-07 and the same chain has priced in whole gwei on other days, at which
    the upload alone is tenths of an ETH. Settled by t03 reading `cast base-fee` before step 4 and
