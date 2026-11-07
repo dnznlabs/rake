@@ -61,8 +61,13 @@ Figures below were read on 2026-11-07; re-run rather than quote.
      step already — stop and find out who.
    - t02 passed (#163 merged, `make gateway-check` green on anvil) and t01 merged (#164): the
      bundle you upload is the one that reads a capped provider.
+   - **t06 merged with no `fix` row** (added 2026-11-07): Slither over `src/` and the two shipped
+     scripts, every result dispositioned in `SECURITY.md` § Static analysis, `make slither` exit 0
+     on `main`. Its handoff's last line says whether anything was a `fix`; if it was, this task does
+     not start until the architect has taken it to Denizen. Run `devbox run -- make slither` once
+     yourself at step 1a and record the exit code beside the commit.
 
-   Check: the five readings per chain in the handoff § Gates, dated.
+   Check: the six readings per chain in the handoff § Gates, dated.
 
 1. **Sepolia, steps 1a–1g.** Exactly as `RUNBOOK.md` § 2 Step 1, in order: toolchain and clean tree
    (record the commit); the gates (`forge build --force` with the two warning greps, `forge test`,
