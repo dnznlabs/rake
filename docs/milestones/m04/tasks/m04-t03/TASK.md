@@ -42,12 +42,17 @@ Figures below were read on 2026-11-07; re-run rather than quote.
      latter exactly at the gate, enough for 14.7 M gas at today's 0.005 gwei a hundred times over,
      but say so in the handoff if the base fee rises). The Creator key `0x68e0741D…` needs ≥ 0.005 on each for Denizen's step 6 (funded
      2026-11-07: 0.01 and 0.01); read it and record it, it is not yours to fund.
-   - `ETHERSCAN_API_KEY`: Denizen put it in `~/.bashrc` on 2026-11-07, **after that file's
-     interactive guard** (`case $- in *i*)` at line 8), so an interactive shell sees it and a tool
-     shell, a login shell and `devbox run` do not — measured. Load that one line, and only it, at the
-     top of each chain's shell: `eval "$(grep -m1 '^export ETHERSCAN_API_KEY=' ~/.bashrc)"`, then
-     `[ -n "$ETHERSCAN_API_KEY" ]`. Never echo it, never commit it; the handoff names its last four
-     characters only. (`forge verify-contract` reads the variable itself; `-e` is not needed.)
+   - `ETHERSCAN_API_KEY` lives in the org's shared env file, `../shared/.envrc.local`
+     (`/mnt/bigdata/shared/.envrc.local`, mode 664, user `openclaw`), which this repo's `.envrc`
+     already names (`source_env_if_exists ../shared/.envrc.local`) — for **direnv**, which only an
+     interactive shell with the hook runs; a tool shell and `devbox run` see nothing from it,
+     measured 2026-11-07. So at the top of each chain's shell: `set -a; . ../shared/.envrc.local;
+     set +a`, then `[ -n "$ETHERSCAN_API_KEY" ]`. **That file also exports `ETH_RPC_URL`**, which
+     `cast` and `forge` take as the default `--rpc-url`: after sourcing it, every command carries an
+     explicit `--rpc-url "$RPC"`, as the runbook writes them — a bare `cast` would talk to whatever
+     that variable names, not your testnet. Never echo the key, never commit it; the handoff names
+     its last four characters only. (`forge verify-contract` reads the variable itself; `-e` is not
+     needed.)
    - Base fee: `cast base-fee --rpc-url $RPC` — record it; if above **20 gwei** on Sepolia, wait for
      a quieter hour before step 2 and again before step 4 (risk 4). Read 2026-11-07: 22 wei on
      Sepolia, 0.005 gwei on Base Sepolia.
