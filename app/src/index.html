@@ -1717,12 +1717,13 @@ function giveBind() {
   amt.onkeydown = e => { if (e.key === 'Enter') send(); };
 }
 /* The docs' live preview: the two variants of the real widget, mounted on whatever address the field
-   holds, and every snippet above rewritten to match. It reads through the dev `?rpc=` or the chain's
-   public endpoint before the wallet, because the docs paint for visitors who have none. */
+   holds, and every snippet above rewritten to match. It reads through the dev `?rpc=`, else the wallet
+   as the landing's widget does — a page host's CSP can refuse a fetch to any endpoint, a wallet's
+   reads it cannot — and the chain's public endpoint only for a visitor with no wallet. */
 function widgetDemo() {
   const input = document.getElementById('wd-in'), res = document.getElementById('wd-res'), go = document.getElementById('wd-go');
   if (!input) return;
-  const rpc = WRPC || PUBLIC_RPC[CFG.chainId] || '', first = input.value;
+  const rpc = WRPC || (window.ethereum ? '' : PUBLIC_RPC[CFG.chainId] || ''), first = input.value;
   const show = async () => {
     const a = await addrField(input.value, res);
     if (!a) return;
