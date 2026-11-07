@@ -125,7 +125,8 @@ than quote. "Both chains" means Sepolia and Base Sepolia, every time.
   *Recommendation:* (1), if a static path under dnzn.dev exists today; it is also where M05's mirror
   will live. *Default and deadline:* (2), opened by the architect, if no answer by the day m04-t04
   is scoped; blocks m04-t04. *Record:* `ROADMAP.md` § Decisions.
-  Issue: [#156](https://github.com/dnznlabs/rake/issues/156).
+  Issue: [#156](https://github.com/dnznlabs/rake/issues/156). **Ruled 2026-11-07: option 1
+  (decision 41).** m04-t04 writes the page; Denizen publishes it under dnzn.dev.
 - **M04-D2, DNZN's testnet table and delay.** *Question:* what table and delay does step 6 pass on
   the testnets, given the distribution it creates is DNZN's address on those chains for good?
   *Options:* (1) the M05 shape with testnet-safe rows — the roster's three EOAs at 60/20/20 (or the
@@ -137,7 +138,10 @@ than quote. "Both chains" means Sepolia and Base Sepolia, every time.
   deadline:* (1) with the roster EOAs and 3600, if no answer by m04-t03's scoping; blocks step 6 of
   m04-t03. *Record:* `ROADMAP.md` § Decisions; the values go into `RUNBOOK.md` § Executed on
   testnets, not § 0 (M05's are different).
-  Issue: [#157](https://github.com/dnznlabs/rake/issues/157).
+  Issue: [#157](https://github.com/dnznlabs/rake/issues/157). **Ruled 2026-11-07 (decision 42):**
+  `DNZN // FEE DISTRIBUTION`, delay 86,400 s, 60/30/10 to `0x3578…902B` (Denizen's address, the row
+  the ruling calls "Creator" — not the Creator key), Ops and Treasury; written in `_set`'s ascending
+  address order in the record. Owner stays the Ops vault.
 - **Testnet ETH, two keys.** Steps 1–5 are signed by Elanik's agent wallet (the handbook roster's
   address), which needs about **0.1 Sepolia ETH** and **0.02 Base Sepolia ETH**: the anvil
   rehearsal totals 14.7 M gas per chain (factory 2,262,485 + `App` 1,648,295 + chunks 10,820,875),

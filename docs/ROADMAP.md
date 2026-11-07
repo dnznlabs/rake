@@ -532,6 +532,31 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     keeping it documented (a permanent loss for an honest recipient with an expensive `receive`).
     Same m03-t08.
 
+Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
+
+41. **The widget's test host is a static page under dnzn.dev.** M04-D1, ruled on
+    [#156](https://github.com/dnznlabs/rake/issues/156) ("Option 1"). The page that embeds the
+    widget for M04 criterion 5 lives on a host Denizen already runs under dnzn.dev: one HTML file
+    on his side, an origin we do not serve, nothing newly public; it is also where M05's dapp mirror
+    will live (decision 12's "mirrors of it"). m04-t04 writes the file's content and the URL is
+    recorded in its handoff; publishing it is Denizen's step. Rejected: GitHub Pages from a new
+    public repository (a public repo whose only content is the snippet; rake itself is private); a
+    page served from this VM over a tunnel (the origin would be ours, and a real host's CSP and
+    mixed-content behaviour is what the criterion exists to meet).
+42. **DNZN's testnet distribution: "DNZN // FEE DISTRIBUTION", one day, 60/30/10.** M04-D2, ruled
+    on [#157](https://github.com/dnznlabs/rake/issues/157). `RUNBOOK.md` step 6 on Sepolia and Base
+    Sepolia passes `DNZN_DESCRIPTION` **`DNZN // FEE DISTRIBUTION`**, `DNZN_DELAY` **86,400** (one
+    day), and a three-row table — written here **in the ascending address order `_set` requires**,
+    which is not the order the ruling listed them in: Treasury `0x00b6E7D12EdE9Ca4A74fE69be758aAB1ee02cFb9`
+    at **1,000 bps**, Ops `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790` at **3,000**, and
+    `0x357836fFcB45307FA7ff2A574F505753c961902B` at **6,000**, the row the ruling labels "Creator".
+    **That label is a beneficiary's name, not the Creator key:** the key that signs the `create` is
+    decision 32's `0x68e0741D…`, and it holds no row; `0x3578…902B` is Denizen's own address. The
+    `owner_` passed to `create` stays the Ops vault (decision 35). These are the testnet values; M05's
+    are M05's to rule, so they live in `RUNBOOK.md` § Executed on testnets (m04-t03), not in § 0.
+    Rejected: the anvil rehearsal's placeholders under DNZN's name on two public chains; skipping
+    step 6 on testnets (criterion 1 and state-collection#74 both need code at the address).
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
