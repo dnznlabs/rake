@@ -1,0 +1,5 @@
+name	rake-blind-2026-11-02
+mode	filename
+files	src/Distribution.sol src/App.sol scripts/forge/Deploy.s.sol scripts/forge/DeployApp.s.sol
+passes_planned	1
+pass_1_agents	3/12

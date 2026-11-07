@@ -37,6 +37,13 @@ contract App is Ownable {
     /// @dev A pointer holding no code. `SSTORE2.read` on one expands memory past any block gas limit,
     ///      so `html()` and `request()` would run out of gas for every caller.
     error CodelessChunk(address ptr);
+    /// @dev A pointer that holds code but is not an SSTORE2 chunk: its first byte is not the `STOP`
+    ///      `SSTORE2.write` prefixes (`lib/solady/src/utils/SSTORE2.sol:52`). The case that matters is
+    ///      an EIP-7702 delegation designator, `0xef0100‖address`: it has code, so `code.length` admits
+    ///      it, and its key holder can re-point or clear it after `lock()`, changing or breaking what
+    ///      `html()` serves. EIP-3541 means no deployed contract begins with `0xef`, and `SSTORE2.read`
+    ///      discards byte 0, so a pointer that fails this check could never have been read correctly.
+    error ForeignChunk(address ptr);
     /// @dev No pointers at all: `html()` would return an empty document.
     error EmptyDocument();
 
@@ -115,7 +122,7 @@ contract App is Ownable {
         if (ptrs.length == 0) revert EmptyDocument();
         delete chunks;
         for (uint256 i; i < ptrs.length; ++i) {
-            if (ptrs[i].code.length == 0) revert CodelessChunk(ptrs[i]);
+            _requireChunk(ptrs[i]);
             chunks.push(ptrs[i]);
         }
         gzipped = gzipped_;
@@ -137,7 +144,7 @@ contract App is Ownable {
         if (ptrs.length == 0) revert EmptyDocument();
         delete widgetChunks;
         for (uint256 i; i < ptrs.length; ++i) {
-            if (ptrs[i].code.length == 0) revert CodelessChunk(ptrs[i]);
+            _requireChunk(ptrs[i]);
             widgetChunks.push(ptrs[i]);
         }
         emit WidgetChunksSet(ptrs.length);
@@ -155,15 +162,18 @@ contract App is Ownable {
     ///      is unbounded gas and would fail for size rather than correctness. The emptiness check is
     ///      the dapp's alone: a dapp with no widget is a complete document, and the widget's own
     ///      pointers are still checked for code so a locked `App` cannot carry an unreadable one.
+    ///      The re-check is for a readable *chunk* and not merely for code, because a pointer that
+    ///      holds code that is not a chunk is the thing the lock must refuse: its bytes can still
+    ///      change afterwards, which is exactly the promise `lock()` exists to make.
     function lock() external onlyOwner {
         uint256 n = chunks.length;
         if (n == 0) revert EmptyDocument();
         for (uint256 i; i < n; ++i) {
-            if (chunks[i].code.length == 0) revert CodelessChunk(chunks[i]);
+            _requireChunk(chunks[i]);
         }
         uint256 w = widgetChunks.length;
         for (uint256 i; i < w; ++i) {
-            if (widgetChunks[i].code.length == 0) revert CodelessChunk(widgetChunks[i]);
+            _requireChunk(widgetChunks[i]);
         }
         locked = true;
         emit AppLocked();
@@ -182,6 +192,20 @@ contract App is Ownable {
         for (uint256 i; i < n; ++i) {
             out = bytes.concat(out, SSTORE2.read(list[i]));
         }
+    }
+
+    /// @dev Reverts unless `ptr` is a readable SSTORE2 chunk: non-empty code whose first byte is 0x00.
+    function _requireChunk(address ptr) private view {
+        uint256 n;
+        bytes32 first;
+        /// @solidity memory-safe-assembly
+        assembly {
+            n := extcodesize(ptr)
+            extcodecopy(ptr, 0x00, 0x00, 0x01)
+            first := mload(0x00)
+        }
+        if (n == 0) revert CodelessChunk(ptr);
+        if (first[0] != 0x00) revert ForeignChunk(ptr);
     }
 
     function _eq(string memory a, string memory b) private pure returns (bool) {
