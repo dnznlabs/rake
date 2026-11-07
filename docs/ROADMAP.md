@@ -380,9 +380,9 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     on a chain DNZN has not reached, with an owner of their choosing, which is the squat decision 10
     exists to prevent, now across every project at once; accepted because separate keys stored the
     same way would fall together anyway and multiply the backup burden. Rejected: an existing key
-    Denizen names. Still open on #90: the key's address (the salt's top 20 bytes) and the low 12
-    bytes (the runbook proposes `…0001`). Criterion 6 stays open and m03-t06 proceeds with a
-    placeholder salt until the address is named here.
+    Denizen names. The key's address, the salt's top 20 bytes, named 2026-11-07 after a restore from
+    its paper backup reproduced it: `0x68e0741D8d693e14BF56914567eADdC130b186eE`. Still open on #90:
+    the low 12 bytes (the runbook proposes `…0001`).
 33. **The factory is placed through Arachnid's keyless deterministic-deployment proxy,
     `0x4e59b44847b379578588920cA78FbF26c0B4956C`; the Safe singleton factory is the fallback for a
     chain that refuses pre-EIP-155 transactions and lacks it.** D12, re-ruled on
