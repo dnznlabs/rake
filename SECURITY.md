@@ -17,9 +17,8 @@ the last commit touching `src/`, `test/*.t.sol` or `.gas-snapshot`) with **branc
 by the legs in a blinded tree at commit `d07483a8b9f6bcfe6200688bcb2d242450b9d464`, mapped in
 [`audits/2026-11-06/BLIND.md`](audits/2026-11-06/BLIND.md). Both are the shas the blinded tree's
 commit message and `audits/KNOWN_ANSWER.md` record, and both are still ancestors of this PR's head:
-`main` came in after the review as the merge commit `cb2e2a9`, not as a rebase, so no reviewed commit
-was rewritten and `src/`'s tree object is `8ddcc99` at the frozen head and at this PR's head alike
-(§ The reviewed commit)
+`main` came in after the review as the merge commit `cb2e2a9`, and `src/`'s tree object is `8ddcc99`
+at the frozen head and at this PR's head alike (§ The reviewed commit)
 **Scope:** `src/Distribution.sol`, `src/App.sol`, `scripts/forge/Deploy.s.sol`,
 `scripts/forge/DeployApp.s.sol` ([`audits/SCOPE`](audits/SCOPE), with every exclusion and its
 reason) — unchanged from the two earlier runs per decision 29, though **all four files' bytes moved
@@ -368,14 +367,12 @@ since: `git diff --stat 94d028c HEAD -- src/` prints nothing. The **branch head*
 only. Both are named because the blinded tree is cut at the frozen head while the PR is reviewed at
 the branch head, and naming one without the other has already caused one correction.
 
-**`main` was brought in after the review by a merge commit, `cb2e2a9`, and not by a rebase.** A
-rebase replays every commit under a new sha: an earlier attempt at step 8 did exactly that, and it
-left `94d028c` unreachable from the branch, so after a merge to `main` a fresh clone would answer
-`git show 94d028c` with an unknown object and the third review's provenance would survive only in
-GitHub's PR refs. Both shas above are ancestors of this PR's head instead —
-`git merge-base --is-ancestor 94d028c HEAD` exits 0 — and the four sha256s in
-`audits/2026-11-06/BLIND.md` § The mapping remain the cross-check on the reviewed *bytes*, which is
-a different thing from the identity of the commit.
+**`main` was brought in after the review by a merge commit, `cb2e2a9`.** That is what keeps the two
+shas above reachable: `git merge-base --is-ancestor 94d028c HEAD` exits 0, so once this PR merges a
+fresh clone of `main` still resolves the commit the legs actually read. The four sha256s in
+`audits/2026-11-06/BLIND.md` § The mapping are the cross-check on the reviewed *bytes*, which is a
+different thing from the identity of the reviewed commit; m03-t07's `HANDOFF.md` § Deviations 4
+records how the branch came to carry that merge.
 
 `git diff --stat 94d028c origin/main -- src/` is **not** empty today, and should not be: it reports
 `src/App.sol | 32 ++---`, the `ForeignChunk` fix, because this PR has not merged yet and `main` does

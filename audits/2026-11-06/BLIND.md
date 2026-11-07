@@ -19,16 +19,13 @@ a correction while this review was being written, so both are given here and in 
 | Blinded tree path | `~/src/rake-blind-2026-11-02` (under `~/src/`, never `/tmp`, which is shared) |
 | Provenance dirty flag | `dirty: no`, captured at preflight before any leg wrote a byte |
 
-**Both shas are still the live ones, and keeping them that way meant undoing a rebase.** The blinded
-tree's own commit message says "at `94d028c`" and `audits/KNOWN_ANSWER.md` is titled for `94d028c`;
-neither can be re-cut without re-cutting the review. Step 8 first brought `origin/main` at `7ff3be4`
-(the merge of #146) in by **rebasing**, which replayed all four of the branch's commits under new
-shas and left `94d028c` unreachable from the branch. That is not a cosmetic difference: after a
-rebase-then-merge, `git show 94d028c` in a fresh clone of `main` answers with an unknown object, and
-the third review's provenance survives only in GitHub's PR refs. The rebase was therefore discarded
-and `main` was brought in as a **merge commit, `cb2e2a9`** — which is also rake's merge policy. The
-frozen head and the branch head are the two shas above, unchanged since the run, and
-`git merge-base --is-ancestor 94d028c HEAD` exits 0.
+**Both shas are the run's own, and both are still reachable.** The blinded tree's own commit message
+says "at `94d028c`" and `audits/KNOWN_ANSWER.md` is titled for `94d028c`; neither can be re-cut
+without re-cutting the review. `origin/main` moved to `7ff3be4` (the merge of #146) after the run and
+was brought into this branch as a **merge commit, `cb2e2a9`** — rake's merge policy, and the form
+that leaves every reviewed commit's sha intact. So the frozen head and the branch head are the two
+shas above, unchanged since the run, and `git merge-base --is-ancestor 94d028c HEAD` exits 0.
+(m03-t07's `HANDOFF.md` § Deviations 4 records how the branch arrived at that merge.)
 
 **No reviewed byte moved, and that is measured rather than argued.** The git tree object for `src/`
 is `8ddcc99648627682d764f2d0b49345e801a248f5` at `94d028c`, at `0819552` and at this PR's head alike,
