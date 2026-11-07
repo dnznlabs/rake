@@ -15,7 +15,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 |:----------|:-----|:-------|
 | [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | done 2026-10-11 — t01 (#6), t02 (#11), t03 (#14) and the decision-10 follow-up (#24) merged; every criterion re-run and passing on `main` at `c292106` |
 | [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain, and Denizen has ironed out the experience against it | done 2026-10-26 — t01 (#33), t02 (#40), t03 (#52), t04 (#60), t05 (#65), t06 done; Phase 5 signed off by Denizen in [#73](https://github.com/dnznlabs/rake/pull/73) |
-| [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | in progress — Phase 1 closed 2026-10-30 (decisions 20–33); Phase 2 done 2026-10-30: t01 (#94), t02 ([#103](https://github.com/dnznlabs/rake/pull/103)), t03 ([#109](https://github.com/dnznlabs/rake/pull/109)); t04 merged 2026-10-30 ([#117](https://github.com/dnznlabs/rake/pull/117)): ten findings over `ede55c3`, five accepted, so t05 stands — scoped 2026-10-31, three contract fixes and a second two-leg run on the final code; t06 done 2026-11-01 ([#131](https://github.com/dnznlabs/rake/pull/131): `RUNBOOK.md`, salted scripts through the keyless proxy, criterion 6 rehearsed; closes #22, #23, #129); D14 ruled as decision 36; Phase 3 reopened — t07 (`App.lock`, decision 38) live, and t08 (expiry and `claim`, decisions 39–40 from the #133 triage) scoped 2026-11-01 to merge before t07 freezes, so the third review reads both; dapp follow-up t09 scoped at t08's merge |
+| [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | **done 2026-11-07** — ten tasks (t01–t10), three two-leg reviews (`audits/2026-10-30`, `10-31`, `11-06`), 14 `SECURITY.md` rows, decisions 20–40; `src/` final at `3ad48ec` ([#153](https://github.com/dnznlabs/rake/pull/153)), `FACTORY_SALT`/`APP_SALT` mined against it (decision 37: `0x00D18B5b…`, `0x00A90943…`), `RUNBOOK.md` rehearsed on two anvils with the real Creator key; DNZN's predicted address `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`; criteria 1–8 re-run in [CLOSEOUT.md](milestones/m03/CLOSEOUT.md) |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | not started |
 | [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; DNZN's own 60/40 distribution live under the Ops multisig with a 7-day delay; dapp mirrored and widget embedded in one DNZN app | not started |
 | [M06 — Owner integrations](milestones/m06/MILESTONE.md) | Optional, after mainnet. When the connected wallet is a member of the owner rather than the owner, route `propose`/`cancel` into the multisig vault's or Majeur DAO's own submit flow instead of copy-calldata. UI only; no contract change | not started |
@@ -282,6 +282,16 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     it in Phase 3 with a finding. Rejected: `balance < reserved ? 0 : balance − reserved` plus a
     test that `release` still pays what is there (a primitive change for tokens the overview
     excludes).
+    *Reaffirmed 2026-11-07 at M03 close-out.* The 2026-11-06 review's rollup F2 rated the
+    consequence **Medium** — under a shortfall the first `release`/`claim` is paid in full and the
+    last exiter bears the whole loss — the third raising of #19's shape (`SECURITY.md` F4). Denizen
+    agreed in the architect's Telegram DM ("i agree") that the ruling stands: no contract change,
+    because the precondition is a token whose balance falls on its own, which the overview excludes
+    and decision 23 already places out of scope, and the fix is per-token backing accounting on
+    every exit. Remedy: one sentence on `#/docs` § Limits naming balance-falling tokens beside the
+    fee-on-transfer one, in M04's first dapp task (`app/` only, no mining). Rejected again: the
+    saturating subtraction; and pro-rating escrow exits against the shortfall (a new mechanism for
+    an excluded token class).
 24. **`release` names the opaque failure and bubbles the rest.** D5, ruled on
     [#82](https://github.com/dnznlabs/rake/issues/82) ("Selected Option 3"), closing
     [#20](https://github.com/dnznlabs/rake/issues/20) when it lands. `revert ReleaseFailed(token)`
@@ -381,8 +391,13 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     exists to prevent, now across every project at once; accepted because separate keys stored the
     same way would fall together anyway and multiply the backup burden. Rejected: an existing key
     Denizen names. The key's address, the salt's top 20 bytes, named 2026-11-07 after a restore from
-    its paper backup reproduced it: `0x68e0741D8d693e14BF56914567eADdC130b186eE`. Still open on #90:
-    the low 12 bytes (the runbook proposes `…0001`).
+    its paper backup reproduced it: `0x68e0741D8d693e14BF56914567eADdC130b186eE`. The low 12 bytes
+    ruled `…0001` by Denizen on 2026-11-07 in the architect's Telegram DM ("0001 is fine"), so
+    `DNZN_SALT` is `0x68e0741D8d693e14BF56914567eADdC130b186eE000000000000000000000001` and
+    `predict(DNZN_SALT)` on a factory at `0x00D18B5b…` (decision 37) is
+    **`0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`**, measured on two anvils at M03 close-out
+    ([CLOSEOUT.md](milestones/m03/CLOSEOUT.md) criterion 6). Nothing remains open on #90; the
+    close-out PR closes it.
 33. **The factory is placed through Arachnid's keyless deterministic-deployment proxy,
     `0x4e59b44847b379578588920cA78FbF26c0B4956C`; the Safe singleton factory is the fallback for a
     chain that refuses pre-EIP-155 transactions and lacks it.** D12, re-ruled on

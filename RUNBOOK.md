@@ -73,9 +73,13 @@ run (decision 5 — a new version is a new factory anyway), and because `OWNER` 
 inside `App`'s hash, `APP_SALT` holds only for the Ops vault and `v0.1`. Step 1f recomputes both
 addresses from these variables on every chain; it never copies them.
 
-**`CREATOR` is a placeholder until [#90](https://github.com/dnznlabs/rake/issues/90) names the
-address.** The rehearsal in § Rehearsed on anvil uses the signing account for it and says so. The
-creator key's two conditions — salted creates only, and never an owner or a signer for anything
+**`CREATOR` is named** (decision 32; [#90](https://github.com/dnznlabs/rake/issues/90) closed at M03
+close-out): `0x68e0741D8d693e14BF56914567eADdC130b186eE`, and the salt's low 12 bytes are `…0001`,
+so **DNZN's distribution is `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`** on every chain where the
+factory is at the § 0 address — `predict($DNZN_SALT)` answered that on two anvils at close-out
+(`docs/milestones/m03/CLOSEOUT.md` criterion 6), and step 6 recomputes it on each chain rather than
+copying it from here. The rehearsal in § Rehearsed on anvil predates the key and uses the signing
+account for it, and says so. The creator key's two conditions — salted creates only, and never an owner or a signer for anything
 else — are the handbook's, in `docs/multisig-transactions.md` § The DNZN Creator key, and are
 referenced rather than restated so there is one copy of them.
 
