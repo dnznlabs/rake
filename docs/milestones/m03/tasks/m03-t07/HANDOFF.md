@@ -305,7 +305,10 @@ bytecode**, and this one is per-revision.
    `git merge-base --is-ancestor 94d028c HEAD` **exits 0** and the replayed tree is byte-identical to
    the rebased one it replaced (`git diff --stat` between the two heads prints nothing). **The
    rewritten commits are not evidence of anything and are named nowhere else in this PR**;
-   `backup/t07-prerebase-2026-11-06` holds them locally until this PR merges. The shas that matter
+   `backup/t07-prerebase-2026-11-06` holds them locally until this PR merges. The replacement history
+   was published with `git push --force-with-lease` against the superseded head **`e71c621`** — the
+   lease is named because the PR timeline shows the force-push, and this is the record a reader needs
+   to tie the two together. The shas that matter
    are therefore **frozen head `94d028c`**, **branch head at the review `0819552`** and the merge
    **`cb2e2a9`**. The merge was conflict-free, measured
    from the true merge base `679d1b8` rather than from the branch tip — `comm -12` over the two
