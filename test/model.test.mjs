@@ -197,6 +197,12 @@ test('revertMessage names every custom error the write screens can provoke', () 
     /* cast sig "Expired(uint256)" · Distribution.sol:54 — its argument is the eta, so the date the
        message prints is `eta + GRACE`, and the grace is the third argument rather than a literal. */
     revertMessage('0xf80dbaea' + Eth.pad(1760000000), undefined, 1209600),
+    /* #148: the same revert decoded before the boot read has filled `S.grace` (`index.html:489` sets
+       it `null`, `:510` fills it), which the create flow reaches before `S.loaded`. There is no
+       deadline to name there, and `deadline()` threw `Cannot convert null to a BigInt` on it until
+       this task, so the sentence drops its date clause rather than the whole message. */
+    revertMessage('0xf80dbaea' + Eth.pad(1760000000), undefined, null),
+    revertMessage('0xf80dbaea' + Eth.pad(1760000000), undefined, undefined),
     revertMessage('0x30116425'),  // cast sig "DeploymentFailed()"      · Distribution.sol:342
     revertMessage('0x0c4549ef'),  // cast sig "SaltDoesNotStartWith()"  · Distribution.sol:343
   ];
@@ -209,6 +215,8 @@ test('revertMessage names every custom error the write screens can provoke', () 
     'this contract will not take that call from this account',
     'retry failed — the token gave no reason',
     'that change expired — it could be applied until 2025-10-23 08:53 UTC and anyone may cancel it now',
+    'that change expired — anyone may cancel it now',
+    'that change expired — anyone may cancel it now',
     'a distribution already exists at that address',
     'that salt belongs to another wallet',
   ]);

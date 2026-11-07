@@ -106,9 +106,14 @@ const Model = (() => {
     },
     /* Expired(uint256 eta) carries the eta, not the deadline, so the date here is `eta + GRACE` — the
        far end of the window `applyQueued` refused it past. `grace` is the boot read's (`S.grace`), so
-       the page holds no second copy of a contract constant; decision 16's cost again. */
+       the page holds no second copy of a contract constant; decision 16's cost again.
+       #148: that read lands at boot, and a revert can be decoded before it — the create flow runs
+       before `S.loaded`, and `S.grace` is `null` until then. Without a grace there is no deadline to
+       print, and `deadline()` would throw on the null rather than say so, so the sentence drops its
+       date clause and keeps the part that is true either way. */
     '0xf80dbaea': (d, now, grace) => {
       const eta = Eth.dec(['uint256'], d.slice(10))[0];
+      if (grace == null) return 'that change expired — anyone may cancel it now';
       return `that change expired — it could be applied until ${dateText(deadline(eta, grace))} and anyone may cancel it now`;
     },
     '0x5c52a868': () => 'nothing to do — there is nothing waiting here',                   // NothingToDo()

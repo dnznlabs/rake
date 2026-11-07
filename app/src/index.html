@@ -167,7 +167,10 @@ async function tx(to, sig, args, opts) {
 function txError(e) {
   if (e && e.code === 4001) return 'rejected in wallet';
   const d = typeof (e && e.data) === 'string' ? e.data : e && e.data && e.data.data;
-  return esc(Model.revertMessage(d, secs(), S.grace));
+  /* `?? null` and not `S.grace`: the boot read fills it (`:510`) and a revert can be decoded before
+     that — the create flow runs before `S.loaded` — so the "no deadline known" case is passed
+     explicitly rather than left to whatever `S.grace` happens to hold (#148). */
+  return esc(Model.revertMessage(d, secs(), S.grace ?? null));
 }
 /* `navigator.clipboard` is missing on an insecure origin and can be refused on a secure one, so the
    calldata is never only in the clipboard: the fallback is a textarea, selected, for a manual copy. */
