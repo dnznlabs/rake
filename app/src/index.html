@@ -1856,6 +1856,7 @@ function docs() {
   <h2 id="s-limits">Limits</h2>
   <p>The owner is trusted for the length of the delay. The contract protects beneficiaries against sudden changes; it does not protect them against the owner.</p>
   <p>A token that charges a fee on transfer delivers less than the table specifies.</p>
+  <p>A token whose balance can fall on its own, such as a rebasing or slashable token, is not supported: under a shortfall the first account to take its escrow is paid in full and the last bears the loss.</p>
   <p>A beneficiary that requires more than 100,000 gas to receive ETH is always held.</p>
   <p>Funds held for a beneficiary that can never receive them remain in the contract permanently. This is by design: there is no sweep, and neither the owner nor anyone else can redirect them.</p>
   <p>Every address, share, name and note is public, and remains in the chain's history after it is changed. An allocation that must stay private, such as individual salaries, is not suited to a distribution.</p>
