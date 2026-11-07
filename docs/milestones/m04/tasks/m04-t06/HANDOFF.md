@@ -50,8 +50,13 @@ ci	slither	2026-11-07T22:48:23.6915268Z INFO:Slither:. analyzed (6 contracts wit
 
 Which is also the independent proof of deviation 4: CI checks out to
 `/home/runner/work/rake/rake`, not to the path `slither.db.json` records, and the gate is still
-green there. The run does not include this handoff, which is committed after it; the handoff touches
-no file any CI step reads.
+green there.
+
+**On the branch head.** Run
+[`42422383022`](https://github.com/dnznlabs/rake/actions/runs/42422383022) on `8b7b4a2`, the commit
+that added this file: `success`, the same nine steps green, the `slither` step again logging
+`INFO:Slither:. analyzed (6 contracts with 75 detectors), 0 result(s) found`. The head commit
+changes documentation only, so the two runs measure the same tree for every step that reads code.
 
 ## Deviations from the plan
 
