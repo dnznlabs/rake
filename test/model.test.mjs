@@ -12,9 +12,9 @@ import Model from '../app/src/model.js';
    touches it, so assigning here — after the import — is in time for every call below. */
 globalThis.Eth = Eth;
 
-const { SNAPSHOT_T, pct, countdown, decodePending, ownerChange, supersededBy, salt } = Model;
+const { SNAPSHOT_T, pct, countdown, deadline, dateText, decodePending, ownerChange, supersededBy, salt } = Model;
 const { revertMessage, tableFrom, parseDelay, wei, namehash } = Model;
-const FUNCTIONS = ['countdown', 'decodePending', 'namehash', 'ownerChange', 'parseDelay', 'pct', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei'];
+const FUNCTIONS = ['countdown', 'dateText', 'deadline', 'decodePending', 'namehash', 'ownerChange', 'parseDelay', 'pct', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei'];
 const SET_BENEFICIARIES = 'setBeneficiaries((address,uint96,string,string)[])';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/abi');
@@ -65,6 +65,41 @@ test('countdown counts down in seconds and stops at ready', () => {
   ];
 
   assert.deepEqual(got, ['3d 14h', '5h 2m', '1m', 'under a minute', 'ready to apply', 'ready to apply']);
+});
+
+/* The third argument, which is `GRACE` as the page read it. The boundary is the contract's:
+   `applyQueued` refuses only `block.timestamp > eta + GRACE` (`src/Distribution.sol:249`), so
+   `eta + grace` exactly is still applicable and the first expired second is the one after it. */
+test('countdown reads the far end of the window when it is given a grace', () => {
+  const eta = 1760000000, GRACE = 14 * 86400;
+
+  const got = [
+    // The delay still running, with a grace that has nothing to say yet.
+    countdown(eta + 3 * 86400, eta, GRACE),
+    // Inside the window: matured, and a day short of the far end.
+    countdown(eta, eta + 86400, GRACE),
+    // The far end exactly, which the contract still applies at.
+    countdown(eta, eta + GRACE, GRACE),
+    // One second past it, which it does not.
+    countdown(eta, eta + GRACE + 1, GRACE),
+    // Two arguments is every other caller on the page, and none of them may start reading `expired`.
+    countdown(eta, eta + GRACE + 1),
+  ];
+
+  assert.deepEqual(got, ['3d 0h', 'ready to apply', 'ready to apply', 'expired', 'ready to apply']);
+});
+
+test('deadline is the eta plus the grace, as a BigInt', () => {
+  assert.equal(deadline(1760000000n, 1209600n), 1761209600n);
+  // Both arrive off the chain, and `eta` through `Eth.dec` is already a BigInt while a literal is not.
+  assert.equal(deadline(1760000000, 1209600), 1761209600n);
+});
+
+/* One date format on the page, and it is UTC: a block timestamp carries no zone, and `toLocaleString`
+   would make the same document read differently on every machine that opened it. */
+test('dateText prints a chain timestamp as a UTC minute', () => {
+  assert.equal(dateText(1761209600n), '2025-10-23 08:53 UTC');
+  assert.equal(dateText(1761209600), '2025-10-23 08:53 UTC');
 });
 
 test('decodePending names the setter a queued setBeneficiaries calls', () => {
@@ -144,7 +179,7 @@ test('salt puts the sender in the top 20 bytes and the counter in the low 12', (
   assert.equal(salt(sender, 255).slice(-24), '0000000000000000000000ff');
 });
 
-/* The nine selectors, each beside the `cast sig` that produced it and the line of
+/* The ten selectors, each beside the `cast sig` that produced it and the line of
    `src/Distribution.sol` that declares it — every annotation re-read on this revision rather than
    carried over. `test/fixtures/abi/selectors.txt` carries function selectors only, so the errors are
    held against the contract instead — see the handoff. `ReleaseFailed` takes an argument, so its
@@ -158,6 +193,9 @@ test('revertMessage names every custom error the write screens can provoke', () 
     revertMessage('0x0f2e5b6c'),  // cast sig "Locked()"                · Distribution.sol:49
     revertMessage('0x82b42900'),  // cast sig "Unauthorized()"          · Distribution.sol:50
     revertMessage('0xca0b64e5' + Eth.pad(TOKEN)),  // cast sig "ReleaseFailed(address)" · Distribution.sol:51
+    /* cast sig "Expired(uint256)" · Distribution.sol:54 — its argument is the eta, so the date the
+       message prints is `eta + GRACE`, and the grace is the third argument rather than a literal. */
+    revertMessage('0xf80dbaea' + Eth.pad(1760000000), undefined, 1209600),
     revertMessage('0x30116425'),  // cast sig "DeploymentFailed()"      · Distribution.sol:342
     revertMessage('0x0c4549ef'),  // cast sig "SaltDoesNotStartWith()"  · Distribution.sol:343
   ];
@@ -169,6 +207,7 @@ test('revertMessage names every custom error the write screens can provoke', () 
     'locked — another call on this contract is still running',
     'this contract will not take that call from this account',
     'retry failed — the token gave no reason',
+    'that change expired — it could be applied until 2025-10-23 08:53 UTC and anyone may cancel it now',
     'a distribution already exists at that address',
     'that salt belongs to another wallet',
   ]);
