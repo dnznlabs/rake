@@ -89,7 +89,18 @@ function fmtEta(eta){var s=eta-Math.floor(Date.now()/1000);if(s<=0)return null;v
    second read for `GRACE()` would break that — and `test/widget.test.mjs` pins it to `14 * 86400`, so
    a change to the constant fails there before it can ship a wrong sentence here. */
 var GRACE=1209600;
-function etaText(eta){var left=fmtEta(eta);return left?'lands in '+left:(Math.floor(Date.now()/1000)>eta+GRACE?'expired':'ready to apply')}
+/* #149: every judgement above and below is against `Date.now()`, the only clock a one-`eth_call`
+   widget has — the dapp judges against the block timestamp, and decision 12's cost model is why this
+   does not read `GRACE()` or a block for a second opinion. The clock stays; the widget says so, in
+   the `title` on the queued line, and it refuses to call a change dead at the boundary: a device an
+   hour fast would otherwise print `expired` over an action the contract still accepts. An hour is
+   0.3% of the fourteen-day window, so being late to say `expired` costs almost nothing, where being
+   early tells an owner a live change is gone. Past the hour the sentence is `expired` as before. */
+var SKEW=3600;
+/* Double-quoted, so the apostrophe stands in the source as itself rather than backslashed: this is
+   the sentence the AC greps for, and an escape would hide it from the grep and from the next reader. */
+var CLOCKNOTE="judged by this device's clock";
+function etaText(eta){var left=fmtEta(eta);return left?'lands in '+left:(Math.floor(Date.now()/1000)>eta+GRACE+SKEW?'expired':'ready to apply')}
 function isDark(el){
  var n=el;while(n&&n!==document.documentElement){
   var bg=getComputedStyle(n).backgroundColor,m=bg&&bg.match(/rgba?\(([^)]+)\)/);
@@ -194,7 +205,7 @@ function render(el){
     +(b.note?' <span class="rk-nt">· '+esc(b.note)+'</span>':'')
     +'</span><b class="rk-pc">'+pct(b.bps)+'%</b></div>'}).join('')+'</div>';
   snap.pending.forEach(function(p){
-   h+='<div class="rk-q">a change is queued · '+(p.eta?etaText(p.eta):'ready to apply')+'</div>';
+   h+='<div class="rk-q" title="'+CLOCKNOTE+'">a change is queued · '+(p.eta?etaText(p.eta):'ready to apply')+'</div>';
    /* The segments shrink to pay for the 2 px gaps, which keeps their proportions declarative. */
    if(p.table){var n=p.table.length;h+=bar(p.table,'rk-qb',0,((n-1)*2/n).toFixed(1))}});
   if(!snap.delay)h+='<div class="rk-nd">no delay — the owner can change this table instantly</div>';

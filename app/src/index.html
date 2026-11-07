@@ -42,6 +42,8 @@ const PUBLIC_RPC = { 1: 'https://ethereum-rpc.publicnode.com', 10: 'https://main
 const ZERO = '0x' + '0'.repeat(40);
 /*DEV*/
 const Q = new URLSearchParams(location.search);
+/* Every windowed `eth_getLogs` the page issues, for the browser check's per-kind count (#76). */
+self.__LOGREQ = [];
 /*DEV*/
 const REPO = 'https://github.com/dnznlabs/rake', SITE = 'https://dnzn.dev';
 // The robot is research.dnzn.dev's mark for dnzn.dev, copied as drawn there.
@@ -65,10 +67,28 @@ const rpcProvider = url => ({
     const j = await r.json(); if (j.error) throw j.error; return j.result;
   }
 });
+/* A provider that refuses a wide `eth_getLogs` the way `sepolia.base.org` does, so #76's window
+   shrink can be driven in a browser against anvil, which caps nothing: `?cap=200` answers the
+   verbatim `-32614` refusal for any range wider than 200 blocks, and `?cap=…&prune=N` also refuses
+   anything below block N the way `ethereum-sepolia.publicnode.com` does. */
+const capped = (p, cap, prune) => ({
+  request: async ({ method, params }) => {
+    if (method === 'eth_getLogs') {
+      const a = parseInt(params[0].fromBlock, 16), b = parseInt(params[0].toBlock, 16);
+      if (prune && a < prune) throw { code: 4444, message: 'pruned history unavailable' };
+      if (b - a + 1 > cap) throw { code: -32614, message: `eth_getLogs is limited to a ${cap} range` };
+    }
+    return p.request({ method, params });
+  }
+});
 /*DEV*/
 async function discover() {
   /*DEV*/
-  if (Q.get('rpc')) { P = rpcProvider(Q.get('rpc')); ACC = Q.get('from') || null; WRPC = Q.get('rpc'); return; }
+  if (Q.get('rpc')) {
+    P = rpcProvider(Q.get('rpc'));
+    if (Q.get('cap')) P = capped(P, Number(Q.get('cap')), Number(Q.get('prune') || 0));
+    ACC = Q.get('from') || null; WRPC = Q.get('rpc'); return;
+  }
   /*DEV*/
   const found = [];
   addEventListener('eip6963:announceProvider', e => found.push(e.detail));
@@ -147,7 +167,10 @@ async function tx(to, sig, args, opts) {
 function txError(e) {
   if (e && e.code === 4001) return 'rejected in wallet';
   const d = typeof (e && e.data) === 'string' ? e.data : e && e.data && e.data.data;
-  return esc(Model.revertMessage(d, secs(), S.grace));
+  /* `?? null` and not `S.grace`: the boot read fills it (`:510`) and a revert can be decoded before
+     that — the create flow runs before `S.loaded` — so the "no deadline known" case is passed
+     explicitly rather than left to whatever `S.grace` happens to hold (#148). */
+  return esc(Model.revertMessage(d, secs(), S.grace ?? null));
 }
 /* `navigator.clipboard` is missing on an insecure origin and can be refused on a secure one, so the
    calldata is never only in the clipboard: the fallback is a textarea, selected, for a manual copy. */
@@ -162,8 +185,88 @@ async function copyCalldata(data, slot) {
 // An event topic is the whole keccak of the signature, not the four-byte selector a call carries.
 const topic = sig => '0x' + Eth.keccak(Eth.utf8(sig));
 const word = a => '0x' + Eth.pad(a);
+/* One `eth_getLogs` from `fromBlock` to `latest` is the query a public endpoint is likeliest to
+   refuse (#76). Measured 2026-11-07: `ethereum-sepolia-rpc.publicnode.com` caps the range at 50,000
+   blocks, `sepolia.base.org` at **200**, and `ethereum-sepolia.publicnode.com` serves 50,000 but has
+   pruned the history behind it. Base Sepolia mints a block every 2 s — 43,200 a day — so a week-old
+   distribution read in one window through that endpoint is not a slow query, it is 1,500 refusals.
+   So: the head is read once per page load, every scan walks back from it in windows, the window
+   shrinks to whatever a refusal names, and a scan that runs out of budget answers a boundary block
+   instead of throwing. The cap belongs to the provider the wallet picked, not to the chain, which is
+   why there is no per-chain table here. */
+let WINDOW_START = 10_000;     // MetaMask's Infura default; an uncapped endpoint answers it whole
+const WINDOW_INFLIGHT = 4;     // at once: enough to hide the round trips, few enough not to read as a flood
+let MAX_WINDOWS = 40;          // per log kind, per pass — 40 × 200 is 8,000 blocks of the strictest endpoint
+/*DEV*/
+/* The windowing exercised against anvil, which caps nothing: `?win=` starts smaller and `?maxwin=`
+   shrinks the budget, so the partial line and `load older` are reachable on a chain a few hundred
+   blocks long. `?cap=` is the other half — see `capped` above. */
+if (Q.get('win')) WINDOW_START = Number(Q.get('win'));
+if (Q.get('maxwin')) MAX_WINDOWS = Number(Q.get('maxwin'));
+/*DEV*/
+/* Read once per page load, and shared: the three queries of one history have to measure their
+   windows against the same `latest`, or the sections disagree about where the end is. */
+let HEAD = null;
+const head = async () => HEAD ?? (HEAD = parseInt(await P.request({ method: 'eth_blockNumber' }), 16));
+/* A refusal, wherever the wallet put the text: MetaMask wraps the provider's JSON-RPC error and the
+   message naming the cap can sit a level or two down from `message`. */
+const errText = e => [e && e.message, e && e.data && e.data.message, e && e.cause && e.cause.message]
+  .filter(Boolean).join(' · ');
+/* A refusal about the *size* of the range rather than its content. `Model.rangeCap` reads the two
+   shapes that name their number; these are the ones that complain without naming one, where halving
+   is the only move left. Anything else is a real failure and is thrown to the caller, which paints it. */
+const RANGEY = /\brange\b|too many|more than \d+ results|response size|\blimit/i;
 // A null `address` is left out of the filter, not sent as null: that is the query over every contract.
-const logs = (address, topics, fromBlock) => P.request({ method: 'eth_getLogs', params: [{ ...(address ? { address } : {}), topics, fromBlock, toBlock: 'latest' }] });
+function window1(address, topics, a, b) {
+  /*DEV*/
+  /* The browser check counts requests per log kind against #76's budget of 40, and the kind is
+     exactly the topic0 set the query asked for. */
+  if (self.__LOGREQ) self.__LOGREQ.push({ kind: JSON.stringify(topics[0]), a, b });
+  /*DEV*/
+  return P.request({
+    method: 'eth_getLogs',
+    params: [{ ...(address ? { address } : {}), topics, fromBlock: '0x' + a.toString(16), toBlock: '0x' + b.toString(16) }],
+  });
+}
+/** `{ logs, partial }` for one log kind over `fromBlock..toBlock` (the head by default), walked
+   newest-first so that what a truncated scan has is the recent history and what it lacks is the old.
+   `partial` is the block it was read back to — `null` when the whole range was covered — which is the
+   one number the section's own line can honestly print. */
+async function logs(address, topics, fromBlock, toBlock) {
+  const from = Number(BigInt(fromBlock));
+  let hi = toBlock == null ? await head() : Number(toBlock);
+  let size = WINDOW_START, spent = 0;
+  const out = [];
+  while (hi >= from && spent < MAX_WINDOWS) {
+    /* The next few windows at the current size, newest-first and contiguous, so everything above `hi`
+       has been read and the boundary below it is a single number rather than a set of holes. */
+    const batch = Model.windows(Math.max(from, hi - size * WINDOW_INFLIGHT + 1), hi, size)
+      .reverse().slice(0, Math.min(WINDOW_INFLIGHT, MAX_WINDOWS - spent));
+    spent += batch.length;
+    const res = await Promise.all(batch.map(([a, b]) =>
+      window1(address, topics, a, b).then(r => ({ ok: r }), e => ({ err: errText(e) }))));
+    /* Kept only as far as the first refusal: the batch is contiguous from the top, so keeping a
+       success from below a failure would leave a hole that no single boundary could describe. */
+    const i = res.findIndex(r => r.err);
+    for (const r of (i < 0 ? res : res.slice(0, i))) out.push(...r.ok);
+    if (i < 0) { hi = batch[batch.length - 1][0] - 1; continue; }
+    const top = batch[i][1], text = res[i].err, cap = Model.rangeCap(text);
+    if (!Model.isPruned(text) && cap == null && !RANGEY.test(text)) throw new Error(text);
+    /* A pruned refusal names no window either, but a *smaller* one can still fit above the block the
+       provider stopped keeping — the refused range straddled it — so it shrinks like any other
+       nameless refusal and the shrinking bisects toward that boundary, which is exactly "the first
+       block the provider still serves". At one block wide there is nothing left to shrink: that block
+       is not served, and the history stops above it. */
+    if (size === 1) return { logs: out, partial: top + 1 };
+    /* Strictly smaller every time, so the loop cannot sit still: a cap is only taken when it is
+       narrower than what already failed, and anything else halves. A provider that names a cap it is
+       already honouring is refusing for some other reason, and halving is the move that makes
+       progress. */
+    size = cap != null && cap < size ? cap : Math.max(1, Math.floor(size / 2));
+    hi = top;
+  }
+  return { logs: out, partial: hi >= from ? hi + 1 : null };
+}
 
 /* ---- text ---------------------------------------------------------------------------------- */
 // Descriptions, names and notes are whatever the chain was given, so every one of them is escaped.
@@ -479,14 +582,24 @@ function tokenIn(log) {
   const tk = Eth.checksum('0x' + log.address.slice(-40));
   return { kind: 'in', block, index, tx: log.transactionHash, token: tk, from: Eth.dec(['address'], log.topics[1])[0], amount: log.data, what: '' };
 }
-async function history(addr, from) {
-  const pick = set => logs(addr, [set.map(([sig]) => topic(sig))], from);
+/* The three raw log queries one distribution's history needs, each with the block it was read back
+   to. Separate from the decode below because `load older` adds to these lists and the decode then
+   runs again over the union: a `Queued` that only arrives in the older slice still has to close
+   against the `Applied` that was already on the page. */
+async function histLogs(addr, from, to) {
+  const pick = set => logs(addr, [set.map(([sig]) => topic(sig))], from, to);
   const [changes, funds, ins] = await Promise.all([pick(CHANGE_EVENTS), pick(FUND_EVENTS),
-    logs(null, [TRANSFER, null, word(addr)], from).catch(() => null)]);
-  const fe = funds.map(entry);
+    logs(null, [TRANSFER, null, word(addr)], from, to).catch(() => null)]);
+  return { changes, funds, ins };
+}
+async function history(addr, from, to) {
+  return histOf(await histLogs(addr, from, to));
+}
+function histOf(raw) {
+  const fe = raw.funds.logs.map(entry);
   const known = new Set([ZERO, ...fe.filter(e => e.token).map(e => e.token)]);
-  const tin = ins && ins.filter(l => l.topics.length === 3 && l.data.length === 66).map(tokenIn);
-  const ch = changes.map(entry);
+  const tin = raw.ins && raw.ins.logs.filter(l => l.topics.length === 3 && l.data.length === 66).map(tokenIn);
+  const ch = raw.changes.logs.map(entry);
   /* `Applied` and `Cancelled` carry only the hash, so each borrows the description of the `Queued` it
      closes, and that `Queued` line trades its countdown for how it ended. */
   const q = new Map(ch.filter(e => e.kind === 'queued').map(e => [e.hash, e]));
@@ -494,10 +607,17 @@ async function history(addr, from) {
     const o = e.kind !== 'queued' && q.get(e.hash);
     if (o) { e.what = `${o.desc} · ${e.what}`; o.what = `${o.desc} · nonce ${o.nonce} · ${e.kind}`; o.closed = true; }
   }
+  /* One boundary for the whole group, and the most conservative of the three: the sections sit
+     together under one `load older`, so the honest line is the highest block any of them stopped at.
+     The address-less `Transfer` query is excluded — a provider that refuses it outright leaves
+     `other` null already, and its budget says nothing about the two queries that carry the history. */
+  const floors = [raw.changes.partial, raw.funds.partial].filter(n => n != null);
   return {
+    raw,
     changes: ch.sort(newest),
     funds: [...fe, ...(tin || []).filter(e => known.has(e.token))].sort(newest),
     other: tin && tin.filter(e => !known.has(e.token)).sort(newest),
+    partial: floors.length ? Math.max(...floors) : null,
   };
 }
 const newest = (a, b) => b.block - a.block || b.index - a.index;
@@ -601,12 +721,23 @@ const row = (k, sub, n, cls) => `<div class="row${cls ? ' ' + cls : ''}"><div><b
    in hand — the logs arrive whole — so the cap is for reading, and opening it costs no call. */
 const HIST_SHOW = 10;
 function histFill(id, items, empty) {
-  if (!items.length) { fill(id, notice(empty)); return; }
+  const tail = partialLine();
+  if (!items.length) { fill(id, notice(empty) + tail); bindOlder(); return; }
   const more = items.length - HIST_SHOW;
-  fill(id, histRows(items.slice(0, HIST_SHOW)) + (more > 0 ? `<button class="link more" id="${id}-more">show all ${items.length}</button>` : ''));
+  fill(id, histRows(items.slice(0, HIST_SHOW)) + (more > 0 ? `<button class="link more" id="${id}-more">show all ${items.length}</button>` : '') + tail);
   const b = document.getElementById(id + '-more');
-  if (b) b.onclick = () => fill(id, histRows(items));
+  if (b) b.onclick = () => { fill(id, histRows(items) + partialLine()); bindOlder(); };
+  bindOlder();
 }
+/* One line under a section whose logs do not reach back to the distribution's first block (#76): what
+   arrived is on the page, and the rest is one control away. The boundary is a block number because
+   that is the only honest unit — the page cannot know how many rows it has *not* read. */
+function partialLine() {
+  if (!DS.h || DS.h.partial == null) return '';
+  return `<div class="notice">history before block ${DS.h.partial} not loaded · `
+    + '<button class="link older">load older</button></div>';
+}
+const bindOlder = () => V.querySelectorAll('.older').forEach(b => { b.onclick = older; });
 const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow${e.kind === 'escrowed' ? ' err' : e.kind === 'queued' && !e.closed ? ' amber' : e.kind === 'applied' || e.kind === 'accepted' ? ' done' : ''}"><b>${e.kind}</b><span class="w">${e.what}</span><span class="t">block ${e.block} · ${ext('tx', e.tx, short(e.tx))}</span></div>`).join('')}</div>`;
 const eyebrow = (text, cls) => `<div class="eyebrow${cls ? ' ' + cls : ''}">${text}</div>`;
 const notice = (text, cls) => `<div class="notice${cls ? ' ' + cls : ''}">${text}</div>`;
@@ -1011,36 +1142,65 @@ async function detail(addr) {
   // apply nonces, the token list and the escrow rows all come out of it, so all three say so until it
   // lands rather than reading as absence.
   const from = FIRST.get(d.addr) || CFG.factoryBlock;
-  history(addr, from).then(async h => {
-    if (stale(t)) return;
-    DS.nonces = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.nonce]));
-    DS.qtx = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.tx]));
-    /* The fallback's pending list, as `snapshot()` would have returned it: every `Queued` the history
-       pass did not find an `Applied` or a `Cancelled` for, oldest first — `h.changes` is newest-first
-       and `_pending` is the queue's own order. */
-    if (d.pending === null) d.pending = h.changes.filter(e => e.kind === 'queued' && !e.closed).reverse().map(e => [e.hash, e.eta, e.action]);
-    DS.h = h;
-    paintChanges();
-    /* The fund rows carry amounts in their token's own units (#43), and the changes above do not, so
-       they paint first and the token set these logs name is read here — one pass for the whole
-       history, cached for the funds block below, which asks for the same tokens. */
-    const toks = [...new Set(h.funds.filter(e => e.amount != null).map(e => e.token))];
-    const decs = new Map(await Promise.all(toks.map(async tk => [tk, await decimalsOf(tk)])));
-    await Promise.all([...new Set(h.funds.filter(e => e.token).map(e => e.token))].map(symbolOf));
-    if (stale(t)) return;
-    for (const e of h.funds) if (e.amount != null) e.what = fundWhat(e, decs.get(e.token));
-    DS.fundsReady = true;
-    paintActivity();
-    DS.f = await readFunds(d, h.funds);
-    if (stale(t)) return;
-    paintFunds();
-    bindAll();
-  }).catch(() => {
+  history(addr, from).then(h => absorb(t, d, h)).catch(() => {
     if (stale(t)) return;
     DS.failed = true;
     paintFailed();
     bindAll();
   });
+}
+
+/* Everything the log-built sections need once a history pass has landed — on the first pass, and
+   again on every `load older`, which is why it is a function and not the body of that `.then`. */
+async function absorb(t, d, h) {
+  if (stale(t)) return;
+  DS.nonces = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.nonce]));
+  DS.qtx = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.tx]));
+  /* The fallback's pending list, as `snapshot()` would have returned it: every `Queued` the history
+     pass did not find an `Applied` or a `Cancelled` for, oldest first — `h.changes` is newest-first
+     and `_pending` is the queue's own order. */
+  if (d.pending === null) d.pending = h.changes.filter(e => e.kind === 'queued' && !e.closed).reverse().map(e => [e.hash, e.eta, e.action]);
+  DS.h = h;
+  paintChanges();
+  /* The fund rows carry amounts in their token's own units (#43), and the changes above do not, so
+     they paint first and the token set these logs name is read here — one pass for the whole
+     history, cached for the funds block below, which asks for the same tokens. */
+  const toks = [...new Set(h.funds.filter(e => e.amount != null).map(e => e.token))];
+  const decs = new Map(await Promise.all(toks.map(async tk => [tk, await decimalsOf(tk)])));
+  await Promise.all([...new Set(h.funds.filter(e => e.token).map(e => e.token))].map(symbolOf));
+  if (stale(t)) return;
+  for (const e of h.funds) if (e.amount != null) e.what = fundWhat(e, decs.get(e.token));
+  DS.fundsReady = true;
+  paintActivity();
+  DS.f = await readFunds(d, h.funds);
+  if (stale(t)) return;
+  paintFunds();
+  bindAll();
+}
+
+/* The partial line's control: another `MAX_WINDOWS` per kind, further back, added to the raw logs
+   already read and decoded again over the union. The button says so while it runs — a second press
+   would spend a second budget on the same blocks. */
+async function older() {
+  const t = TOKEN, d = DS.d, prev = DS.h.raw, to = DS.h.partial - 1;
+  const from = Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock));
+  if (!(to >= from)) return;
+  for (const b of V.querySelectorAll('.older')) { b.disabled = true; b.textContent = 'loading older…'; }
+  let add;
+  try { add = await histLogs(d.addr, from, to); } catch (e) {
+    if (stale(t)) return;
+    for (const b of V.querySelectorAll('.older')) { b.disabled = false; b.textContent = 'load older — that read failed, try again'; }
+    return;
+  }
+  if (stale(t)) return;
+  /* `add` is the older half, so it goes in front, and the boundary that remains is its own. `ins` is
+     dropped unless both halves have it: a half-read `other` list cannot be told from a complete one. */
+  const join = (older_, newer_) => ({ logs: [...older_.logs, ...newer_.logs], partial: older_.partial });
+  await absorb(t, d, histOf({
+    changes: join(add.changes, prev.changes),
+    funds: join(add.funds, prev.funds),
+    ins: prev.ins && add.ins ? join(add.ins, prev.ins) : null,
+  }));
 }
 
 /* The log-built sections, painted from DS so a repaint of the page — the drawer opening, a mode switch —
@@ -1051,9 +1211,12 @@ function paintChanges() {
 }
 const paintActivity = () => histFill('h-funds', DS.h.funds, 'nothing has arrived at this address yet.');
 function paintFunds() {
-  fill('funds', fundsHTML(DS.d, DS.f, DS.h.other));
+  /* The escrow rows and the token list are built from the same logs the sections are, so a partial
+     history is a caveat on this block too, not only on the two lists below it. */
+  fill('funds', fundsHTML(DS.d, DS.f, DS.h.other) + partialLine());
   bindOthers(DS.d, DS.h.other, TOKEN);
   bindClaims();
+  bindOlder();
 }
 function paintFailed() {
   for (const id of ['h-changes', 'h-funds']) fill(id, notice('history unavailable', 'err'));
@@ -1515,12 +1678,14 @@ function paintCreate(st) {
    confirmed against `snapshot().owner` — ownership can have moved since the log was written. */
 async function mine() {
   const found = await logs(CFG.factory, [topic('Created(address,address)'), null, word(ACC)], CFG.factoryBlock);
-  const addrs = found.map(l => { const a = Eth.dec(['address'], l.topics[1])[0]; FIRST.set(a, l.blockNumber); return a; });
+  const addrs = found.logs.map(l => { const a = Eth.dec(['address'], l.topics[1])[0]; FIRST.set(a, l.blockNumber); return a; });
   const rows = await Promise.all(addrs.map(async a => {
     const d = await loadDistro(a);
     return !d.missing && d.owner.toLowerCase() === ACC.toLowerCase() ? d : null;
   }));
-  return rows.filter(Boolean);
+  /* A truncated scan says so rather than showing fewer: this list is the only place the dapp claims
+     to know everything an account owns, and a short answer here reads as "you own three" (#76). */
+  return { rows: rows.filter(Boolean), partial: found.partial };
 }
 
 async function list() {
@@ -1531,24 +1696,29 @@ async function list() {
     + `<div id="rows">${notice('reading…')}</div>`;
   V.querySelectorAll('[data-tab]').forEach(b => { b.onclick = () => { S.tab = b.dataset.tab; list(); }; });
   const t = TOKEN, slot = document.getElementById('rows');
-  let items = [], failed = false;
+  let items = [], failed = false, scanned = null;
   try {
-    if (S.tab === 'mine') items = await mine();
+    if (S.tab === 'mine') { const m = await mine(); items = m.rows; scanned = m.partial; }
     else items = (await Promise.all(recents().map(loadDistro))).filter(d => !d.missing);
   } catch (e) { failed = true; }
   if (stale(t)) return;
   if (failed) { slot.innerHTML = notice('could not read the list from this chain.', 'err'); return; }
+  /* A `Created` scan that ran out of windows has not seen the whole factory, so this list is "what the
+     scan reached", not "what you own" — said here in both the empty and the populated case (#76). */
+  const short_ = scanned == null ? ''
+    : notice(`the factory was scanned back to block ${scanned} only — a distribution created before that is not in this list. Open it by address below.`);
   if (!items.length) {
     slot.innerHTML = notice(S.tab === 'mine'
       ? `nothing on ${cname(CFG.chainId)} is owned by ${ext('address', ACC, short(ACC))}.`
       : 'no distribution opened yet. Paste an address below, or <a href="#/create">create one</a>.')
+      + short_
       + (ACC ? '' : notice('<b>mine</b> needs a connected wallet.'))
       + `<div class="load"><input id="load-in" placeholder="0x… or .eth / .wei / .gwei" aria-label="address or name"><button class="btn sec" id="load-go">view</button></div><div class="res" id="load-res"></div>`;
     loadField();
     return;
   }
   fill('rows', items.map(d => `<a class="list-row" href="#/distros/${d.addr}"><span><b>${esc(d.description)}</b><span class="sub">${cname(CFG.chainId)} · ${ext('address', d.addr, short(d.addr))}</span></span>`
-    + `${d.pending.length ? '<span class="dot" title="change queued"></span>' : '<span></span>'}${mini(d.table)}</a>`).join(''));
+    + `${d.pending.length ? '<span class="dot" title="change queued"></span>' : '<span></span>'}${mini(d.table)}</a>`).join('') + short_);
 }
 
 /* ---- docs ------------------------------------------------------------------------------------ */
@@ -1686,6 +1856,7 @@ function docs() {
   <h2 id="s-limits">Limits</h2>
   <p>The owner is trusted for the length of the delay. The contract protects beneficiaries against sudden changes; it does not protect them against the owner.</p>
   <p>A token that charges a fee on transfer delivers less than the table specifies.</p>
+  <p>A token whose balance can fall on its own, such as a rebasing or slashable token, is not supported: under a shortfall the first account to take its escrow is paid in full and the last bears the loss.</p>
   <p>A beneficiary that requires more than 100,000 gas to receive ETH is always held.</p>
   <p>Funds held for a beneficiary that can never receive them remain in the contract permanently. This is by design: there is no sweep, and neither the owner nor anyone else can redirect them.</p>
   <p>Every address, share, name and note is public, and remains in the chain's history after it is changed. An allocation that must stay private, such as individual salaries, is not suited to a distribution.</p>

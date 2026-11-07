@@ -167,11 +167,20 @@
   with a bare `Location: /host` and the query string is lost, so the page falls back to its default
   endpoint and renders nothing. `Chunks.s.sol` never reads it and nothing uploads it.
 - The browser check every `app/` task ends with runs here, driven by `playwright-core` from a directory
-  outside the repo (there is no playwright in this project's `node_modules`). The cached Playwright
-  chromium (`~/.cache/ms-playwright/chromium-1243/chrome-linux-arm64/chrome`) fails on `libnspr4.so` and
-  two dozen other missing host libraries; the nix chromium (`ls -d /nix/store/*-chromium-1*/bin`, not the
-  `-unwrapped` or `-sandbox` one) launches as `executablePath`. Chromium also refuses a handful of ports outright — port 9 answers `ERR_UNSAFE_PORT`
-  rather than connecting — which `host.html` uses deliberately for its failure mount.
+  outside the repo (there is no playwright in this project's `node_modules`;
+  `/home/openclaw/src/deadletter/node_modules/playwright-core` is one that is, at 1.63.0). **Measured
+  2026-11-07, both launchers on this host, and the result is the opposite of what this paragraph said
+  until now:** the cached Playwright chromium
+  (`~/.cache/ms-playwright/chromium-1243/chrome-linux-arm64/chrome`, the `arm64` build, marked
+  `DEPENDENCIES_VALIDATED`) **launches** — chromium `153.0.8010.12`, a page navigated and its DOM read
+  back — and is the launcher to use, as `executablePath` or by letting `playwright-core` resolve it
+  itself, which finds the same binary. The nix chromium **does not exist on this host**:
+  `ls -d /nix/store/*-chromium-1*/bin` matches zero derivations, so the earlier advice named a path
+  that cannot be launched, and the `libnspr4.so` failure it blamed on the cached build belongs to the
+  `chrome-linux` (x86) directory, which this arm64 install does not have. Re-measure rather than trust
+  this line if the host's nix profile changes. Chromium also refuses a handful of ports outright — port
+  9 answers `ERR_UNSAFE_PORT` rather than connecting — which `host.html` uses deliberately for its
+  failure mount.
 - The build minifier strips leading whitespace on every line, template literals included.
 - gzip output depends on the node build's zlib. Build through devbox when the bytes matter.
 - Node tests are `test/*.test.mjs`.

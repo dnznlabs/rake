@@ -106,9 +106,14 @@ const Model = (() => {
     },
     /* Expired(uint256 eta) carries the eta, not the deadline, so the date here is `eta + GRACE` — the
        far end of the window `applyQueued` refused it past. `grace` is the boot read's (`S.grace`), so
-       the page holds no second copy of a contract constant; decision 16's cost again. */
+       the page holds no second copy of a contract constant; decision 16's cost again.
+       #148: that read lands at boot, and a revert can be decoded before it — the create flow runs
+       before `S.loaded`, and `S.grace` is `null` until then. Without a grace there is no deadline to
+       print, and `deadline()` would throw on the null rather than say so, so the sentence drops its
+       date clause and keeps the part that is true either way. */
     '0xf80dbaea': (d, now, grace) => {
       const eta = Eth.dec(['uint256'], d.slice(10))[0];
+      if (grace == null) return 'that change expired — anyone may cancel it now';
       return `that change expired — it could be applied until ${dateText(deadline(eta, grace))} and anyone may cancel it now`;
     },
     '0x5c52a868': () => 'nothing to do — there is nothing waiting here',                   // NothingToDo()
@@ -163,6 +168,46 @@ const Model = (() => {
     return BigInt(whole) * WEI + BigInt((frac + '0'.repeat(18)).slice(0, 18));
   }
 
+  /* ---- log windows (#76) --------------------------------------------------------------------- */
+
+  /** A block range as the list of windows a provider will accept: inclusive `[a, b]` pairs of at most
+     `size` blocks, ascending, together covering `from..to` exactly once. `from > to` is no range at
+     all — which is what a distribution created in the head block has behind it — and so is a
+     non-positive `size`. Numbers, not BigInts: a block height is far inside `Number`'s exact range,
+     and the caller hex-encodes them for the wire. */
+  function windows(from, to, size) {
+    const lo = BigInt(from), hi = BigInt(to), step = BigInt(size);
+    if (step <= 0n || hi < lo) return [];
+    const out = [];
+    for (let a = lo; a <= hi; a += step) {
+      const b = a + step - 1n;
+      out.push([Number(a), Number(b > hi ? hi : b)]);
+    }
+    return out;
+  }
+
+  /* The two shapes a provider's range refusal takes, both measured against the live endpoints on
+     2026-11-07: publicnode's Sepolia answers `-32701 exceed maximum block range: 50000` and
+     `sepolia.base.org` answers `-32614 eth_getLogs is limited to a 200 range` under an HTTP 413. The
+     number is the window to retry with, so it is read out rather than guessed at by halving. */
+  const CAPS = [/block range:\s*(\d+)/i, /limited to a\s+(\d+)\s+range/i];
+
+  /** The window size a provider's error names, or `null` for an error that names none — including a
+     pruned-history refusal, which is about which blocks are kept and not about how many were asked
+     for, and so is `isPruned`'s to answer. */
+  function rangeCap(message) {
+    const s = String(message == null ? '' : message);
+    for (const re of CAPS) { const m = re.exec(s); if (m) return Number(m[1]); }
+    return null;
+  }
+
+  /** Whether a provider refused a range because it no longer holds those blocks (publicnode's
+     `4444 pruned history unavailable`). No smaller window fixes this one: the history simply stops
+     there, and what the page can say is where. */
+  function isPruned(message) {
+    return /pruned history/i.test(String(message == null ? '' : message));
+  }
+
   /** EIP-137 namehash, over eth.js's own keccak. */
   function namehash(name) {
     let node = '0'.repeat(64);
@@ -170,6 +215,6 @@ const Model = (() => {
     return '0x' + node;
   }
 
-  return { SNAPSHOT_T, BENEFICIARY_T, pct, countdown, deadline, dateText, decodePending, ownerChange, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash };
+  return { SNAPSHOT_T, BENEFICIARY_T, pct, countdown, deadline, dateText, decodePending, ownerChange, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash, windows, rangeCap, isPruned };
 })();
 export default Model;

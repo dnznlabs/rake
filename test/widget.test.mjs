@@ -48,7 +48,7 @@ function widget() {
     addEventListener() {},
   };
   const win = {};
-  const api = new Function('window', 'document', `${body}\nreturn { decode, SNAP, SETBEN, etaText, GRACE };`)(win, doc);
+  const api = new Function('window', 'document', `${body}\nreturn { decode, SNAP, SETBEN, etaText, GRACE, SKEW };`)(win, doc);
   assert.deepEqual(Object.keys(win.RakeWidget), ['mount', 'refresh'], 'the widget\'s public surface changed');
   return api;
 }
@@ -145,16 +145,51 @@ test('the two selector literals are the ones cast recorded', () => {
    contract stops being true fourteen days after the eta (`src/Distribution.sol:249`). The fixture's
    own eta is years past, so this is a decoded pending entry rather than a bare number. */
 test('a decoded pending entry past the window renders expired', () => {
-  const { decode, etaText } = widget();
+  const { decode, etaText, GRACE, SKEW } = widget();
   const snap = decode(fixture('snapshot.return'));
   const now = Math.floor(Date.now() / 1000);
 
   /* Without this the assertion below would pass on an eta that merely matured, which is the bug. */
-  assert.ok(snap.pending[0].eta + 14 * 86400 < now, 'the fixture\'s eta is no longer past the window');
+  assert.ok(snap.pending[0].eta + GRACE + SKEW < now, 'the fixture\'s eta is no longer an hour past the window');
   assert.equal(etaText(snap.pending[0].eta), 'expired');
   // The two phases it must not swallow: still waiting, and matured but inside the window.
   assert.equal(etaText(now + 3 * 86400 + 14 * 3600), 'lands in 3d 14h');
   assert.equal(etaText(now - 86400), 'ready to apply');
+});
+
+/* #149: the widget judges against `Date.now()` and nothing else, so a device whose clock is fast
+   decides the far end of the window on its own. An hour of slack buys back the boundary: inside it
+   the row still offers the action the contract still accepts, and past it the sentence is `expired`
+   as before. The hour is this task's constant, pinned here so it cannot drift unremarked. */
+test('the widget gives a skewed device an hour before it calls a change dead', () => {
+  const { etaText, GRACE, SKEW } = widget();
+  const now = Math.floor(Date.now() / 1000);
+  // Each eta is placed so that `now` sits the stated distance past `eta + GRACE`.
+  const past = secs => now - GRACE - secs;
+
+  assert.equal(SKEW, 3600, 'the tolerance is one hour');
+  const got = [
+    etaText(past(30 * 60)),      // 30 minutes past the window — inside the hour
+    etaText(past(SKEW - 60)),     // a minute short of the hour
+    etaText(past(SKEW + 60)),     // a minute past it
+    etaText(past(3 * 86400)),     // three days past: no clock skew explains this
+  ];
+
+  assert.deepEqual(got, ['ready to apply', 'ready to apply', 'expired', 'expired']);
+});
+
+/* The clock the two sentences above are judged by, named on the row that prints them. One
+   occurrence: the AC greps for exactly this phrase, and a second copy would be a second place to
+   keep true. */
+test('the queued line says whose clock judged it', () => {
+  const hits = SRC.match(/device's clock/g) || [];
+
+  /* Exactly one, unescaped: the AC greps the source for this phrase, and a `\'` would pass a test
+     written against the parsed string while failing that grep. */
+  assert.equal(hits.length, 1);
+  assert.match(SRC, /var CLOCKNOTE="judged by this device's clock"/);
+  // And it reaches the queued row's title, which is the only place it is meant to show up.
+  assert.match(SRC, /<div class="rk-q" title="'\+CLOCKNOTE\+'"/);
 });
 
 /* The one contract constant the widget copies rather than reads, because reading it would cost the

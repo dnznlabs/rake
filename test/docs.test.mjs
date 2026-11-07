@@ -95,3 +95,20 @@ test('the rail and the headings are the same thirteen sections, in one order', (
   assert.deepEqual(ids, sections.map(s => s[0]));
   assert.ok(ids.includes('widget'), 'the owner bar\'s widget link points at #/docs#widget');
 });
+
+/* Decision 23, reaffirmed 2026-11-07, and `SECURITY.md` F4: the token class the contract excludes,
+   said on the page that lists what it does not do. Asserted against the Limits section rather than
+   the whole document, so the sentence cannot drift into some other heading and still pass. */
+test('the Limits section names the balance-falling tokens decision 23 excludes', () => {
+  const at = PAGE.indexOf('<h2 id="s-limits">');
+  assert.ok(at >= 0, 'the docs page has no Limits heading');
+  const limits = PAGE.slice(at, PAGE.indexOf('<h2 id="s-developers">', at));
+
+  assert.ok(limits.includes('rebasing or slashable'), 'the Limits section does not name rebasing or slashable tokens');
+  assert.ok(
+    limits.includes('under a shortfall the first account to take its escrow is paid in full and the last bears the loss'),
+    'the Limits section names the token class but not what happens under a shortfall',
+  );
+  // One occurrence on the page, which is what the AC greps for.
+  assert.equal((PAGE.match(/rebasing or slashable/g) || []).length, 1);
+});
