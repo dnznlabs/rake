@@ -4,15 +4,17 @@
    eth.js first, and test/model.test.mjs puts the same module on globalThis before calling anything
    here. Nothing at module scope reads it, so the order only matters at call time. */
 const Model = (() => {
-  const BENEFICIARY = '(address,uint96,string,string)';
+  /* The `Beneficiary` tuple, in one place: `SNAPSHOT_T` is built from it and `beneficiaries()` — the
+     one-view fallback for a provider that will not answer `snapshot()` — decodes with it directly. */
+  const BENEFICIARY_T = '(address,uint96,string,string)';
   /* The `snapshot()` return type, in one place: every reader of a distribution decodes with this. */
-  const SNAPSHOT_T = `(address,uint32,uint32,string,${BENEFICIARY}[],(bytes32,uint256,bytes)[])`;
+  const SNAPSHOT_T = `(address,uint32,uint32,string,${BENEFICIARY_T}[],(bytes32,uint256,bytes)[])`;
   /* The four `onlySelf` setters a pending action can carry. `transferOwnership(address)` is one call
      with three effects since decision 21 — it nominates, and `address(0)` renounces, and the current
      owner's own address withdraws a nomination still in flight — so it decodes as one and
      `ownerChange` below says which of the three a decoded action is. */
   const SETTERS = [
-    [`setBeneficiaries(${BENEFICIARY}[])`, 'setBeneficiaries', 'table'],
+    [`setBeneficiaries(${BENEFICIARY_T}[])`, 'setBeneficiaries', 'table'],
     ['setDescription(string)', 'setDescription', 'description'],
     ['setDelay(uint32)', 'setDelay', 'delay'],
     ['transferOwnership(address)', 'transferOwnership', 'owner'],
@@ -27,14 +29,33 @@ const Model = (() => {
     return Math.floor(n / 100) + (frac ? '.' + frac : '') + '%';
   }
 
-  /** Seconds, as the chain counts them: `3d 14h`, then `ready to apply` once `now` passes `eta`. */
-  function countdown(eta, now) {
+  /** Seconds, as the chain counts them: `3d 14h`, then `ready to apply` once `now` passes `eta`. With
+     a `grace`, the far end of the window is read too: an action more than `grace` past its eta is
+     `expired`, which is what `applyQueued` answers from that instant on
+     (`src/Distribution.sol:249`). Every caller that passes two arguments is unchanged, which is every
+     countdown that is not a pending view's. */
+  function countdown(eta, now, grace) {
+    if (grace != null && Number(now) > Number(eta) + Number(grace)) return 'expired';
     const left = Number(eta) - Number(now);
     if (left <= 0) return 'ready to apply';
     const d = Math.floor(left / DAY), h = Math.floor((left % DAY) / HOUR), m = Math.floor((left % HOUR) / MINUTE);
     if (d) return `${d}d ${h}h`;
     if (h) return `${h}h ${m}m`;
     return m ? `${m}m` : 'under a minute';
+  }
+
+  /** The last instant a queued action can still be applied: `eta + GRACE`, a BigInt because both
+     numbers come off the chain as one. The boundary itself is inside the window on both sides —
+     `applyQueued` lands at `eta + GRACE` and a stranger's `cancel` is still refused there
+     (`src/Distribution.sol:249,266`) — so this is the last applicable second, not the first dead one. */
+  function deadline(eta, grace) {
+    return BigInt(eta) + BigInt(grace);
+  }
+
+  /** A chain timestamp as the one date this page prints. UTC to the minute: a block carries no zone,
+     and a locale string would read differently on every machine that loaded the same document. */
+  function dateText(when) {
+    return new Date(Number(when) * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
   }
 
   /** A pending action's calldata as the setter it calls, or its selector when it is none of them. */
@@ -83,6 +104,13 @@ const Model = (() => {
         ? 'that change is not queued here — it has already been applied or cancelled'
         : `the delay has not passed — ${countdown(eta, now)}`;
     },
+    /* Expired(uint256 eta) carries the eta, not the deadline, so the date here is `eta + GRACE` — the
+       far end of the window `applyQueued` refused it past. `grace` is the boot read's (`S.grace`), so
+       the page holds no second copy of a contract constant; decision 16's cost again. */
+    '0xf80dbaea': (d, now, grace) => {
+      const eta = Eth.dec(['uint256'], d.slice(10))[0];
+      return `that change expired — it could be applied until ${dateText(deadline(eta, grace))} and anyone may cancel it now`;
+    },
     '0x5c52a868': () => 'nothing to do — there is nothing waiting here',                   // NothingToDo()
     '0x0f2e5b6c': () => 'locked — another call on this contract is still running',         // Locked()
     /* ReleaseFailed(address token): decision 24's threshold swallows an argument-less custom error
@@ -96,8 +124,9 @@ const Model = (() => {
     '0x0c4549ef': () => 'that salt belongs to another wallet',                             // SaltDoesNotStartWith()
   };
 
-  /** Revert bytes as the one line the page shows. `now` is seconds, for `NotReady`'s countdown. */
-  function revertMessage(data, now) {
+  /** Revert bytes as the one line the page shows. `now` is seconds, for `NotReady`'s countdown, and
+     `grace` is `GRACE()` as the page read it, for `Expired`'s date. */
+  function revertMessage(data, now, grace) {
     const d = String(data == null ? '' : data);
     if (!d || d === '0x') return 'reverted';
     /* #20: `_balance` bubbles whatever `balanceOf` reverted with, unguarded (`src/Distribution.sol:308`),
@@ -106,7 +135,7 @@ const Model = (() => {
        `ReleaseFailed(token)` above. */
     if (d.length === 66) return 'the token refused the call';
     const known = ERRORS[d.slice(0, 10).toLowerCase()];
-    return known ? known(d, now) : `reverted (${d.slice(0, 10)})`;
+    return known ? known(d, now, grace) : `reverted (${d.slice(0, 10)})`;
   }
 
   /** The editor's rows as the tuple array `Eth.enc` takes: percent to bps, and ascending by account
@@ -141,6 +170,6 @@ const Model = (() => {
     return '0x' + node;
   }
 
-  return { SNAPSHOT_T, pct, countdown, decodePending, ownerChange, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash };
+  return { SNAPSHOT_T, BENEFICIARY_T, pct, countdown, deadline, dateText, decodePending, ownerChange, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash };
 })();
 export default Model;

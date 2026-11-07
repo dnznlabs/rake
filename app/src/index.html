@@ -147,7 +147,7 @@ async function tx(to, sig, args, opts) {
 function txError(e) {
   if (e && e.code === 4001) return 'rejected in wallet';
   const d = typeof (e && e.data) === 'string' ? e.data : e && e.data && e.data.data;
-  return esc(Model.revertMessage(d, secs()));
+  return esc(Model.revertMessage(d, secs(), S.grace));
 }
 /* `navigator.clipboard` is missing on an insecure origin and can be refused on a secure one, so the
    calldata is never only in the clipboard: the fallback is a textarea, selected, for a manual copy. */
@@ -386,7 +386,7 @@ function who() {
 }
 
 /* ---- reading the chain ---------------------------------------------------------------------- */
-const S = { featured: null, maxRows: null, loaded: false, error: null, tab: 'recent' };
+const S = { featured: null, maxRows: null, grace: null, loaded: false, error: null, tab: 'recent' };
 async function load() {
   CHAIN = parseInt(await P.request({ method: 'eth_chainId' }), 16);
   // The same address on another network is another contract, or none: do not read it.
@@ -397,12 +397,17 @@ async function load() {
     call(CFG.factory, 'predict(bytes32)', [CFG.featuredSalt], ['address']),
     call(CFG.factory, 'implementation()', [], ['address']),
   ]);
-  /* The row cap the editor refuses past (decision 27, ruling 4): read, never a literal, because the
-     editor also runs on create, where no distribution exists to ask — so it is asked of the
-     implementation behind the factory, which is the code every clone runs. A failure here is a failed
-     boot like any other and the page says so; no editor falls back to a number of its own. */
-  const [max] = await call(impl, 'MAX_BENEFICIARIES()', [], ['uint256']);
-  S.featured = a; S.maxRows = Number(max); S.loaded = true;
+  /* The row cap the editor refuses past (decision 27, ruling 4) and the window a matured change stays
+     applicable in: read, never literals, because the editor also runs on create, where no distribution
+     exists to ask — so both are asked of the implementation behind the factory, which is the code every
+     clone runs. A failure here is a failed boot like any other and the page says so; no editor and no
+     pending view falls back to a number of its own. `GRACE` is a constant, so one read at boot serves
+     every distribution this page opens afterwards.  */
+  const [[max], [grace]] = await Promise.all([
+    call(impl, 'MAX_BENEFICIARIES()', [], ['uint256']),
+    call(impl, 'GRACE()', [], ['uint256']),
+  ]);
+  S.featured = a; S.maxRows = Number(max); S.grace = grace; S.loaded = true;
 }
 
 /* One distribution, in four reads: code first, so an address with nothing on it is "could not read"
@@ -415,22 +420,50 @@ async function load() {
 async function loadDistro(addr) {
   const code = await P.request({ method: 'eth_getCode', params: [addr, 'latest'] });
   if (!code || code === '0x') return { addr, missing: true };
-  const [snap] = Eth.dec([Model.SNAPSHOT_T], await P.request({ method: 'eth_call', params: [{ to: addr, data: Eth.enc('snapshot()', []) }, 'latest'] }));
+  let snap = null;
+  try {
+    /*DEV*/
+    // The rehearsal's way into the fallback below without a hostile node; stripped from the bundle that ships.
+    if (Q.get('nosnapshot')) throw new Error('nosnapshot=1');
+    /*DEV*/
+    [snap] = Eth.dec([Model.SNAPSHOT_T], await P.request({ method: 'eth_call', params: [{ to: addr, data: Eth.enc('snapshot()', []) }, 'latest'] }));
+  } catch (e) { snap = null; }
   const [reserved, balance, nominee] = await Promise.all([
     call(addr, 'reserved(address)', [ZERO], ['uint256']),
     P.request({ method: 'eth_getBalance', params: [addr, 'latest'] }),
     call(addr, 'pendingOwner()', [], ['address']),
   ]);
-  const [owner, delay, nonce, description, table, pending] = snap;
   const waiting = BigInt(balance) - reserved[0];
-  return { addr, owner, delay, nonce, description, table, pending, pendingOwner: nominee[0], waiting: waiting > 0n ? waiting : 0n };
+  const d = { addr, pendingOwner: nominee[0], waiting: waiting > 0n ? waiting : 0n };
+  if (snap) {
+    const [owner, delay, nonce, description, table, pending] = snap;
+    return { ...d, owner, delay, nonce, description, table, pending };
+  }
+  /* #137 item 2. `snapshot()` is one call returning every list at once, so a provider that will not
+     answer it — a gas cap on `eth_call`, a result-size limit, a revert — takes the whole page down
+     with it. The same state comes back in five calls, each returning one bounded thing, and the one
+     member no single view returns is `_pending`: that list is rebuilt from the `Queued` logs in
+     `detail` below, which carry hash, eta and action. `pending: null` is the signal to do it, and
+     tells "not read yet" from the empty queue a `[]` would be indistinguishable from. #136 closed the
+     contract side — no paging, no cap on `_pending` — so this is the dapp's whole answer.
+     `beneficiaries()` is not guarded: a failed table read is a failed read like any other here, and a
+     distribution rendered without its table would be a lie rather than a degraded truth. */
+  const [[owner], [delay], [nonce], [description], [table]] = await Promise.all([
+    call(addr, 'owner()', [], ['address']),
+    call(addr, 'delay()', [], ['uint32']),
+    call(addr, 'nonce()', [], ['uint32']),
+    call(addr, 'description()', [], ['string']),
+    call(addr, 'beneficiaries()', [], [`${Model.BENEFICIARY_T}[]`]),
+  ]);
+  return { ...d, owner, delay, nonce, description, table, pending: null, rebuilt: true };
 }
 
 /* The histories, as two log queries with their topic0s OR'd. `from` is the distribution's own first
    block when the `Created` scan found it, else the factory's — never genesis. */
 const CHANGE_EVENTS = [['Queued(bytes32,uint32,uint256,bytes)', 'queued'], ['Applied(bytes32)', 'applied'], ['Cancelled(bytes32)', 'cancelled'],
   ['OwnershipTransferred(address,address)', 'accepted']];
-const FUND_EVENTS = [['Received(address,uint256)', 'in'], ['Distributed(address,uint256)', 'distributed'], ['Escrowed(address,address,uint256)', 'escrowed'], ['Released(address,address,uint256)', 'released']];
+const FUND_EVENTS = [['Received(address,uint256)', 'in'], ['Distributed(address,uint256)', 'distributed'], ['Escrowed(address,address,uint256)', 'escrowed'], ['Released(address,address,uint256)', 'released'],
+  ['Claimed(address,address,address,uint256)', 'claimed']];
 /* Filled by the `Created` scan: a distribution's own first block, which is a better `fromBlock` than
    the factory's for anything created long after it. */
 const FIRST = new Map();
@@ -476,7 +509,9 @@ function entry(log) {
   if (kind === 'queued') {
     const [nonce, eta, action] = Eth.dec(['uint32', 'uint256', 'bytes'], log.data);
     // The `uint32 nonce` `applyQueued` takes: `snapshot()`'s struct does not carry it, this log does.
-    e.hash = log.topics[1]; e.nonce = Number(nonce); e.desc = describe(Model.decodePending(action));
+    // The eta and the action ride along for the fallback above, which rebuilds `_pending` from these.
+    e.hash = log.topics[1]; e.nonce = Number(nonce); e.eta = eta; e.action = action;
+    e.desc = describe(Model.decodePending(action));
     e.what = `${e.desc} · nonce ${nonce} · ${Model.countdown(eta, secs())}`;
   } else if (kind === 'applied' || kind === 'cancelled') {
     e.hash = log.topics[1];
@@ -485,9 +520,22 @@ function entry(log) {
     // The nomination's `Applied` is not the handover; this is, and it is the only log the nominee's call leaves.
     e.what = `owner · ${ext('address', at(1), short(at(1)))} → ${ext('address', at(2), short(at(2)))}`;
   } else if (kind === 'in') {
-    e.what = `${eth(log.data)} from ${ext('address', at(1), short(at(1)))}`;
+    /* `init` logs `Received(address(0), balance)` for value already at the address when the clone was
+       initialised — value that rode the `create`, or a send to the counterfactual address before any
+       code was there (`src/Distribution.sol:128-131`). The sentinel has no sender to link, so it reads
+       as what it means rather than as a payment from `0x000…0`. An ERC-20 `Transfer` from the zero
+       address is a mint and keeps its link: that path is `tokenIn`'s, not this one. */
+    e.from = at(1);
+    e.what = `${eth(log.data)} ${e.from === ZERO ? 'present at creation' : `from ${ext('address', e.from, short(e.from))}`}`;
   } else if (kind === 'distributed') {
     e.token = at(1); e.amount = log.data;
+  } else if (kind === 'claimed') {
+    /* `Claimed(token, account, to, amount)` indexes the first two and carries the other two in its
+       data: it is the one fund log whose destination is not the account it is credited to, because
+       `claim` takes a `to` the escrowed account chooses. */
+    e.token = at(1); e.account = at(2);
+    const [to, amount] = Eth.dec(['address', 'uint256'], log.data);
+    e.to = to; e.amount = '0x' + amount.toString(16);
   } else {
     // `Escrowed` and `Released` both index the token then the account, which is the token list and the
     // escrow list the funds block reads: nothing on chain carries either one.
@@ -502,6 +550,7 @@ const token = (a, known = true) => a === ZERO ? 'ETH' : ext('address', a, known 
    `decimalsOf` found for the token, `null` included — `amt` prints that as raw units. */
 const fundWhat = (e, dec, known = true) => e.kind === 'distributed' ? `${money(e.amount, e.token, dec)} by the table`
   : e.kind === 'in' ? `${money(e.amount, e.token, dec, known)} from ${ext('address', e.from, short(e.from))}`
+  : e.kind === 'claimed' ? `${money(e.amount, e.token, dec)} · ${ext('address', e.account, short(e.account))} claimed to ${ext('address', e.to, short(e.to))}`
   : `${money(e.amount, e.token, dec)} · ${ext('address', e.account, short(e.account))}`;
 /* A decoded pending action as one line, named by the setter it calls. `setBeneficiaries` is also
    drawn as a second bar; the other three say everything they do here. `transferOwnership` has three
@@ -572,36 +621,71 @@ const meta = d => `<div class="meta"><div><div class="k">owner</div><div class="
   + `<div><div class="k">delay</div><div class="v${Number(d.delay) ? '' : ' amber'}">${delayText(d.delay)}</div></div>`
   + `<div><div class="k">waiting to distribute</div><div class="v">${eth(d.waiting)}</div></div></div>`;
 
+/* Which of the three phases a queued entry is in, measured against the chain's latest block rather
+   than the browser's clock, like every other countdown here. `S.grace` is the boot read's, so there
+   is no second copy of `GRACE` on this page and no fallback reading for a missing one: a page that
+   could not read it never got past its boot. */
+const phase = eta => Model.countdown(eta, secs(), S.grace) === 'expired' ? 'expired'
+  : Model.countdown(eta, secs()) === 'ready to apply' ? 'ready' : 'waiting';
+/* #137 item 1: a queued `setDelay` that lowers the delay also shortens the notice every change after
+   it gets, and a zero removes that notice entirely — so the row says which, at the weight the live
+   delay's own zero already carries in `meta`. It sits beside the action rather than inside `describe`,
+   which is also a history row's line and has no live delay to compare a queued one against. */
+const lowers = (d, p) => p.kind !== 'setDelay' || Number(p.delay) >= Number(d.delay) ? ''
+  : `<div class="status bad">${Number(p.delay) === 0
+    ? 'removes the delay — after this, changes apply the moment they are proposed'
+    : `lowers the delay from ${delayText(d.delay)} to ${delayText(p.delay)}`}</div>`;
 /* The pending block: a queued table as a second bar in the pending style, the other three setters as
-   one line each, an action this build does not know as its selector. With `acts`, each row also
-   carries what can be done to it — which is the detail page only. */
+   one line each, an action this build does not know as its selector. The eyebrow reads by phase,
+   because the three are three different offers — the delay still running, matured and inside the
+   window, and expired, which only a cancel can clear. With `acts`, each row also carries what can be
+   done to it — which is the detail page only. */
 function pendingBlock(d, acts) {
-  return d.pending.map((p, i) => {
+  /* The fallback's list is the queue log's, so the block says so: it is as fresh as the last log
+     query rather than as fresh as the call that could not be made. `d.pending` is null until that
+     query lands, which is why the map is guarded rather than the notice. */
+  const lag = d.rebuilt ? notice('the one-call view could not be read — this list is rebuilt from the queue log and may lag it by a block', 'warn') : '';
+  return lag + (d.pending || []).map((p, i) => {
     const decoded = Model.decodePending(p[2]);
     // The tx that queued it comes from the logs, so it appears once `history` has landed.
     const tx = DS.qtx && DS.qtx.get(p[0]);
-    const head = eyebrow(`change queued · ${Model.countdown(p[1], secs())}`, 'amber') + `<div class="status warn">${describe(decoded, d.owner)}${tx ? ` · queued in ${ext('tx', tx, short(tx))}` : ''}</div>`;
+    const ph = phase(p[1]);
+    const brow = ph === 'expired' ? eyebrow('expired · anyone may cancel', 'err')
+      : ph === 'ready' ? eyebrow(`ready to apply · expires in ${Model.countdown(Model.deadline(p[1], S.grace), secs())}`, 'amber')
+      : eyebrow(`change queued · ${Model.countdown(p[1], secs())}`, 'amber');
+    const head = brow + `<div class="status warn">${describe(decoded, d.owner)}${tx ? ` · queued in ${ext('tx', tx, short(tx))}` : ''}</div>` + lowers(d, decoded);
     const body = decoded.kind === 'setBeneficiaries' ? bar(decoded.table, { pending: true }) + ticks(decoded.table, { pending: true }) : '';
-    return head + body + (acts ? pendingActs(d, p, i) : '');
+    return head + body + (acts ? pendingActs(d, p, i, ph) : '');
   }).join('');
 }
-/* `cancel(bytes32)` takes the hash straight from the struct, and is the owner's and immediate — the
-   delay guards applying, not cancelling. `applyQueued(bytes,uint32)` also needs the nonce, which the
-   struct does not carry and that entry's `Queued` log does. Until the log has arrived the apply button
-   says which reading it is waiting on and stays disabled: a guessed nonce is a different hash, and
-   would revert `NotReady(0)`. */
-function pendingActs(d, p, i) {
+/* `cancel(bytes32)` takes the hash straight from the struct. It is the owner's and immediate while
+   the entry can still be applied — the delay guards applying, not cancelling — and anyone's once the
+   entry has expired, which is the only control on this page whose audience the clock decides
+   (`src/Distribution.sol:266`). `applyQueued(bytes,uint32)` also needs the nonce, which the struct
+   does not carry and that entry's `Queued` log does. Until the log has arrived the apply button says
+   which reading it is waiting on and stays disabled: a guessed nonce is a different hash, and would
+   revert `NotReady(0)`. An expired entry reads past that wait: no nonce makes it applicable again. */
+function pendingActs(d, p, i, ph) {
   const nonce = DS.nonces ? DS.nonces.get(p[0]) : undefined;
-  const apply = nonce === undefined
-    ? `<button class="btn off sm" disabled>apply</button><span class="status${DS.failed ? ' bad' : ''}">`
-      + `${DS.failed ? 'history unavailable — apply needs the queue log' : 'reading the queue log — apply needs the nonce it carries'}</span>`
-    : Model.countdown(p[1], secs()) === 'ready to apply'
-      ? sctl(`apply:${i}`, 'apply', { to: d.addr, sig: 'applyQueued(bytes,uint32)', args: () => [p[2], nonce], label: 'applyQueued' })
-        + `<span class="status">the delay has passed — anyone can land it${ACC ? '' : ' · connect a wallet to send it'}</span>`
-      : '<button class="btn off sm" disabled>apply</button><span class="status">anyone can apply once the delay passes</span>';
-  const cancel = !OWNS() ? ''
-    : wctl(`cancel:${i}`, 'cancel', { to: d.addr, sig: 'cancel(bytes32)', args: () => [p[0]], label: 'cancel' })
-      + '<span class="status">cancel is owner-only and immediate</span>';
+  const apply = ph === 'expired'
+    ? '<button class="btn off sm" disabled>apply</button>'
+      + `<span class="status bad">this change expired on ${Model.dateText(Model.deadline(p[1], S.grace))} — it can no longer be applied</span>`
+    : nonce === undefined
+      ? `<button class="btn off sm" disabled>apply</button><span class="status${DS.failed ? ' bad' : ''}">`
+        + `${DS.failed ? 'history unavailable — apply needs the queue log' : 'reading the queue log — apply needs the nonce it carries'}</span>`
+      : ph === 'ready'
+        ? sctl(`apply:${i}`, 'apply', { to: d.addr, sig: 'applyQueued(bytes,uint32)', args: () => [p[2], nonce], label: 'applyQueued' })
+          + `<span class="status">the delay has passed — anyone can land it${ACC ? '' : ' · connect a wallet to send it'}</span>`
+        : '<button class="btn off sm" disabled>apply</button><span class="status">anyone can apply once the delay passes</span>';
+  /* Expired, the cancel is a direct send for whoever is connected rather than the owner's `wctl`: the
+     contract takes it from any account, so a vault signer's copy-calldata route would be a detour
+     around a call their own key can make. */
+  const cancel = ph === 'expired'
+    ? sctl(`cancel:${i}`, 'cancel', { to: d.addr, sig: 'cancel(bytes32)', args: () => [p[0]], label: 'cancel' })
+      + '<span class="status">expired — anyone may clear it</span>'
+    : !OWNS() ? ''
+      : wctl(`cancel:${i}`, 'cancel', { to: d.addr, sig: 'cancel(bytes32)', args: () => [p[0]], label: 'cancel' })
+        + '<span class="status">cancel is the owner\'s until the window closes</span>';
   return `<div class="acts">${cancel}${apply}</div>`;
 }
 
@@ -931,6 +1015,10 @@ async function detail(addr) {
     if (stale(t)) return;
     DS.nonces = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.nonce]));
     DS.qtx = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.tx]));
+    /* The fallback's pending list, as `snapshot()` would have returned it: every `Queued` the history
+       pass did not find an `Applied` or a `Cancelled` for, oldest first — `h.changes` is newest-first
+       and `_pending` is the queue's own order. */
+    if (d.pending === null) d.pending = h.changes.filter(e => e.kind === 'queued' && !e.closed).reverse().map(e => [e.hash, e.eta, e.action]);
     histFill('h-changes', h.changes, 'no change has been queued yet.');
     fill('pending', pendingBlock(d, true));
     /* The fund rows carry amounts in their token's own units (#43), and the changes above do not, so
@@ -946,6 +1034,7 @@ async function detail(addr) {
     if (stale(t)) return;
     fill('funds', fundsHTML(d, f, h.other));
     bindOthers(d, h.other, t);
+    bindClaims();
     bindAll();
   }).catch(() => {
     if (stale(t)) return;
@@ -1020,7 +1109,7 @@ function drawerHTML(d) {
   const val = id => document.getElementById(id).value;
   return '<div class="drawer">'
     + '<div class="dhead"><h2>Queue a change</h2><button class="link" id="dclose">close</button></div>'
-    + `<p class="prose">Queued changes wait in public for ${delayText(d.delay)}. The owner can cancel any time before one lands; anyone can apply after.</p>`
+    + `<p class="prose">Queued changes wait in public for ${delayText(d.delay)}, then stay applicable for ${delayText(S.grace)}. The owner can cancel any time before one lands; anyone can apply inside that window, and anyone can clear it once the window has closed.</p>`
     + eyebrow('the table — live preview')
     + editorHTML(D.rows)
     + `<div class="acts">${prop('table', 'Queue (1 transaction)', 'setBeneficiaries', SET_BENEFICIARIES, () => {
@@ -1057,7 +1146,7 @@ const ACKS = {
     'After the delay anyone can apply it. I can cancel it until then, and withdraw the nomination after.',
   ],
   renounce: [
-    'Once this is applied, no change to this distribution can be proposed or cancelled again, by anyone. A transfer waiting to be accepted is destroyed with it.',
+    'Once this is applied, no change to this distribution can be proposed again, by anyone. A transfer waiting to be accepted is destroyed with it, and an entry that has expired can still be cleared by anyone.',
     'The table, the delay and the name become permanent, mistakes included, once nothing else is queued. Funds keep going to the addresses in the table.',
     'After the delay anyone can apply it. I can cancel it only until then.',
   ],
@@ -1190,7 +1279,12 @@ async function readFunds(d, funds) {
   const escrows = await Promise.all(pairs.map(async k => {
     const [tk, ac] = k.split(' ');
     const [held] = await call(d.addr, 'escrowed(address,address)', [tk, ac], ['uint256']);
-    return { tk, ac, held, dec: await decimalsOf(tk) };
+    /* `claim` is self-only on chain, so the row's second control is offered to the escrowed account
+       and to a vault it signs for — decision 7's probe, the same one `ownerView` runs for the owner.
+       Asked here because `fundsHTML` is synchronous, and only where it can change the answer: the
+       connected account being the escrowed account is cheaper and takes precedence. */
+    const signs = !!ACC && !same(ACC, ac) && await signsFor(ac);
+    return { tk, ac, held, signs, dec: await decimalsOf(tk) };
   }));
   return { rows, escrows: escrows.filter(e => e.held > 0n) };
 }
@@ -1226,6 +1320,39 @@ function bindOthers(d, other, t) {
   };
 }
 const frow = (k, sub, n, ctl, cls) => `<div class="frow${cls ? ' ' + cls : ''}"><div><b>${k}</b>${sub ? `<div class="sub">${sub}</div>` : ''}</div><div class="n">${n}</div><div class="c">${ctl}</div></div>`;
+/* An escrow row's controls. `release` is permissionless and on every row, as it has been: anyone may
+   retry the push the distribution owes. `claim` is the escrowed account's own exit (F5, #95) and the
+   contract takes it from that account only, so it appears for that account — as a transaction where
+   the connected wallet is it, and as calldata where the connected wallet merely signs for it
+   (decision 7). `to` is the one argument the contract does not check, so this field does: it defaults
+   to the account itself, resolves a name the way the owner field does, and an unusable value throws
+   out of the argument thunk, which lands on the status line and sends nothing. */
+function escrowActs(d, e) {
+  const rel = sctl(`rel:${e.tk}:${e.ac}`, 'release', { to: d.addr, sig: 'release(address,address)', args: () => [e.tk, e.ac], label: 'release' });
+  const mine = same(ACC, e.ac);
+  if (!mine && !e.signs) return rel;
+  const key = `claim:${e.tk}:${e.ac}`, to = `to:${key}`, res = `res:${key}`;
+  const w = {
+    to: d.addr, sig: 'claim(address,address)', label: 'claim',
+    args: () => {
+      const v = document.getElementById(to).value.trim();
+      if (!isAddr(v)) throw new Error('claim sends to an address — a name resolves on mainnet and Sepolia');
+      if (!checksumOk(v)) throw new Error(BAD_SUM);
+      return [e.tk, Eth.checksum(v)];
+    },
+  };
+  return `<div class="acts">${rel}`
+    + `<input class="narrow" id="${to}" data-claimto="${res}" aria-label="claim to" placeholder="to — 0x…" value="${esc(mine ? ACC : e.ac)}">`
+    + `${mine ? sctl(key, 'claim', w) : wctl(key, 'claim', w)}</div><div class="res" id="${res}"></div>`;
+}
+/* The `to` field's one behaviour beyond holding text: a name resolves on change, through the same
+   `addrField` the owner field uses, which writes its own line into the `.res` beside it. The value is
+   read out of the DOM when the button fires, so a typed address needs no state of its own. */
+function bindClaims() {
+  V.querySelectorAll('[data-claimto]').forEach(el => {
+    el.onchange = async () => { const a = await addrField(el.value, document.getElementById(el.dataset.claimto)); if (a) el.value = a; };
+  });
+}
 function fundsHTML(d, f, other) {
   const rows = f.rows.map(r => frow(
     token(r.tk),
@@ -1235,9 +1362,10 @@ function fundsHTML(d, f, other) {
   )).join('');
   const escrows = f.escrows.map(e => frow(
     `escrowed · ${token(e.tk)}`,
-    `${ext('address', e.ac, esc(short(e.ac)))} — the push failed, so this share waits here`,
+    `${ext('address', e.ac, esc(short(e.ac)))} — the push failed, so this share waits here`
+      + (e.signs || same(ACC, e.ac) ? ' · release retries the push under its gas cap; claim is the account\'s own exit, paid with its own gas' : ''),
     e.tk === ZERO ? eth(e.held) : amt(e.held, e.dec),
-    sctl(`rel:${e.tk}:${e.ac}`, 'release', { to: d.addr, sig: 'release(address,address)', args: () => [e.tk, e.ac], label: 'release' }),
+    escrowActs(d, e),
     'err',
   )).join('');
   const n = other && new Set(other.map(e => e.token)).size;

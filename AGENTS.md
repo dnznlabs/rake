@@ -98,7 +98,7 @@
 - Every write goes through `tx(to, sig, args, {value, label})`: an `eth_call` preflight on exactly the
   transaction about to be sent, then `eth_sendTransaction`, then `waitReceipt`, then the receipt's
   `status`. A revert is therefore a sentence before anything is paid for, and `Model.revertMessage`
-  turns the bytes into it — the nine custom errors by selector, a bare 32-byte word as the token
+  turns the bytes into it — the ten custom errors by selector, a bare 32-byte word as the token
   refusing the call (that is whatever a token's `balanceOf` reverted with, bubbled by `_balance` with
   no selector in front of it), no bytes as `reverted`. The bytes themselves sit at `error.data` for the dev `rpcProvider`, which throws the
   JSON-RPC error object, and at `error.data.data` for a MetaMask-class wallet, so both are read.

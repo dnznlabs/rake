@@ -83,6 +83,13 @@ function pct(bps){return bps/100}
 function cname(id){return CHAINS[id]||'chain '+id}
 function fmtDelay(s){if(!s)return 'no delay';var d=Math.floor(s/86400),h=Math.round(s%86400/3600);return d?d+'d'+(h?' '+h+'h':''):h+'h'}
 function fmtEta(eta){var s=eta-Math.floor(Date.now()/1000);if(s<=0)return null;var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d?d+'d '+h+'h':(h?h+'h '+m+'m':m+'m')}
+/* `GRACE` in `src/Distribution.sol`: a matured action stays applicable for fourteen days and expires
+   after that, so a row that only ever says `ready to apply` goes on claiming something the contract
+   stopped allowing. The literal is deliberate — this widget is one `eth_call` by contract (:3) and a
+   second read for `GRACE()` would break that — and `test/widget.test.mjs` pins it to `14 * 86400`, so
+   a change to the constant fails there before it can ship a wrong sentence here. */
+var GRACE=1209600;
+function etaText(eta){var left=fmtEta(eta);return left?'lands in '+left:(Math.floor(Date.now()/1000)>eta+GRACE?'expired':'ready to apply')}
 function isDark(el){
  var n=el;while(n&&n!==document.documentElement){
   var bg=getComputedStyle(n).backgroundColor,m=bg&&bg.match(/rgba?\(([^)]+)\)/);
@@ -187,8 +194,7 @@ function render(el){
     +(b.note?' <span class="rk-nt">· '+esc(b.note)+'</span>':'')
     +'</span><b class="rk-pc">'+pct(b.bps)+'%</b></div>'}).join('')+'</div>';
   snap.pending.forEach(function(p){
-   var left=p.eta?fmtEta(p.eta):null;
-   h+='<div class="rk-q">a change is queued · '+(left?'lands in '+left:'ready to apply')+'</div>';
+   h+='<div class="rk-q">a change is queued · '+(p.eta?etaText(p.eta):'ready to apply')+'</div>';
    /* The segments shrink to pay for the 2 px gaps, which keeps their proportions declarative. */
    if(p.table){var n=p.table.length;h+=bar(p.table,'rk-qb',0,((n-1)*2/n).toFixed(1))}});
   if(!snap.delay)h+='<div class="rk-nd">no delay — the owner can change this table instantly</div>';

@@ -3,10 +3,12 @@ pragma solidity ^0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {Distribution, DistributionFactory} from "../../src/Distribution.sol";
-import {MockERC20, MockVault, RevertingReceiver} from "../../test/mocks/Mocks.sol";
+import {BlocklistToken, MockERC20, MockVault, RevertingReceiver} from "../../test/mocks/Mocks.sol";
 
 /// @notice The two distributions the write screens need and the seed does not carry: one holding a
-/// live escrow in both ETH and a token that reports failure, and one owned by a contract.
+/// live escrow in both ETH and a token that reports failure, and one owned by a contract. Plus one
+/// token escrow on the *featured* distribution, owed to an anvil EOA, which is the only escrow on this
+/// chain whose own key can press `claim` in a browser (m03-t09).
 /// @dev Not a `Deploy*.s.sol`: the deploy loop in `mk/10-forge.mk` runs those with no environment, and
 /// this one needs the factory's address. Not part of `deploy` either — the escrow demo is a hand-run
 /// step, so `make fixtures` is called after `make deploy` and never from it.
@@ -42,6 +44,9 @@ contract Fixtures is Script {
             return;
         }
 
+        // The featured distribution the seed made, read the way the seed addresses it.
+        address featured = factory.predict(vm.envBytes32("FEATURED_SALT"));
+
         vm.startBroadcast();
         RevertingReceiver receiver = new RevertingReceiver();
         MockERC20 liar = new MockERC20(MockERC20.Ret.False);
@@ -62,6 +67,18 @@ contract Fixtures is Script {
         // real deployment looks like: one EOA holds the salt, the vault holds the distribution.
         address vaulted =
             factory.create{value: VAULT_DEPOSIT}(address(owner), VAULT_DELAY, "vault demo", _pair(), vaultSalt);
+
+        /* An escrow an EOA can clear itself. Every other escrow on this chain is owed to a contract —
+           the receiver refuses ETH, the liar's share is owed to account 1 in a token whose `transfer`
+           lies rather than reverting — and `claim` is self-only, so none of them can be pressed from a
+           browser wallet. `BlocklistToken` reverts on a transfer to the account it blocks, so
+           distributing it on the featured distribution escrows account 1's share of a token account 1
+           holds the key to. Account 1's share of the featured table is `Seed.s.sol`'s "treasury" row. */
+        BlocklistToken blocker = new BlocklistToken(ACCOUNT_1);
+        if (featured.code.length != 0) {
+            blocker.mint(featured, MINT);
+            Distribution(payable(featured)).distribute(address(blocker));
+        }
         vm.stopBroadcast();
 
         console.log("receiver", address(receiver));
@@ -70,6 +87,9 @@ contract Fixtures is Script {
         console.log("vault signer", ACCOUNT_3);
         console.log("escrow demo", escrowed);
         console.log("vault demo", vaulted);
+        console.log("blocklist token", address(blocker));
+        console.log("blocked (claims its own escrow)", ACCOUNT_1);
+        if (featured.code.length == 0) console.log("featured not seeded, no claim demo", featured);
     }
 
     /// @dev The sender-bound salt of decision 10, as `Model.salt` builds it in the dapp.
