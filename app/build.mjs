@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Eth from './src/eth.js';
 import { assertInlineScripts } from './inline-scripts.mjs';
+import { assertPairable, creations } from './broadcast.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -33,17 +34,16 @@ function deployed() {
     const file = join(dir, script, chain, 'run-latest.json');
     if (!existsSync(file)) continue;
     const log = JSON.parse(readFileSync(file, 'utf8'));
-    /* Matched by hash rather than by index: the receipt order is forge's, not this file's contract. */
-    const blocks = new Map((log.receipts || []).map(r => [r.transactionHash, r.blockNumber]));
-    for (const t of log.transactions) {
-      /* CREATE2 as well as CREATE: a salted `new` is routed through the keyless proxy, so the
-         deploys this reads are logged CREATE2 and a CREATE-only filter resolves nothing. */
-      if ((t.transactionType !== 'CREATE' && t.transactionType !== 'CREATE2') || !t.contractName) continue;
-      const name = t.contractName.toUpperCase();
+    /* Before the pairing is used, never after: the receipt a creation block comes from is joined to
+       its transaction by hash, and m03-t06 found `run-latest.json` filing a hash under the wrong
+       transaction object. A `fromBlock` off a mispaired receipt looks fine and silently starts a log
+       scan in the wrong place, so the build refuses the log rather than emit it — see rake#140. */
+    assertPairable(file, log);
+    for (const c of creations(log)) {
+      const name = c.name.toUpperCase();
       /* Checksummed: the log is lowercase, and the same address two ways gzips to two sizes. */
-      out[name] = Eth.checksum(t.contractAddress);
-      const block = blocks.get(t.hash);
-      if (block != null) out[`${name}_BLOCK`] = '0x' + BigInt(block).toString(16);
+      out[name] = Eth.checksum(c.address);
+      if (c.block != null) out[`${name}_BLOCK`] = '0x' + BigInt(c.block).toString(16);
     }
   }
   return out;
