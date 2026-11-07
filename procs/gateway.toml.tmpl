@@ -1,0 +1,16 @@
+ServerPort = "$GATEWAY_PORT"
+RunAsHttp = true
+IsBehindHttpsProxy = false
+HomePage = "/"
+CORS = "*"
+defaultChain = 31337
+requestLimit = 50
+[pageCache]
+enabled = false
+[nsDefaultChains]
+[name2chain]
+"anvil" = 31337
+[chainConfigs]
+    [chainConfigs.31337]
+    "ChainID" = 31337
+    "RPC" = "http://127.0.0.1:$ANVIL_PORT"
