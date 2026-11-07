@@ -59,6 +59,24 @@
   as built without writing its artifact, and the next `forge test`/`forge snapshot` silently drops that
   file's whole suite — `--check` then exits 0 on code it never ran (t03 handoff: 23 tests counted of
   36). CI is unaffected because it builds from a clean checkout.
+- `test/invariant/` is the stateful suite: one handler (`DistributionHandler.sol`) and seven
+  `invariant_` properties (`Distribution.inv.t.sol`). Run it alone with
+  `devbox run -- forge test --match-path 'test/invariant/*'`; add `-vv` for forge's call summary, which
+  is calls, bubbled reverts and discards per handler selector; add `INV_SUMMARY=1` to that for the
+  handler's own count, per entry point, of the refusals it caught — from the last run of the campaign
+  only, because forge keeps one run's logs. `[invariant] runs` and `depth` live in `foundry.toml` with
+  the wall-time measurement they were chosen against.
+- `[invariant] fail_on_revert = false`, so a revert that bubbles out of a handler function is
+  *discarded*: that step of the sequence does nothing and the campaign still reports green. A new
+  handler function must catch every revert it legitimately expects with `try`/`catch` and count it, and
+  its `Reverts` column must read 0. A handler that has stopped reaching the contract looks exactly as
+  passing as one that works, so read the call summary rather than the exit code — m04-t07 shipped a
+  handler whose first renounce rate left a 51,200-call sequence having queued one action in total, with
+  all seven properties green.
+- Regenerate `.gas-snapshot` with an **unfiltered** `forge snapshot`. A fuzz test's `μ` depends on
+  which tests the run selected: on one tree `testFuzz_applyWindow` read 456,764 under
+  `--match-test testFuzz` and 456,944 over the whole suite. CI checks the whole suite, so a snapshot
+  regenerated under a filter fails `--check` for a reason that has nothing to do with gas.
 
 <!-- fragment: dapp -->
 ## The dapp

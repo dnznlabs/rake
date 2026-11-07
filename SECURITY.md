@@ -203,10 +203,13 @@ column records which leg reported it, from `AUDIT.md`'s grading section.
 
 ## Invariants the suite holds
 
-From `forge test --list` on the head of this PR: **91 tests** in five suites — `DistributionTest` 52,
-`AppTest` 27, `DistributionFactoryTest` 6, `PushGasTest` 3, `TableCapTest` 3. Grouped by the
-property each group holds. A property asserted by a test is stronger than a finding: a finding gets
-fixed once, a test refuses to let it come back.
+From `forge test --list --json`: **102 tests** in six suites — `DistributionTest` 56, `AppTest` 27,
+`DistributionInvariantsTest` 7, `DistributionFactoryTest` 6, `PushGasTest` 3, `TableCapTest` 3.
+Grouped by the property each group holds. A property asserted by a test is stronger than a finding: a
+finding gets fixed once, a test refuses to let it come back. The last eleven are m04-t07's — the whole
+of `DistributionInvariantsTest` and four of `DistributionTest`'s — and are the group at the end; the
+count read **91** in five suites before them, which is the figure the reconciliation in the next
+paragraph was done against.
 
 Three generations of additions are marked. The nine m03-t05 added are marked **new**; the fourteen
 m03-t08 added are marked **t08**; the five **this** PR adds are marked **t07** and are the whole of
@@ -333,7 +336,43 @@ change), `test_lockRejectsRealDelegation` (**t07** — the chain's own designato
 stated it), `test_setChunksRejectsNonChunkContract` (**t07** — a deployed contract is not a chunk
 either: its first byte is not `0x00`, and `SSTORE2.read` would have mis-read it) — 5 tests.
 
-8 + 15 + 11 + 20 + 4 + 7 + 21 + 5 = **91**, the whole suite.
+**The random sequence nobody wrote down** — seven properties asserted after *every call* of every
+sequence a handler drives, and four unit tests run over a bounded input space instead of over one
+input. New in m04-t07, and a different class of check from the rest of this section: the groups above
+pin sequences someone thought of, and these look for the one nobody did. The handler
+(`test/invariant/DistributionHandler.sol`) owns one clone created through the real factory and wraps
+every state-changing entry point the contract has, one handler function each — `receive`,
+`distribute`, `release`, `claim`, `propose` in its four action shapes and once more from a stranger,
+`applyQueued`, `cancel`, `acceptOwnership` — plus a bounded `warp` and a token mint, so forge's own
+call summary is the evidence that each was reached. `init` is reached once per run, in the handler's
+constructor, through `create`. Six actors (the owner, four payees including one that refuses ETH and
+one that burns the whole push cap, two strangers) and three tokens (ETH, a plain ERC-20, and one that
+reports failure without moving a balance) bound every address and every amount, which is what makes
+the conservation check exact. A fee-on-transfer or rebasing token is **not** among them: decision 23
+excludes the class and F4's row documents the consequence.
+
+- `invariant_tableSumsToBps` — one to 107 rows, no zero share, strictly ascending accounts, and shares summing to exactly 10,000 bps, after every call (overview § 5; `_set`).
+- `invariant_reservedEqualsEscrowSum` — `reserved[token]` is the sum of `escrowed[token][account]` and nothing else, for every token (the escrow accounting; F4's row).
+- `invariant_balanceCoversReserved` — the contract always holds at least what it has promised, so an escrow is always payable; this is the property decision 23 rests on, and the excluded token class is what would break it.
+- `invariant_conservation` — every wei and every token unit that went in is either still in the contract or in an actor, exactly: nothing is minted or lost by `distribute`, `release` or `claim`.
+- `invariant_noActionOutsideWindow` — an action applies only at a time in `[eta, eta + GRACE]`, only once, and never after it was cancelled or carried off by an ownership move (decisions 25 and 39; F9/F13).
+- `invariant_ownerOrNobody` — a non-owner never queues an action, and a renounce is final: `owner()` stays zero, nobody is left nominated, and `propose` is refused (F2's queue clear, decision 21; `test_renounceClearsQueue` is the unit version).
+- `invariant_lockNeverHeld` — the transient lock is never held between calls, read through the `notLocked` surface that refuses while a money path is running.
+
+The one property deliberately **not** asserted is "`distribute` leaves zero balance". It does not,
+under escrow, and F10's remainder-to-the-last-row is design — so conservation is asserted instead.
+
+`fail_on_revert = false`, so the handler catches the refusals it legitimately expects and counts them
+per entry point rather than letting them bubble: a bubbled revert would be discarded and that call of
+the sequence would do nothing, which is how a suite that has stopped exercising the contract still
+reports green. Both numbers are in the t07 handoff, and `AGENTS.md` § Contracts says how to read them.
+
+`testFuzz_roundingNeverExceedsAmount` (every three-row table, not the one hand-picked in
+`test_rounding_3333_3333_3334`), `testFuzz_saltPrefixMustBeSender` (every salt tail under the right
+prefix and a wrong one), `testFuzz_applyWindow` (every offset from the proposal to a month past the
+lapse), `testFuzz_claimMovesExactlyEscrow` (every amount an unpushable row can be owed) — 11 tests.
+
+8 + 15 + 11 + 20 + 4 + 7 + 21 + 5 + 11 = **102**, the whole suite.
 
 ---
 
