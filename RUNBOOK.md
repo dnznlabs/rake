@@ -44,8 +44,8 @@ export CHAIN_ID=<from § 1's table>
 export SIGNER="--account <keystore> --sender <address>"   # anvil: --unlocked --sender 0xf39F…2266
 export OWNER=0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790    # the Ops vault: App's owner, and the owner passed to create
 export APP_VERSION=v0.1
-export FACTORY_SALT=0x0000000000000000000000000000000000000000000000000000000000000000
-export APP_SALT=0x0000000000000000000000000000000000000000000000000000000000000000
+export FACTORY_SALT=0xc7b08946793948e2cb78adf914cfa19ac8341e52b8a7a96ab26034fe6c476693  # mined, decision 37
+export APP_SALT=0xd9ad8a57dc1d24c639881670feb590b06bb437e8c698f3e9fc53d5920c04b7ef      # mined, decision 37
 export CREATOR=0x68e0741D8d693e14BF56914567eADdC130b186eE  # DNZN Creator, decision 32
 export DNZN_SALT=${CREATOR}000000000000000000000001        # top 20 bytes CREATOR (decision 10), low 12 bytes 1
 # filled in by step 1, never by hand
@@ -62,10 +62,16 @@ line never branches by chain, and `App` is same-address on all eight because of 
 constructor or salt inputs, so the same-address property holds only while all three are the same on
 every chain. Changing any one of them on one chain puts `App` somewhere else there.
 
-**The salts are zero here.** [#115](https://github.com/dnznlabs/rake/issues/115) was ruled for
-vanity mining (decision 37) and that is M04's step, not this document's: the salts are variables, so
-a mined value is a one-line change to the two lines above. `FACTORY_SALT` can be mined against the
-final `src/`; `APP_SALT` waits on D15 ([#126](https://github.com/dnznlabs/rake/issues/126)).
+**The salts are mined.** [#115](https://github.com/dnznlabs/rake/issues/115) was ruled for vanity
+mining (**decision 37**, amended 2026-11-07 with the prefixes: `0x00d1…` for `DistributionFactory`,
+`0x00a9…` for `App`), and both were mined once, in
+[m03-t10](docs/milestones/m03/tasks/m03-t10/TASK.md), against the init-code hashes step 1f computes:
+`0xd8a1208ac79c66d94c864e7620534dd0f923bf0f7518d25ae87a7f619bc31cc5` for the factory and
+`0x0b2894a38c541f156e2be856b7469993004331006a2ba9c66fa4d040f7b9864a` for `App`. **A salt is tied to
+the bytes it was mined against**: any later `src/` byte is a new factory address and a new mining
+run (decision 5 — a new version is a new factory anyway), and because `OWNER` and `APP_VERSION` are
+inside `App`'s hash, `APP_SALT` holds only for the Ops vault and `v0.1`. Step 1f recomputes both
+addresses from these variables on every chain; it never copies them.
 
 **`CREATOR` is a placeholder until [#90](https://github.com/dnznlabs/rake/issues/90) names the
 address.** The rehearsal in § Rehearsed on anvil uses the signing account for it and says so. The
@@ -444,7 +450,10 @@ blank transaction hash is a step that did not run.
 Steps 1, 2, 3, 6 and 7 were run start to finish on **two anvils at once** — `--chain-id 31337` on
 port 8555 and `--chain-id 31338` on port 8556 — at commit `d75b664`, forge `1.7.1-dev`, node
 `v24.12.0`, on 2026-11-01. **Step 4 was rehearsed on the 31337 chain** (below); step 5 is named and
-not run by design. Both chains used the same `FACTORY_SALT` and `APP_SALT` (zero), the same
+not run by design. **That rehearsal ran with zero salts**, before decision 37's prefixes were ruled;
+the run that landed both contracts at the mined addresses of § 0 is m03-t10's, recorded in
+[its handoff](docs/milestones/m03/tasks/m03-t10/HANDOFF.md) § Acceptance criteria. Both chains here
+used the same `FACTORY_SALT` and `APP_SALT` (zero), the same
 `APP_VERSION` (`v0.1`), and the same `OWNER`: anvil's first account
 `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`, standing in for the Ops vault, which also stands in
 for the DNZN Creator key until [#90](https://github.com/dnznlabs/rake/issues/90) names it. So
