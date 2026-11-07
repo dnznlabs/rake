@@ -452,8 +452,10 @@ contract DistributionFactory {
     ///    CREATE2 collision consumes every unit forwarded to it. Read `predict(salt)` with
     ///    `eth_getCode` first and refuse a non-empty answer.
     /// 3. Same-address-everywhere is this factory's address, not a clone's claim on its own. The
-    ///    factory is nonce-addressed where it is deployed; a byte-identical deploy through a
-    ///    deterministic deployer is a later milestone's one-way door.
+    ///    factory is placed by CREATE2 through the keyless proxy at `0x4e59b448…0B4956C`
+    ///    (`scripts/forge/Deploy.s.sol`), so its address follows that proxy, `FACTORY_SALT` and this
+    ///    contract's bytes — never a deployer's nonce — and `RUNBOOK.md` puts it at one address on
+    ///    every chain it reaches.
     function create(
         address owner_,
         uint32 delay_,

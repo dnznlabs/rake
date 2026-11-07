@@ -365,10 +365,17 @@ either: its first byte is not `0x00`, and `SSTORE2.read` would have mis-read it)
 
 The current review reads **`94d028c`**, this PR's **frozen head** — the last commit touching `src/`,
 `test/*.t.sol` or `.gas-snapshot`, frozen at step 5 before the review ran and unchanged under `src/`
-since: `git diff --stat 94d028c HEAD -- src/` prints nothing. The **branch head** at the review was
-**`0819552`**, one commit later, which step 5 permits because it rewrote `audits/KNOWN_ANSWER.md`
-only. Both are named because the blinded tree is cut at the frozen head while the PR is reviewed at
-the branch head, and naming one without the other has already caused one correction.
+since: `git diff --stat 94d028c 0819552 -- src/` prints nothing. **One comment moved after that.**
+m03-t10 ([#153](https://github.com/dnznlabs/rake/pull/153)) rewrote the three `///` lines of the
+factory's NatSpec point 3 and nothing else under `src/`, so the diff criterion 4 reads is no longer
+empty and what it reports is that comment: every contract's **opcode bytes** are still equal to
+`94d028c`'s — `forge inspect <C> deployedBytecode` with the 53-byte CBOR tail stripped is
+`cmp`-silent for `Distribution` and `DistributionFactory`, and `App`'s whole string is byte-identical
+— only the metadata block moved, and the review is **not** re-opened. The **branch head** at the
+review was **`0819552`**, one commit later, which step 5 permits because it rewrote
+`audits/KNOWN_ANSWER.md` only. Both are named because the blinded tree is cut at the frozen head
+while the PR is reviewed at the branch head, and naming one without the other has already caused one
+correction.
 
 **`main` was brought in after the review by a merge commit, `cb2e2a9`.** That is what keeps the two
 shas above reachable: `git merge-base --is-ancestor 94d028c HEAD` exits 0, so once this PR merges a
