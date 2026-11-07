@@ -136,8 +136,9 @@ quote.
   added), every one of them a `///` line. `grep -c 'nonce-addressed' src/Distribution.sol` → 0.
 - Opcode equality: step 1's `cmp` against the step 0 captures is silent for `Distribution` and
   `DistributionFactory`, and `forge inspect App deployedBytecode` is identical to `33c8336`'s. The
-  handoff shows both commands and their outputs, and the captured byte counts (18,437 and 2,535)
-  as the denominator.
+  handoff shows both commands and their outputs, and the captured byte counts (18,439 and 2,537 —
+  corrected at close-out from 18,437 and 2,535, which omitted the `0x`; step 0 had the right pair
+  and the handoff's deviation 1 caught the mismatch) as the denominator.
 - `forge test` 91 passed, 0 failed; `node --test test/*.test.mjs` 67; `forge snapshot --check`
   exit 0 and `.gas-snapshot` untouched; `forge build --force` 0 warning lines; `forge fmt --check`
   and `forge lint` silent; `tools/abi-vectors.sh` idempotent on the branch head.
