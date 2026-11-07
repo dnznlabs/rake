@@ -43,8 +43,11 @@ ptr)` at `:46`, `_requireChunk` at `:198` and its four call sites at `:125`, `:1
 `:176`, and `grep -v '^\s*//' src/App.sol | grep -c 'code.length'` is 0 there. So no leg is reading
 code it was not given, and no leg has found the fix wanting: on 2026-10-31 leg 2 raised this shape at
 confidence 80 — its highest of that run — against the unfixed file, and against the fixed file
-neither leg raised it. That absence is the one piece of positive evidence this run produces that runs
-*towards* the fix rather than around it.
+neither leg raised it. **That absence is the expected outcome against a tree carrying the fix, not
+independent validation of `_requireChunk`:** it cannot distinguish a leg that read the check and
+found it sound from one that never reached it. The 2026-10-31 contrast is the most it supports — the
+same method, at its highest confidence of that run, raised the shape while the unfixed file was in
+scope and did not raise it here. **F11's disposition rests on this PR's five tests, not on the legs.**
 
 **One re-raise is recorded rather than treated as new.** Leg 2's `L2#4` (the rollup's F7) is the
 closest thing either leg brought to the closed F9/F13: `applyQueued` (`:242`) still has no caller

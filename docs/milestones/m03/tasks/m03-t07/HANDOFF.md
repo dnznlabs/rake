@@ -159,14 +159,19 @@ leg 2 **8 findings, 7 leads**; **8 distinct** after dedup.
 
 Ten shapes closed before this audit — **#20, #61, #74, #111, F1, F2, F6, F11, F9/F13, F5/#95** —
 and **no leg reported any of them as open in its original mechanism**. Item by item in `AUDIT.md`
-§ 4. Two carry a note:
+§ 4. **That is measured against a tree carrying all ten fixes, so it is consistent with the fixes
+holding and with the legs never reaching them, and cannot distinguish the two** — each shape's
+disposition rests on the PR that closed it, not on this run's silence. Two carry a note:
 
 - **F11 is among the closed and neither leg raised it**, which the plan requires this handoff to
   state explicitly. The fix was in the bytes they read — the blinded tree's `src/App.sol` carries
   `ForeignChunk` at `:46`, `_requireChunk` at `:198` and its four call sites, and
   `grep -v '^\s*//' … | grep -c 'code.length'` is 0 there. On 2026-10-31 leg 2 raised this shape at
   confidence 80, its highest of that run, against the unfixed file. So no leg is reading code it was
-  not given, and none has found the fix wanting.
+  not given, and none has found the fix wanting — but **the absence is the expected outcome against
+  the fixed bytes, not independent validation of `_requireChunk`**, and it cannot distinguish a leg
+  that read the check and found it sound from one that never reached it. The 2026-10-31 contrast is
+  the most it supports. **F11's "fixed" rests on this PR's five tests, not on the legs.**
 - **F9/F13's closest re-raise is leg 2's `L2#4`** (the rollup's F7): `applyQueued` still has no
   caller check, so a matured action is applicable by any caller in any order. That is the standing
   disposition's own wording — `GRACE` bounds the window to 14 days rather than removing it — so
