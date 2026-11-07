@@ -30,7 +30,7 @@ runs = 512
 
 # test/invariant/ — one handler, seven properties (m04-t07). `runs × depth` is the call budget for
 # one property and there are seven of them, so these two figures are CI's wall-time budget restated.
-# Measured on this host, invariant suite alone at `runs = 256`: depth 50 → 3 s, 100 → 7 s, 200 → 11 s,
+# Measured on this host, invariant suite alone at `runs = 256`: depth 50 → 3 s, 100 → 8 s, 200 → 11 s,
 # 500 → 26 s, all seven passing at every depth. 200 is the chosen point — long enough for one sequence
 # to chain propose → warp → applyQueued → cancel → distribute → release → claim rather than brush
 # past each entry point three times — and it leaves a fivefold margin under the 60 s budget t07 set,
