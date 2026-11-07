@@ -7,6 +7,7 @@
     "process-compose@latest",
     "jq@latest",
     "nodejs@24",
-    "serve@14.2.6"
+    "serve@14.2.6",
+    "go@1.27"
   ]
 }

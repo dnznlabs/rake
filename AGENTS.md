@@ -175,6 +175,19 @@
 - The build minifier strips leading whitespace on every line, template literals included.
 - gzip output depends on the node build's zlib. Build through devbox when the bytes matter.
 - Node tests are `test/*.test.mjs`.
+- `make serve` runs a third process beside anvil and :3000: the
+  [ethstorage/web3url-gateway](https://github.com/ethstorage/web3url-gateway) (the software behind
+  w3link.io), pinned in `tools/gateway.sh`, serving the dev chain's `App` at
+  `http://0x<App>.31337.w3.localhost:8787/` — address, chain id, then `w3.<gateway host>`. Chrome
+  resolves any `*.localhost` to loopback on its own, so that URL just opens; `curl` does not, and
+  needs `--resolve $H:8787:127.0.0.1`. **The document the gateway serves is not `html()` verbatim:**
+  it injects its own `cmd/server/html.patch` — a `fetch` wrapper, a click handler and a
+  `MutationObserver` that rewrite `web3://` URLs into gateway URLs — immediately after `<body>`'s
+  `>`. `make gateway-check` is the proof the ERC-5219 path works through real gateway software: the
+  three `Web3-*` response headers, `/widget.js` byte-equal to `app/dist/widget.js`, 404 for anything
+  else, and the body with that injected block removed byte-equal to `html()`. It needs the stack up,
+  and the gateway build needs Go — `devbox.json` pins `go@1.27`, though the pin's `go.mod` asks for
+  1.27.3, so `GOTOOLCHAIN=auto` fetches that compiler on the first build.
 
 <!-- fragment: onchain-dapp -->
 ## The contract-hosted dapp
