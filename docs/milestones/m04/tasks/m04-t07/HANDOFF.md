@@ -1,6 +1,6 @@
 # m04-t07 — handoff
 
-PR: pending · Branch: `m04/t07-invariants` · 2026-11-07
+PR: #171 · Branch: `m04/t07-invariants` · 2026-11-07
 
 `test/invariant/` now holds a stateful suite: one handler owning a single `Distribution` clone created
 through the real factory, and seven `invariant_` properties asserted after every call of every random
