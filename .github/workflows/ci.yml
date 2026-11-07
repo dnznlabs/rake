@@ -51,6 +51,16 @@ jobs:
       - name: gas snapshot
         run: devbox run -- forge snapshot --check
 
+      # Last, after `gas snapshot`, and not between `test` and it as m04-t06's plan first ordered:
+      # Slither compiles with its own `forge build --build-info --skip ./test/** --force`, which
+      # leaves `out/` holding six artifacts and none of the tests'. `forge snapshot --check` reads
+      # `out/` and so pays a full recompile if it follows Slither — measured at 13.4 s against the
+      # 0.3 s it takes behind `test`. Correctness is unaffected either way: forge rebuilds what is
+      # missing, and `forge snapshot --check` exits 0 straight after a Slither run. This is wall
+      # time only, which is why the step is ordered rather than guarded.
+      - name: slither
+        run: devbox run -- make slither
+
       - name: working tree clean
         shell: bash
         run: |

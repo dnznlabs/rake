@@ -59,6 +59,26 @@
   as built without writing its artifact, and the next `forge test`/`forge snapshot` silently drops that
   file's whole suite — `--check` then exits 0 on code it never ran (t03 handoff: 23 tests counted of
   36). CI is unaffected because it builds from a clean checkout.
+- `make slither` is the static analysis gate: Slither 0.11.5 from devbox, configured by
+  `slither.config.json`, green only because `slither.db.json` triages every result. **The triage
+  database and `SECURITY.md` § Static analysis move together in the same PR** — the database is the
+  code's record and the table is the reasoning's, and a result with one and not the other is either
+  an unexplained silence or a row for a result nobody sees. A new result (a changed line, a new
+  detector in a bumped version) fails the gate until it has both. Regenerate with
+  `devbox run -- slither . --triage-mode`; it matches results by relative source mapping, so the
+  absolute paths it records are noise that churns on every regeneration.
+- **Slither's compile rebuilds `out/` without the test artifacts.** It runs its own
+  `forge build --build-info --skip ./test/** --force`, which leaves six artifacts and none of the
+  suites'. So `forge build --force` before any test count or `forge snapshot --check` that follows a
+  Slither run, exactly as the `forge lint` rule above requires — the difference is that this one
+  costs wall time, not a wrong answer: forge rebuilds what is missing, so `--check` still exits 0, it
+  just pays 13.4 s for it. CI orders `slither` last, after `gas snapshot`, for that reason.
+- `filter_paths` in `slither.config.json` filters **results, not the compilation unit**:
+  crytic-compile derives Slither's `--skip` list from `forge config --json`, so `scripts/forge/` is
+  skipped whatever the config says. Analysing the two shipped deploy scripts needs
+  `--foundry-compile-all` (71 contracts, 46.6 s) or a `--skip ./test/**` pre-build with
+  `--foundry-ignore-compile` (54 contracts, 12.6 s); both give the same 23 gated results, none of
+  them in `scripts/forge`.
 
 <!-- fragment: dapp -->
 ## The dapp
