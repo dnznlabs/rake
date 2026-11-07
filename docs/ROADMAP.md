@@ -457,6 +457,15 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     t06's two-anvil rehearsal runs with zero salts in every case (the issue's default), since the
     runbook takes the salt as a variable and the rehearsal proves the method, not the address.
     Rejected: zero salts (nothing gained, and the house style already has the prefix).
+    *Amended 2026-11-07 — the prefixes.* Ruled by Denizen in the architect's Telegram DM ("yeah go
+    with option 1"): `0x00` plus four hex digits, the vaults' family — `0x00d1…` for
+    `DistributionFactory`, `0x00a9…` for `App`, the pair the architect proposed. Rejected: four
+    digits without the `0x00` (no family resemblance) and eight digits (hours per salt for a signal
+    nobody reads). The sequencing above is superseded by events: `FACTORY_SALT` was not mined at
+    `b0fb4e3`, because t08 and then #150 (a) moved `Distribution.sol` after it; both salts are mined
+    once, in [m03-t10](milestones/m03/tasks/m03-t10/TASK.md), after that task's NatSpec line — the
+    last `src/` byte — and the mining took 2.4 ms per salt at rehearsal, so "minutes" in the DM was
+    an overestimate. #115 closed the same day.
 38. **`App.lock` is fixed before M04: a t07 refuses any chunk pointer whose code can change.** D15,
     opened at m03-t05's second review on [#126](https://github.com/dnznlabs/rake/issues/126), ruled
     by Denizen on 2026-11-01 ("Option 1"). The issue's § Record said decision 37; #115 took that
