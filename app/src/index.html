@@ -954,7 +954,7 @@ function loadField() {
 /* ---- one distribution ------------------------------------------------------------------------ */
 /* What one load of `#/distros/<addr>` knows. `nonces` arrives with the logs rather than the snapshot,
    which is why the apply buttons are drawn twice: once disabled, once able. */
-let DS = { d: null, next: null, heir: null, nonces: null, qtx: null, failed: false };
+let DS = { d: null, next: null, heir: null, nonces: null, qtx: null, failed: false, h: null, fundsReady: false, f: null };
 let PROPOSE = null, DRAWER = false, OWNOPEN = false;
 // The distribution `#/docs#widget` embeds: set only where the owner bar paints, cleared by every route but the docs.
 let EMBED = null;
@@ -1003,7 +1003,7 @@ async function detail(addr) {
   const next = Model.supersededBy(d.table);
   const [heir, view] = await Promise.all([next ? loadDistro(next) : null, ownerView(d)]);
   if (stale(t)) return;
-  DS = { d, next, heir, nonces: null, qtx: null, failed: false };
+  DS = { d, next, heir, nonces: null, qtx: null, failed: false, h: null, fundsReady: false, f: null };
   VIEW = view;
   WRITES.clear();
   paintDetail();
@@ -1019,8 +1019,8 @@ async function detail(addr) {
        pass did not find an `Applied` or a `Cancelled` for, oldest first — `h.changes` is newest-first
        and `_pending` is the queue's own order. */
     if (d.pending === null) d.pending = h.changes.filter(e => e.kind === 'queued' && !e.closed).reverse().map(e => [e.hash, e.eta, e.action]);
-    histFill('h-changes', h.changes, 'no change has been queued yet.');
-    fill('pending', pendingBlock(d, true));
+    DS.h = h;
+    paintChanges();
     /* The fund rows carry amounts in their token's own units (#43), and the changes above do not, so
        they paint first and the token set these logs name is read here — one pass for the whole
        history, cached for the funds block below, which asks for the same tokens. */
@@ -1029,21 +1029,36 @@ async function detail(addr) {
     await Promise.all([...new Set(h.funds.filter(e => e.token).map(e => e.token))].map(symbolOf));
     if (stale(t)) return;
     for (const e of h.funds) if (e.amount != null) e.what = fundWhat(e, decs.get(e.token));
-    histFill('h-funds', h.funds, 'nothing has arrived at this address yet.');
-    const f = await readFunds(d, h.funds);
+    DS.fundsReady = true;
+    paintActivity();
+    DS.f = await readFunds(d, h.funds);
     if (stale(t)) return;
-    fill('funds', fundsHTML(d, f, h.other));
-    bindOthers(d, h.other, t);
-    bindClaims();
+    paintFunds();
     bindAll();
   }).catch(() => {
     if (stale(t)) return;
     DS.failed = true;
-    for (const id of ['h-changes', 'h-funds']) fill(id, notice('history unavailable', 'err'));
-    fill('pending', pendingBlock(d, true));
-    fill('funds', notice('history unavailable — the token list and the escrow rows are read from the logs.', 'err'));
+    paintFailed();
     bindAll();
   });
+}
+
+/* The log-built sections, painted from DS so a repaint of the page — the drawer opening, a mode switch —
+   puts back what has already arrived instead of leaving "loading…" that nothing will replace. */
+function paintChanges() {
+  histFill('h-changes', DS.h.changes, 'no change has been queued yet.');
+  fill('pending', pendingBlock(DS.d, true));
+}
+const paintActivity = () => histFill('h-funds', DS.h.funds, 'nothing has arrived at this address yet.');
+function paintFunds() {
+  fill('funds', fundsHTML(DS.d, DS.f, DS.h.other));
+  bindOthers(DS.d, DS.h.other, TOKEN);
+  bindClaims();
+}
+function paintFailed() {
+  for (const id of ['h-changes', 'h-funds']) fill(id, notice('history unavailable', 'err'));
+  fill('pending', pendingBlock(DS.d, true));
+  fill('funds', notice('history unavailable — the token list and the escrow rows are read from the logs.', 'err'));
 }
 
 function paintDetail() {
@@ -1063,6 +1078,8 @@ function paintDetail() {
   const q = document.getElementById('queue');
   if (q) q.onclick = () => { DRAWER = !DRAWER; if (DRAWER && !PROPOSE) PROPOSE = { rows: rowsFrom(d.table) }; paintDetail(); };
   if (DRAWER) bindDrawer(d);
+  if (DS.failed) paintFailed();
+  else if (DS.h) { paintChanges(); if (DS.fundsReady) paintActivity(); if (DS.f) paintFunds(); }
   bindAll();
   nameSweep();
 }
@@ -1700,12 +1717,13 @@ function giveBind() {
   amt.onkeydown = e => { if (e.key === 'Enter') send(); };
 }
 /* The docs' live preview: the two variants of the real widget, mounted on whatever address the field
-   holds, and every snippet above rewritten to match. It reads through the dev `?rpc=` or the chain's
-   public endpoint before the wallet, because the docs paint for visitors who have none. */
+   holds, and every snippet above rewritten to match. It reads through the dev `?rpc=`, else the wallet
+   as the landing's widget does — a page host's CSP can refuse a fetch to any endpoint, a wallet's
+   reads it cannot — and the chain's public endpoint only for a visitor with no wallet. */
 function widgetDemo() {
   const input = document.getElementById('wd-in'), res = document.getElementById('wd-res'), go = document.getElementById('wd-go');
   if (!input) return;
-  const rpc = WRPC || PUBLIC_RPC[CFG.chainId] || '', first = input.value;
+  const rpc = WRPC || (window.ethereum ? '' : PUBLIC_RPC[CFG.chainId] || ''), first = input.value;
   const show = async () => {
     const a = await addrField(input.value, res);
     if (!a) return;
