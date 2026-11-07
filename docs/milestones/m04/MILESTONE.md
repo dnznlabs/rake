@@ -1,0 +1,258 @@
+# M04 — Testnets
+
+Status: not started · scoped 2026-11-07 · updated 2026-11-07
+
+`RUNBOOK.md` executed for real, twice — Sepolia (11155111) and Base Sepolia (84532) — so that the
+factory, the implementation, `App` and DNZN's own distribution sit at the addresses M03 predicted
+(`0x00D18B5b…`, `0x31dd18b4…`, `0x00A90943…`, `0x6aC98EDA…`) on two public chains; the dapp served
+from `App` through a `web3://` gateway with nothing of ours in the path; the widget embedded on a
+page we do not control the origin of; and Denizen accepting all of it from a browser wallet. It comes
+now because M03 made `src/` final and mined the salts against it, so the addresses are fixed and a
+testnet deploy is the first thing that can go wrong in public without costing anything but testnet
+ETH. It comes before M05 because every deviation the runbook meets here is folded back into it before
+it runs on Ethereum, where a surprise costs real money and, for `App`'s address, is permanent.
+
+**The dapp is finished before anything is uploaded.** Phase 1 lands the five `app/` items carried
+out of M03 and the one provider limit that is known to bite on a real chain (#76), and only then does
+Phase 2 build the bundle step 4 uploads. A dapp change after the upload is not a door — `setChunks`
+re-points — but it is another 10.8 M gas per chain and another `chain-doc` hash to record, so the
+order is cheaper than the alternative. Nothing under `src/` moves in this milestone: a `src/` byte is
+a new factory address and a new mining run (decision 5), which is M03 reopened, not M04.
+
+## Acceptance criteria
+
+Every command runs from the repo root through `devbox run --` (forge `1.7.1-dev`, node from
+`devbox.lock`), with `RPC` and `CHAIN_ID` set per chain as `RUNBOOK.md` § 0 does and the § 0
+constants unchanged: `OWNER` the Ops vault, `APP_VERSION` `v0.1`, the two mined salts, `CREATOR`
+`0x68e0741D…`, `DNZN_SALT` `…0001`. Measured 2026-11-07 against both chains: `cast code` at all four
+predicted addresses prints `0x` on both, which is what makes criteria 1–4 criteria. Re-run rather
+than quote. "Both chains" means Sepolia and Base Sepolia, every time.
+
+1. **The four addresses carry code, and they are M03's.** On both chains, `cast code` at
+   `0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B` is the factory's 1,320-byte runtime (equal to
+   `forge inspect DistributionFactory deployedBytecode` outside the three `immutableReferences`
+   spans), `cast call <factory> "implementation()(address)"` prints
+   `0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0`, `cast code` at
+   `0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE` is `App`'s 7,155-byte runtime byte-for-byte, and
+   `cast call <factory> "predict(bytes32)(address)" $DNZN_SALT` prints
+   `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` with 45 bytes of code at it. `App`'s `owner()` and
+   the distribution's `owner()` are both the Ops vault; `App.locked()` is `false`; the distribution's
+   `delay()` and `snapshot().table` are what decision M04-D2 ruled. Every transaction hash and
+   `gasUsed` is in the deploy task's handoff, read from the chain, not from the broadcast log (#140).
+2. **Verified on the explorer.** For each of the three contracts on each chain, the explorer's
+   `getsourcecode` answer names the contract (`DistributionFactory`, `Distribution`, `App`) and the
+   six links are in the handoff; `forge verify-contract … --watch` exited 0 for all six, with `App`'s
+   constructor arguments as `RUNBOOK.md` step 5 encodes them. Same compiler settings as
+   `foundry.toml`, so the explorer's bytecode match is the proof that the deployed bytes are the
+   reviewed bytes.
+3. **The document on chain is the bundle, and the gateway serves it.** Per chain, after
+   `make dapp-nodev` for that chain: `make chain-doc` reports `inflated sha256` equal to
+   `sha256sum app/dist/index.html` and `widget sha256` equal to `sha256sum app/dist/widget.js`;
+   `curl -s https://0x00a90943f58b6ab7fde05aae01c13a80e6995bae.<chainId>.w3link.io/ | sha256sum`
+   equals `sha256sum` of the string `cast call <App> "html()(string)"` returns, and
+   `curl -sI …/widget.js` carries `content-type: application/javascript` with a body equal to
+   `app/dist/widget.js`. The gateway host form is decision 19's; if the hosted gateway's chain list
+   differs from its README (both testnets are listed there, read 2026-11-07), the task says which
+   gateway it used and why, and criterion 5's snippet names that one.
+4. **The history survives a capped provider.** `test/model.test.mjs` (or a sibling) holds a test
+   that the log reader splits a 100,000-block range into windows no larger than the limit the
+   dapp sets, and retries one window on the provider's "range too large" error class; and on
+   Sepolia through MetaMask's default RPC, the DNZN distribution's page shows its `Created` row
+   under changes and its `create` deposit under activity rather than `history unavailable`. This is
+   [#76](https://github.com/dnznlabs/rake/issues/76) closed; the window size is the task's to measure
+   against publicnode and Infura and record.
+5. **The widget is embedded on a host we do not serve.** A page at a URL the handoff records, on
+   the host decision M04-D1 names, contains the two-line snippet `#/docs` § the widget gives for
+   Sepolia (`src="https://0x00a90943….11155111.w3link.io/widget.js"`, `data-rake` the DNZN
+   distribution) and nothing else of ours; `curl -s <url> | grep -c 'w3link.io/widget.js'` → 1, and
+   a browser screenshot in the handoff shows the DNZN table rendered from it, both with `data-rpc`
+   and, with a wallet on Sepolia, without.
+6. **Denizen has used it from a wallet and signed off, in writing.** From a browser wallet on each
+   chain, in a session driven by the UAT script (m04-t05): the dapp loaded through the gateway URL
+   of criterion 3 — not `localhost`, not `?rpc=` — connects the wallet (the delivered document has a
+   real origin: `window.top === window` and `window.ethereum` present, the probe state-collection
+   named and never ran); he creates a distribution with his EOA as owner, pays ETH in, calls
+   `distribute`, queues a table change, applies it after the delay, cancels one, and exercises
+   `release` or `claim` on an escrowed row; and reads DNZN's distribution, whose owner is the vault,
+   with the propose control showing calldata (decision 7). Every transaction hash is in the UAT
+   handoff. The signoff is a dated line under § Phases 4 in this file, written by Denizen; the
+   milestone is not done while it is absent.
+7. **The runbook is amended by what happened, not annotated.** Every deviation the deploy task's
+   handoff lists is either a change to `RUNBOOK.md` in that PR or a one-line reason it is not;
+   `git log --oneline -- RUNBOOK.md` since this milestone's first commit shows the amendments, and
+   § Rehearsed on anvil gains a sibling § Executed on testnets with the two chains' addresses,
+   hashes and gas, so M05 reads a record and not a rehearsal.
+8. **Carried out and clean.** `gh issue list -R dnznlabs/rake --label carried --label m04
+   --state open` prints nothing; `git status --porcelain` is empty after `forge build --force`,
+   `forge test`, `forge snapshot`, `make deploy` and `make chain-doc` on a fresh anvil; CI is green
+   on the merge commit; [state-collection#74](https://github.com/dnznlabs/state-collection/issues/74)
+   carries a comment naming the chains where `cast code` at `0x6aC98EDA…` is non-empty.
+
+## Out of scope
+
+- **Any mainnet.** Ethereum, Base, Arbitrum, OP Mainnet and the stretch row are M05's; this
+  milestone sends nothing to a chain where ETH costs money.
+- **Any byte under `src/`, `test/*.t.sol` or `.gas-snapshot`.** A finding here that needs a
+  contract change reopens M03 (a new review, a new factory address, a new mining run) and is a
+  decision for Denizen, not a task here. The two stale contract comments the third review noted
+  (`receive`'s stipend line, `_push`'s "bounded by the token") stay for the next version.
+- **`App.lock()`, renounce, and any owner change** on `App` or on DNZN's distribution. The runbook's
+  § Not in this runbook holds; `lock()` is M05's, after mainnet has been watched.
+- **The paid, independent review.** Decision 20 places it at M05's go/no-go; nothing here commits
+  the spend. What this milestone adds to that decision is a list of what the two-model method
+  missed on three runs (#22, #54, nothing in `App.sol` or the scripts).
+- **The dnzn.dev mirror and IPFS** (decision 12's "mirrors of it") — M05. The test host of
+  criterion 5 is a host page embedding the widget, not a mirror of the dapp.
+- **Owner-kind submit routes** (M06). The vault-owned distribution shows calldata, as shipped.
+- **Freedom or any other native `web3://` client** as a criterion. Criterion 3 is the HTTPS
+  gateway, decision 19's reason; if a native client is tried, it is recorded, not required.
+
+## Needs from the Product Owner
+
+- **M04-D1, the test host.** *Question:* where does the widget's host page live for criterion 5?
+  *Options:* (1) a static page on a host Denizen already runs under dnzn.dev — costs one file on his
+  side and nothing public that is new; (2) GitHub Pages from a new public repository holding one
+  HTML file — costs a public repo whose only content is the snippet (rake itself is private, so its
+  Pages cannot be used); (3) a page served from this VM over a tunnel — rejected: the origin is
+  ours and the CSP and mixed-content behaviour of a real host is what the criterion exists to meet.
+  *Recommendation:* (1), if a static path under dnzn.dev exists today; it is also where M05's mirror
+  will live. *Default and deadline:* (2), opened by the architect, if no answer by the day m04-t04
+  is scoped; blocks m04-t04. *Record:* `ROADMAP.md` § Decisions.
+  Issue: [#156](https://github.com/dnznlabs/rake/issues/156).
+- **M04-D2, DNZN's testnet table and delay.** *Question:* what table and delay does step 6 pass on
+  the testnets, given the distribution it creates is DNZN's address on those chains for good?
+  *Options:* (1) the M05 shape with testnet-safe rows — the roster's three EOAs at 60/20/20 (or the
+  60/40 pair if M05's two recipients are already known), `DNZN_DELAY` 3600 to match the Ops vault's
+  own timelock; costs nothing and reads as DNZN's on an explorer; (2) the anvil rehearsal's
+  placeholders (`rehearsal placeholder`, two anvil accounts) — costs a nonsense table under DNZN's
+  name on two public chains; (3) skip step 6 on testnets — rejected, criterion 1 and the
+  state-collection gate both need code at the address. *Recommendation:* (1). *Default and
+  deadline:* (1) with the roster EOAs and 3600, if no answer by m04-t03's scoping; blocks step 6 of
+  m04-t03. *Record:* `ROADMAP.md` § Decisions; the values go into `RUNBOOK.md` § Executed on
+  testnets, not § 0 (M05's are different).
+  Issue: [#157](https://github.com/dnznlabs/rake/issues/157).
+- **Testnet ETH, two keys.** Steps 1–5 are signed by Elanik's agent wallet (the handbook roster's
+  address), which needs about **0.1 Sepolia ETH** and **0.02 Base Sepolia ETH**: the anvil
+  rehearsal totals 14.7 M gas per chain (factory 2,262,485 + `App` 1,648,295 + chunks 10,820,875),
+  and the base fee read on 2026-11-07 was 15 wei on Sepolia and 0.005 gwei on Base Sepolia, so the
+  figures are a margin against a busier hour (14.7 M gas at 5 gwei is 0.07 ETH), not a forecast.
+  Step 6 is signed by the **Creator key on Denizen's machine**, which needs about **0.005 ETH on
+  each** for one `create` (280,281 gas on anvil). Funding is Denizen's; the amounts are estimates
+  and the handoff records what was spent.
+- **An Etherscan API key** (v2 keys cover Basescan), handed to the engineer's session as
+  `ETHERSCAN_API_KEY` for step 5 and never committed; the handoff names the key's last four
+  characters and nothing else.
+- **Step 6 on both chains, by hand**, from the runbook's § Step 6 with the M04-D2 values, after the
+  engineer's handoff for steps 1–5 is reviewed — the only step the Creator key signs (decision 32).
+- **The UAT session and the signoff line** (criterion 6), with a wallet that holds a little testnet
+  ETH on both chains and is not the Creator key.
+
+## Phases
+
+In order. Phase 1 must merge before Phase 2 builds the bundle — and t02 must have **passed**, not
+merely merged, because a failure there is a contract question and Phase 2 spends gas on an address
+that cannot move; Phase 2 before Phase 3 has anything to serve; Phase 3 before Phase 4 has a URL to
+accept from. Phase 2's step 6 is Denizen's and can land any time after steps 1–5 are reviewed,
+before Phase 4. t01 and t02 are independent and run in parallel.
+
+### Phase 1 — The dapp that ships
+
+Everything `app/` owes before the bundle is uploaded to a public chain, with nothing under `src/`.
+
+| Task | Goal | Status |
+|:-----|:-----|:-------|
+| m04-t01 | Log reading in provider-sized windows with a retry on the range error, sized against publicnode and Infura (#76); a `Received` whose `S.grace` is read before `txError` can need it (#148); the widget's expiry judged against the block timestamp it already decodes, or labelled as local time (#149); one sentence under `#/docs` § Limits naming tokens whose balance falls on its own beside the fee-on-transfer one (decision 23, reaffirmed 2026-11-07); `AGENTS.md`'s chromium paragraph re-tested and rewritten (#110); `app/build.mjs` asserting one creation per script before it reads a block from `run-latest.json` (#140). Closes #76, #110, #140, #148, #149 | not started — scoped at this file's merge |
+| m04-t02 | **The gateway in the dev stack, before a single testnet transaction.** [ethstorage/web3url-gateway](https://github.com/ethstorage/web3url-gateway) — the software behind w3link.io — as a third process `make serve` brings up beside anvil and the dapp: `go@1.27` added to `devbox.json` (nixpkgs has 1.27.1; the gateway's `go.mod` asks 1.27.3, so the first build fetches that toolchain the way Go does, or the task pins a commit that does not); a `tools/gateway.sh` that clones the repo at a pinned commit (`c5826718`, 2026-10-23, is `main` at scoping) into gitignored `cache/`, builds `./cmd/server`, and writes its `config.toml` from a tracked template — `RunAsHttp = true`, `ServerPort = $GATEWAY_PORT`, `CORS = "*"`, `pageCache.enabled = false` (a cache hides a re-upload), `defaultChain = 31337`, `[chainConfigs.31337]` at `http://127.0.0.1:$ANVIL_PORT`; a `procs/30-gateway.yml` that depends on `deploy` and probes readiness with a `curl` of the root. The URL form is four labels, `http://0x<App>.31337.w3.localhost:$GATEWAY_PORT/`, because `handleSubdomain` takes the last two labels as the gateway's own host and needs `<address>.<chain>` in front of them (`protocol.go:416-498`); Chrome resolves any `*.localhost` to loopback, `curl` needs `--resolve`. `AGENTS.md` § The dapp and the `#/docs` host page gain the local form. Measure the two things no client has measured yet: the ERC-5219 surface as a real gateway consumes it — `/` is `html()`'s bytes with `text/html`, `/widget.js` is `app/dist/widget.js` with `application/javascript` (Freedom reads `html()` for every path by design, decision 19, so it cannot test this); and wallet reach — the gateway URL opened in Chrome with MetaMask has `window.top === window`, `window.ethereum` present, and one transaction sent from it. Evidence: the `eth_call`s the gateway made, read from anvil's log, and the response headers. **If the 5219 shape fails here, stop:** the fix is a `src/App.sol` byte, which is M03 reopened and Denizen's decision, and it is the reason this task runs before t03 spends gas on an address that cannot move. Pass or fail, the handoff rewrites risks 1 and 2 below with what was measured | not started — scoped at this file's merge, beside t01; runs in parallel with it |
+
+### Phase 2 — The runbook, for real
+
+`RUNBOOK.md` steps 1–5 on Sepolia, then Base Sepolia, by the engineer; step 6 by Denizen.
+
+| Task | Goal | Status |
+|:-----|:-----|:-------|
+| m04-t03 | Steps 1–5 on both chains in the runbook's order, each `record:` line filled from the chain: the offline prediction before any transaction, the proxy-sender check, `cast call --create` as the EVM proof, the collision check, the factory, `App`, `make dapp-nodev` for that chain then `make chunks` and `make chain-doc` with the hashes equal, explorer verification of all six. Every deviation is a `RUNBOOK.md` change in the same PR (criterion 7) and § Executed on testnets is written. Then the handoff hands step 6 to Denizen with the exact command, the M04-D2 values and the `cast code` check that must print `0x` first | not started — scoped when t01 and t02 have merged, t02 with a pass |
+
+### Phase 3 — Served from nowhere we run
+
+The gateway serves the dapp and the widget from `App`; the widget sits on a host page.
+
+| Task | Goal | Status |
+|:-----|:-----|:-------|
+| m04-t04 | Criterion 3 measured on both chains through w3link.io (or the gateway the task names, with why); the origin probe (`window.top === window`, `window.ethereum` present) run in headless chromium against the gateway URL and its result recorded, so Phase 4 knows before Denizen opens it whether a wallet can reach the document; the host page of M04-D1 published with the snippet and the screenshots of criterion 5; `#/docs` § the widget re-read against what actually worked, amended if the host form differs | not started — scoped when t03's steps 1–5 are reviewed |
+
+### Phase 4 — Accepted from a wallet
+
+Denizen's session, scripted so the evidence is a list of hashes and not a feeling.
+
+| Task | Goal | Status |
+|:-----|:-----|:-------|
+| m04-t05 | The UAT script for criterion 6 — one ordered list per chain with the expected state after each step, the gateway URL to open, the wallet to use and what to screenshot; run first by the engineer in headless chromium with an injected provider against Sepolia so the script is known to be executable; then Denizen's run, its hashes and screenshots filed in the handoff by whoever holds them, and the signoff line below. Anything he finds is an issue, scoped per item: `app/` fixes land as m04-t06 if they change what criterion 3 hashes, and are re-uploaded once | not started — scoped when t04 merges |
+
+**Signoff:** _not yet — a dated line by Denizen goes here._
+
+### Phase 5 — Close-out
+
+The architect re-runs criteria 1–8, records them in `CLOSEOUT.md` beside this file, fills
+§ Carried issues at close-out, comments on state-collection#74 with the chains that now carry
+code at DNZN's address, and hands M05 the list of what the runbook changed. No task.
+
+**Estimate, labelled as one:** five tasks and possibly a sixth; three weeks of calendar time, most
+of it waiting on funding, the explorer and Denizen's session; t02 is a day or two and runs beside
+t01. Re-estimate when t03 reports.
+
+## Carried issues at close-out
+
+Filled at close-out. The queue today, 2026-11-07, every item labelled `m04`:
+
+| Issue | Where it lands |
+|:------|:---------------|
+| [#76](https://github.com/dnznlabs/rake/issues/76) log paging | t01; criterion 4. |
+| [#110](https://github.com/dnznlabs/rake/issues/110) the chromium note | t01. |
+| [#127](https://github.com/dnznlabs/rake/issues/127) native-balance alias (F12) | t03's per-chain check before the first deploy, as the runbook already requires; neither testnet is known to carry such a token, and the task records the check's answer. Stays open into M05 for the mainnets unless the task closes it with a per-chain table for all eight. |
+| [#140](https://github.com/dnznlabs/rake/issues/140) `run-latest.json` pairing | t01 (the assertion); t03 reads every figure from the chain. |
+| [#148](https://github.com/dnznlabs/rake/issues/148), [#149](https://github.com/dnznlabs/rake/issues/149) t09's dapp nits | t01. |
+| [#137](https://github.com/dnznlabs/rake/issues/137) | Closed by t09; listed because it was labelled `m04` before that. Nothing to do. |
+
+## One-way doors
+
+Testnet transactions are public and permanent, and unlike state-collection's M3 these contracts are
+**not throwaway**: they are the same-address deploy at the addresses M05 will use.
+
+1. **`App` at `0x00A90943…` on two public chains.** After this, a `src/App.sol` byte means a new
+   `App` address on the mainnets while the testnets keep the old one — same-address broken across
+   the set, which is the property decision 5 exists to protect. The door is already shut by M03's
+   mining; this milestone is where it becomes visible on a block explorer.
+2. **DNZN's distribution at `0x6aC98EDA…` with the M04-D2 table.** Its table and delay are changeable
+   by the Ops vault through the timelock, and its ownership is per chain, so the contents are not a
+   door; the address and the fact that it exists on these chains are. Step 6 runs once per chain,
+   by the Creator key, and never again on that chain (#22).
+3. **The explorer verification is additive**, not a door: a verified source can be re-verified, not
+   un-verified. Named because it publishes the source under DNZN's addresses for the first time.
+
+## Risks
+
+Things that would cost a redeploy or a re-upload to learn late. Each says what settles it and when.
+
+1. **The hosted gateway is not its README.** w3link.io's README lists both testnets; the running
+   service's chain list is a config file we cannot read. The *software* is settled by t02 on anvil
+   (same code, our config); the *hosted service* by t04's first `curl` — before that, t03 records
+   the gateway URL as "to be measured" and nothing in Phase 2 depends on it.
+2. **A gateway-delivered document may not reach a wallet.** state-collection filed this risk on
+   2026-09-26 and never ran M3 to measure it: an HTTPS gateway could wrap the document (sandboxed
+   frame, `data:` URI) into an opaque origin where no extension injects `window.ethereum`. Criterion
+   3 would pass and criterion 6 could not. Settled twice: by t02's probe against the gateway
+   software on anvil, before any gas, and by t04's probe against the hosted service, before
+   Denizen's session. If the hosted one fails where anvil passed, the difference is the host's
+   configuration and the fallback for Phase 4 is Freedom (a native client measured to inject a
+   wallet); criterion 6 is then reworded by that finding, not quietly passed on `localhost`.
+3. **Provider log caps bite the DNZN page on day one.** MetaMask's default Sepolia RPC caps
+   `eth_getLogs` at 10,000 blocks; Sepolia adds about 7,000 blocks a day. Settled by t01 landing
+   before t03 uploads, which is why Phase 1 is first.
+4. **Sepolia gas.** The chunk upload is 10.8 M gas, and a testnet base fee is not a forecast: it
+   read 15 wei on 2026-11-07 and the same chain has priced in whole gwei on other days, at which
+   the upload alone is tenths of an ETH. Settled by t03 reading `cast base-fee` before step 4 and
+   waiting for a quiet hour rather than paying a spike; the handoff records the price paid.
+5. **Base Sepolia verification.** Etherscan's v2 API covers Basescan, but a verification that fails
+   for a reason the task cannot fix (an explorer-side compiler build) is recorded as such and does
+   not block criterion 2's other five; the criterion is then amended by the finding, in this file,
+   with the date.
