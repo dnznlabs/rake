@@ -14,7 +14,8 @@ globalThis.Eth = Eth;
 
 const { SNAPSHOT_T, pct, countdown, deadline, dateText, decodePending, ownerChange, supersededBy, salt } = Model;
 const { revertMessage, tableFrom, parseDelay, wei, namehash } = Model;
-const FUNCTIONS = ['countdown', 'dateText', 'deadline', 'decodePending', 'namehash', 'ownerChange', 'parseDelay', 'pct', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei'];
+const { windows, rangeCap, isPruned } = Model;
+const FUNCTIONS = ['countdown', 'dateText', 'deadline', 'decodePending', 'isPruned', 'namehash', 'ownerChange', 'parseDelay', 'pct', 'rangeCap', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei', 'windows'];
 const SET_BENEFICIARIES = 'setBeneficiaries((address,uint96,string,string)[])';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/abi');
@@ -320,4 +321,83 @@ test('SNAPSHOT_T decodes a real snapshot() return', () => {
   assert.equal(description, 'DNZN fees');
   assert.equal(table.length, 2);
   assert.equal(decodePending(pending[0][2]).kind, 'setBeneficiaries');
+});
+
+/* ---- log windows (#76) ------------------------------------------------------------------------
+   The three helpers the windowed `logs()` is built on. The provider strings below are verbatim from
+   the architect's 2026-11-07 measurement against the live endpoints, which is the whole point of
+   pinning them here: a provider that rewords its refusal breaks the cap read, and this is where that
+   shows up rather than in a browser against a week-old distribution. */
+
+test('windows cuts a range into inclusive windows that tile it exactly', () => {
+  const got = windows(100, 350, 100);
+
+  assert.deepEqual(got, [[100, 199], [200, 299], [300, 350]]);
+});
+
+test('windows leaves no gap and no overlap at a window boundary', () => {
+  const got = windows(1000, 1199, 100);
+
+  /* 1099 → 1100 with nothing between and nothing twice: an `eth_getLogs` range is inclusive at both
+     ends, so an off-by-one here drops or double-counts a whole block of history. */
+  assert.deepEqual(got, [[1000, 1099], [1100, 1199]]);
+});
+
+test('windows covers every block in the range exactly once', () => {
+  const seen = [];
+  for (const [a, b] of windows(7, 43, 5)) for (let n = a; n <= b; n++) seen.push(n);
+
+  assert.deepEqual(seen, Array.from({ length: 37 }, (_, i) => i + 7));
+});
+
+test('windows gives one window to a range smaller than the window', () => {
+  assert.deepEqual(windows(0, 9, 10), [[0, 9]]);
+  assert.deepEqual(windows(500, 500, 10_000), [[500, 500]]);
+});
+
+test('windows reads the hex a block number arrives as', () => {
+  /* `CFG.factoryBlock` is a build token substituted as hex, and `log.blockNumber` is hex off the
+     wire, so neither caller has a decimal to pass. */
+  assert.deepEqual(windows('0x10', '0x1f', 8), [[16, 23], [24, 31]]);
+});
+
+test('windows answers an empty list where there is no range to scan', () => {
+  assert.deepEqual(windows(5, 4, 10), []);
+  assert.deepEqual(windows(100, 100, 0), []);
+});
+
+test('rangeCap reads the window out of the two refusals that name one', () => {
+  const got = [
+    rangeCap('-32701 exceed maximum block range: 50000'),      // ethereum-sepolia-rpc.publicnode.com
+    rangeCap('-32614 eth_getLogs is limited to a 200 range'),   // sepolia.base.org, under an HTTP 413
+    rangeCap('4444 pruned history unavailable'),                // ethereum-sepolia.publicnode.com
+    rangeCap('header not found'),                              // not about the range at all
+  ];
+
+  /* The pruned refusal is deliberately `null`: it is about which blocks the provider keeps, not how
+     many were asked for, so halving the window would retry forever. `isPruned` answers that one. */
+  assert.deepEqual(got, [50_000, 200, null, null]);
+});
+
+test('rangeCap survives the wrapping a wallet puts around a provider error', () => {
+  const got = rangeCap('Internal JSON-RPC error: {"code":-32701,"message":"exceed maximum block range: 50000"}');
+
+  assert.equal(got, 50_000);
+});
+
+test('rangeCap answers null rather than a number for an error with no window in it', () => {
+  const got = ['', null, undefined, 'reverted', 'rate limit exceeded', 'Failed to fetch'].map(rangeCap);
+
+  assert.deepEqual(got, [null, null, null, null, null, null]);
+});
+
+test('isPruned tells a provider that dropped the blocks from one that refused the count', () => {
+  const got = [
+    isPruned('4444 pruned history unavailable'),
+    isPruned('-32701 exceed maximum block range: 50000'),
+    isPruned('header not found'),
+    isPruned(null),
+  ];
+
+  assert.deepEqual(got, [true, false, false, false]);
 });
