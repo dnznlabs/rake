@@ -309,11 +309,19 @@ bytecode**, and this one is per-revision.
    rows fixed by t05, t08 and this task, and names F14's issue. No row's disposition changed beyond
    the ones step 7 asks for; F3, F12 and F13 are byte-identical to `main`, which is verified
    row-by-row in § Discoveries.
-7. **`audit complete` was taken as satisfied by the rollup rather than by a printed line.** Step 6
-   asks Denizen to verify `audit complete` printed when the run ends. The launcher writes no log and
-   he ran it from his own terminal, so no on-disk record of that line exists. The three substantive
-   checks it stands for were verified instead, and are AC 6's evidence: `dirty: no`, both leg
-   directories non-empty, `transcripts/` holding both legs. Accepted.
+7. **Step 6's `audit complete` end condition was observed by the operator, and it reproduces.**
+   Denizen pasted the launcher's tail from his terminal: `audit complete:
+   audits/2026-11-06/AUDIT.md`, preceded by its check block — `AUDIT.md` 264 lines, leg 1 3 files,
+   leg 2 3 files, rollup 172 s wall, `transcripts/` 2.8M. Four of those five figures were then
+   re-measured directly against the blinded tree and every one reproduces: `grep -c '' AUDIT.md` →
+   **264**, `ls -1 pashov/solidity-auditor/gpt-5.6-sol | wc -l` → **3**, the same for `opus` → **3**,
+   `du -sh transcripts` → **2.8M**. The end condition therefore rests on the operator's own output
+   *and* on an independent measurement that agrees with it, which is stronger than either alone. The
+   172 s rollup wall is the operator's figure to cite: it is not in `AUDIT.md`'s provenance block,
+   which carries the per-leg walls instead (593 s and 568 s, `AUDIT.md:16-17`). The three substantive
+   checks step 6 names are AC 6's evidence: `dirty: no`, both leg directories non-empty,
+   `transcripts/` holding both legs. **This is not a deviation** — it keeps its number because an
+   earlier draft of this file recorded it as one, before the operator's output was available.
 
 ## Decisions
 
