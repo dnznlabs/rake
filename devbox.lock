@@ -468,6 +468,70 @@
           "store_path": "/nix/store/nf75vk2nkgdp040w33iy5qi8a8n9b6la-serve-14.2.6"
         }
       }
+    },
+    "slither-analyzer@0.11.5": {
+      "last_modified": "2026-10-02T22:55:44Z",
+      "resolved": "github:NixOS/nixpkgs/55ba7f49ef2962b42cbd126522b7df5f95037679#slither-analyzer",
+      "source": "devbox-search",
+      "version": "0.11.5",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/hi3am1lphr7r2f4kr83msiq6bd2xgra2-python3.14-slither-analyzer-0.11.5",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/55123071xa6kr836hsb06sa9xbn0xdx7-python3.14-slither-analyzer-0.11.5-dist"
+            }
+          ],
+          "store_path": "/nix/store/hi3am1lphr7r2f4kr83msiq6bd2xgra2-python3.14-slither-analyzer-0.11.5"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/plf1jv6gib1h9dmm7660kk3y92xcq7d3-python3.14-slither-analyzer-0.11.5",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/3mkpm3n0ph36rsarbxn0dc14v904a8cm-python3.14-slither-analyzer-0.11.5-dist"
+            }
+          ],
+          "store_path": "/nix/store/plf1jv6gib1h9dmm7660kk3y92xcq7d3-python3.14-slither-analyzer-0.11.5"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/j9f4r19n86z93777gz59h6zdfpkcjwyg-python3.13-slither-analyzer-0.11.5",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/rka4z1789asfwgrrbg2595nj5ahsvy26-python3.13-slither-analyzer-0.11.5-dist"
+            }
+          ],
+          "store_path": "/nix/store/j9f4r19n86z93777gz59h6zdfpkcjwyg-python3.13-slither-analyzer-0.11.5"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/30fhvyp4whxv69246sk3ps2qzzhiw40z-python3.14-slither-analyzer-0.11.5",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/2zrdq16hsi0lam9i7p3x5pc7b4bsl8gi-python3.14-slither-analyzer-0.11.5-dist"
+            }
+          ],
+          "store_path": "/nix/store/30fhvyp4whxv69246sk3ps2qzzhiw40z-python3.14-slither-analyzer-0.11.5"
+        }
+      }
     }
   }
 }

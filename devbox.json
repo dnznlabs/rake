@@ -8,6 +8,7 @@
     "jq@latest",
     "nodejs@24",
     "serve@14.2.6",
-    "go@1.27"
+    "go@1.27",
+    "slither-analyzer@0.11.5"
   ]
 }
