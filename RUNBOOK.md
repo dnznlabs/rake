@@ -73,6 +73,11 @@ creator key's two conditions — salted creates only, and never an owner or a si
 else — are the handbook's, in `docs/multisig-transactions.md` § The DNZN Creator key, and are
 referenced rather than restated so there is one copy of them.
 
+**Setting the creator key up for `cast`** is the handbook's too: `docs/multisig-transactions.md`
+§ Setting the key up for `cast` covers `cast wallet import dnzn-creator --interactive`, verifying
+the address, and backing up the key itself before step 6 runs anywhere. Done, step 6's `SIGNER` is
+`--account dnzn-creator --sender <address>`.
+
 ## 1 — the chains
 
 Every chain DNZN's distribution is expected to reach: M04's two testnets, M05's four mainnets, and
