@@ -22,7 +22,7 @@ Baselines (step 0) matched the plan exactly: `node --test` **67**, `wc -c app/di
 | AC | Result | Evidence |
 |:---|:-------|:---------|
 | `git diff --stat origin/main -- src/ test/*.t.sol .gas-snapshot` empty; `forge test` 91 | pass | diff prints nothing. `forge build --force && forge test` → `Ran 5 test suites in 297.07ms (618.46ms CPU time): 91 tests passed, 0 failed, 0 skipped (91 total tests)` |
-| `node --test test/*.test.mjs` passes with more tests than 67, handoff names the added tests | pass | `ℹ tests 90 · ℹ pass 90 · ℹ fail 0` — **67 → 90, +23**. Per file: `model.test.mjs` 25→35, `widget.test.mjs` 10→12, `docs.test.mjs` 8→9, `build.test.mjs` new 10. Added tests listed below this table. |
+| `node --test test/*.test.mjs` passes with more tests than 67, handoff names the added tests | pass | `ℹ tests 90 · ℹ pass 90 · ℹ fail 0` — **67 → 90, +23**. Per file: `model.test.mjs` 25→35, `widget.test.mjs` 10→12, `docs.test.mjs` 8→9, `build.test.mjs` new 10. Added tests listed below this table. Green in all three `broadcast/` states after the review fix (§ Deviations 6): a deployed tree 10/10, the directory absent 10/10, the script directories present but holding no log 10/10. |
 | `grep -c 'rebasing or slashable' app/src/index.html` → 1 | pass | `1` |
 | `grep -c "device's clock" app/src/widget.js` → 1 | pass | `1` (needed `CLOCKNOTE` to be double-quoted — a `\'` parses the same and greps as nothing) |
 | `grep -c 'rake#140' app/build.mjs` → 1 | pass | `1` |
@@ -170,6 +170,15 @@ On anvil without `?cap=`, nothing changes: one window, no partial line, as the p
    `lib/forge-std` and `lib/solady`, so nothing compiled and `make deploy` failed on
    `Source "solady/auth/Ownable.sol" not found`. Not a plan deviation so much as a worktree one, noted
    because the next task in a fresh worktree will hit it.
+6. **After the review (#164, `CHANGES_REQUESTED` at `96d7185`): the working-tree test no longer
+   depends on local deploy history.** `every broadcast log in this working tree passes the
+   assertion` returned early when `broadcast/` was absent but asserted `files.length > 0` when the
+   directory existed and held no `run-latest.json` — the state a tree is in after its chain
+   directories are removed while the per-script directories stay. Reproduced here before changing
+   anything: a deployed tree 10/10, `broadcast/` absent 10/10, script directories present and empty
+   **9/10, 1 failing**. The two empty states now agree — no log found returns like no directory, and
+   the old assertion's message is kept as a comment explaining why it cannot be an assertion. Re-run
+   in all three states after the fix: 10/10 each, and the full suite 90/90. Nothing else moved.
 
 ## Decisions
 
