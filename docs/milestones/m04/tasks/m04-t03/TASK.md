@@ -38,11 +38,16 @@ Figures below were read on 2026-11-07; re-run rather than quote.
 
 0. **Gates before any transaction, both chains.**
    - Funding: `cast balance 0x5A158aF8… --ether --rpc-url $RPC` ≥ **0.05** on Sepolia and ≥ **0.01**
-     on Base Sepolia (read 2026-11-07: 0.0049 and 0 — Denizen funds first; the plan's ask is 0.1 and
-     0.02). The Creator key `0x68e0741D…` needs ≥ 0.005 on each for Denizen's step 6; read it and
-     record it, it is not yours to fund.
-   - `ETHERSCAN_API_KEY` is set in the shell (`[ -n "$ETHERSCAN_API_KEY" ]`), provided by Denizen,
-     never echoed, never committed; the handoff names its last four characters only.
+     on Base Sepolia (funded 2026-11-07 15:30: **0.1049** Sepolia and **0.0100** Base Sepolia — the
+     latter exactly at the gate, enough for 14.7 M gas at today's 0.005 gwei a hundred times over,
+     but say so in the handoff if the base fee rises). The Creator key `0x68e0741D…` needs ≥ 0.005 on each for Denizen's step 6 (funded
+     2026-11-07: 0.01 and 0.01); read it and record it, it is not yours to fund.
+   - `ETHERSCAN_API_KEY`: Denizen put it in `~/.bashrc` on 2026-11-07, **after that file's
+     interactive guard** (`case $- in *i*)` at line 8), so an interactive shell sees it and a tool
+     shell, a login shell and `devbox run` do not — measured. Load that one line, and only it, at the
+     top of each chain's shell: `eval "$(grep -m1 '^export ETHERSCAN_API_KEY=' ~/.bashrc)"`, then
+     `[ -n "$ETHERSCAN_API_KEY" ]`. Never echo it, never commit it; the handoff names its last four
+     characters only. (`forge verify-contract` reads the variable itself; `-e` is not needed.)
    - Base fee: `cast base-fee --rpc-url $RPC` — record it; if above **20 gwei** on Sepolia, wait for
      a quieter hour before step 2 and again before step 4 (risk 4). Read 2026-11-07: 22 wei on
      Sepolia, 0.005 gwei on Base Sepolia.
