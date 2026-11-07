@@ -86,7 +86,7 @@ This task runs beside t06 (see § Sequencing at the end of the plan).
    (`grep -rn 'CodelessChunk' app/ test/*.mjs` is empty today).
 
    Check: `grep -c '_requireChunk' src/App.sol` → 5 (the definition and four uses);
-   `grep -c 'code.length' src/App.sol` → 0.
+   `grep -v '^\s*//' src/App.sol | grep -c 'code.length'` → 0 (step 2's `ForeignChunk` doc comment keeps the string, so `grep -c 'code.length' src/App.sol` → 1; amended 2026-11-03, #132).
 
 3. **Tests, in `test/App.t.sol`,** named so `forge test --list --match-contract AppTest` reads as
    this list. Each must **fail on `67146a7`'s `src/App.sol`** before it passes on the branch: write
@@ -241,7 +241,7 @@ produces, which is why the hash is in the handoff.
   diffed against `origin/main`'s, shows **exactly one added line, `ForeignChunk`, and nothing
   removed**; both lists have a non-zero count stated in the handoff (a diff of two empty lists is
   not a check — t05 handoff § Discoveries 1).
-- `grep -c 'code.length' src/App.sol` → 0; `grep -c '_requireChunk' src/App.sol` → 5.
+- `grep -v '^\s*//' src/App.sol | grep -c 'code.length'` → 0 (step 2's `ForeignChunk` doc comment keeps the string, so `grep -c 'code.length' src/App.sol` → 1; amended 2026-11-03, #132); `grep -c '_requireChunk' src/App.sol` → 5.
 - `forge test --list --match-contract AppTest` shows 27 names including the five of step 3, and the
   handoff quotes each of the five failing on `67146a7`'s `src/App.sol` with the assertion that failed;
   the seven existing names step 3 lists keep their assertions (`git diff origin/main -- test/App.t.sol`
