@@ -1,0 +1,18 @@
+version: "0.5"
+
+processes:
+  gateway:
+    command: "bash tools/gateway.sh"
+    availability:
+      restart: "on_failure"
+    depends_on:
+      deploy:
+        condition: process_completed_successfully
+    # The port, not a body: the gateway's root host answers its own home page, which is not our
+    # document, so only a `$APP.31337.w3.localhost` request would prove anything — and that is
+    # `make gateway-check`'s job, not a readiness probe's.
+    readiness_probe:
+      exec:
+        command: "bash -c 'exec 3<>/dev/tcp/127.0.0.1/$GATEWAY_PORT'"
+      initial_delay_seconds: 1
+      period_seconds: 2
