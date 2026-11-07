@@ -13,33 +13,30 @@ a correction while this review was being written, so both are given here and in 
 
 | | |
 |:--|:--|
-| Reviewed commit — **frozen head** (this repo) | **`d0410f8`** — `chore(gas): re-snapshot for the ForeignChunk check`, the last commit touching `src/`, `test/*.t.sol` or `.gas-snapshot`; the sha the blinded tree is cut at |
-| **Branch head** at the review (this repo) | **`da8ff02`** — `docs(audit): known answer for 94d028c — 6 present, 10 closed`, the commit after the freeze, which step 5 permits because it touches none of those three paths |
+| Reviewed commit — **frozen head** (this repo) | **`94d028c`** — `chore(gas): re-snapshot for the ForeignChunk check`, the last commit touching `src/`, `test/*.t.sol` or `.gas-snapshot`; the sha the blinded tree is cut at |
+| **Branch head** at the review (this repo) | **`0819552`** — `docs(audit): known answer for 94d028c — 6 present, 10 closed`, the commit after the freeze, which step 5 permits because it touches none of those three paths |
 | Blinded tree commit | **`d07483a8b9f6bcfe6200688bcb2d242450b9d464`** — `rake src/ and deploy scripts at 94d028c, for a blind two-model review` |
 | Blinded tree path | `~/src/rake-blind-2026-11-02` (under `~/src/`, never `/tmp`, which is shared) |
 | Provenance dirty flag | `dirty: no`, captured at preflight before any leg wrote a byte |
 
-**Those two shas were rewritten by a rebase after the run, and the old numbers are the ones written
-into two artefacts that cannot be re-cut.** The blinded tree's own commit message says "at
-`94d028c`" and `audits/KNOWN_ANSWER.md` is titled for `94d028c`, because at the time the tree was
-cut the frozen head was `94d028c` and the branch head `0819552`. Step 8 then rebased this branch
-onto `origin/main` at `7ff3be4` (the merge of #146), which rewrote all four of the branch's commits:
+**Both shas are still the live ones, and keeping them that way meant undoing a rebase.** The blinded
+tree's own commit message says "at `94d028c`" and `audits/KNOWN_ANSWER.md` is titled for `94d028c`;
+neither can be re-cut without re-cutting the review. Step 8 first brought `origin/main` at `7ff3be4`
+(the merge of #146) in by **rebasing**, which replayed all four of the branch's commits under new
+shas and left `94d028c` unreachable from the branch. That is not a cosmetic difference: after a
+rebase-then-merge, `git show 94d028c` in a fresh clone of `main` answers with an unknown object, and
+the third review's provenance survives only in GitHub's PR refs. The rebase was therefore discarded
+and `main` was brought in as a **merge commit, `cb2e2a9`** — which is also rake's merge policy. The
+frozen head and the branch head are the two shas above, unchanged since the run, and
+`git merge-base --is-ancestor 94d028c HEAD` exits 0.
 
-| Role | At the run | After the rebase |
-|:--|:--|:--|
-| Frozen head | `94d028c` | **`d0410f8`** |
-| Branch head | `0819552` | **`da8ff02`** |
-
-**The rebase moved no reviewed byte, and that is measured rather than argued.** The git tree object
-for `src/` is `8ddcc99648627682d764f2d0b49345e801a248f5` at `94d028c`, at `0819552`, at `d0410f8`
-and at `da8ff02` — one identical tree under all four shas — and
-`git diff --stat 94d028c d0410f8 -- src/ 'test/*.t.sol' .gas-snapshot` prints nothing. #146 moved
+**No reviewed byte moved, and that is measured rather than argued.** The git tree object for `src/`
+is `8ddcc99648627682d764f2d0b49345e801a248f5` at `94d028c`, at `0819552` and at this PR's head alike,
+and `git diff --stat 94d028c HEAD -- src/ 'test/*.t.sol' .gas-snapshot` prints nothing. #146 moved
 `app/` and the two node test files only; `git diff --name-only 679d1b8 7ff3be4 -- src/ 'test/*.t.sol'`
-is empty, and `forge snapshot --check` exits 0 on the snapshot committed at the freeze. So the
-pre-rebase shas and the post-rebase shas name the same four scoped files, byte for byte, and either
-pair ties the run to the same source. The post-rebase pair is the one `main` will carry, which is
-what milestone criterion 4 requires; the pre-rebase pair is the one the blinded tree and the known
-answer record.
+is empty, and `forge snapshot --check` exits 0 on the snapshot committed at the freeze. The four file
+hashes below are the cross-check on the reviewed *bytes*; the commit shas are its identity, and
+after the merge both are intact.
 
 The two repositories' commits differ for the reason they always have — the blinded tree is a
 separate one-commit repository, because `codex exec` refuses to start outside a git repo — so **the

@@ -9,7 +9,7 @@ them. Every pointer now passes through one private `_requireChunk`, which additi
 0 to be the `STOP` that `SSTORE2.write` prefixes — the tighter test, and the one `SSTORE2.read`
 already assumes, so a pointer it rejects could never have been served correctly. Five tests pin the
 three doors, one of them signing a real EIP-7702 authorization rather than etching a designator. The
-code was then frozen at `d0410f8` and read a third time by two blinded legs; `SECURITY.md` carries
+code was then frozen at `94d028c` and read a third time by two blinded legs; `SECURITY.md` carries
 that run as its third entry, marks F11 **fixed**, and adds one new row, F14, from the run's own F5.
 The only contract this task moves is `App`.
 
@@ -22,7 +22,7 @@ The only contract this task moves is `App`.
 | 3 — the `code.length` criterion | pass | `grep -v '^\s*//' src/App.sol \| grep -c 'code.length'` → **0**; `grep -c 'code.length' src/App.sol` → **1**, the `ForeignChunk` doc comment at `src/App.sol:42`; `grep -c '_requireChunk' src/App.sol` → **5**, the definition plus four uses. This is the criterion as the architect amended it on #132 (2026-11-03) and as #147 then landed it in the plan. |
 | 4 — 27 `AppTest` names, five failing before | pass | `forge test --list --match-contract AppTest` → **27**. Each of the five fails on the pre-fix `src/App.sol` with `next call did not revert as expected`; all five quoted in § The five tests, failing first. The seven existing names keep their assertions: `git diff origin/main -- test/App.t.sol` is **77 added, 1 removed**, and the one removed line is `import {Test}` → `import {Test, Vm}`, not an assertion. |
 | 5 — the upload path still works | pass | On a fresh anvil: `forge script scripts/forge/Chunks.s.sol --broadcast` printed `chunk 0`, `chunk 1`, `widget chunk 0` and `html() bytes 54541`; `cast call $APP "chunkCount()"` returns `0x…02` = **2**, equal to the two chunks the script printed, and `widgetChunkCount()` = 1. `html()`'s raw return is 54,624 bytes carrying offset `0x20` and length `0xd50d` = **54,541**, whose payload begins `<!DOCTYPE html><html><head><meta charset="utf-8"><title>app<`. Read off the raw ABI return rather than a decode under a signature I supplied. |
-| 6 — milestone criterion 4 | pass | `audits/2026-11-06/AUDIT.md` provenance says `dirty: no`; both leg directories hold 3 files each and `transcripts/` holds `leg-1-codex.log` (375,701 B) and `leg-2-claude.jsonl` (2,469,493 B); `audits/2026-11-06/BLIND.md` maps the blinded tree's `d07483a8` to the frozen head; `SECURITY.md` names `d0410f8` **7** times, F11 reads **fixed in this PR**, and all three runs' findings are dispositioned across 14 rows; `README.md:15` reads `two-model agent review, 2026-11-06`. `git diff --stat d0410f8 HEAD -- src/` prints nothing at the PR's final commit. |
+| 6 — milestone criterion 4 | pass | `audits/2026-11-06/AUDIT.md` provenance says `dirty: no`; both leg directories hold 3 files each and `transcripts/` holds `leg-1-codex.log` (375,701 B) and `leg-2-claude.jsonl` (2,469,493 B); `audits/2026-11-06/BLIND.md` maps the blinded tree's `d07483a8` to the frozen head; `SECURITY.md` names the frozen head `94d028c` **9** times, F11 reads **fixed in this PR**, and all three runs' findings are dispositioned across 14 rows; `README.md:15` reads `two-model agent review, 2026-11-06`. `git diff --stat 94d028c HEAD -- src/` prints nothing at the PR's final commit, and `git merge-base --is-ancestor 94d028c HEAD` exits 0 — the reviewed commit is an ancestor of what `main` will carry, not an orphaned rewrite (§ Deviations 4). |
 | 7 — the known answer | pass | `audits/KNOWN_ANSWER.md` names `94d028c` **4** times (the frozen head as it was when the tree was cut — see § Deviations 4), carries `ForeignChunk` twice and `#127` twice, lists F11 among the closed with its mechanism, and holds **16** top-level entries (`grep -c '^- \*\*'`). `AUDIT.md` § 4 opens "Sixteen entries: six live, ten closed" and grades both legs against every one. |
 | 8 — the gates | pass, with one measured correction | `forge build --force` → `Compiler run successful!` and **zero** `warning[` / `Warning (` lines; `forge test` → **91 passed, 0 failed**; `forge snapshot --check` → **exit 0**; `forge lint` → silent, exit 0; `forge fmt --check` → silent, exit 0, run last; `git status --porcelain` → empty. `node --test test/*.test.mjs` → **67 pass, 0 fail**, not the 62 the plan names (§ Deviations 3). |
 | 9 — this file | pass | § For M04 names `App`'s init-code hash and the command that produced it; § Discoveries names the two findings the third run raised that this PR did not act on. |
@@ -130,15 +130,16 @@ leg 2             claude 2.1.310 (Claude Code) · requested opus → observed cl
 tokens            leg 1 112,063 · leg 2 1191782
 ```
 
-**Two shas, named both ways because the rebase rewrote them.** The blinded tree is cut at the
-**frozen head**, `94d028c` at the run and `d0410f8` after step 8's rebase onto `7ff3be4`; the
-**branch head** was `0819552` at the run and is `da8ff02` after it. `src/`'s git tree object is
-`8ddcc99` under all four shas and
-`git diff --stat 94d028c d0410f8 -- src/ 'test/*.t.sol' .gas-snapshot` prints nothing, so the rebase
-moved no reviewed byte; `forge snapshot --check` exits 0 on the snapshot committed at the freeze,
-which is the plan's own test for step 6 being void and it is not. `audits/2026-11-06/BLIND.md`
+**Two shas, and they are the run's own.** The blinded tree is cut at the **frozen head**, `94d028c`;
+the **branch head** at the review was `0819552`. Both are still ancestors of this PR's head, because
+`main` was brought in as the merge commit `cb2e2a9` rather than by a rebase — see § Deviations 4,
+which is why. `src/`'s git tree object is `8ddcc99` at `94d028c`, at `0819552` and at this PR's head
+alike, and `git diff --stat 94d028c HEAD -- src/ 'test/*.t.sol' .gas-snapshot` prints nothing, so no
+reviewed byte moved; `forge snapshot --check` exits 0 on the snapshot committed at the freeze, which
+is the plan's own test for step 6 being void and it is not. `audits/2026-11-06/BLIND.md`
 § The mapping proves this by tree object, and the blinded tree's commit message and
-`audits/KNOWN_ANSWER.md` keep the pre-rebase numbers because neither can be re-cut.
+`audits/KNOWN_ANSWER.md` name `94d028c` — which, after the merge, is still a commit a fresh clone of
+`main` can resolve.
 
 ### Per-leg grading, against all sixteen entries
 
@@ -221,8 +222,9 @@ row. Everything else in `Carries forward:` is the reviewer's to fill.
 
 ## For M04 — `App`'s init-code hash
 
-`APP_SALT` is mined against this, per decision 37, and `d0410f8` is the commit it must be mined
-against because it is the one M04 deploys.
+`APP_SALT` is mined against this, per decision 37, and `94d028c` is the commit it must be mined
+against because it is the one M04 deploys — the frozen head, which the merge of `main` left intact
+as an ancestor rather than rewriting (§ Deviations 4).
 
 **`cast keccak $(forge inspect App bytecode)` is not the init-code hash.** `App`'s constructor takes
 `(address owner_, string memory version_)`, and `CREATE2` hashes the creation code **with the
@@ -281,18 +283,32 @@ bytecode**, and this one is per-revision.
    and took the node suite 62 → 67, which t09's handoff records. Step 8's *reasoning* holds exactly
    as written — this task moves no `app/` byte, so it changes nothing about the dapp — but the
    absolute number is per-revision and is quoted here as measured rather than asserted from the
-   plan. **67 pass, 0 fail**, over six files.
-4. **Step 8's rebase rewrote the two shas the plan and two artefacts name.** `origin/main` moved to
-   `7ff3be4` (the merge of #146) after the review, and rebasing onto it rewrote all four of the
-   branch's commits: frozen head `94d028c` → `d0410f8`, branch head `0819552` → `da8ff02`. The
-   blinded tree's commit message ("at `94d028c`") and `audits/KNOWN_ANSWER.md`'s title cannot be
-   re-cut without re-cutting the review, so both pairs are named wherever either appears, with the
-   tree-object proof that the rebase moved no reviewed byte. The post-rebase pair is what
-   `SECURITY.md` § The reviewed commit leads with, because that is the pair `main` will carry and
-   milestone criterion 4 asks about; the pre-rebase pair is what the run's own artefacts record.
-   `#146` moved no `src/` and no forge test — `git diff --name-only 679d1b8 7ff3be4 -- src/
-   'test/*.t.sol'` is empty — and `forge snapshot --check` exits 0 after the rebase, so step 6
-   is not void.
+   plan. **67 pass, 0 fail**, over six files. **The five extra tests arrive with the merge**
+   (§ Deviations 4): they are t09's change entering this branch at `cb2e2a9`, not a t07 regression,
+   and this task still moves no `app/` byte of its own — `git diff --name-only origin/main HEAD --
+   app/` is empty. A count other than 67 here would be the thing to stop on.
+4. **`main` was brought in with a merge commit, not with the rebase step 8 first used.**
+   `origin/main` moved to `7ff3be4` (the merge of #146) after the review. Step 8 rebased onto it,
+   which replayed all four branch commits under new shas and left the frozen head `94d028c`
+   unreachable from the branch — measured, not assumed: `git merge-base --is-ancestor 94d028c
+   <rebased head>` was **false**. The architect ruled that out, and the reason is provenance rather
+   than taste: after a rebase-then-merge, `git show 94d028c` in a fresh clone of `main` answers with
+   an unknown object, so the third review's reviewed commit would survive only in GitHub's PR refs.
+   The four sha256s in `BLIND.md` are the cross-check on the reviewed *bytes*; they are not the
+   identity of the reviewed commit. So the rebase was discarded, the branch was reset to the
+   pre-merge head `0819552`, `main` was merged in as **`cb2e2a9`**, and the four documentation
+   commits were replayed on top — after which `git merge-base --is-ancestor 94d028c HEAD` **exits
+   0** and the replayed tree is byte-identical to the rebased one it replaced. The shas that matter
+   are therefore **frozen head `94d028c`**, **branch head at the review `0819552`** and the merge
+   **`cb2e2a9`**. The post-rebase pair is gone from the write-up entirely: naming an orphaned
+   rewrite would preserve exactly the confusion this removes. The merge was conflict-free, measured
+   from the true merge base `679d1b8` rather than from the branch tip — `comm -12` over the two
+   sorted change lists is empty, `main` having touched `AGENTS.md`, `RUNBOOK.md`,
+   `app/src/{index.html,model.js,widget.js}`, `test/{model,widget}.test.mjs`,
+   `scripts/forge/Fixtures.s.sol` and two docs files, none of them this task's. Precedent: m02-t02's
+   handoff refused a rebase for this same reason ("bringing `main` in is the merge"). `#146` moved no
+   `src/` and no forge test — `git diff --name-only 679d1b8 7ff3be4 -- src/ 'test/*.t.sol'` is empty
+   — and `forge snapshot --check` exits 0 after the merge, so step 6 is not void.
 5. **Step 3's prescribed rehearsal cannot compile as written.** The plan says to `git stash push --
    src/` and watch the five tests fail on the pre-fix code, but the tests name
    `App.ForeignChunk.selector` and only the fix declares that error, so the pre-fix tree fails to

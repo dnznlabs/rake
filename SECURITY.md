@@ -11,15 +11,15 @@
 reviews of the same code, captured separately, then reconciled"
 ([`audits/README.md`](audits/README.md) § What an audit here is, and is not). Two harnesses, two
 labs, one pass each, reconciled by a third pass.
-**Scope commit:** **frozen head `d0410f8`** (`chore(gas): re-snapshot for the ForeignChunk check`,
-the last commit touching `src/`, `test/*.t.sol` or `.gas-snapshot`) with **branch head `da8ff02`**
+**Scope commit:** **frozen head `94d028c`** (`chore(gas): re-snapshot for the ForeignChunk check`,
+the last commit touching `src/`, `test/*.t.sol` or `.gas-snapshot`) with **branch head `0819552`**
 (the known-answer rewrite, which step 5 permits because it touches none of those three paths) — read
 by the legs in a blinded tree at commit `d07483a8b9f6bcfe6200688bcb2d242450b9d464`, mapped in
-[`audits/2026-11-06/BLIND.md`](audits/2026-11-06/BLIND.md). Those two shas were `94d028c` and
-`0819552` when the tree was cut and the run happened, which is what the blinded tree's commit
-message and `audits/KNOWN_ANSWER.md` record; step 8's rebase onto `7ff3be4` rewrote them without
-moving a reviewed byte — `src/`'s tree object is `8ddcc99` under all four shas, and
-`git diff --stat 94d028c d0410f8 -- src/ 'test/*.t.sol' .gas-snapshot` prints nothing
+[`audits/2026-11-06/BLIND.md`](audits/2026-11-06/BLIND.md). Both are the shas the blinded tree's
+commit message and `audits/KNOWN_ANSWER.md` record, and both are still ancestors of this PR's head:
+`main` came in after the review as the merge commit `cb2e2a9`, not as a rebase, so no reviewed commit
+was rewritten and `src/`'s tree object is `8ddcc99` at the frozen head and at this PR's head alike
+(§ The reviewed commit)
 **Scope:** `src/Distribution.sol`, `src/App.sol`, `scripts/forge/Deploy.s.sol`,
 `scripts/forge/DeployApp.s.sol` ([`audits/SCOPE`](audits/SCOPE), with every exclusion and its
 reason) — unchanged from the two earlier runs per decision 29, though **all four files' bytes moved
@@ -361,26 +361,32 @@ either: its first byte is not `0x00`, and `SSTORE2.read` would have mis-read it)
 
 ## The reviewed commit
 
-The current review reads **`d0410f8`**, this PR's **frozen head** — the last commit touching `src/`,
+The current review reads **`94d028c`**, this PR's **frozen head** — the last commit touching `src/`,
 `test/*.t.sol` or `.gas-snapshot`, frozen at step 5 before the review ran and unchanged under `src/`
-since: `git diff --stat d0410f8 HEAD -- src/` prints nothing. The **branch head** at the review was
-**`da8ff02`**, one commit later, which step 5 permits because it rewrote `audits/KNOWN_ANSWER.md`
+since: `git diff --stat 94d028c HEAD -- src/` prints nothing. The **branch head** at the review was
+**`0819552`**, one commit later, which step 5 permits because it rewrote `audits/KNOWN_ANSWER.md`
 only. Both are named because the blinded tree is cut at the frozen head while the PR is reviewed at
-the branch head, and naming one without the other has already caused one correction. At the run they
-were `94d028c` and `0819552`; step 8's rebase onto `7ff3be4` rewrote both shas without moving a
-reviewed byte, which `audits/2026-11-06/BLIND.md` § The mapping proves by tree object rather than by
-assertion.
+the branch head, and naming one without the other has already caused one correction.
 
-`git diff --stat d0410f8 origin/main -- src/` is **not** empty today, and should not be: it reports
+**`main` was brought in after the review by a merge commit, `cb2e2a9`, and not by a rebase.** A
+rebase replays every commit under a new sha: an earlier attempt at step 8 did exactly that, and it
+left `94d028c` unreachable from the branch, so after a merge to `main` a fresh clone would answer
+`git show 94d028c` with an unknown object and the third review's provenance would survive only in
+GitHub's PR refs. Both shas above are ancestors of this PR's head instead —
+`git merge-base --is-ancestor 94d028c HEAD` exits 0 — and the four sha256s in
+`audits/2026-11-06/BLIND.md` § The mapping remain the cross-check on the reviewed *bytes*, which is
+a different thing from the identity of the commit.
+
+`git diff --stat 94d028c origin/main -- src/` is **not** empty today, and should not be: it reports
 `src/App.sol | 32 ++---`, the `ForeignChunk` fix, because this PR has not merged yet and `main` does
 not carry it. That is the opposite direction from the two earlier entries, which were written after
 their fixes were on `main`. Per milestone criterion 4, what `SECURITY.md` names must be the commit
 `main` carries when M03 closes, or an ancestor whose diff to it touches nothing under `src/`. When
-this PR merges, the merge commit becomes a descendant of `d0410f8` whose diff to it touches nothing
+this PR merges, the merge commit becomes a descendant of `94d028c` whose diff to it touches nothing
 under `src/` — nothing after the freeze touches `src/` — and that diff becomes empty; the handoff
 names both commits and criterion 4 is re-checked on the merged `main` at close-out.
 
 The 2026-10-31 review read `b0fb4e3` and the 2026-10-30 review read `ede55c3`; both remain true of
-their entries. `d0410f8` supersedes them as the reviewed commit, because it is the one carrying the
+their entries. `94d028c` supersedes them as the reviewed commit, because it is the one carrying the
 `App.lock` fix, and it is the commit M04 deploys — which is why its `App` init-code hash, not a
 later one, is what `APP_SALT` is mined against (decision 37, m03-t07 `HANDOFF.md` § For M04).
