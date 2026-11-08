@@ -23,3 +23,24 @@ path = "./app/dist"
 [[profile.default.fs_permissions]]
 access = "read"
 path = "./test/fixtures/bytecode"
+
+# The four `testFuzz_` cases in test/Distribution.t.sol (m04-t07).
+[fuzz]
+runs = 512
+
+# test/invariant/ — one handler, seven properties (m04-t07). `runs × depth` is the call budget for
+# one property and there are seven of them, so these two figures are CI's wall-time budget restated.
+# Measured on this host, invariant suite alone at `runs = 256`: depth 50 → 3 s, 100 → 8 s, 200 → 11 s,
+# 500 → 26 s, all seven passing at every depth. 200 is the chosen point — long enough for one sequence
+# to chain propose → warp → applyQueued → cancel → distribute → release → claim rather than brush
+# past each entry point three times — and it leaves a fivefold margin under the 60 s budget t07 set,
+# which is the room a slower CI runner needs. Lower `depth` before `runs` if that margin ever goes.
+#
+# `fail_on_revert = false` because the handler catches the legitimate refusals itself and counts them
+# per entry point; a revert that bubbles out of a handler function is a handler bug rather than a
+# finding, and the `Reverts` column of `forge test --match-path 'test/invariant/*' -vv` is where to
+# read it. AGENTS.md § Contracts says what that means for a handler function added later.
+[invariant]
+runs = 256
+depth = 200
+fail_on_revert = false

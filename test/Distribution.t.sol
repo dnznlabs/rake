@@ -1505,6 +1505,126 @@ contract DistributionTest is Test {
         assertEq(address(d).balance, 0.25 ether);
     }
 
+    /// @dev F10, over every three-row table rather than the one someone wrote down: each row but the
+    /// last takes the floor of its bps share, the last takes the remainder, and the three sum to
+    /// exactly what came in — so rounding can never pay out more than was distributed and can never
+    /// leave a wei behind. `test_rounding_3333_3333_3334` is the hand-picked case.
+    function testFuzz_roundingNeverExceedsAmount(uint96 amount, uint16[3] calldata bps) public {
+        // Arrange — a table `_set` accepts: ascending, no zero share, summing to 10,000 bps. The casts
+        // are safe because every bound above is below `BPS_TOTAL`, which is itself a `uint96`.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint96 b0 = uint96(bound(bps[0], 1, BPS_TOTAL - 2));
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint96 b1 = uint96(bound(bps[1], 1, BPS_TOTAL - 1 - b0));
+        uint96 b2 = BPS_TOTAL - b0 - b1;
+
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](3);
+        t[0] = _row(A, b0);
+        t[1] = _row(B, b1);
+        t[2] = _row(C, b2);
+        Distribution d = _deploy(0, t);
+
+        uint256 amount_ = bound(amount, 1, 1000 ether);
+
+        // Act
+        _send(d, amount_);
+        d.distribute(address(0));
+
+        // Assert
+        assertEq(A.balance, (uint256(b0) * amount_) / BPS_TOTAL, "a row takes the floor of its share");
+        assertEq(B.balance, (uint256(b1) * amount_) / BPS_TOTAL);
+        assertGe(C.balance, (uint256(b2) * amount_) / BPS_TOTAL, "the last row takes the remainder");
+        assertLe(C.balance, (uint256(b2) * amount_) / BPS_TOTAL + 2, "which is its share plus two rows of dust");
+        assertEq(A.balance + B.balance + C.balance, amount_, "the three sum to exactly what came in");
+        assertEq(address(d).balance, 0, "and nothing is left behind");
+    }
+
+    /// @dev Decision 10, over every salt: `create` takes one only if its top 20 bytes are the sender's,
+    /// so a counterfactual address cannot be front-run, and the clone lands where `predict` said it
+    /// would. `test_saltFrontRunningRejected` and `test_create2AddressStableAcrossChains` pin one salt
+    /// each; this varies the low 12 bytes and holds everything else equal.
+    function testFuzz_saltPrefixMustBeSender(bytes32 salt) public {
+        // Arrange — one pair of salts with the same tail and different prefixes, so the prefix is the
+        // only thing under test.
+        uint256 tail = uint256(salt) & type(uint96).max;
+        bytes32 mine = bytes32((uint256(uint160(address(this))) << 96) | tail);
+        bytes32 theirs = bytes32((uint256(uint160(OWNER)) << 96) | tail);
+
+        // Act / Assert — someone else's prefix is refused, whatever the tail.
+        vm.expectRevert(DistributionFactory.SaltDoesNotStartWith.selector);
+        factory.create(OWNER, 0, "desc", _defaultTable(), theirs);
+
+        // … and the sender's own prefix lands at exactly `predict(salt)`.
+        address predicted = factory.predict(mine);
+        assertEq(factory.create(OWNER, 0, "desc", _defaultTable(), mine), predicted, "created where predicted");
+        assertEq(Distribution(payable(predicted)).owner(), OWNER, "and it was initialised on the way");
+    }
+
+    /// @dev Decisions 39 and 25 over the whole window: a queued action applies if and only if
+    /// `eta ≤ now ≤ eta + GRACE`, and a refusal leaves it queued. `test_applyQueuedExpires` and
+    /// `test_staleActionExpires` pin single instants either side of the edge; this sweeps every offset
+    /// from the proposal to well past the lapse.
+    function testFuzz_applyWindow(uint32 delay, uint64 dt) public {
+        // Arrange — a delay of at least a second, so the action queues rather than running inline. The
+        // cast is safe because the bound is far below `type(uint32).max`.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint32 delay_ = uint32(bound(delay, 1, 365 days));
+        Distribution d = _deploy(delay_, _defaultTable());
+        bytes memory action = abi.encodeCall(Distribution.setDescription, ("next"));
+
+        vm.prank(OWNER);
+        d.propose(action);
+        uint256 eta = block.timestamp + delay_;
+        uint256 grace = d.GRACE();
+
+        // Act — land anywhere between the proposal and a month past the lapse.
+        vm.warp(block.timestamp + bound(dt, 0, uint256(delay_) + grace + 30 days));
+
+        // Assert — a timelock is a timestamp comparison, the reading `src/Distribution.sol` takes.
+        // forge-lint: disable-next-line(block-timestamp)
+        if (block.timestamp < eta) {
+            vm.expectRevert(abi.encodeWithSelector(Distribution.NotReady.selector, eta));
+            d.applyQueued(action, 1);
+            assertEq(d.pendingCount(), 1, "too early, and still queued");
+            // forge-lint: disable-next-line(block-timestamp)
+        } else if (block.timestamp > eta + grace) {
+            vm.expectRevert(abi.encodeWithSelector(Distribution.Expired.selector, eta));
+            d.applyQueued(action, 1);
+            assertEq(d.pendingCount(), 1, "too late, and still queued");
+        } else {
+            d.applyQueued(action, 1);
+            assertEq(d.description(), "next", "inside the window it applies");
+            assertEq(d.pendingCount(), 0, "and leaves the queue");
+        }
+    }
+
+    /// @dev F5 and decision 40 over every amount: an escrow the push cap can never deliver leaves
+    /// through `claim`, exactly — all of it, to the address its own account names, with nothing left
+    /// reserved. `test_claimEthToSelfUncapped` pins one amount.
+    function testFuzz_claimMovesExactlyEscrow(uint128 amount) public {
+        // Arrange — one row whose `receive()` costs more than `PUSH_GAS` forwards, so the whole
+        // deposit is escrowed rather than paid.
+        HungryReceiver hungry = new HungryReceiver();
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](1);
+        t[0] = _row(address(hungry), BPS_TOTAL);
+        Distribution d = _deploy(0, t);
+
+        uint256 amount_ = bound(amount, 1, 1000 ether);
+        _send(d, amount_);
+        d.distribute(address(0));
+        assertEq(d.escrowed(address(0), address(hungry)), amount_, "the push cap cannot deliver it");
+        assertEq(d.reserved(address(0)), amount_);
+
+        // Act — the escrowed account takes its own escrow, to an address it names.
+        hungry.take(d, address(0), A);
+
+        // Assert
+        assertEq(A.balance, amount_, "exactly the escrow moved");
+        assertEq(d.escrowed(address(0), address(hungry)), 0, "and the escrow is gone");
+        assertEq(d.reserved(address(0)), 0);
+        assertEq(address(d).balance, 0, "with nothing left behind");
+    }
+
     function _row(address account, uint96 bps) internal pure returns (Distribution.Beneficiary memory) {
         return Distribution.Beneficiary({account: account, bps: bps, name: "name", note: "note"});
     }
