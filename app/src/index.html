@@ -1860,7 +1860,7 @@ function docs() {
   <p>A beneficiary that requires more than 100,000 gas to receive ETH is always held.</p>
   <p>Funds held for a beneficiary that can never receive them remain in the contract permanently. This is by design: there is no sweep, and neither the owner nor anyone else can redirect them.</p>
   <p>Every address, share, name and note is public, and remains in the chain's history after it is changed. An allocation that must stay private, such as individual salaries, is not suited to a distribution.</p>
-  <p>A contract that pays in with <code>transfer</code> or <code>send</code> fails while the implementation is cold, because the 2,300-gas stipend does not cover receipt.</p>
+  <p>A contract that pays in with <code>transfer</code> or <code>send</code> fails while the implementation is cold, because the 2,300-gas stipend does not cover receipt: a cold receipt needs 4,162 gas. Pay in with <code>call</code> and forward the gas instead. The payment simply reverts, so nothing is lost.</p>
   <p>The contracts cannot be upgraded. A defect is remedied by deploying a new distribution.</p>
   <p>The contracts have not yet been audited. Security issues should be reported through the repository's <a href="${REPO}/security/advisories/new" target="_blank" rel="noopener">advisory form</a>.</p>
 
