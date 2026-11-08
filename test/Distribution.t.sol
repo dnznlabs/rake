@@ -447,6 +447,11 @@ contract DistributionTest is Test {
         assertEq(d.reserved(address(tk)), 0, "so nothing is escrowed");
     }
 
+    /// @notice The **warm** case only, and deliberately so: the clone is deployed inside the test, so
+    /// the implementation it delegates into is already warm when the ETH arrives and 1,662 gas of the
+    /// 2,300 stipend is enough. Cold it needs 4,162 and this same `transfer` reverts — #174, measured
+    /// and pinned from both sides in `test/ColdStipend.t.sol`, which creates its clone in `setUp` to
+    /// get a genuinely cold first touch. Read the two together; neither says what the other does.
     function test_receiveUnderStipend() public {
         // Arrange
         Distribution d = _deploy(0, _defaultTable());
