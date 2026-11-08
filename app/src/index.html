@@ -1566,7 +1566,21 @@ function fundsHTML(d, f, other) {
    author's-cut selector. Decisions 1, 2 and 7 dropped the first three; the fourth is #38's, deferred
    to M05. The draft survives a step change and a repaint; a landed create clears it. */
 let DRAFT = null;
-const newDraft = () => ({ step: 1, desc: '', owner: ACC || '', delay: '7d', deposit: '', n: '1', rows: [EMPTY_ROW(), EMPTY_ROW()], predicted: null, taken: false, salt: null });
+const newDraft = () => ({ step: 1, desc: '', owner: ACC || '', delay: '7d', deposit: '', n: '1', rows: [EMPTY_ROW(), EMPTY_ROW()], predicted: null, taken: false, salt: null, ack: false });
+/* The owner field's reading, which both steps show: step 1 under the field, where Next is held until
+   a reading that asks for one has been acknowledged, and step 2 one line above Deploy, so the owner
+   the acknowledgement was about is beside the button that spends (#172, decision 43). A bad checksum
+   is refused here rather than read — the same refusal `addrField` makes (`:461`) — and every other
+   value is `Model.ownerKind`'s to read, against the connected wallet and whatever `probeOwner` has
+   already answered for the address. */
+const ownerLine = () => {
+  const v = DRAFT.owner;
+  if (!isAddr(v) || !checksumOk(v)) return null;
+  const a = Eth.checksum(v);
+  return Model.ownerKind(a, ACC, PROBE.get(a) || null);
+};
+// The statement beside a reading that must be confirmed; the reading itself is the line above it.
+const OWNER_ACK = 'I have read the note above and still want this owner.';
 // The amount field for ETH: the symbol sits inside the box, so it reads as one control.
 const ethIn = attrs => `<span class="ethin"><span aria-hidden="true">Ξ</span><input ${attrs} inputmode="decimal"></span>`;
 const field = (lab, input, help) => `<div class="field"><div class="lab">${lab}</div>${input}<div class="help">${help}</div></div>`;
@@ -1588,26 +1602,64 @@ function createOne() {
       "The distribution's display name, stored on chain as its description — shown everywhere it appears.")
     + field('owner', `<input id="c-owner" aria-label="owner" value="${esc(D.owner)}" placeholder="0x… or .eth / .wei / .gwei"><div class="res" id="c-ownerres"></div>`,
       'Defaults to the connected wallet. A vault address here owns the distribution from its first block, and the salt stays yours (decision 10).')
+    + '<div id="c-ownerack"></div>'
     + field('delay', `<input id="c-delay" class="narrow" aria-label="delay" value="${esc(D.delay)}">`,
       'How long every future change waits in public. Accepts 7d, 48h, 0. Zero means changes apply instantly, and is flagged everywhere it shows.')
     + '<div class="actions"><button class="btn" id="c-next">Next</button><span class="status" id="c-why"></span></div>';
   const desc = document.getElementById('c-desc'), own = document.getElementById('c-owner'), del = document.getElementById('c-delay');
   const why = document.getElementById('c-why'), next = document.getElementById('c-next');
+  const res = document.getElementById('c-ownerres'), ackbox = document.getElementById('c-ownerack');
+  /* The owner's own line, and the acknowledgement where the reading carries one. The checkbox is
+     drawn only for a classed reading — the zero address and an amber probe — because a probe still
+     in flight is `ack` without a class: Next stays held for the instant of the read without a box
+     flashing in and out of the step. A line is written only where there is one to write, so a name
+     that failed to resolve keeps what `addrField` said about it. */
+  const paintOwner = k => {
+    if (k) { res.className = 'res' + (k.cls ? ' ' + k.cls : ''); res.textContent = k.text; }
+    ackbox.innerHTML = k && k.ack && k.cls
+      ? `<label class="ack"><input type="checkbox" id="c-ack"${D.ack ? ' checked' : ''}><span>${esc(OWNER_ACK)}</span></label>`
+      : '';
+    const box = document.getElementById('c-ack');
+    if (box) box.onchange = () => { D.ack = box.checked; check(); };
+  };
   const check = () => {
+    const was = D.owner;
     D.desc = desc.value; D.owner = own.value.trim(); D.delay = del.value;
+    // A new address is a new reading, so a confirmation does not carry over to it (as at `:1426`).
+    if (D.owner !== was) D.ack = false;
     const secs_ = Model.parseDelay(D.delay);
+    const k = ownerLine();
+    paintOwner(k);
+    /* An unconfirmed reading holds Next. One still being read says so on its own line rather than
+       here, so the status does not ask for a confirmation of something nobody has been told yet. */
+    const held = !!k && k.ack && !D.ack;
     const bad = !D.desc.trim() ? 'the distribution needs a name'
       : !isAddr(D.owner) ? 'owner takes an address — a name resolves on mainnet and Sepolia'
-        : secs_ === null ? 'delay takes 7d, 48h, 30m or a number of seconds' : null;
-    next.disabled = !!bad;
+        : !checksumOk(D.owner) ? BAD_SUM
+          : secs_ === null ? 'delay takes 7d, 48h, 30m or a number of seconds'
+            : held && k.cls ? 'confirm the note on the owner before continuing' : null;
+    next.disabled = !!bad || held;
     why.className = 'status' + (bad ? ' bad' : secs_ === 0 ? ' warn' : '');
     why.textContent = bad || (secs_ === 0 ? 'no delay: every change applies the moment it is proposed' : '');
-    return !bad;
+    return !bad && !held;
   };
-  [desc, own, del].forEach(i => { i.oninput = check; });
-  own.onchange = async () => { const a = await addrField(own.value, document.getElementById('c-ownerres')); if (a) own.value = a; check(); };
+  /* The probe, once per address: `probeOwner` caches into `PROBE`, so the repaint reads the answer
+     and a return to this step does not ask again. The wallet itself and the zero address are read
+     from the value alone and never probed. */
+  const read = async () => {
+    const v = D.owner;
+    if (!isAddr(v) || !checksumOk(v)) return;
+    const a = Eth.checksum(v);
+    if (same(a, ACC) || a === ZERO || PROBE.has(a)) return;
+    await probeOwner(a);
+    if (D.owner === v) check();
+  };
+  [desc, del].forEach(i => { i.oninput = check; });
+  own.oninput = () => { res.className = 'res'; res.textContent = ''; check(); read(); };
+  own.onchange = async () => { const a = await addrField(own.value, res); if (a) own.value = a; check(); read(); };
   next.onclick = () => { if (check()) { D.step = 2; createTwo(); } };
   check();
+  read();
 }
 
 function createTwo() {
@@ -1622,6 +1674,9 @@ function createTwo() {
       'The index in your salt. Its top 20 bytes are your own address (decision 10), so this is the only part you choose — and it alone fixes the address, on every chain.')
     + '</div>'
     + `<div id="c-predict">${notice('reading the address this would deploy to…')}</div>`
+    // The owner, again, where it is not the wallet signing: the reading step 1 was acknowledged for,
+    // beside the button that spends. The connected wallet says nothing here, as it says nothing there.
+    + (k => k && k.text ? `<div class="res${k.cls ? ' ' + k.cls : ''}">owner ${esc(D.owner)} · ${esc(k.text)}</div>` : '')(ownerLine())
     + '<div class="actions"><button class="btn" id="c-deploy" disabled>Deploy</button><span class="status" id="c-why"></span></div>'
     + '<div id="txs"></div>';
   document.getElementById('c-back').onclick = () => { D.step = 1; createOne(); };
