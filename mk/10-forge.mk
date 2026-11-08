@@ -16,7 +16,7 @@ FORGE_SEND := --rpc-url $(RPC) --broadcast $(SEND_FLAGS)
 # CREATE2, and a CREATE-only filter would leave `addresses` and the `deploy::` guard below blind.
 DEPLOYED    = jq -r '.transactions[]|select(.transactionType=="CREATE" or .transactionType=="CREATE2")|"\(.contractName) \(.contractAddress)"' broadcast/*/$(CHAIN_ID)/run-latest.json
 
-.PHONY: serve build test fmt clean deploy addresses
+.PHONY: serve build test fmt clean deploy addresses slither
 
 serve: ## Start the dev stack: anvil, a deploy, and whatever else procs/ holds
 	process-compose $(addprefix -f ,$(sort $(wildcard procs/*.yml))) up
@@ -33,6 +33,14 @@ fmt:: ## Check formatting
 
 clean:: ## Remove build artifacts
 	forge clean
+
+# `slither.config.json` holds the whole configuration, including `fail_on: pedantic`, so an
+# untriaged result is a non-zero exit. The run is only green because `slither.db.json` carries one
+# triage entry per row of `SECURITY.md` § Static analysis; the two move together in the same PR.
+# Single-colon and not part of `test`: Slither's compile rewrites `out/` without the test artifacts,
+# so a `forge test` or `forge snapshot --check` chained behind it pays a full rebuild.
+slither: ## Static analysis gate — every result triaged in SECURITY.md
+	slither .
 
 # Every scripts/forge/Deploy*.s.sol, each with its own broadcast log. LC_ALL=C because glob order is
 # locale-dependent, and deploy order decides the addresses.

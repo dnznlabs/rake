@@ -181,6 +181,109 @@ freeze.
 
 ---
 
+## Static analysis — disposition
+
+**Slither 0.11.5** (nixpkgs, pinned in `devbox.lock`; `devbox run -- slither --version` → `0.11.5`),
+configured by `slither.config.json` at the repo root, run against this branch, whose `src/` is
+byte-identical to `main` at [`a90fa61`](https://github.com/dnznlabs/rake/commit/a90fa61)
+(`git diff --stat origin/main -- src/` prints nothing). **23 results** with informational and
+optimization detectors excluded — **2 High, 8 Medium, 13 Low** by Slither's own impact — and
+**32** with every detector on; the 9 that the gate excludes are dismissed one line each below.
+`fail_on: pedantic`, so an untriaged result is a non-zero exit; `slither.db.json` carries one triage
+entry per row of this table, and the two move together in the same PR (`AGENTS.md` § Contracts).
+
+**23 rows for 23 results, and 23 is the whole population.** `filter_paths` filters results, not the
+compilation unit: crytic-compile builds Slither's own `--skip` list from `forge config --json`, so
+the `script` directory is skipped whatever `filter_paths` says. Compiling the two shipped deploy
+scripts in — `--foundry-compile-all` (71 contracts) or a `--skip ./test/**` pre-build with
+`--foundry-ignore-compile` (54 contracts) — gives the same 23 gated and 32 full results and **zero
+results naming `scripts/forge`** under either detector set, so `Deploy.s.sol` and `DeployApp.s.sol`
+are clean and the gate's fast configuration loses nothing. The deviation is recorded in
+`docs/milestones/m04/tasks/m04-t06/HANDOFF.md` § Deviations.
+
+**This is the third review leg, and it is a mechanical one, so each row below was confirmed against
+the source rather than against the expectation the plan recorded.** Four of those expectations did
+not survive that reading and are refuted in their rows: two of the four `timestamp` results are not
+timestamp comparisons, one of the two `calls-loop` results is on a statement no loop reaches, the
+`return-bomb` is on the branch F6 deliberately kept rather than the one it removed, and two of the
+four `incorrect-equality` results are in `cancel` rather than on a `data.length` test. **No result is
+a `fix`:** no `src/` byte moves in this PR.
+
+| # | Detector | Location | Impact | Disposition | Why |
+|---|---|---|---|---|---|
+| 1 | `arbitrary-send-eth` | `_push` `src/Distribution.sol:402-419`, call at `:408` | High | `design` | `to` is never caller-chosen on the flagged statement. `:408` runs only when `keepData` is true **and** the token is ETH, which is reachable from one call site only — `release` (`:183`); `claim`'s caller-named `to` (`:198`) reaches ETH at `:207`, a different statement Slither did not flag, and a token at `:417`. `release`'s `account` is an `escrowed` key, and only `distribute` (`:168`) creates one, from `_table[i].account`. The table is written by `_set` under `onlySelf` (`:274`, `:330`), reachable only through `propose`/`applyQueued` — the owner plus the delay (decision 6; F4's row for the table's authority). The call is capped at `PUSH_GAS` = 100,000 (`:59`), so a hostile row cannot burn the frame either. |
+| 2 | `reentrancy-eth` | `distribute` `src/Distribution.sol:154-174` | High | `covered by F1` | Slither names the surface exactly: `escrowed` (`:97`) and `reserved` (`:95`) are written at `:168-169`, after the ETH send inside `_push`. **Read twice, and the answer is the completeness of two locks, not "known".** (a) The cross-function surface Slither warns about is closed: `escrowed` and `reserved` are touched in three functions and no others — `distribute` (`:155`, `:168-169`), `release` (`:178`, `:181-182`), `claim` (`:200`, `:203-204`) — and all three carry `nonReentrant` (`:109-114`), so the transient `locked` (`:99`), set before the loop, reverts `Locked()` on any reentry into any of them. `test_hookTokenDistributeIsLocked`, `test_hookTokenReleaseIsLocked` and `test_claimReentrancyLocked` read the four bytes of `Locked()` back out of the hook, so the refusal is asserted rather than assumed. (b) The write that mattered is the table, not the money: a reentrant `applyQueued` could once swap `_table` between two rows of the loop, which is **F1**, fixed with the check-only `notLocked` (`:118-121`) on `propose` (`:220`) and `applyQueued` (`:242`) and pinned by **`test_applyQueuedRefusedDuringDistribute`** and `test_proposeRefusedDuringDistribute`. (c) What is left unguarded during the lock was enumerated rather than assumed: of the contract's external functions, the only ones that neither revert nor are views are `cancel` (`:260`), `acceptOwnership` (`:304`), `receive` (`:147`) and `init` (`:134`, which reverts `Unauthorized` on any initialised clone). None of them writes `escrowed`, `reserved` or `_table` — they reach `queued`, `_pending`, `_pendingIndex`, `owner` and `pendingOwner` only — so nothing reachable from inside the push can change a value the remaining rows read. |
+| 3 | `incorrect-equality` | `distribute` `:156` (`amount == 0`) | Medium | `design` | A comparison against zero, not against a balance: `amount` is the computed distributable and zero means `NothingToDo`. |
+| 4 | `incorrect-equality` | `_push` `:418` (`data.length == 0`, `data.length >= 32`, `abi.decode(data) == 1`) | Medium | `design` | Exact return-data lengths and the ERC-20 success word, which is what the standard specifies; a no-return token (mainnet USDT) is the `length == 0` branch (`:390-392`). |
+| 5 | `incorrect-equality` | `cancel` `:267` (`eta == 0`) | Medium | `design` | **Refutes the plan's expectation**, which named a `data.length` test here: `eta == 0` is the absence sentinel for `queued[hash]` (`:93`), a mapping's own default, not a balance. |
+| 6 | `incorrect-equality` | `cancel` `:266` (the `eta == 0` disjunct of the non-owner guard) | Medium | `design` | Same sentinel, in the compound guard whose check order F9's `test_strangerCannotCancelUnexpired` pins. |
+| 7 | `locked-ether` | `DistributionFactory` `:432-501`, `create` `:459-485` | Medium | `false positive` | The factory never holds the value: `create2(callvalue(), 0x0e, 0x36, salt)` (`:476`) forwards all of it into the clone, which is why `create` is `payable` and why there is no withdraw. `test_createForwardsValue` asserts `d.balance == 1 ether` after `create{value: 1 ether}` and that the clone logs `Received` first; `test/DistributionFactory.t.sol:103` asserts a plain send to the factory reverts, since it has neither `receive` nor `fallback` (`:429-430`). |
+| 8 | `uninitialized-local` | `distribute` `:159` (`paid`) | Medium | `false positive` | Solidity zero-initialises it, and zero is the correct running total before the first row; `:163` reads it as the remainder base only on the last row. |
+| 9 | `uninitialized-local` | `_set` `:335` (`sum`) | Medium | `false positive` | An accumulator whose zero start is its definition; `:344` compares the total to `BPS_TOTAL`. |
+| 10 | `uninitialized-local` | `_set` `:336` (`prev`) | Medium | `design` | Here the zero is load-bearing and documented: `:329` says ascending accounts "keep the first row above `address(0)`", so `prev == address(0)` is the guard that rejects a zero-address beneficiary, not an oversight. |
+| 11 | `calls-loop` | `_push` `:417` (the ERC-20 `transfer`) | Low | `covered by F8` | This is the one the loop actually reaches: `distribute` (`:166`) calls `_push` for every row and the ERC-20 branch passes no gas argument. Ruled documented rather than capped by **decision 36** ([#123](https://github.com/dnznlabs/rake/issues/123)); `test_hookRecipientStarvesLaterRows` sizes it at over 95M gas, more than 3× a 30M block. |
+| 12 | `calls-loop` | `_push` `:408` (the ETH call with `keepData`) | Low | `false positive` | **Refutes the plan's expectation**, which mapped both `calls-loop` results to F8. No loop reaches `:408`: `distribute`'s call site passes `keepData = false` (`:166`), and the ETH path then takes the assembly `call` at `:411-414` with a zero-length output area. `:408` is reached only from `release` (`:183`), which has no loop. |
+| 13 | `events-maths` | `setDelay` `:282-284` | Low | `design` | The record is the timelock's own log, not a per-setter event: `propose` emits `Queued(hash, nonce, eta, action)` with the new delay inside `action` (`:227`, `:235`) and `Applied(hash)` when it lands (`:229`, `:254`), so every delay change is on chain twice, with its calldata. Adding nothing. |
+| 14 | `missing-zero-check` | `init` `:134` (`owner_`), written at `:139` | Low | `design` | **The one row the plan asked for a real answer on; see § Static analysis — the `owner_` zero check below, which is the reasoning and the escalation.** `owner() == address(0)` is already a documented, fully supported state — `docs/REFERENCE.md:38` defines it as "renounced" — and `create(address(0), …)` lands a clone in exactly that state rather than in a new one. Nothing is stuck there: `distribute`, `release` and `claim` are permissionless and keep working forever; only `propose` (`:221`) closes, which is what renouncing means. No stranger can impose it, because `create`'s salt must carry `msg.sender` in its top 20 bytes (`:468`). Disposition `design`, pending Denizen's confirmation; no `src/` check added. |
+| 15 | `missing-zero-check` | `claim` `:199` (`to`), used at `:207` | Low | `design` | The beneficiary's own money going where the beneficiary says: `:198` states "Not validated: it is the beneficiary's own money", and `:200` reads `escrowed[token][msg.sender]`, so no one else's balance can move. |
+| 16 | `reentrancy-events` | `propose` `:220-237`, `Applied` at `:229` after `_selfCall` `:228` | Low | `design` | Foreign code **can** run inside the self-call — `address(this).call(action)` (`:377`) takes arbitrary calldata, and a proposed `distribute(token)` is not `onlySelf` — so the detector's premise is not simply false, which is why "benign self-call" would be the wrong row. What makes it design is that no state the two events describe can change across the call: `distribute` takes the transient lock, so a reentrant `propose` or `applyQueued` is refused by `notLocked` (F1), and `Queued` is already emitted at `:227` before the call. The remaining effect is that an inner `Distributed`/`Escrowed` log precedes `Applied(hash)`, which is the true order of events. |
+| 17 | `reentrancy-events` | `applyQueued` `:242-255`, `Applied` at `:254` after `_selfCall` `:253` | Low | `design` | The same self-call and the same answer; here `queued[hash]` is deleted and `_remove(hash)` run at `:251-252`, before the call, so a reentrant caller cannot apply the action twice. |
+| 18 | `reentrancy-events` | `DistributionFactory.create` `:459-485`, `Created` at `:484` after `init` `:483` | Low | `false positive` | No foreign code runs: the callee is the clone the factory placed two statements earlier, and a clone delegatecalls the implementation the factory itself deployed (`:439`). `init` makes no external call — `_set` (`:330`) only writes storage — so there is nothing to reorder. |
+| 19 | `return-bomb` | `_push` `:408` | Low | `covered by F6` | **Refutes the plan's expectation**, which described this row as the ETH branch discarding return data: the flagged statement is the branch F6's fix deliberately *kept*. F6 removed the copy from the loop by adding `keepData` (`:393-401`), false at `:166`; `:408` is the true branch, reached only from `release` (`:183`), because decision 24 bubbles a reason longer than a word and cannot name one it did not copy (`:184-190`). It is outside any loop, the callee's gas is capped at `PUSH_GAS`, and the memory cost is paid by whoever chose to call `release`. `test_releaseStillBubblesEthReason` is the test that requires the data to stay. |
+| 20 | `timestamp` | `applyQueued` `:247`, `:249` | Low | `design` | A timelock is a timestamp comparison; `:245` says a validator's few seconds of drift is not the threat, and `:246`/`:248` already carry `forge-lint: disable-next-line(block-timestamp)` for the same reason. |
+| 21 | `timestamp` | `cancel` `:266`, `:267` | Low | `design` | The same comparison against `eta + GRACE` (`:65`), suppressed for the same reason at `:265`. |
+| 22 | `timestamp` | `_clearQueue` `:352` (`n > 0`) | Low | `false positive` | **Refutes the plan's expectation**, which mapped all four `timestamp` results to "the timelock is time". This one is not a timestamp comparison at all: `n` is `_pending.length` (`:351`), a loop bound. Slither's taint is field-insensitive over the `Pending` struct, so the `eta` field (`:19`) taints the array and therefore its length. |
+| 23 | `timestamp` | `_remove` `:367` (`i != last`) | Low | `false positive` | The same artefact: `last` is `_pending.length` (`:366`) and `i` is `_pendingIndex[hash]` (`:363`), an array index comparison in the swap-and-pop. No timestamp is read in the function. |
+
+### The 9 results the gate excludes
+
+Read once with every detector on (32 results), and dismissed here rather than left unread. Both
+detectors are notices that a pattern is present, with no claim attached.
+
+1. `assembly` — `_push` `:411-414`: the memory-safe `call` with a zero-length output area that **is** F6's fix; removing it reinstates the return-data copy inside the loop.
+2. `assembly` — `_bubble` `:421-425`: `revert(add(data, 0x20), mload(data))` is the only way to re-raise another frame's revert data verbatim, which decision 24 requires.
+3. `assembly` — `DistributionFactory.create` `:472-482`: the PUSH0 minimal-proxy init code, byte for byte as solady's `LibClone.initCode_PUSH0` writes it; `test_create2AddressStableAcrossChains` pins the address it produces.
+4. `assembly` — `DistributionFactory.predict` `:492-498`: the same init code hashed instead of deployed, so `predict` and `create` cannot drift.
+5. `assembly` — `App._requireChunk` `:202-206`: `extcodesize` plus a one-byte `extcodecopy`, which is F11's fix; Solidity exposes no first-byte read.
+6. `low-level-calls` — `_push` `:408`, `:417`: a raw `call` is the point — a push must not revert the distribution, which a typed call would.
+7. `low-level-calls` — `_selfCall` `:377`: the timelock reaches its own `onlySelf` setters by calling itself with the queued calldata; that is the design (`:123`).
+8. `low-level-calls` — `claim` `:207`: the uncapped ETH exit F5's fix added, deliberately not routed through `_push`'s cap.
+9. `low-level-calls` — `_balance` `:385`: a `staticcall` to `balanceOf` so a token with no code fails the decode rather than reverting the frame (`:381`).
+
+### Static analysis — the `owner_` zero check
+
+`init` (`:134`) writes `owner = owner_` with no zero check, and `DistributionFactory.create` (`:459`)
+does not check it either, so `create(address(0), …)` produces a distribution with no owner from its
+first block. The plan singled this out as the one Slither result that deserves a real answer rather
+than a disposition. **The answer reached from the code is that it is a documented shape, and the
+reasoning is recorded here because the ruling is Denizen's, not this PR's.**
+
+What an ownerless clone does, read off the source rather than assumed:
+
+- `propose` (`:221`) reverts `NotOwner` for every caller, since no transaction has `msg.sender == address(0)`. So the table, the delay, the description and the ownership are frozen permanently.
+- `acceptOwnership` (`:305`) reverts `Unauthorized` for the same reason, and `pendingOwner` is zero at `init`; `transferOwnership` is `onlySelf` and only `propose`/`applyQueued` reach it. There is no path back.
+- `distribute`, `release` and `claim` are permissionless and unaffected: the money keeps flowing to the table, and an escrowed account can always take its own escrow. **Nothing is stuck.**
+- `cancel` has nothing to cancel: the queue is empty at `init` and nothing can be queued.
+
+That is exactly the state the renounce branch produces deliberately (`:291-298`), and
+`docs/REFERENCE.md:38` already tells a reader what it means: "`owner()` … the zero address means
+renounced". `create(address(0), …)` is therefore not a new state, it is the documented terminal one
+entered at block one instead of later. Two further bounds: the zero owner is on chain in the clone's
+own creation log, `Created(distribution, owner_)` (`:484`), so an indexer and the dapp both see it
+immediately; and no stranger can impose it on anyone, because `create` requires the salt's top 20
+bytes to equal `msg.sender` (`:468`), so only the deploying key can reach the address at all — the
+same bound F14's row rests on.
+
+**Disposition `design`. What is genuinely missing is not a check but two non-`src/` things, neither
+of them this task's:** `docs/REFERENCE.md` documents the zero owner under `owner()` but nowhere says
+`create` accepts one — that a distribution can be born renounced; and no test asserts it, where the
+renounced state is otherwise covered by `test_renounceClearsQueue` and
+`test_renounceEmitsOwnershipTransferred` through `transferOwnership(address(0))`. **If Denizen rules
+the other way, the remedy is a one-line check in `src/`, which is M03 reopened and a new task — not
+a byte in this PR.**
+
+---
+
 ## Carried issues — disposition
 
 Every issue carried into this milestone, what was decided, and where the ruling is. The "found by"

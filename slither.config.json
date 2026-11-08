@@ -1,0 +1,6 @@
+{
+  "filter_paths": "lib/|test/|scripts/forge/(Chunks|Fixtures|Seed)",
+  "exclude_informational": true,
+  "exclude_optimization": true,
+  "fail_on": "pedantic"
+}
