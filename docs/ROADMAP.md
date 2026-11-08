@@ -557,6 +557,30 @@ Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
     Rejected: the anvil rehearsal's placeholders under DNZN's name on two public chains; skipping
     step 6 on testnets (criterion 1 and state-collection#74 both need code at the address).
 
+43. **`create` accepts a zero `owner_`; a born-renounced distribution is documented, not refused.**
+    M04-D3, ruled by Denizen on 2026-11-08 on [#173](https://github.com/dnznlabs/rake/issues/173)
+    ("Option 1"), reaffirmed the same day against the question "are we being lazy". Raised by
+    Slither's `missing-zero-check` on `init:134` (m04-t06, `SECURITY.md` § Static analysis row 14).
+    Two industry standards exist and they split by what the contract is: OpenZeppelin `Ownable`
+    (v5.0+) reverts `OwnableInvalidOwner(address(0))` in its constructor, because a zero owner on a
+    general-purpose contract is almost always a typo and the owner is usually the only route to
+    anything; 0xSplits' `createSplit` documents its `controller` as "0x0 if immutable", deploys that
+    case deterministically and exposes `predictImmutableSplitAddress` for it — an immutable split is
+    their headline product, not an edge case (`SplitMain.sol`, read 2026-11-08). Rake is the second
+    kind: an ownerless distribution is a fully working splitter whose table can never change, which
+    is a thing a counterparty deliberately wants to be able to verify. **The reason, not just the
+    precedent:** rake has no one-call renounce. Renounce is `propose` → the delay → `apply`, so
+    refusing a zero owner at `create` would make the honest route to an immutable distribution slower
+    and, during the delay, less trustworthy — the interim owner could rewrite the table. The
+    restriction removes no state; it taxes the people who want that state. No `src/` byte; row 14
+    stays `design`. **The mistake risk moves to the dapp**, where it belongs:
+    [#172](https://github.com/dnznlabs/rake/issues/172) adds the `REFERENCE.md` sentence, a test
+    pinning the shape, and a create-screen guard — whenever the owner field holds anything other than
+    the connected wallet, the page says what it holds (zero: "no owner, immutable forever"; a
+    contract; an account; a never-used address) and requires an acknowledgement before step 2, the
+    pattern the ownership drawer already uses. Rejected (option 2): a one-line zero check in `init`
+    or `create`, M03 reopened for a state the contract already supports on another path.
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
