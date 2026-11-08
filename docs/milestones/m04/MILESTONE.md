@@ -235,7 +235,7 @@ Filled at close-out. The queue today, 2026-11-07, every item labelled `m04`:
 | [#148](https://github.com/dnznlabs/rake/issues/148), [#149](https://github.com/dnznlabs/rake/issues/149) t09's dapp nits | t01. |
 | [#137](https://github.com/dnznlabs/rake/issues/137) | Closed by t09; listed because it was labelled `m04` before that. Nothing to do. |
 | [#165](https://github.com/dnznlabs/rake/issues/165) window budget | t05's UAT script states the load-older cost on Base Sepolia; stays open into M05 if the figure is acceptable as documented. |
-| [#172](https://github.com/dnznlabs/rake/issues/172) born-renounced sentence and test | Decision 43 opened it: a small engineer PR beside t03, no `src/`, gates nothing. |
+| [#172](https://github.com/dnznlabs/rake/issues/172) born-renounced sentence, test, create-screen owner guard | Decision 43 opened it; widened 2026-11-08 with the dapp guard (owner field ≠ connected wallet → say what it is, acknowledge before step 2). No `src/`. **It changes the bundle, so it lands before t03's step 4 (`make dapp-nodev` / `make chunks`) or it is the m04-t08 re-upload** — the engineer does it first. |
 | [#174](https://github.com/dnznlabs/rake/issues/174) cold-implementation stipend | Docs and a test in M04 (t03's runbook or #172's PR, whichever is open); the `src/` comment waits for `src/` to reopen. |
 
 ## One-way doors

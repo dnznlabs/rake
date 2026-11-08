@@ -559,15 +559,27 @@ Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
 
 43. **`create` accepts a zero `owner_`; a born-renounced distribution is documented, not refused.**
     M04-D3, ruled by Denizen on 2026-11-08 on [#173](https://github.com/dnznlabs/rake/issues/173)
-    ("Option 1"). Raised by Slither's `missing-zero-check` on `init:134` (m04-t06, `SECURITY.md`
-    § Static analysis row 14). `create(address(0), …)` lands a clone in the state the renounce branch
-    already produces deliberately and `docs/REFERENCE.md:38` already defines: `propose` is closed,
-    `distribute`/`release`/`claim` keep working, nothing is stuck, and no stranger can impose it
-    because the salt's top 20 bytes must be `msg.sender`. No `src/` byte; row 14 stays `design`. The
-    two non-`src/` gaps — a sentence in `REFERENCE.md` saying `create` accepts a zero owner, and a test
-    pinning the shape — are [#172](https://github.com/dnznlabs/rake/issues/172), a small PR beside
-    m04-t03 that gates nothing. Rejected (option 2): a one-line zero check in `init` or `create`,
-    which is M03 reopened for a state the contract already supports on another path.
+    ("Option 1"), reaffirmed the same day against the question "are we being lazy". Raised by
+    Slither's `missing-zero-check` on `init:134` (m04-t06, `SECURITY.md` § Static analysis row 14).
+    Two industry standards exist and they split by what the contract is: OpenZeppelin `Ownable`
+    (v5.0+) reverts `OwnableInvalidOwner(address(0))` in its constructor, because a zero owner on a
+    general-purpose contract is almost always a typo and the owner is usually the only route to
+    anything; 0xSplits' `createSplit` documents its `controller` as "0x0 if immutable", deploys that
+    case deterministically and exposes `predictImmutableSplitAddress` for it — an immutable split is
+    their headline product, not an edge case (`SplitMain.sol`, read 2026-11-08). Rake is the second
+    kind: an ownerless distribution is a fully working splitter whose table can never change, which
+    is a thing a counterparty deliberately wants to be able to verify. **The reason, not just the
+    precedent:** rake has no one-call renounce. Renounce is `propose` → the delay → `apply`, so
+    refusing a zero owner at `create` would make the honest route to an immutable distribution slower
+    and, during the delay, less trustworthy — the interim owner could rewrite the table. The
+    restriction removes no state; it taxes the people who want that state. No `src/` byte; row 14
+    stays `design`. **The mistake risk moves to the dapp**, where it belongs:
+    [#172](https://github.com/dnznlabs/rake/issues/172) adds the `REFERENCE.md` sentence, a test
+    pinning the shape, and a create-screen guard — whenever the owner field holds anything other than
+    the connected wallet, the page says what it holds (zero: "no owner, immutable forever"; a
+    contract; an account; a never-used address) and requires an acknowledgement before step 2, the
+    pattern the ownership drawer already uses. Rejected (option 2): a one-line zero check in `init`
+    or `create`, M03 reopened for a state the contract already supports on another path.
 
 ## Findings carried forward
 
