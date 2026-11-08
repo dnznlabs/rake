@@ -78,6 +78,28 @@ const Model = (() => {
     return self ? 'withdraw' : 'nominate';
   }
 
+  /** The create screen's owner field as the one line it shows, and whether that line has to be
+     acknowledged before the flow goes on (decision 43, #172). `owner` is the field's address,
+     checksummed; `acc` is the connected wallet; `probe` is what `probeOwner` answered for `owner`, or
+     null while that read is still out. Four readings:
+       - the connected wallet, which is the default the screen fills in: no line at all, as before;
+       - the zero address, which `create` accepts rather than refusing, so the clone is born renounced
+         — permanent from its first block, which is `bad` and acknowledged rather than turned away;
+       - any other address, where the probe's own sentence is prefixed to say whose it is not. A
+         contract and an account with a history proceed on the line alone; a `warn` — an address that
+         has never sent a transaction, which is also what a mistyped one looks like, and equally a
+         read that could not be made — is acknowledged first.
+     A probe still in flight is the third reading with nothing read yet: `ack`, so Next does not go
+     live for the instant before the answer, and classless, which is how the caller tells it from the
+     two readings that have a checkbox to draw. */
+  function ownerKind(owner, acc, probe) {
+    const a = String(owner);
+    if (acc && a.toLowerCase() === String(acc).toLowerCase()) return { text: '', cls: '', ack: false };
+    if (BigInt(a) === 0n) return { text: 'no owner: nobody can ever change the table, delay or description; this is permanent', cls: 'bad', ack: true };
+    if (!probe) return { text: 'not the connected wallet — reading the address…', cls: '', ack: true };
+    return { text: `not the connected wallet — ${probe.text}`, cls: probe.cls, ack: probe.cls === 'warn' };
+  }
+
   /** The account a one-row table at 100% forwards to — decision 6's supersession — else null. */
   function supersededBy(table) {
     return table.length === 1 && BigInt(table[0][1]) === 10000n ? table[0][0] : null;
@@ -215,6 +237,6 @@ const Model = (() => {
     return '0x' + node;
   }
 
-  return { SNAPSHOT_T, BENEFICIARY_T, pct, countdown, deadline, dateText, decodePending, ownerChange, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash, windows, rangeCap, isPruned };
+  return { SNAPSHOT_T, BENEFICIARY_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash, windows, rangeCap, isPruned };
 })();
 export default Model;

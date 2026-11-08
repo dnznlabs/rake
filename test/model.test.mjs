@@ -12,10 +12,10 @@ import Model from '../app/src/model.js';
    touches it, so assigning here — after the import — is in time for every call below. */
 globalThis.Eth = Eth;
 
-const { SNAPSHOT_T, pct, countdown, deadline, dateText, decodePending, ownerChange, supersededBy, salt } = Model;
+const { SNAPSHOT_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt } = Model;
 const { revertMessage, tableFrom, parseDelay, wei, namehash } = Model;
 const { windows, rangeCap, isPruned } = Model;
-const FUNCTIONS = ['countdown', 'dateText', 'deadline', 'decodePending', 'isPruned', 'namehash', 'ownerChange', 'parseDelay', 'pct', 'rangeCap', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei', 'windows'];
+const FUNCTIONS = ['countdown', 'dateText', 'deadline', 'decodePending', 'isPruned', 'namehash', 'ownerChange', 'ownerKind', 'parseDelay', 'pct', 'rangeCap', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei', 'windows'];
 const SET_BENEFICIARIES = 'setBeneficiaries((address,uint96,string,string)[])';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/abi');
@@ -28,6 +28,7 @@ const row = (account, bps) => [account, bps, 'r', ''];
 const OPS = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC';
 const TREASURY = '0x90F79bf6EB2c4f870365E785982E1f101E93b906';
 const OWNER = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
+const ZERO = '0x' + '0'.repeat(40);
 
 test('the module exports exactly the functions this file imports', () => {
   const exported = Object.keys(Model).filter(k => typeof Model[k] === 'function').sort();
@@ -157,6 +158,64 @@ test('a call that is not a setter is unknown even when it is this ABI', () => {
   const got = decodePending(action);
 
   assert.deepEqual(got, { kind: 'unknown', selector: action.slice(0, 10) });
+});
+
+/* The create screen's owner guard (decision 43, #172). The probes below are `probeOwner`'s own three
+   answers verbatim (`app/src/index.html:1358-1361`), since what `ownerKind` does to them is prefix
+   one and read the class off it — a paraphrase here would pass while the screen showed something
+   else. */
+const CONTRACT = { text: 'a contract — it will have to propose and cancel through its own calls', cls: '' };
+const ACCOUNT = { text: 'an account · 3 transactions on Sepolia', cls: '' };
+const NEVER = { text: 'has never sent a transaction on Sepolia — make sure someone holds its key', cls: 'warn' };
+
+test('the connected wallet in the owner field is the default, and says nothing at all', () => {
+  const got = [
+    ownerKind(OWNER, OWNER, null),
+    // The field holds what the user typed, and a wallet names itself in whichever case it likes.
+    ownerKind(OWNER, OWNER.toLowerCase(), NEVER),
+  ];
+
+  assert.deepEqual(got, [{ text: '', cls: '', ack: false }, { text: '', cls: '', ack: false }]);
+});
+
+test('the zero owner is the permanent one, and is acknowledged rather than refused', () => {
+  const got = ownerKind(ZERO, OWNER, null);
+
+  /* `create` accepts it (decision 43) and the clone is born renounced, so the screen's job is to say
+     what that costs — not to turn it away, which is the whole point of the ruling. */
+  assert.deepEqual(got, {
+    text: 'no owner: nobody can ever change the table, delay or description; this is permanent',
+    cls: 'bad',
+    ack: true,
+  });
+});
+
+test('another address carries the probe\'s own sentence, prefixed with whose wallet it is not', () => {
+  const got = [ownerKind(TREASURY, OWNER, CONTRACT), ownerKind(TREASURY, OWNER, ACCOUNT)];
+
+  // A contract and an account with a history are both legitimate owners: the line is shown and Next
+  // stays live, so neither carries `ack`.
+  assert.deepEqual(got, [
+    { text: `not the connected wallet — ${CONTRACT.text}`, cls: '', ack: false },
+    { text: `not the connected wallet — ${ACCOUNT.text}`, cls: '', ack: false },
+  ]);
+});
+
+test('an address that has never been used is the one probe that must be acknowledged', () => {
+  const got = ownerKind(TREASURY, OWNER, NEVER);
+
+  /* Amber rather than refused, for the reason `probeOwner` gives: a fresh key looks exactly like a
+     typo. The acknowledgement is what separates the two, and it is the probe's own class that asks
+     for it — so a read that could not be made (`warn` too) is held the same way, deliberately. */
+  assert.deepEqual(got, { text: `not the connected wallet — ${NEVER.text}`, cls: 'warn', ack: true });
+});
+
+test('a probe still in flight holds Next without a checkbox to draw', () => {
+  const got = ownerKind(TREASURY, OWNER, null);
+
+  /* `ack` without a class: the screen renders a checkbox only for a classed reading, so Next is held
+     for the instant before the answer lands without a box flashing in and out of the step. */
+  assert.deepEqual(got, { text: 'not the connected wallet — reading the address…', cls: '', ack: true });
 });
 
 test('supersededBy answers only for a single row at 100%', () => {
