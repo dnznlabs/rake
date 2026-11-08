@@ -557,6 +557,18 @@ Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
     Rejected: the anvil rehearsal's placeholders under DNZN's name on two public chains; skipping
     step 6 on testnets (criterion 1 and state-collection#74 both need code at the address).
 
+43. **`create` accepts a zero `owner_`; a born-renounced distribution is documented, not refused.**
+    M04-D3, ruled by Denizen on 2026-11-08 on [#173](https://github.com/dnznlabs/rake/issues/173)
+    ("Option 1"). Raised by Slither's `missing-zero-check` on `init:134` (m04-t06, `SECURITY.md`
+    § Static analysis row 14). `create(address(0), …)` lands a clone in the state the renounce branch
+    already produces deliberately and `docs/REFERENCE.md:38` already defines: `propose` is closed,
+    `distribute`/`release`/`claim` keep working, nothing is stuck, and no stranger can impose it
+    because the salt's top 20 bytes must be `msg.sender`. No `src/` byte; row 14 stays `design`. The
+    two non-`src/` gaps — a sentence in `REFERENCE.md` saying `create` accepts a zero owner, and a test
+    pinning the shape — are [#172](https://github.com/dnznlabs/rake/issues/172), a small PR beside
+    m04-t03 that gates nothing. Rejected (option 2): a one-line zero check in `init` or `create`,
+    which is M03 reopened for a state the contract already supports on another path.
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
