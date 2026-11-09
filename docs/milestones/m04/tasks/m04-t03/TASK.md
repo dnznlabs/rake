@@ -94,16 +94,12 @@ Figures below were read on 2026-11-07; re-run rather than quote.
    deployedBytecode` byte for byte; the factory's equal outside its three `immutableReferences`
    spans (m03-t10's handoff shows the comparison).
 
-3. **Sepolia, step 4 — the document.** `make dapp-nodev CHAIN_ID=11155111` (the bundle now
-   carries this chain's addresses and the factory's block), `Chunks.s.sol` with `APP` and `$SIGNER`
-   (10.8 M gas on anvil; re-read the base fee first), then `node tools/chain-doc.mjs --app $APP
-   --rpc "$RPC" --chain 11155111` and `sha256sum app/dist/index.html app/dist/widget.js`: the
-   `inflated sha256` and `widget sha256` equal the files', byte counts both ways. Record the chunk
-   pointers and every hash. Keep this chain's `app/dist/` hashes in the handoff: the Base Sepolia
-   bundle will differ (different addresses and block), and so will its `html()` — that is expected,
-   and § Executed on testnets says so.
-
-   Check: the two equalities, printed; `App.locked()` still `false`.
+3. **Sepolia, step 4 — moved to m04-t08 (decision 44, amended 2026-11-08).** `App.owner()` is the
+   Ops vault on every public chain and `addChunk`/`setChunks` are `onlyOwner`, so `Chunks.s.sol`
+   broadcast from the engineer's key reverts `Unauthorized` — found by this task on both chains
+   (#178). The upload is five Ops-vault calls per chain that Denizen signs; preparing and verifying
+   them is [m04-t08](../m04-t08/TASK.md). This task records step 4 as "prepared by t08, awaiting
+   Denizen" in § Executed on testnets and does not build or upload the bundle.
 
 4. **Sepolia, step 5 — explorer verification.** The three `forge verify-contract` commands of
    `RUNBOOK.md` Step 5 with `--chain 11155111 --watch`, `App` with its ABI-encoded constructor
@@ -114,14 +110,14 @@ Figures below were read on 2026-11-07; re-run rather than quote.
 
    Check: three URLs in the handoff, each showing the contract name.
 
-5. **Base Sepolia, steps 1–5**, the same list with `CHAIN_ID=84532`, `RPC=https://sepolia.base.org`
+5. **Base Sepolia, steps 1–3 and 5**, the same list with `CHAIN_ID=84532`, `RPC=https://sepolia.base.org`
    and its explorer. Same addresses must come out of 1f — that is the point — and the same
    collision check must print `0x` first. Note `sepolia.base.org` caps `eth_getLogs` at 200 blocks;
    nothing in steps 1–5 reads logs, so it does not bite here. Explorer verification goes through
    Etherscan's v2 API with the same key (Basescan is Etherscan-family); if forge's chain table
    needs `--verifier-url`, say which.
 
-   Check: as steps 1–4, per chain.
+   Check: as steps 1, 2 and 4 above, per chain.
 
 6. **`RUNBOOK.md`, amended by what happened.** Every deviation you met is either a change to the
    runbook's text in this PR or a one-line reason it is not (criterion 7). Add § Executed on
@@ -174,9 +170,9 @@ Figures below were read on 2026-11-07; re-run rather than quote.
   the handoff is from `cast receipt`.
 - M04 criterion 2: six `forge verify-contract … --watch` exits 0 (or the verbatim explorer error,
   with the five that passed), six `#code` URLs naming the contracts.
-- M04 criterion 3's chain half, per chain: `make chain-doc` `inflated sha256` = `sha256sum
-  app/dist/index.html` of that chain's `dapp-nodev` build, `widget sha256` = `app/dist/widget.js`,
-  byte counts both ways.
+- M04 criterion 3's chain half (`chain-doc` hashes equal the `dapp-nodev` build's) is **m04-t08's**
+  (decision 44); here, § Executed on testnets names step 4 as awaiting t08 and `App.locked()` is
+  `false` on both chains.
 - M04 criterion 7: `RUNBOOK.md` carries § Executed on testnets with both § Record tables filled;
   the handoff § Deviations is empty or every item names its runbook hunk or its reason.
 - `git diff --stat origin/main -- src/ test/*.t.sol .gas-snapshot` empty; `forge test` 91; node
