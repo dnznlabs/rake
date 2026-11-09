@@ -565,8 +565,11 @@ Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
     so the order is sound and no runbook deviation is needed. (iii) **Precondition, unverifiable from
     any agent host:** `RUNBOOK.md` § Step 6 requires the Creator key "backed up to the handbook's
     standard for an owner key before step 6 runs anywhere" — #23 closed the *documentation* of that
-    requirement, not the backup — so Denizen confirms the backup in writing before the first send, and
-    the handoff records the confirmation beside the step-6 rows. The address is
+    requirement, not the backup — so Denizen confirms the backup in writing before the first send.
+    **Confirmed by Denizen, Telegram, 2026-11-08 22:26 CST: the Creator key is backed up to the
+    handbook's standard for an owner key.** The medium and location are deliberately not recorded here
+    or anywhere in this repo; the fact, the date and the channel are what the gate needs. The handoff
+    repeats that line beside the step-6 rows; the gate is satisfied. The address is
     `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` on both chains (`predict(DNZN_SALT)` on the live
     factory, `cast code` `0x` on both, 2026-11-08); the anvil rehearsal's `0x633e24C2…6148` differs by
     design — a different salt prefix and a different implementation address fold into the clone's
