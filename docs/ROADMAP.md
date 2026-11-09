@@ -581,6 +581,27 @@ Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
     pattern the ownership drawer already uses. Rejected (option 2): a one-line zero check in `init`
     or `create`, M03 reopened for a state the contract already supports on another path.
 
+44. **Step 4 of the runbook — the document upload — is an Ops-vault action, permanently.** M04-D4,
+    ruled by Denizen on 2026-11-08 on [#178](https://github.com/dnznlabs/rake/issues/178) (Telegram,
+    22:06 CST: "I guess I was thinking we wouldn't set owner to the multisig until after everything is
+    fully deployed and tested - but agree, doesn't help future deploys that require ops ms anyway. yes
+    I have access to all three signers on the ms."). Found by m04-t03: `App` takes its owner in the
+    constructor, the chunk setters are `onlyOwner`, § 0 makes the owner the Ops vault on every chain and
+    `APP_SALT` was mined against init code containing it, so the engineer's key can never run step 4
+    on a public chain — and the only rehearsal had signer and owner as one anvil account. Five calls
+    per chain (`addChunk` ×2, `addWidgetChunk`, `setChunks`, `setWidgetChunks`), by one of two routes:
+    **unanimous via `TimelockExecutor.forward()`, immediate**, which Denizen can satisfy alone since
+    all three Ops signers are his; or **threshold via `Multisig.execute()`, queued for the vault's
+    3,600 s, then `executeQueued()`**, kept in the runbook as the fallback. `forward()` requires
+    `ownerCount()` signatures for anything but `cancelQueued` (`TimelockExecutor.sol:35-46`); the
+    handbook sentence that said threshold was corrected the same day (handbook#34). Every later
+    upload, `lock()` and M05's mirror take the same road. Rejected: redeploying `App` owned by the
+    deploying key and transferring afterwards (a new `APP_SALT`, a new live address, and it saves one
+    upload); the engineer's key as owner (decision 35, the handbook's agent rule). **Also ruled:** the
+    step-4 preparation is a new task, m04-t08, scoped after this ruling rather than widened into
+    m04-t03 under review — the engineer correctly refused to take it from an issue, since `TASK.md` on
+    `main` is the only task authority.
+
 Ruled by Denizen on 2026-11-11 over Telegram, for rake, runner and drop alike; the org convention is
 the handbook README § Conventions. Numbered 45 because 44 is taken by
 [#180](https://github.com/dnznlabs/rake/pull/180), open when this was written.
