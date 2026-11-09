@@ -182,6 +182,24 @@ older than its last network upgrade. A new predeploy is a new reading.
 
 ## 2 — the steps
 
+**Every step's `record:` line is committed before the next transaction is sent.** Not at the end of
+the chain, not at the end of the session: a step that sent something is written down and committed —
+and pushed, if a remote is reachable — before the next `forge script` or `cast send` runs. The
+broadcast logs of a real network are part of that commit; `.gitignore` keeps only the dev-chain ones
+out (`!/broadcast`, then `31337/`, `31338/` and `dry-run/`), precisely so this rule has something to
+commit.
+
+The reason is not tidiness. These transactions are public and permanent and there is no redeploy, so
+the chain is authoritative and the only question a later reader has is *what was already sent*. A run
+that dies between sending and recording leaves that question unanswerable from the repository: the
+addresses are taken, the gas is spent, and nothing on disk says so. Worse, the pre-send readings a
+killed run never wrote down are **not recoverable afterwards** in any form that can stand in for
+them — archive state may answer what the chain held at that block, but a reading taken after the
+send is not the gate that was supposed to precede it, and no honest record can present it as one
+(m04-t03 § Gates names which of its Sepolia gates went unrecorded this way).
+
+So the commit is the step's receipt. If the run is killed, the tree still says what it spent.
+
 ### Step 1 — preflight, nothing broadcast
 
 Nothing is sent in this step. It produces the addresses every later step is checked against.
@@ -295,9 +313,46 @@ cast code $FACTORY --rpc-url "$RPC"    # must print 0x
 cast code $APP --rpc-url "$RPC"        # must print 0x
 ```
 
-Code at either address means **this chain already carries the deploy**. Do not resend: a second
-CREATE2 through the proxy is a collision, and a collision consumes every unit of gas forwarded to it
-before anything can revert. The record for this chain is already written — go to step 5.
+`0x` at both: proceed to step 2.
+
+Code at either address means **something is already there**, and there are two cases. Do not resend
+in either one: a second CREATE2 through the proxy is a collision, and a collision consumes every unit
+of gas forwarded to it before anything can revert. Which case it is decides whether this chain is
+done or stopped, so **identify it before doing anything else**:
+
+```sh
+# Is it ours? The runtime must match the artifact, and the contract must answer step 3's reads.
+cast code $FACTORY --rpc-url "$RPC" | tr -d '\n' | wc -c                    # 2,642 chars = 1,320 bytes
+cast call $FACTORY "implementation()(address)" --rpc-url "$RPC"             # must be a contract, see below
+cast code $APP --rpc-url "$RPC" | tr -d '\n' | wc -c                        # must equal the artifact's length
+cmp <(cast code $APP --rpc-url "$RPC" | tr -d '\n') <(forge inspect App deployedBytecode | tr -d '\n')
+cast call $APP "owner()(address)" --rpc-url "$RPC"                          # must be $OWNER
+cast call $APP "version()(string)" --rpc-url "$RPC"                         # must be $APP_VERSION
+cast call $APP "locked()(bool)" --rpc-url "$RPC"                            # must be false
+```
+
+- **Already deployed by us — record and skip.** The factory's runtime is the artifact's outside its
+  three `immutableReferences` spans (the comparison step 2 writes out), `implementation()` reads back
+  a contract whose address equals the one every other chain reports, and `App`'s runtime is `cmp`-equal
+  to `forge inspect App deployedBytecode` with `owner()`, `version()` and `locked()` the § 0 values.
+  Then CREATE2 did what it is for and this chain simply already carries *this* deploy. **Fill this
+  chain's `record:` rows from the chain** — the transaction hashes and `gasUsed` with `cast receipt`,
+  which needs the hashes: take them from the committed broadcast logs if the run that sent them got
+  that far, otherwise from the explorer by address, and say in the handoff which. Commit that record,
+  then go to step 4. This is the branch a killed or resumed run lands in, and m04-t03 is the precedent:
+  Sepolia's steps 2 and 3 were already on chain when the recovery began, and recording them was the
+  whole of the work left.
+- **Stop — collision.** Anything else: a length that disagrees, a `cmp` that differs, a read that
+  reverts or answers a value that is not § 0's, or code at the predicted `DISTRO` before step 6. The
+  address is taken by bytes that are not ours, and this is #22's one-way door. Message the architect
+  with the address, the code length and the readings; do not send, do not "try the other salt", and do
+  not improvise a new salt — a new address is decision 37's mining run and a ruling, not a step here.
+
+**The check is only as good as the chain it ran against.** `../shared/.envrc.local` exports
+`ETH_RPC_URL`, which `cast` takes as its default, and in m04-t03 it pointed at **mainnet** — where a
+historical `cast code` at these addresses returns a cheerful `0x` that looks exactly like a passing
+gate. Hence every command here carries an explicit `--rpc-url "$RPC"`, and if there is any doubt,
+`cast chain-id --rpc-url "$RPC"` must print `$CHAIN_ID` before the readings are believed.
 
 ### Step 2 — the factory
 
