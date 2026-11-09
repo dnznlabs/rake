@@ -556,6 +556,21 @@ Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
     are M05's to rule, so they live in `RUNBOOK.md` § Executed on testnets (m04-t03), not in § 0.
     Rejected: the anvil rehearsal's placeholders under DNZN's name on two public chains; skipping
     step 6 on testnets (criterion 1 and state-collection#74 both need code at the address).
+    **Amended 2026-11-08 (m04-t03 review).** Three things pinned before the first testnet `create`:
+    (i) **these are the values a testnet step 6 uses** — not placeholders and not M05's; `RUNBOOK.md`
+    § Step 6's "M05 values are M05's to fill" refers to the mainnet table, and the m04-t03 handoff's
+    § For Denizen carries exactly these. (ii) **Step 6 runs before step 4 on the testnets** (Denizen,
+    22:17 CST: he travels with the Creator key and one of three Ops signers, so the document upload
+    waits for his return while the `create` does not); step 6 touches only the factory and the clone,
+    so the order is sound and no runbook deviation is needed. (iii) **Precondition, unverifiable from
+    any agent host:** `RUNBOOK.md` § Step 6 requires the Creator key "backed up to the handbook's
+    standard for an owner key before step 6 runs anywhere" — #23 closed the *documentation* of that
+    requirement, not the backup — so Denizen confirms the backup in writing before the first send, and
+    the handoff records the confirmation beside the step-6 rows. The address is
+    `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` on both chains (`predict(DNZN_SALT)` on the live
+    factory, `cast code` `0x` on both, 2026-11-08); the anvil rehearsal's `0x633e24C2…6148` differs by
+    design — a different salt prefix and a different implementation address fold into the clone's
+    init code — and is not a discrepancy.
 
 43. **`create` accepts a zero `owner_`; a born-renounced distribution is documented, not refused.**
     M04-D3, ruled by Denizen on 2026-11-08 on [#173](https://github.com/dnznlabs/rake/issues/173)
