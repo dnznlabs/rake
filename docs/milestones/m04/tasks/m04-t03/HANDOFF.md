@@ -16,7 +16,9 @@ work was recovering a deploy that already existed — the transactions are recor
 and the pre-send gates that run never wrote down are named as unrecorded rather than reconstructed
 (§ Gates). **Step 4 was not run on either chain**, and the reason turned out to be permanent rather
 than a scheduling hold: `App.owner()` is the Ops vault, so the engineer's key cannot upload at all.
-That is open as decision M04-D4 ([#178](https://github.com/dnznlabs/rake/issues/178)) and it takes
+That was ruled 2026-11-08 as decision 44 (M04-D4,
+[#178](https://github.com/dnznlabs/rake/issues/178)) — step 4 becomes a permanent Ops vault action,
+on the unanimous 3-of-3 route — and it takes
 criterion 3's chain half with it.
 
 ## Acceptance criteria
@@ -29,7 +31,7 @@ every command. Tree figures are the branch head through `devbox run --` (forge `
 |:---|:-------|:---------|
 | **1.** M04 criterion 1, both chains: factory runtime equals the artifact outside the immutable spans; `implementation()` is `0x31dd18b4…`; `App` runtime equals `forge inspect App deployedBytecode`; `App.owner()` the Ops vault; `locked()` false; every hash and `gasUsed` from `cast receipt` | **pass** | Factory **1,320 bytes** on both (`cast code \| tr -d '\n' \| wc -c` → 2,642), **60** bytes differ from the artifact, **none outside** the three declared `immutableReferences` spans at offsets **275, 865, 940**, each holding `0x…31dd18b4c3ece3f123c285bdb045331364cfa4b0`. `implementation()` → `0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0` on both. `App` **7,155 bytes** (14,312 chars) and `cmp` against `forge inspect App deployedBytecode` **equal, byte for byte**, on both. `owner()` → `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`; `version()` → `"v0.1"`; `locked()` → `false`. Hashes and `gasUsed` all from `cast receipt`, never `run-latest.json` (#140) — and § Discoveries 3 says why that mattered |
 | **2.** M04 criterion 2: six `forge verify-contract … --watch` exit 0, six `#code` URLs naming the contracts | **pass** | Six of six exited 0; six `getsourcecode` reads name `DistributionFactory`, `Distribution`, `App`. URLs in `RUNBOOK.md` § Explorer verification. All six report solc `v0.8.34+commit.80d5c536`, optimizer on. Caveat recorded there: on Sepolia the factory and implementation answered `is already verified` rather than being submitted by this run — almost certainly the killed run did it between 09:51 and 09:56, which `getsourcecode` carries no timestamp to confirm. `App` was submitted and verified here; all three on Base Sepolia were |
-| **3.** M04 criterion 3's chain half: `make chain-doc` hashes equal `sha256sum` of that chain's bundle, byte counts both ways | **not met — blocked** | Step 4 was not run on either chain. `App.owner()` is the Ops vault and `Chunks.s.sol` broadcasts from the engineer's key into `onlyOwner` setters, so it reverts `Unauthorized` on any public chain. Open as **M04-D4** ([#178](https://github.com/dnznlabs/rake/issues/178)); default and recommendation is option 1, step 4 becomes an Ops vault action permanently. No bundle hashes exist for either chain and none are claimed. § Deviations 1 |
+| **3.** M04 criterion 3's chain half: `make chain-doc` hashes equal `sha256sum` of that chain's bundle, byte counts both ways | **not met — blocked** | Step 4 was not run on either chain. `App.owner()` is the Ops vault and `Chunks.s.sol` broadcasts from the engineer's key into `onlyOwner` setters, so it reverts `Unauthorized` on any public chain. **Ruled 2026-11-08 as decision 44** (M04-D4, [#178](https://github.com/dnznlabs/rake/issues/178)): option 1, step 4 becomes an Ops vault action permanently, on the unanimous 3-of-3 `forward()` route. No bundle hashes exist for either chain and none are claimed. § Deviations 1 |
 | **4.** M04 criterion 7: `RUNBOOK.md` § Executed on testnets with both § Record tables filled; § Deviations empty or each item names its runbook hunk or its reason | **pass** | `git diff --stat origin/main -- RUNBOOK.md` → `1 file changed, 268 insertions(+), 5 deletions(-)`. § Executed on testnets carries both § Record tables, the runtime comparison, the base-fee table, the explorer table and § Step 6 is Denizen's. Step 4's rows are blank **on purpose**, labelled `not run — blocked on M04-D4 (#178)`. Each deviation below names its hunk |
 | **5a.** `git diff --stat origin/main -- src/ test/*.t.sol .gas-snapshot` empty | **pass, measured against the branch base** | Against the base `308ca75`: **empty**. Against the current `origin/main` tip it is *not* empty — but that is main moving, not me: main gained `7681d35` (#177) after this branch started, which added `test/ColdStipend.t.sol` and 66 lines of `test/Distribution.t.sol`. This branch touches `RUNBOOK.md`, the real-network broadcast logs and this handoff, and nothing else: `git diff --stat 308ca75 HEAD` lists exactly those. § Deviations 3 |
 | **5b.** `forge test` 91 | **pass on intent, the figure is stale** | **102 passed**, 0 failed. The plan's 91 predates m04-t07, which added 11 tests (`76eeba1`, `e35ae13`, `3c4cdf3` — 7 `invariant_` + 4 `testFuzz`) and merged into main *before* this branch's base; `MILESTONE.md:187` records the same 91 → 102. All three commits are ancestors of `308ca75`. § Discoveries 1 |
@@ -131,17 +133,25 @@ which proves the deployed bytes are the right bytes, retroactively.
 
 1. **Step 4 was not run on either chain, and cannot be as the plan writes it.** The plan (steps 3
    and 5) has the engineer run `make dapp-nodev` then `Chunks.s.sol` with `$SIGNER`. `App` takes its
-   owner in the constructor (`src/App.sol:51` — #178 cites `:50`, off by one) and `addChunk`,
+   owner in the constructor (`src/App.sol:50-51`) and `addChunk`,
    `setChunks`, `addWidgetChunk`, `setWidgetChunks`, `setVersion` and `lock` are all `onlyOwner`
    (`:111`, `:120`, `:133`, `:142`, `:153`, `:168`); `RUNBOOK.md` § 0 sets `OWNER` to the Ops vault on
    every chain and `APP_SALT` was mined against init code containing it, so the owner is part of
    `App`'s address. The engineer's key is not an Ops owner, so step 4 reverts `Unauthorized` on any
-   public chain. Found by this task, confirmed from the chain by the architect, and open as decision
-   **M04-D4** ([#178](https://github.com/dnznlabs/rake/issues/178)), whose default is that step 4
-   becomes an Ops vault action permanently: five calls to `App` per chain, either **unanimous**
-   through `TimelockExecutor.forward()` for immediate execution, or at **threshold** through
-   `Multisig.execute()` then `executeQueued()` after `delay()`, depending on whether the third owner
-   key is reachable. #178 carries the mechanics and is the authority on them. My earlier wording here
+   public chain. Found by this task, confirmed from the chain by the architect, and **ruled 2026-11-08
+   as decision 44** (M04-D4, [#178](https://github.com/dnznlabs/rake/issues/178)): option 1, step 4
+   becomes an Ops vault action permanently, for every future upload including `lock()` and M05's
+   mirror. Five calls to `App` per chain — `addChunk` ×2, `addWidgetChunk` ×1, then `setChunks` and
+   `setWidgetChunks`. **The route is the unanimous one**: all three Ops owners are Denizen's and he
+   confirmed he can reach all three, so the five go through `TimelockExecutor.forward()` at 3-of-3 and
+   execute immediately, with no queue and no hour. The **threshold** route stays documented as the
+   fallback — `Multisig.execute()` queues at `eta = block.timestamp + delay()` and `executeQueued()`
+   runs it after, with all five queued back-to-back sharing one hour rather than costing five. On
+   either route the three `add*Chunk` calls must have *executed* before the two setters, because
+   `setChunks` and `setWidgetChunks` validate their pointers through `_requireChunk`, which reverts
+   `CodelessChunk(ptr)` on a pointer with no code (`src/App.sol:125`, `:147`, `:198-207`) — so
+   queueing a setter beside the adds it depends on reverts at execution, not at queue time. #178 and
+   decision 44 are the authority on the mechanics. My earlier wording here
    and in the runbook said "sign 2-of-3, execute through `TimelockExecutor.forward()`", which is
    **wrong and would have reverted**: `forward()` requires `ownerCount()` signatures for everything
    except `cancelQueued`, plus `forwardEnabled` (`src/mods/TimelockExecutor.sol:41-47` of
@@ -153,10 +163,13 @@ which proves the deployed bytes are the right bytes, retroactively.
    bundle change, which merged at 21:46 CST as #177 (`7681d35`); that hold is gone and this one
    replaced it. Runbook hunk: § Executed on testnets, the step-4 paragraph, and six `record:` rows
    now reading `not run — blocked on M04-D4 (#178)`.
-   **#178 also asks the engineer to prepare the five calldatas, pointers, hashes, estimates and a
+   **#178 also asked the engineer to prepare the five calldatas, pointers, hashes, estimates and a
    draft runbook section "regardless of ruling". That is not in this PR**, because `TASK.md` on
    `main` does not contain it — it is unrevised since 2026-11-07, before the finding — and an issue
-   filed at review is not task authority. It is a clean next task and wants a revised `TASK.md`.
+   filed at review is not task authority. **That is now settled the same way**: the architect took
+   option (b) at review and the step-4 preparation has been scoped as **its own task** after decision
+   44, recorded beside M04-D4. So nothing in this PR prepares calldata, and § Step 4 via the Ops vault
+   is that task's to write, against the ruling rather than against a recommendation.
 
 2. **Sepolia's steps 2 and 3 were recorded, not executed, by this task.** The plan has one run per
    chain doing steps 1–5 in order. On Sepolia a run at commit `4b6f95b` sent both transactions at
@@ -301,22 +314,16 @@ deliberately blank until then.
 
 ## Open questions
 
-**M04-D4 — who executes step 4** is already open and in the five-line form on
-[#178](https://github.com/dnznlabs/rake/issues/178), filed by the architect; nothing is added here.
-Its default if unruled is option 1 (step 4 becomes a permanent Ops vault action), and it blocks this
-task's criterion 3, t04's criterion 3, and every later upload including `lock()`.
+**None outstanding.** Both questions this handoff opened were ruled while it was in review, and are
+recorded here as closed rather than deleted:
 
-One question that is this handoff's own, in the same form:
-
-- **Question:** does the step-4 preparation work #178 asks of the engineer belong to m04-t03, or to a
-  new task?
-- **Options:** (a) a revised `TASK.md` for m04-t03 adding it, and this PR grows — costs a second
-  review round on an already-landed deploy, and keeps criterion 3 open inside this task; (b) a new
-  task scoped after M04-D4 is ruled — costs a day of latency, and the preparation is then written
-  against the ruling instead of against the recommendation, so none of it is thrown away if Denizen
-  picks another option.
-- **Recommendation:** (b). The five calldatas, the three predicted pointers and the estimates all
-  depend on which option is ruled; preparing them against option 1 before it is ruled is work that
-  option 2 or 3 would discard. Steps 1–3 and 5 are done and reviewable now.
-- **Default and what it blocks:** (b). Blocks nothing that is not already blocked by M04-D4 itself.
-- **Where the ruling is recorded:** `ROADMAP.md` § Decisions, beside M04-D4.
+1. **M04-D4 — who executes step 4.** **Ruled 2026-11-08 as decision 44**: option 1, step 4 becomes a
+   permanent Ops vault action, on the unanimous 3-of-3 `forward()` route, Denizen having confirmed he
+   can reach all three Ops signers ([#178](https://github.com/dnznlabs/rake/issues/178) comments). The
+   threshold route stays documented as the fallback. The ruling's `ROADMAP.md` § Decisions entry lands
+   in a later PR, not this one. It still blocks this task's criterion 3 and t04's criterion 3 until the
+   upload runs.
+2. **Whether the step-4 preparation belongs to m04-t03 or a new task.** **Ruled (b)** by the architect
+   at first-pass review: a new task, scoped after decision 44 and recorded beside M04-D4, so the
+   preparation is written against the ruling rather than a recommendation. Nothing in this PR prepares
+   calldata.

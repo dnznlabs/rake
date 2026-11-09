@@ -689,22 +689,38 @@ written cannot be run by the engineer at all.** `App` takes its owner in the con
 the Ops vault on every chain, and `APP_SALT` was mined against init code containing it, so the owner
 is part of `App`'s address. `scripts/forge/Chunks.s.sol` broadcasts from the engineer's key, which is
 not an Ops owner, so it reverts `Unauthorized` on any public chain. The only step-4 rehearsal used
-the anvil account as both signer and owner, which is why no rehearsal caught it. This is open as
-decision **M04-D4** ([#178](https://github.com/dnznlabs/rake/issues/178)); its default and
-recommendation is that step 4 becomes an Ops vault action, permanently, for every future upload
-including `lock()`: **five calls to `App` per chain, either unanimous through
-`TimelockExecutor.forward()` for immediate execution, or at threshold through `Multisig.execute()`
-followed by `executeQueued()` after `delay()`** — which of the two applies depends on whether the
-third owner key is reachable. **`forward()` is not a threshold route**: it requires
+the anvil account as both signer and owner, which is why no rehearsal caught it. This was **ruled on
+2026-11-08 as decision 44** (M04-D4, [#178](https://github.com/dnznlabs/rake/issues/178)): step 4
+becomes an Ops vault action, permanently, for every future upload including `lock()` and M05's mirror.
+It is **five calls to `App` per chain** — `addChunk` ×2, `addWidgetChunk` ×1, then `setChunks` and
+`setWidgetChunks`.
+
+**The route is the unanimous one.** All three Ops owners are Denizen's and he has confirmed he can
+reach all three, so the five calls go through `TimelockExecutor.forward()` at **3-of-3**, executing
+**immediately** — no queue and no wait. Write it this way first; it is the plan, not a fallback.
+
+**The threshold route stays documented for the day a signer is unreachable.** With only `threshold()`
+signatures the call goes through `Multisig.execute()`, which **queues** it at
+`eta = block.timestamp + delay()`, and `executeQueued()` runs it after. All five can be queued
+back-to-back so they share one hour rather than costing five. **Order matters on this route and on
+the other**: both `addChunk` calls and the `addWidgetChunk` call must have *executed* before
+`setChunks` and `setWidgetChunks`, because the setters validate their pointers through
+`_requireChunk`, which reverts `CodelessChunk(ptr)` on a pointer with no code
+(`src/App.sol:125`, `:147`, `:198-207`). Queueing a setter beside the adds it depends on is a
+revert at execution, not at queue time.
+
+**`forward()` is not a threshold route**, which is the trap worth stating once: it requires
 `ownerCount()` signatures for everything except `cancelQueued`, plus `forwardEnabled`
-(`src/mods/TimelockExecutor.sol:41-47` of src-company/multisig at `62eb905`), so a threshold
-signature set sent through it reverts `InvalidSig` on the `sigs.length == required * 65` check.
+(`src/mods/TimelockExecutor.sol:41-47` of src-company/multisig, identical at `62eb905` and
+`cbfa345`), so a threshold signature set sent through it reverts `InvalidSig` on the
+`sigs.length == required * 65` check.
 Read on both chains 2026-11-08: Ops `ownerCount()` **3**, `threshold()` **2**, `delay()` **3600**,
 `forwardEnabled(Ops)` **true**. #178 carries the mechanics and is the authority on them. So there are
 **no bundle hashes in this section**, step 4's `record:` rows are blank on purpose, and criterion 3's
-chain half is not claimed here. **This section gains § Step 4 via the Ops vault when M04-D4 is
-ruled**; writing it is not this task's, whose `TASK.md` still describes step 4 as a `forge script` the
-engineer runs. Step 6 has not run on either chain:
+chain half is not claimed here. **§ Step 4 via the Ops vault is written by the step-4 preparation
+task**, which was scoped after decision 44 and is recorded beside M04-D4; it is not this task's,
+whose `TASK.md` still describes step 4 as a `forge script` the engineer runs. Step 6 has not run on
+either chain:
 `cast code` at `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` prints `0x` on both and the Creator key
 is at **nonce 0** on both.
 
