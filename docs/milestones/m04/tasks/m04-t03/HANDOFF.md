@@ -70,13 +70,13 @@ worth, and the column says which — nothing here is reconstructed or inferred:
 
 | reading | value | what it is worth |
 |:--|:--|:--|
-| `cast code` at `FACTORY` | `0x` | **LOST as a reading** — but the emptiness is *proven* another way, below |
-| `cast code` at `APP` | `0x` | **LOST as a reading** — same proof applies |
-| `cast code` at predicted `DISTRO` | `0x` | not needed historically: step 6 has not run, so this is a **current** read, `0x` and nonce 0 today |
-| `cast code` at the proxy `0x4e59b448…` | **69 bytes**, keccak equal to § 1's | corroborating control, not a gate (see below) |
-| signer balance at send time | **0.104894517730887580 ETH**, nonce 1 | **RECOVERABLE** — reconciles against the receipts to the wei |
-| Creator key balance | **0.010000000000000000 ETH**, nonce 0 | recoverable; also reads the same today |
-| base fee | **19 wei** | recoverable; agrees with the receipts' `effectiveGasPrice` |
+| `cast code` at `FACTORY` | `0x` | **lost — no positive control.** The emptiness is *proven* separately, by the chain, below |
+| `cast code` at `APP` | `0x` | **lost — no positive control.** Same proof applies |
+| `cast code` at predicted `DISTRO` | `0x` | **lost — no positive control** as a historical read. Not needed: step 6 has not run, so the live read stands on its own (`0x`, Creator nonce 0, today) |
+| `cast code` at the proxy `0x4e59b448…` | **69 bytes**, keccak equal to § 1's | **lost as a gate reading.** Quoted only as the *control* for the rows above, which is the one job a known-non-zero value can do here |
+| signer balance at send time | **0.104894517730887580 ETH**, nonce 1 | **archive read, reconciled** — against `gasUsed × effectiveGasPrice`, to the wei |
+| Creator key balance | **0.010000000000000000 ETH**, nonce 0 | archive read; also reads the same live today |
+| base fee | **19 wei** | archive read, reconciled — agrees with the receipts' `effectiveGasPrice` |
 | `ETHERSCAN_API_KEY` | present, `…9SKI` | current, verified this session |
 
 **Why the code read is lost and the balance is not.** The distinction is whether anything independent
@@ -84,13 +84,24 @@ can fail when the value is wrong.
 
 The `0x` code read **cannot self-validate, because its pass value is the empty answer** — a wrong
 answer is indistinguishable from a right one. That is the `ETH_RPC_URL` hazard of § Discoveries 2 one
-level deeper. The endpoint is also only intermittently useful: it is load-balanced across archive and
-pruned backends, and at the factory's pre-send block **12,091,536**, eight paired attempts returned
-the proxy's known 69 bytes 6 times and `historical state … is not available` twice. In fairness to
-the endpoint, the refusal is always **explicit** — a pruned backend errors rather than fabricating,
-and was never once observed returning a false `0x`; `cast codesize` at the deploy block 12,091,537
-returned the true **1320** on 4 of 5 attempts. But a lone unpaired `0x` still carries no weight, and
-each `cast` call may reach a different backend, so even the pairing above is not a guarantee.
+level deeper, and on its own it is enough to call the read lost.
+
+The endpoint's behaviour makes it worse, and here the architect's reading and mine disagree in a way
+worth recording rather than smoothing over. `ethereum-sepolia-rpc.publicnode.com` is load-balanced
+across archive and pruned backends, so **the positive control is itself non-deterministic**: the
+architect found `cast codesize` at the deploy block 12,091,537 — where 1,320 bytes certainly exist —
+*erroring*, while five attempts here returned the true **1320** four times. Both observations are
+real. At the factory's pre-send block 12,091,536, eight paired attempts returned the proxy's known 69
+bytes 6 times and `historical state … is not available` twice. The refusal is always **explicit** — a
+pruned backend errors rather than fabricating, and was never once observed returning a false `0x`.
+
+That last point is the only place I would soften the mechanism: the failure mode here is a visible
+error, not a silent default. **It does not rescue the reading, and the verdict is still lost.** A
+control you cannot reproduce on demand is not a control; each `cast` call may reach a different
+backend, so a `0x` carries no attached evidence about which backend answered it; and the architect's
+conclusion — an endpoint that cannot reliably return a known non-zero value at N+1 cannot vouch for
+an empty value at N — holds under either observation. Non-determinism argues for `lost` at least as
+strongly as a flat failure would.
 
 The balance **does** have an independent control: `gasUsed × effectiveGasPrice` over the three
 transactions is **31,130,197,802,436 wei** (2,833,494 × 1,000,020 + 16,789,404 × 1,000,019 +
@@ -127,8 +138,18 @@ which proves the deployed bytes are the right bytes, retroactively.
    `App`'s address. The engineer's key is not an Ops owner, so step 4 reverts `Unauthorized` on any
    public chain. Found by this task, confirmed from the chain by the architect, and open as decision
    **M04-D4** ([#178](https://github.com/dnznlabs/rake/issues/178)), whose default is that step 4
-   becomes an Ops vault action permanently — prepare, sign 2-of-3, execute through
-   `TimelockExecutor.forward()`. It was *first* held for a different and smaller reason, #172's
+   becomes an Ops vault action permanently: five calls to `App` per chain, either **unanimous**
+   through `TimelockExecutor.forward()` for immediate execution, or at **threshold** through
+   `Multisig.execute()` then `executeQueued()` after `delay()`, depending on whether the third owner
+   key is reachable. #178 carries the mechanics and is the authority on them. My earlier wording here
+   and in the runbook said "sign 2-of-3, execute through `TimelockExecutor.forward()`", which is
+   **wrong and would have reverted**: `forward()` requires `ownerCount()` signatures for everything
+   except `cancelQueued`, plus `forwardEnabled` (`src/mods/TimelockExecutor.sol:41-47` of
+   src-company/multisig, identical at `62eb905` and `cbfa345`), so a threshold set fails the
+   `sigs.length == required * 65` check with `InvalidSig`. Read on both chains 2026-11-08: Ops
+   `ownerCount()` **3**, `threshold()` **2**, `delay()` **3600**, `forwardEnabled(Ops)` **true** —
+   so `forward()` needs 3-of-3 and the 2-of-3 route carries the full hour's wait. Corrected at the
+   architect's first pass. It was *first* held for a different and smaller reason, #172's
    bundle change, which merged at 21:46 CST as #177 (`7681d35`); that hold is gone and this one
    replaced it. Runbook hunk: § Executed on testnets, the step-4 paragraph, and six `record:` rows
    now reading `not run — blocked on M04-D4 (#178)`.

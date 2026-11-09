@@ -691,8 +691,16 @@ is part of `App`'s address. `scripts/forge/Chunks.s.sol` broadcasts from the eng
 not an Ops owner, so it reverts `Unauthorized` on any public chain. The only step-4 rehearsal used
 the anvil account as both signer and owner, which is why no rehearsal caught it. This is open as
 decision **M04-D4** ([#178](https://github.com/dnznlabs/rake/issues/178)); its default and
-recommendation is that step 4 becomes an Ops vault action — prepare, sign 2-of-3, execute through
-`TimelockExecutor.forward()` — permanently, for every future upload including `lock()`. So there are
+recommendation is that step 4 becomes an Ops vault action, permanently, for every future upload
+including `lock()`: **five calls to `App` per chain, either unanimous through
+`TimelockExecutor.forward()` for immediate execution, or at threshold through `Multisig.execute()`
+followed by `executeQueued()` after `delay()`** — which of the two applies depends on whether the
+third owner key is reachable. **`forward()` is not a threshold route**: it requires
+`ownerCount()` signatures for everything except `cancelQueued`, plus `forwardEnabled`
+(`src/mods/TimelockExecutor.sol:41-47` of src-company/multisig at `62eb905`), so a threshold
+signature set sent through it reverts `InvalidSig` on the `sigs.length == required * 65` check.
+Read on both chains 2026-11-08: Ops `ownerCount()` **3**, `threshold()` **2**, `delay()` **3600**,
+`forwardEnabled(Ops)` **true**. #178 carries the mechanics and is the authority on them. So there are
 **no bundle hashes in this section**, step 4's `record:` rows are blank on purpose, and criterion 3's
 chain half is not claimed here. **This section gains § Step 4 via the Ops vault when M04-D4 is
 ruled**; writing it is not this task's, whose `TASK.md` still describes step 4 as a `forge script` the
@@ -713,12 +721,16 @@ when it is wrong**:
 
 - **The pre-send `0x` code read cannot be recovered as a reading.** Its pass value is the *empty*
   answer, so it cannot self-validate: a wrong answer looks exactly like a right one. This is the
-  `ETH_RPC_URL` hazard of § 1g again, one level deeper. A historical `cast code` on
-  `ethereum-sepolia-rpc.publicnode.com` is also only intermittently served — it is load-balanced
-  across archive and pruned backends, and at the factory's pre-send block 8 paired attempts gave the
-  proxy's known 69 bytes 6 times and `historical state … is not available` twice. The refusal is at
-  least explicit (a pruned backend errors; it was never once observed returning a false `0x`), but a
-  lone unpaired `0x` still proves nothing on its own.
+  `ETH_RPC_URL` hazard of § 1g again, one level deeper, and on its own it settles the matter. A
+  historical `cast code` on `ethereum-sepolia-rpc.publicnode.com` is also only intermittently served,
+  being load-balanced across archive and pruned backends — which makes **the positive control
+  non-deterministic too**: `cast codesize` at the deploy block, where 1,320 bytes certainly exist,
+  errored for the architect and returned the true 1320 on 4 of 5 attempts here. At the pre-send block,
+  8 paired attempts gave the proxy's known 69 bytes 6 times and `historical state … is not available`
+  twice. The refusal is always explicit — a pruned backend errors rather than fabricating, and was
+  never observed returning a false `0x` — but a control you cannot reproduce on demand is not a
+  control, and a lone `0x` carries no evidence about which backend answered it. **Treat such a reading
+  as lost.**
 - **The emptiness those reads were checking for is nevertheless proven, by the chain rather than by
   an RPC.** Both CREATE2s **succeeded**, at exactly the addresses step 1f predicted, with runtime
   matching the artifacts — and a CREATE2 onto an address that already holds code **fails**.
