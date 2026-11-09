@@ -680,10 +680,23 @@ immediately after `dapp-nodev` and `chunks`, and why this document says `dapp-no
 
 Steps 1, 2, 3 and 5 were executed on **Sepolia (11155111)** and then **Base Sepolia (84532)** in
 m04-t03, with Elanik's agent wallet `0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d`. **Step 4 was not
-run on either chain** — the architect blocked it until [#172](https://github.com/dnznlabs/rake/issues/172)
-merges, because #172 changes the dapp bundle and an upload before it becomes a re-upload on both
-chains. So there are **no bundle hashes in this section**, step 4's `record:` rows are blank on
-purpose, and criterion 3's chain half is not claimed here. Step 6 has not run on either chain:
+run on either chain**, for two reasons in succession. First the architect held it until
+[#172](https://github.com/dnznlabs/rake/issues/172) merged, because #172 changes the dapp bundle and
+an upload before it would become a re-upload on both chains; that merged on 2026-11-08 at 21:46 CST
+([#177](https://github.com/dnznlabs/rake/pull/177), `7681d35`). Then the harder reason: **step 4 as
+written cannot be run by the engineer at all.** `App` takes its owner in the constructor and
+`addChunk`, `setChunks`, `addWidgetChunk` and `setWidgetChunks` are `onlyOwner`; § 0 sets `OWNER` to
+the Ops vault on every chain, and `APP_SALT` was mined against init code containing it, so the owner
+is part of `App`'s address. `scripts/forge/Chunks.s.sol` broadcasts from the engineer's key, which is
+not an Ops owner, so it reverts `Unauthorized` on any public chain. The only step-4 rehearsal used
+the anvil account as both signer and owner, which is why no rehearsal caught it. This is open as
+decision **M04-D4** ([#178](https://github.com/dnznlabs/rake/issues/178)); its default and
+recommendation is that step 4 becomes an Ops vault action — prepare, sign 2-of-3, execute through
+`TimelockExecutor.forward()` — permanently, for every future upload including `lock()`. So there are
+**no bundle hashes in this section**, step 4's `record:` rows are blank on purpose, and criterion 3's
+chain half is not claimed here. **This section gains § Step 4 via the Ops vault when M04-D4 is
+ruled**; writing it is not this task's, whose `TASK.md` still describes step 4 as a `forge script` the
+engineer runs. Step 6 has not run on either chain:
 `cast code` at `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` prints `0x` on both and the Creator key
 is at **nonce 0** on both.
 
@@ -692,9 +705,14 @@ is at **nonce 0** on both.
 does not repeat them, and they were not re-sent — the addresses are taken and a second CREATE2 would
 be the collision of #22. `git diff --stat 4b6f95b 308ca75 -- src/` prints nothing, so the bytecode on
 Sepolia is `main`'s, and step 1f recomputed both init-code hashes and both addresses at `308ca75` to
-prove it retroactively. Four readings of that chain's step 0 and step 1g are **gone** — they were
-pre-send by construction and this RPC is pruned; they are named as unrecoverable in m04-t03's handoff
-rather than reconstructed here.
+prove it retroactively. **That chain's step 0 and step 1g gates were never recorded**, and no reading
+taken now can replace them: a `cast code` run after the send is not the check that was meant to
+precede it, whatever it returns. The *state* those gates would have asserted is separately readable —
+`ethereum-sepolia-rpc.publicnode.com` answers historical calls at the pre-send block from an archive
+backend on roughly three attempts in five, the rest refusing with `historical state … is not
+available`, and every success agrees — so m04-t03's handoff § Gates records those archive readings
+**as archive readings, labelled as not the gates**, and names the gates themselves as unrecorded.
+Nothing there is reconstructed or inferred.
 
 The toolchain for every row: forge `1.7.1-dev`, node `v24.12.0`, solc `0.8.34`, `make slither`
 exit **0** with 0 results. `forge test` **102 passed**, `node --test` **90 passed**,
@@ -715,9 +733,9 @@ exit **0** with 0 results. `forge test` **102 passed**, `node --test` **90 passe
 | | 2 | `implementation()` | `IMPL`: `0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0` (9,271 bytes) |
 | 2 | 3 | `App` CREATE2 | tx: `0x6f8d868f381a5b0cda7fd6c397fc63d581ab08593e57d6eb1a318cd13275ad14` · gas: **11,506,694** · addr: `0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE` · block 12,091,543 |
 | | 3 | `owner()` · `version()` · `locked()` | `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790` · `v0.1` · false |
-| 3 | 4 | `addChunk` ×N · `setChunks` | **not run — blocked on #172** |
-| 4 | 4 | widget chunks | **not run — blocked on #172** |
-| | 4 | `inflated sha256` · `widget sha256` · byte counts | **not run — blocked on #172** |
+| 3 | 4 | `addChunk` ×N · `setChunks` | **not run — blocked on M04-D4 (#178)** |
+| 4 | 4 | widget chunks | **not run — blocked on M04-D4 (#178)** |
+| | 4 | `inflated sha256` · `widget sha256` · byte counts | **not run — blocked on M04-D4 (#178)** |
 | 5 | 5 | explorer: factory / implementation / App | all three `Pass`, names `DistributionFactory` / `Distribution` / `App`; URLs below |
 | 6 | 6 | DNZN `create` | not run — Denizen's; `predict($DNZN_SALT)` = `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`, `cast code` `0x` |
 | | 6 | `owner()` on `DISTRO` | not run |
@@ -741,9 +759,9 @@ a collision and the successful send that followed it is not a resend.
 | | 2 | `implementation()` | `IMPL`: `0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0` (9,271 bytes) |
 | 2 | 3 | `App` CREATE2 | tx: `0xce1bdad0a3907098277ce40fe412aac1ac56b4bde62879349e4fc67886130e52` · gas: **1,655,660** · addr: `0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE` · block 56,161,508 |
 | | 3 | `owner()` · `version()` · `locked()` | `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790` · `v0.1` · false |
-| 3 | 4 | `addChunk` ×N · `setChunks` | **not run — blocked on #172** |
-| 4 | 4 | widget chunks | **not run — blocked on #172** |
-| | 4 | `inflated sha256` · `widget sha256` · byte counts | **not run — blocked on #172** |
+| 3 | 4 | `addChunk` ×N · `setChunks` | **not run — blocked on M04-D4 (#178)** |
+| 4 | 4 | widget chunks | **not run — blocked on M04-D4 (#178)** |
+| | 4 | `inflated sha256` · `widget sha256` · byte counts | **not run — blocked on M04-D4 (#178)** |
 | 5 | 5 | explorer: factory / implementation / App | all three `Pass - Verified` this run; URLs below |
 | 6 | 6 | DNZN `create` | not run — Denizen's; `predict($DNZN_SALT)` = `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`, `cast code` `0x` |
 | | 6 | `owner()` on `DISTRO` | not run |
