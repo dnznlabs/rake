@@ -19,7 +19,7 @@ Everything through `devbox run --`.
 
 0. **Gates.** Vault state as the mechanism needs it, read and recorded per chain:
    `cast call $OWNER "ownerCount()(uint256)"` → 3, `"threshold()(uint256)"` → 2, `"nonce()(uint32)"`
-   (**2** on both chains at scoping, 2026-11-08 22:40 CST; the digests below depend on it),
+   (**2** on both chains at scoping, 2026-11-08 22:40 CST; the digests below depend on it — **this is the vault's internal `nonce()`, not its account nonce**: `cast nonce $OWNER` reads 1 on both chains and would make every digest wrong by one; `cast nonce` is right only for `App` in step 2, where the SSTORE2 pointers really are account-nonce CREATEs),
    `cast call 0x00000000a72A30AdBf38e14d36BCE2610ec3973F "forwardEnabled(address)(bool)" $OWNER` → `true`;
    `cast nonce $APP` → **1** (the pointers below depend on it; anything else is a stop — someone has
    written to `App`); `cast call $APP "html()(string)"` → `""` and `"locked()(bool)"` → `false`.
