@@ -447,6 +447,11 @@ contract DistributionTest is Test {
         assertEq(d.reserved(address(tk)), 0, "so nothing is escrowed");
     }
 
+    /// @notice The **warm** case only, and deliberately so: the clone is deployed inside the test, so
+    /// the implementation it delegates into is already warm when the ETH arrives and 1,662 gas of the
+    /// 2,300 stipend is enough. Cold it needs 4,162 and this same `transfer` reverts — #174, measured
+    /// and pinned from both sides in `test/ColdStipend.t.sol`, which creates its clone in `setUp` to
+    /// get a genuinely cold first touch. Read the two together; neither says what the other does.
     function test_receiveUnderStipend() public {
         // Arrange
         Distribution d = _deploy(0, _defaultTable());
@@ -623,6 +628,67 @@ contract DistributionTest is Test {
         // Assert
         assertEq(d.queued(hash), eta, "the hash stays queued for a retry");
         assertEq(d.pendingCount(), 1);
+    }
+
+    /// @notice `create` accepts a zero `owner_` rather than refusing it, so a clone can be born in
+    /// exactly the state `test_renounceFreezes` reaches by proposing it: ownerless from its first
+    /// block. `propose` is the only thing that closes — `distribute`, `release` and `claim` stay
+    /// permissionless forever — and the zero owner is on the `Created` log, which is where a deployer
+    /// who left the field empty reads it. Nobody can impose the state on a stranger, because the
+    /// salt's top 20 bytes must be `msg.sender`.
+    /// @dev The counterpart of `test_renounceFreezes`: that one renounces a clone, this one is handed
+    /// a clone already there, and the two must agree on what the state permits. Ruled on #173, which
+    /// asked whether `create` should refuse it instead.
+    function test_createAcceptsZeroOwnerBornRenounced() public {
+        // Arrange — one row that refuses its push and one that burns past the cap, so `release` and
+        // `claim` each have an escrow to move; `A` is paid by the split itself.
+        RevertingReceiver bad = new RevertingReceiver();
+        HungryReceiver hungry = new HungryReceiver();
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](3);
+        t[0] = _row(address(bad), 4000);
+        t[1] = _row(address(hungry), 4000);
+        t[2] = _row(A, 2000);
+        bytes32 salt = _salt();
+        address predicted = factory.predict(salt);
+
+        // Act — the create itself, with the zero owner in the log.
+        vm.expectEmit(true, true, false, true, address(factory));
+        emit DistributionFactory.Created(predicted, address(0));
+        Distribution d = Distribution(payable(factory.create(address(0), 0, "desc", _asc(t), salt)));
+
+        // Assert — created, at the predicted address, born in the state `owner()` calls renounced.
+        assertEq(address(d), predicted, "the clone is where predict said");
+        assertEq(d.owner(), address(0), "and it is born renounced");
+        assertEq(d.pendingOwner(), address(0), "with no transfer pending to undo it");
+
+        // Assert — `propose` is closed, to the creator and to a stranger alike.
+        vm.expectRevert(Distribution.NotOwner.selector);
+        d.propose(abi.encodeCall(Distribution.setDescription, ("mine")));
+        vm.prank(STRANGER);
+        vm.expectRevert(Distribution.NotOwner.selector);
+        d.propose(abi.encodeCall(Distribution.setDescription, ("mine")));
+
+        // Act — the permissionless half, from a stranger so no owner is implied anywhere in it.
+        _send(d, 10_000);
+        vm.prank(STRANGER);
+        d.distribute(address(0));
+
+        // Assert
+        assertEq(A.balance, 2000, "the plain row is paid");
+        assertEq(d.escrowed(address(0), address(bad)), 4000, "and the two failing rows are escrowed");
+        assertEq(d.escrowed(address(0), address(hungry)), 4000);
+
+        // Act — `release` retries one, the beneficiary `claim`s the other, neither needing an owner.
+        bad.setAccepting(true);
+        vm.prank(STRANGER);
+        d.release(address(0), address(bad));
+        hungry.take(d, address(0), C);
+
+        // Assert
+        assertEq(address(bad).balance, 4000, "the retried row is paid");
+        assertEq(C.balance, 4000, "and the beneficiary's own escrow went where it said");
+        assertEq(d.reserved(address(0)), 0);
+        assertEq(address(d).balance, 0, "with nothing left behind and no owner at any point");
     }
 
     function test_renounceFreezes() public {

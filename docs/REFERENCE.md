@@ -35,7 +35,7 @@ round. `self` means the function is reachable only as a queued action, the contr
 | `queued(bytes32 hash)` | view | the eta of a queued action; zero means no such action |
 | `escrowed(address token, address account)` | view | what is held for one account after a push failed |
 | `reserved(address token)` | view | everything escrowed for a token, which the next split leaves alone |
-| `owner()` | view | who may propose and cancel; the zero address means renounced |
+| `owner()` | view | who may propose and cancel; the zero address means renounced, and `create` accepts a zero `owner` rather than refusing it, so a clone can be born renounced — permanently configured from its first block, still distributing, releasing and claiming, with nothing left to propose |
 | `pendingOwner()` | view | who has been named as the next owner; the zero address means no transfer is pending |
 | `delay()` | view | seconds every proposal waits before it can be applied |
 | `nonce()` | view | proposals made so far; it is hashed into every queued action |
