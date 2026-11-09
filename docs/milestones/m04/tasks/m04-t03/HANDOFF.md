@@ -1,6 +1,6 @@
 # m04-t03 — handoff
 
-PR: #<n> · Branch: `m04/t03-testnets` · 2026-11-08
+PR: [#179](https://github.com/dnznlabs/rake/pull/179) · Branch: `m04/t03-testnets` · 2026-11-08
 
 Steps 1, 2, 3 and 5 of `RUNBOOK.md` ran on **Sepolia (11155111)** and then **Base Sepolia (84532)**.
 The factory is at `0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B` on both, its implementation at
@@ -37,7 +37,7 @@ every command. Tree figures are the branch head through `devbox run --` (forge `
 | **5d.** `git status --porcelain` empty | **pass** | empty at the branch head |
 | **6a.** § For Denizen — step 6 holds both chains' complete commands and the anvil rehearsal of the table string | **pass** | § For Denizen — step 6 below, one complete command per chain, decision 42's values, nothing to fill in. Rehearsed on anvil 2026-11-08 with the exact table string: it parsed, `DISTRO` landed on its `predict` address `0x633e24C2320B8d86A2A36aB659b64850e5aC6148` (the rehearsal's own salt, not the real `DNZN_SALT`), `owner()` the Ops vault, `delay()` 86400 |
 | **6b.** § Gates holds the balances, base fees and `cast code` readings, dated | **pass, with Sepolia's pre-send gates declared unrecorded** | § Gates below. Base Sepolia's six gates were performed before its first send and are recorded. **Sepolia's were not recorded** — the killed run never wrote them down, and § Gates says so plainly instead of substituting a later reading |
-| **7.** PR closes this task's issue | **pending the PR** | Task issue is [#175](https://github.com/dnznlabs/rake/issues/175), open. The PR body carries `Closes #175`. **`Closes #127` is deliberately absent** — the plan's default is to leave it open; the per-chain alias re-readings it asks for are recorded (both chains `none`, 2026-11-08), so the architect can close it at review if the M05 rows do not keep it open |
+| **7.** PR closes this task's issue | **pass** | [#179](https://github.com/dnznlabs/rake/pull/179), reviewer `lakkoss` requested. `gh pr view 179 --json closingIssuesReferences` → `[175]` and nothing else, checked twice. **No closing keyword for #127 is present**, which is the plan's default; the per-chain alias re-readings it asks for are recorded (both chains `none`, 2026-11-08), so the architect can rule on it at review if the M05 rows do not keep it open |
 
 `forge snapshot --check` exit 0; `forge build --force` 41 files with **0** `warning[` and **0**
 `Warning (`; `make slither` exit **0** with 0 results. `forge build --force` was re-run before every
@@ -150,7 +150,7 @@ and the two § 0 addresses — which proves the deployed bytes are the right byt
 2. **Verification was attempted on all six contracts even though two reported `is already verified`.**
    Re-running is idempotent and the alternative — assuming the killed run had done it — is an
    assumption. The two that answered `already verified` are recorded as such rather than claimed.
-3. **`Closes #127` is left off the PR.** The plan's default. Both chains' alias re-readings are
+3. **#127 is left open, with no closing keyword in the PR.** The plan's default. Both chains' alias re-readings are
    recorded (`none`), so the architect has what the condition asks for and can rule at review.
 
 ## Discoveries
