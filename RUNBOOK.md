@@ -707,12 +707,36 @@ be the collision of #22. `git diff --stat 4b6f95b 308ca75 -- src/` prints nothin
 Sepolia is `main`'s, and step 1f recomputed both init-code hashes and both addresses at `308ca75` to
 prove it retroactively. **That chain's step 0 and step 1g gates were never recorded**, and no reading
 taken now can replace them: a `cast code` run after the send is not the check that was meant to
-precede it, whatever it returns. The *state* those gates would have asserted is separately readable —
-`ethereum-sepolia-rpc.publicnode.com` answers historical calls at the pre-send block from an archive
-backend on roughly three attempts in five, the rest refusing with `historical state … is not
-available`, and every success agrees — so m04-t03's handoff § Gates records those archive readings
-**as archive readings, labelled as not the gates**, and names the gates themselves as unrecorded.
-Nothing there is reconstructed or inferred.
+precede it, whatever it returns. What each missing reading is worth afterwards differs, though, and
+the difference is the lesson — **a historical read is only evidence if something independent can fail
+when it is wrong**:
+
+- **The pre-send `0x` code read cannot be recovered as a reading.** Its pass value is the *empty*
+  answer, so it cannot self-validate: a wrong answer looks exactly like a right one. This is the
+  `ETH_RPC_URL` hazard of § 1g again, one level deeper. A historical `cast code` on
+  `ethereum-sepolia-rpc.publicnode.com` is also only intermittently served — it is load-balanced
+  across archive and pruned backends, and at the factory's pre-send block 8 paired attempts gave the
+  proxy's known 69 bytes 6 times and `historical state … is not available` twice. The refusal is at
+  least explicit (a pruned backend errors; it was never once observed returning a false `0x`), but a
+  lone unpaired `0x` still proves nothing on its own.
+- **The emptiness those reads were checking for is nevertheless proven, by the chain rather than by
+  an RPC.** Both CREATE2s **succeeded**, at exactly the addresses step 1f predicted, with runtime
+  matching the artifacts — and a CREATE2 onto an address that already holds code **fails**.
+  Demonstrated on anvil at m04-t03: the same salt and init code through the proxy gave status 1 and a
+  10-byte runtime onto an empty address, then `execution reverted` at gas estimation when repeated
+  onto the now-occupied one. So the success of the deploy *is* the collision check, after the fact and
+  unconditionally. This is why **#22's one-way door closes only on a successful create** — and it is
+  stronger evidence than the gate would have produced.
+- **The balance at send time is recoverable**, because it has an independent control the code read
+  lacks: it reconciles against the receipts. `gasUsed × effectiveGasPrice` over the three
+  transactions is **31,130,197,802,436 wei**, and the pre-send balance minus that equals the recorded
+  post-send balance **to the wei**. A wrong figure from a pruned backend would not balance. That
+  control earned its keep at m04-t03: it caught an assumed `effectiveGasPrice` of 1,000,019 on the
+  failed attempt where the receipt says 1,000,020, an error of exactly one wei per gas.
+
+What is left genuinely and permanently lost is **whether those checks were run at all** — which is
+the thing the § 2 preamble's commit rule exists to stop losing, and no reading of any quality can
+supply it. m04-t03's handoff § Gates records the split above.
 
 The toolchain for every row: forge `1.7.1-dev`, node `v24.12.0`, solc `0.8.34`, `make slither`
 exit **0** with 0 results. `forge test` **102 passed**, `node --test` **90 passed**,

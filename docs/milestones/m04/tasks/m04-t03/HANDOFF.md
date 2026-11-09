@@ -36,7 +36,7 @@ every command. Tree figures are the branch head through `devbox run --` (forge `
 | **5c.** `node --test` 90 | **pass** | 90 passed |
 | **5d.** `git status --porcelain` empty | **pass** | empty at the branch head |
 | **6a.** § For Denizen — step 6 holds both chains' complete commands and the anvil rehearsal of the table string | **pass** | § For Denizen — step 6 below, one complete command per chain, decision 42's values, nothing to fill in. Rehearsed on anvil 2026-11-08 with the exact table string: it parsed, `DISTRO` landed on its `predict` address `0x633e24C2320B8d86A2A36aB659b64850e5aC6148` (the rehearsal's own salt, not the real `DNZN_SALT`), `owner()` the Ops vault, `delay()` 86400 |
-| **6b.** § Gates holds the balances, base fees and `cast code` readings, dated | **pass, with Sepolia's pre-send gates declared unrecorded** | § Gates below. Base Sepolia's six gates were performed before its first send and are recorded. **Sepolia's were not recorded** — the killed run never wrote them down, and § Gates says so plainly instead of substituting a later reading |
+| **6b.** § Gates holds the balances, base fees and `cast code` readings, dated | **pass, with Sepolia's pre-send gates declared unrecorded** | § Gates below. Base Sepolia's six gates were performed before its first send and are recorded. **Sepolia's were not recorded** — the killed run never wrote them down, and § Gates says so plainly instead of substituting a later reading. It splits the missing readings by what each is actually worth: the `0x` code read is **lost as a reading** (its pass value cannot self-validate), though the emptiness it checked for is *proven* by the successful CREATE2 itself; the send-time balance is **recoverable**, because it reconciles against the receipts to the wei |
 | **7.** PR closes this task's issue | **pass** | [#179](https://github.com/dnznlabs/rake/pull/179), reviewer `lakkoss` requested. `gh pr view 179 --json closingIssuesReferences` → `[175]` and nothing else, checked twice. **No closing keyword for #127 is present**, which is the plan's default; the per-chain alias re-readings it asks for are recorded (both chains `none`, 2026-11-08), so the architect can rule on it at review if the M05 rows do not keep it open |
 
 `forge snapshot --check` exit 0; `forge build --force` 41 files with **0** `warning[` and **0**
@@ -61,39 +61,60 @@ again from archive state at block **56,161,389**, the block before step 2:
 | t01 (#164), t02 (#163), t06 (#170, **no `fix` row**) | all merged |
 
 **Sepolia (11155111) — the gates were not recorded.** Steps 2 and 3 were sent at 09:44–09:51 CST on
-2026-11-08 by a run that was killed before writing anything down. The readings below are **archive
-reads of block 12,091,512** — the block before the first step-2 attempt — taken on 2026-11-08 at
-22:05 CST, and they are *not* the gates. A `cast code` run after the send is not the check that was
-meant to precede it, whatever it returns, so nothing here should be read as evidence that step 0 or
-step 1g was performed on this chain. What they establish is the state those gates would have
-asserted:
+2026-11-08 by a run that was killed before writing anything down. Nothing below is a gate: a reading
+taken after the send is not the check that was meant to precede it, whatever it returns, so none of it
+is evidence that step 0 or step 1g was performed on this chain. The readings are archive reads at the
+pre-send blocks **12,091,512** (before the first, failed step-2 attempt) and **12,091,536** (before
+the successful one), taken 2026-11-08 between 22:05 and 22:40 CST. They differ in how much they are
+worth, and the column says which — nothing here is reconstructed or inferred:
 
-| reading at block 12,091,512 | value | status |
+| reading | value | what it is worth |
 |:--|:--|:--|
-| `cast code` at `FACTORY` | `0x` | archive read, **not a gate** |
-| `cast code` at `APP` | `0x` | archive read, **not a gate** |
-| `cast code` at predicted `DISTRO` | `0x` | archive read, **not a gate** |
-| `cast code` at the proxy `0x4e59b448…` | 141 chars = **69 bytes**, keccak equal to § 1's | archive read, **not a gate** |
-| signer balance | **0.104894517730887580 ETH**, nonce 1 | archive read, **not a gate** |
-| Creator key balance | **0.010000000000000000 ETH**, nonce 0 | archive read, **not a gate** |
-| base fee | **19 wei** | archive read, **not a gate** |
+| `cast code` at `FACTORY` | `0x` | **LOST as a reading** — but the emptiness is *proven* another way, below |
+| `cast code` at `APP` | `0x` | **LOST as a reading** — same proof applies |
+| `cast code` at predicted `DISTRO` | `0x` | not needed historically: step 6 has not run, so this is a **current** read, `0x` and nonce 0 today |
+| `cast code` at the proxy `0x4e59b448…` | **69 bytes**, keccak equal to § 1's | corroborating control, not a gate (see below) |
+| signer balance at send time | **0.104894517730887580 ETH**, nonce 1 | **RECOVERABLE** — reconciles against the receipts to the wei |
+| Creator key balance | **0.010000000000000000 ETH**, nonce 0 | recoverable; also reads the same today |
+| base fee | **19 wei** | recoverable; agrees with the receipts' `effectiveGasPrice` |
 | `ETHERSCAN_API_KEY` | present, `…9SKI` | current, verified this session |
 
-Two notes on how much weight those archive reads can carry. First, they are **intermittent**:
-`ethereum-sepolia-rpc.publicnode.com` is load-balanced across archive and pruned backends, and the
-same historical call succeeds on about three attempts in five, the rest refusing with `historical
-state … is not available` (measured: 5 attempts on the signer balance → 3 OK / 2 refused; 5 on `code`
-at `APP` → 3 OK / 2 refused). Every success agreed exactly, which is why they are quotable at all.
-Second, the balance **reconciles independently**: 104,894,517,730,887,580 wei pre-send minus the
-recorded post-send 104,863,387,533,085,144 wei is **31,130,197,802,436 wei**, which equals the
-0.000031130197802436 ETH the base-fee table records as spent. Both endpoints of that delta agree
-without either being derived from the other.
+**Why the code read is lost and the balance is not.** The distinction is whether anything independent
+can fail when the value is wrong.
 
-The one thing that is genuinely gone and cannot be recovered in any form is **whether those checks
-were run at all**. The recovery had to establish the facts another way: `git diff --stat 4b6f95b
-308ca75 -- src/` prints nothing, so the bytecode on Sepolia is `main`'s, and step 1f recomputed both
-init-code hashes and both addresses at `308ca75` and got `0xd8a1208a…bc31cc5`, `0x0b2894a3…f7b9864a`
-and the two § 0 addresses — which proves the deployed bytes are the right bytes, retroactively.
+The `0x` code read **cannot self-validate, because its pass value is the empty answer** — a wrong
+answer is indistinguishable from a right one. That is the `ETH_RPC_URL` hazard of § Discoveries 2 one
+level deeper. The endpoint is also only intermittently useful: it is load-balanced across archive and
+pruned backends, and at the factory's pre-send block **12,091,536**, eight paired attempts returned
+the proxy's known 69 bytes 6 times and `historical state … is not available` twice. In fairness to
+the endpoint, the refusal is always **explicit** — a pruned backend errors rather than fabricating,
+and was never once observed returning a false `0x`; `cast codesize` at the deploy block 12,091,537
+returned the true **1320** on 4 of 5 attempts. But a lone unpaired `0x` still carries no weight, and
+each `cast` call may reach a different backend, so even the pairing above is not a guarantee.
+
+The balance **does** have an independent control: `gasUsed × effectiveGasPrice` over the three
+transactions is **31,130,197,802,436 wei** (2,833,494 × 1,000,020 + 16,789,404 × 1,000,019 +
+11,506,694 × 1,000,020), and 104,894,517,730,887,580 − 31,130,197,802,436 = **104,863,387,533,085,144**,
+the recorded post-send balance, exactly. A wrong figure from a pruned backend would not balance. That
+control proved itself here by catching an error of mine: I first assumed the failed attempt's
+`effectiveGasPrice` was 1,000,019 and the sum missed by precisely 2,833,494 wei — one wei per gas —
+until the receipt was read and gave 1,000,020.
+
+**The emptiness of `FACTORY` and `APP` before the send is proven regardless, by the chain rather than
+by any RPC.** Both CREATE2s succeeded, at exactly the addresses step 1f predicted, with runtime
+matching the artifacts — and a CREATE2 onto an address that already holds code **fails**. Verified on
+anvil rather than cited: the same salt and init code through the proxy gave status 1 and a 10-byte
+runtime onto an empty address, then `Failed to estimate gas: … execution reverted` when repeated onto
+the now-occupied one. So the success of the deploy *is* the collision check, after the fact and
+unconditionally — which is the reason #22's one-way door closes only on a *successful* create. It is
+stronger evidence than the gate would have produced, and it needs no archive node.
+
+What is left genuinely and permanently gone is **whether those checks were run at all** — the thing
+the runbook's new commit rule exists to stop losing, and which no reading of any quality can supply.
+The recovery established the rest another way: `git diff --stat 4b6f95b 308ca75 -- src/` prints
+nothing, so the bytecode on Sepolia is `main`'s, and step 1f recomputed both init-code hashes and both
+addresses at `308ca75` and got `0xd8a1208a…bc31cc5`, `0x0b2894a3…f7b9864a` and the two § 0 addresses —
+which proves the deployed bytes are the right bytes, retroactively.
 
 ## Deviations from the plan
 
@@ -185,7 +206,15 @@ and the two § 0 addresses — which proves the deployed bytes are the right byt
    explanation of the failed first attempt, whose gas limit was 3,287,625 — forge's figure, byte for
    byte. Step 1e now says to compare the node's estimate with the dry run's and raise the limit
    explicitly when the node's is larger.
-6. **A step-2 or step-3 transaction that fails for gas is safe but not free.** `0xf80fc26d…` created
+6. **A historical reading is only evidence if something independent can fail when it is wrong** —
+   and a gate whose pass value is "empty" can never meet that bar. This is the general form of the
+   `ETH_RPC_URL` trap in 2 above, and it is what separates the two missing Sepolia gates: the `0x`
+   code read has no control and is lost as a reading, while the send-time balance reconciles against
+   `gasUsed × effectiveGasPrice` to the wei and so is recoverable. Worth stating because the useful
+   move when a reading is lost is not to hunt for a better RPC — it is to look for a different fact
+   that the chain's own rules make unconditional. Here that fact was the **success** of the CREATE2,
+   which cannot happen onto occupied code. § Gates carries the full argument and the anvil proof.
+7. **A step-2 or step-3 transaction that fails for gas is safe but not free.** `0xf80fc26d…` created
    nothing and is not a collision — #22's one-way door closes only on a *successful* create — but it
    burned 2,833,494 gas. Recorded in step 1e as the reason to read the estimate rather than discover it.
 
