@@ -5,3 +5,9 @@ title = "project"
 useDefault = true
 
 # Project rules and allowlists below.
+
+# `lib/` is pinned third-party code (forge-std, solady) carrying its own test fixtures: a JWT in
+# solady's JSONParserLib test and four WebAuthn vectors. They are not ours to rotate and not secrets.
+[allowlist]
+description = "Vendored submodules"
+paths = ['''^lib/''']

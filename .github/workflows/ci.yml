@@ -30,11 +30,21 @@ jobs:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
 
-      # betterleaks lives in .pre-commit-config.yaml as a local hook; this makes the scan independent
-      # of whether a clone ever ran `pre-commit install`. Whole tree, not the diff: the net may have
-      # been absent for earlier commits.
+      # betterleaks lives in .pre-commit-config.yaml; running it here makes the scan independent of
+      # whether a clone ever ran `pre-commit install`. The `betterleaks-tree` alias is the one that
+      # scans the tree: the commit-time hook is `betterleaks git --staged`, which under --all-files
+      # has no staged diff and reports "scanned ~0 bytes" while passing whatever the tree holds.
+      # Whole tree, not the diff, because the net may have been absent for earlier commits.
       - name: secrets — betterleaks over the whole tree
-        run: devbox run -- pre-commit run betterleaks --all-files
+        shell: bash
+        env:
+          LEAK_LOG: ${{ runner.temp }}/leaks.log
+        run: |
+          set -eo pipefail
+          devbox run -- pre-commit run betterleaks-tree --hook-stage manual --all-files --verbose 2>&1 | tee "$LEAK_LOG"
+          # A scan of nothing passes. Assert it read the tree before trusting the result.
+          grep -qE 'scanned ~[1-9][0-9]{5,} bytes' "$LEAK_LOG" \
+            || { echo "secrets: the scan read almost nothing — the gate is not measuring the tree"; exit 1; }
 
       - name: cache solc
         uses: actions/cache@v5
