@@ -6,8 +6,16 @@ useDefault = true
 
 # Project rules and allowlists below.
 
-# `lib/` is pinned third-party code (forge-std, solady) carrying its own test fixtures: a JWT in
-# solady's JSONParserLib test and four WebAuthn vectors. They are not ours to rotate and not secrets.
+# Vendored submodules only. `lib/` is third-party code pinned to a tag — forge-std and solady here —
+# and it ships test fixtures that a tree scan reports as findings: in this repo five, all in solady at
+# `acd959a`, measured 2026-11-11 with the block below removed and again with it in place (5 → 0):
+# a JWT in `test/JSONParserLib.t.sol:791` and four WebAuthn vectors in `test/WebAuthn.t.sol` at 49,
+# 50, 70 and 71. None is ours, none is a live credential, and the pins are not ours to edit.
+#
+# Scoped to a path deliberately. Do not widen this to a rule id, a regex over content, or a bare
+# `stopwords` entry: any of those would silence the same shape of finding everywhere, `src/` and
+# `test/` included, which is the half the scan exists for. A new vendored directory gets its own
+# `paths` entry here with its own findings named, and nothing else gets one.
 [allowlist]
-description = "Vendored submodules"
+description = "Vendored submodules: pinned third-party code with test fixtures of its own"
 paths = ['''^lib/''']
