@@ -12,11 +12,15 @@ A distribution is one address with a published table of beneficiaries. Anything 
 
 | STATUS | VERSION | AUDIT |
 |:---|:---|:---|
-| `pre-mvp` | unreleased | two-model agent review, 2026-11-06 ([SECURITY.md](SECURITY.md)) |
+| `pre-mvp` | `0.1alpha` | two-model agent review, 2026-11-06 ([SECURITY.md](SECURITY.md)) |
 
 This is pre-release software. The contracts are unaudited and deployed only to a local dev chain. Milestones and their status are in the [roadmap](docs/ROADMAP.md).
 
-No warranty.
+**Alpha software is alpha, act accordingly.** See [Disclaimer](#disclaimer).
+
+### Disclaimer
+
+Alpha software. The contracts are reviewed by the shared two-model method and Slither ([SECURITY.md](SECURITY.md)), not audited. No warranty. The contracts are immutable: a found bug is not patched, it is a new address. The alpha marks come off 90 days after the mainnet milestone closes with no `bug` issue filed and no accepted security finding ([decision 45](docs/ROADMAP.md#decisions)).
 
 ## Documentation
 

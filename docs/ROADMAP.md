@@ -581,6 +581,29 @@ Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
     pattern the ownership drawer already uses. Rejected (option 2): a one-line zero check in `init`
     or `create`, M03 reopened for a state the contract already supports on another path.
 
+Ruled by Denizen on 2026-11-11 over Telegram, for rake, runner and drop alike; the org convention is
+the handbook README § Conventions. Numbered 45 because 44 is taken by
+[#180](https://github.com/dnznlabs/rake/pull/180), open when this was written.
+
+45. **Alpha marker: `0.1alpha`, the tag line, the Disclaimer; removed by a test.** "Alpha" is a
+    marker, not a version in the contract: `App.version` is a constructor argument that feeds `App`'s
+    CREATE2 address (`DeployApp.s.sol`'s own comment) and stays `v0.1`. The marker lives in three
+    places: the page's version string — `0.1alpha`, and one source: `build.mjs:55` hardcodes
+    `VERSION: 'v0.1'` beside `App.version`'s `v0.1` today, and the task collapses the page string onto
+    `App.version` plus the marker — the README's Release Info table, and a Disclaimer section first in
+    `#/docs`, saying: alpha; reviewed by the two-model method and Slither (`SECURITY.md`), not
+    audited; no warranty; and that the contracts are immutable, so a found bug is not patched, it is
+    a new address. The tag line "alpha software is alpha, act accordingly." sits in the dapp header
+    and on the landing, every view, linking to that section; the widget carries the word `alpha` and
+    no link (decision 12's one outbound link is spoken for and M02 criterion 7's 10,240-byte gate
+    stands). An M04 Phase 1 task, `app/` and README only, with the chunks re-uploaded on both
+    testnets before Phase 4's UAT reads the page. Removal: 90 days after M05 closes with no `bug`
+    issue filed and no accepted security finding, the marks come off in one PR — a chunk re-upload
+    and a README edit, no redeploy — one more reason `lock()` is not called at launch (decision 5).
+    Rejected: the marker in `App.version` (a new `App` address, and M03's predicted addresses
+    redone); a README-only disclaimer (the dapp is the surface a user reaches without ever seeing the
+    repo).
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
