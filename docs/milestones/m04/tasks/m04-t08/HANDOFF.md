@@ -60,7 +60,10 @@ signs, every digest is recomputed — one re-run of the command in § For Denize
 
 ## The bundle, per chain
 
-`make dapp-nodev CHAIN_ID=<id>` at head `ad7371d`, through the devbox-pinned toolchain
+`make dapp-nodev CHAIN_ID=<id>` at `ad7371d`, the last commit on this branch that touches anything a
+measurement reads — `git diff --stat ad7371d..HEAD -- tools/ app/ RUNBOOK.md docs/…/calldata/` is
+empty, so every figure in this file is the head's, whatever the head is by the time it is read. That
+check is the citation; a handoff cannot name its own commit. Through the devbox-pinned toolchain
 (forge/cast/anvil `1.7.1-dev`, node `v24.21.0`). `app/` is unchanged since `ed0aa00`
 (`git diff --stat ed0aa00..HEAD -- app/` is empty), so these are m04-t09's figures re-measured, not
 quoted — and they match that handoff's § For t08 byte for byte, on both chains.
