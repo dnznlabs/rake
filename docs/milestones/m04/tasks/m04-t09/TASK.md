@@ -64,9 +64,14 @@ the decision wins and this file is fixed. Never `devbox run -- bash -c` with a p
    a wallet would see no version at all; the chain is instead read by the reviewer (AC 1).
 
    Check: `make dapp-nodev` on a dev chain prints the version it derived; `grep -c "0.1alpha"
-   app/dist/index.html` ≥ 2 (the footer and the docs eyebrow); `grep -c "v0.1" app/build.mjs` → 0;
+   app/dist/index.html` → 1 (the single `__VERSION__` in `CFG`), and `test/docs.test.mjs` pins the two
+   paint sites (footer `#ver`, docs eyebrow) reading `CFG.version`; `grep -c "v0.1" app/build.mjs` → 0;
    a test in `test/inline-scripts.test.mjs` or a new `test/build.test.mjs` pins the derivation on
    three inputs (`v0.1` → `0.1alpha`, `0.1` → `0.1alpha`, `v1` → refused).
+
+   *(Amended 2026-11-12 with AC 1's clause 3, by the architect's review on
+   [#186](https://github.com/dnznlabs/rake/pull/186): this check previously read `≥ 2`, the same
+   defect as the criterion — it counted source text for two runtime paints and could not hold.)*
 
 2. **The Disclaimer, first in `#/docs`.** Add `['disclaimer', 'Disclaimer']` as the **first** entry
    of `SECTIONS` (`index.html:1783`) and `<h2 id="s-disclaimer">Disclaimer</h2>` as the first
