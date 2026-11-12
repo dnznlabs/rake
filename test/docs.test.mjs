@@ -15,6 +15,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = p => readFileSync(join(root, p), 'utf8');
 const REF = read('docs/REFERENCE.md');
 const PAGE = read('app/src/index.html');
+const LAYOUT = read('app/src/layout.html');
 
 /* A markdown table under `heading`: the rows after the `|:--` rule, up to the first blank line, each
    split on its pipes with the backticks taken off. The same shape the acceptance script reads. */
@@ -147,4 +148,35 @@ test('the Limits section names the balance-falling tokens decision 23 excludes',
   );
   // One occurrence on the page, which is what the AC greps for.
   assert.equal((PAGE.match(/rebasing or slashable/g) || []).length, 1);
+});
+
+/* The version string's one source and its two readers, which is what AC 1's third clause reaches for.
+   That clause counted `0.1alpha` in the built bundle and expected two, naming the footer and the docs
+   eyebrow; but the source carries a single `__VERSION__`, substituted once into `CFG`, and the two
+   "sites" are two runtime paints of `CFG.version`. The bundle therefore holds the literal once — it
+   held `v0.1` once on `main` by the same arithmetic — so the grep could never read 2 without a second
+   substitution site, which is the second source of the string step 1 exists to delete. This pins the
+   shape the grep was trying to describe: one substitution, two readers. A paint site that stopped
+   reading `CFG.version` and hardcoded a version would pass that grep and fail here, which is the
+   whole point. */
+test('the page has one version substitution and both paint sites read it', () => {
+  // (a) Exactly one `__VERSION__`, and it is `CFG`'s `version:` rather than some other key.
+  assert.equal((PAGE.match(/__VERSION__/g) || []).length, 1, 'the page does not carry exactly one __VERSION__');
+  assert.ok(PAGE.includes("version: '__VERSION__'"), "__VERSION__ is not CFG's version value");
+
+  // (b) Two readers of it, and no third: the footer line and the docs eyebrow.
+  assert.equal(
+    (PAGE.match(/\$\{CFG\.version\}/g) || []).length,
+    2,
+    'the page does not read CFG.version at exactly the two paint sites',
+  );
+  assert.ok(
+    PAGE.includes("document.getElementById('ver').textContent = `dnzn labs · ${CFG.version}`"),
+    'the footer does not paint CFG.version into #ver',
+  );
+  assert.ok(PAGE.includes('eyebrow(`docs · ${CFG.version}`)'), 'the docs eyebrow does not paint CFG.version');
+
+  /* The footer node the first site writes into lives in the layout, not the page, so a layout edit
+     that dropped the span would leave the paint site reading correctly into nothing. */
+  assert.ok(LAYOUT.includes('id="ver"'), 'the layout carries no #ver span for the footer paint to write into');
 });

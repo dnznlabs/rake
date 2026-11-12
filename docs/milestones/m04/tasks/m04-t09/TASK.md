@@ -153,7 +153,13 @@ the decision wins and this file is fixed. Never `devbox run -- bash -c` with a p
    `DeployApp.s.sol` log exists derives the string from the log's `App` constructor argument, and
    on both testnets `cast call 0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE "version()(string)"
    --rpc-url "$RPC"` prints `v0.1`, so the derived string is `0.1alpha`; `grep -c 0.1alpha
-   app/dist/index.html` ≥ 2. Without a log and without `--set VERSION=`, the build refuses by name.
+   app/dist/index.html` → 1 (the single `__VERSION__` in `CFG`), and `test/docs.test.mjs` pins the two
+   paint sites (footer `#ver`, docs eyebrow) reading `CFG.version`. Without a log and without
+   `--set VERSION=`, the build refuses by name.
+
+   *(Clause 3 amended 2026-11-12 by the architect's review on [#186](https://github.com/dnznlabs/rake/pull/186):
+   it previously read `≥ 2`, which counted source text for two runtime paints and could not hold — see
+   the handoff's § Deviations 1 for the arithmetic.)*
 2. **Disclaimer first.** `SECTIONS[0][0] === 'disclaimer'` and the first `id="s-…"` in
    `app/src/index.html` is `s-disclaimer` (pinned in `test/docs.test.mjs`, fourteen sections);
    the section states the four things decision 45 names, with the `SECURITY.md` link, and the
