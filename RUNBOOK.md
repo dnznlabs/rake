@@ -182,6 +182,24 @@ older than its last network upgrade. A new predeploy is a new reading.
 
 ## 2 — the steps
 
+**Every step's `record:` line is committed before the next transaction is sent.** Not at the end of
+the chain, not at the end of the session: a step that sent something is written down and committed —
+and pushed, if a remote is reachable — before the next `forge script` or `cast send` runs. The
+broadcast logs of a real network are part of that commit; `.gitignore` keeps only the dev-chain ones
+out (`!/broadcast`, then `31337/`, `31338/` and `dry-run/`), precisely so this rule has something to
+commit.
+
+The reason is not tidiness. These transactions are public and permanent and there is no redeploy, so
+the chain is authoritative and the only question a later reader has is *what was already sent*. A run
+that dies between sending and recording leaves that question unanswerable from the repository: the
+addresses are taken, the gas is spent, and nothing on disk says so. Worse, the pre-send readings a
+killed run never wrote down are **not recoverable afterwards** in any form that can stand in for
+them — archive state may answer what the chain held at that block, but a reading taken after the
+send is not the gate that was supposed to precede it, and no honest record can present it as one
+(m04-t03 § Gates names which of its Sepolia gates went unrecorded this way).
+
+So the commit is the step's receipt. If the run is killed, the tree still says what it spent.
+
 ### Step 1 — preflight, nothing broadcast
 
 Nothing is sent in this step. It produces the addresses every later step is checked against.
@@ -213,6 +231,11 @@ nothing, and because `forge lint` after an edit records a file as built without 
 artifact, which silently drops that file's suite from the next `forge test`. Run `forge lint` and
 `forge fmt --check` **after** these, never before.
 
+`make slither` is the same hazard with a louder mechanism: it runs `forge clean` and then
+`forge build --build-info --skip ./test/** ./scripts/forge/** --force`, so it leaves `out/` with no
+test or script artifacts at all. Run it after this step — M04 reads its exit code here — and then
+**`forge build --force` again** before quoting any test count or running any `forge script`.
+
 **1c. The proxy is on this chain, at the canonical address.**
 
 ```sh
@@ -243,11 +266,31 @@ constructor would see the proxy as its sender, and **the deploy stops**.
 ```sh
 cast call --rpc-url "$RPC" --create "$(forge inspect DistributionFactory bytecode)"
 cast estimate --rpc-url "$RPC" --create "$(forge inspect DistributionFactory bytecode)"
+cast estimate --rpc-url "$RPC" --create "$AINIT"   # the App init code of 1f, same reason
 ```
 
 The call must return the factory's **1,320-byte** runtime. The constructor runs
 `new Distribution`, whose bytecode is cancun/PUSH0, so a success here is the EVM check of § 1 —
 executed, not read off a feature list. Record the estimate; it is the gas figure for this chain.
+
+**The estimate is a per-chain reading and `forge script` does not take it.** `forge script` sizes its
+gas limit from its *own* simulation, which runs under `foundry.toml`'s cancun rules and so prices
+creation the same on every chain: it printed `Estimated total gas used for script: 3287625` for
+`Deploy.s.sol` on Sepolia and on Base Sepolia alike, where this `cast estimate` — which asks the node
+— read **16,730,843** and **2,395,343** respectively (2026-11-08). Sepolia charges roughly 7× cancun
+for this init code and Base Sepolia does not, so one simulated figure cannot cover both chains.
+On Sepolia that gap is what made the first step-2 attempt fail: `0xf80fc26d…534b7c29`, gas limit
+3,287,625, **status 0 after burning 2,833,494 gas** (m04-t03). So, before step 2 on any chain:
+
+```sh
+cast block latest --rpc-url "$RPC" --field gasLimit   # the estimate must fit in a block
+```
+
+Compare the node's estimate with the `Estimated total gas used for script` the dry run prints. If the
+node's figure is the larger, the broadcast needs the limit raised explicitly rather than forge's — and
+a step-2 or step-3 transaction that fails for gas is **safe** (it creates nothing and is not a
+collision: #22's one-way door closes only on a *successful* create), but it is not free, so read the
+estimate rather than discovering it. `record:` both estimates and the block gas limit.
 
 **1f. The prediction, offline, before any transaction.**
 
@@ -270,9 +313,46 @@ cast code $FACTORY --rpc-url "$RPC"    # must print 0x
 cast code $APP --rpc-url "$RPC"        # must print 0x
 ```
 
-Code at either address means **this chain already carries the deploy**. Do not resend: a second
-CREATE2 through the proxy is a collision, and a collision consumes every unit of gas forwarded to it
-before anything can revert. The record for this chain is already written — go to step 5.
+`0x` at both: proceed to step 2.
+
+Code at either address means **something is already there**, and there are two cases. Do not resend
+in either one: a second CREATE2 through the proxy is a collision, and a collision consumes every unit
+of gas forwarded to it before anything can revert. Which case it is decides whether this chain is
+done or stopped, so **identify it before doing anything else**:
+
+```sh
+# Is it ours? The runtime must match the artifact, and the contract must answer step 3's reads.
+cast code $FACTORY --rpc-url "$RPC" | tr -d '\n' | wc -c                    # 2,642 chars = 1,320 bytes
+cast call $FACTORY "implementation()(address)" --rpc-url "$RPC"             # must be a contract, see below
+cast code $APP --rpc-url "$RPC" | tr -d '\n' | wc -c                        # must equal the artifact's length
+cmp <(cast code $APP --rpc-url "$RPC" | tr -d '\n') <(forge inspect App deployedBytecode | tr -d '\n')
+cast call $APP "owner()(address)" --rpc-url "$RPC"                          # must be $OWNER
+cast call $APP "version()(string)" --rpc-url "$RPC"                         # must be $APP_VERSION
+cast call $APP "locked()(bool)" --rpc-url "$RPC"                            # must be false
+```
+
+- **Already deployed by us — record and skip.** The factory's runtime is the artifact's outside its
+  three `immutableReferences` spans (the comparison step 2 writes out), `implementation()` reads back
+  a contract whose address equals the one every other chain reports, and `App`'s runtime is `cmp`-equal
+  to `forge inspect App deployedBytecode` with `owner()`, `version()` and `locked()` the § 0 values.
+  Then CREATE2 did what it is for and this chain simply already carries *this* deploy. **Fill this
+  chain's `record:` rows from the chain** — the transaction hashes and `gasUsed` with `cast receipt`,
+  which needs the hashes: take them from the committed broadcast logs if the run that sent them got
+  that far, otherwise from the explorer by address, and say in the handoff which. Commit that record,
+  then go to step 4. This is the branch a killed or resumed run lands in, and m04-t03 is the precedent:
+  Sepolia's steps 2 and 3 were already on chain when the recovery began, and recording them was the
+  whole of the work left.
+- **Stop — collision.** Anything else: a length that disagrees, a `cmp` that differs, a read that
+  reverts or answers a value that is not § 0's, or code at the predicted `DISTRO` before step 6. The
+  address is taken by bytes that are not ours, and this is #22's one-way door. Message the architect
+  with the address, the code length and the readings; do not send, do not "try the other salt", and do
+  not improvise a new salt — a new address is decision 37's mining run and a ruling, not a step here.
+
+**The check is only as good as the chain it ran against.** `../shared/.envrc.local` exports
+`ETH_RPC_URL`, which `cast` takes as its default, and in m04-t03 it pointed at **mainnet** — where a
+historical `cast code` at these addresses returns a cheerful `0x` that looks exactly like a passing
+gate. Hence every command here carries an explicit `--rpc-url "$RPC"`, and if there is any doubt,
+`cast chain-id --rpc-url "$RPC"` must print `$CHAIN_ID` before the readings are believed.
 
 ### Step 2 — the factory
 
@@ -292,7 +372,25 @@ the same on every chain the factory is. It is created inside the constructor, so
 transaction in the broadcast log and `make addresses` cannot list it; the `cast call` above is how it
 is read.
 
-`record:` the transaction hash, `gasUsed`, `FACTORY`, `IMPL`.
+`record:` the transaction hash, `gasUsed`, `FACTORY`, `IMPL`. **The hash and the `gasUsed` come from
+`cast receipt`**, never from `run-latest.json` (#140); the broadcast log is read only by
+`make dapp-nodev`, for the factory's block, where its one-creation shape makes it safe.
+
+**The runtime, compared to the artifact.** The factory carries `IMPL` in three immutables, so it is
+not byte-equal to `forge inspect DistributionFactory deployedBytecode` — it must be equal
+*everywhere else*. `forge inspect` has no `immutableReferences` field in 1.7.1-dev (its `<FIELD>`
+list does not offer one), so the spans are read from the build artifact:
+
+```sh
+cast code $FACTORY --rpc-url "$RPC" | tr -d '\n' > /tmp/fac.onchain
+forge inspect DistributionFactory deployedBytecode | tr -d '\n' > /tmp/fac.artifact
+jq -r '.deployedBytecode.immutableReferences' out/Distribution.sol/DistributionFactory.json
+```
+
+Both files must be the same length; every differing byte must fall inside a declared span, and each
+span must hold `IMPL` left-padded to 32 bytes. `record:` the byte count, the number of differing
+bytes, and that **none** of them is outside the spans. `App` takes no immutables, so its runtime is
+compared with a plain `cmp` against `forge inspect App deployedBytecode` and must be equal outright.
 
 ### Step 3 — `App`
 
@@ -360,7 +458,28 @@ the command's own exit code carries the result rather than a submission receipt.
 `--constructor-args <ARGS>` — so its position among the flags does not matter, which is why the
 `cast abi-encode` is quoted as a single argument. The variadic spelling is `forge create`'s
 (`<ARGS>...`), where the flag must go last because it swallows anything after it; that command is
-not used in this runbook.
+not used in this runbook — the hazard is that command's, not this one's.
+
+**Run the three one at a time.** Etherscan's v2 API caps at 3 calls/sec per key and each
+`verify-contract --watch` spends several, so back to back they fail the third with
+`Response: NOTOK` / `Max calls per sec rate limit reached (3/sec)` — a key-side throttle, not a
+verification failure. Re-running the one that tripped it succeeds. **No `--verifier-url` is needed
+for Base Sepolia**: forge 1.7.1-dev's chain table resolves 84532 to Basescan through the same
+Etherscan v2 key (measured 2026-11-08, all three contracts `Pass - Verified`).
+
+A contract already verified reports `is already verified. Skipping verification.` and **exits 0**,
+which is a pass for criterion 2 but is not a reading of *who* verified it: `getsourcecode` carries no
+verification timestamp, so a re-run cannot distinguish a verification this run submitted from one that
+already existed. Record which of the two each address was.
+
+Then read each one back and record the `#code` URL:
+
+```sh
+curl -s "https://api.etherscan.io/v2/api?chainid=$CHAIN_ID&module=contract&action=getsourcecode\
+&address=$FACTORY&apikey=$ETHERSCAN_API_KEY" | jq -r '.result[0].ContractName'
+```
+
+`record:` the three `#code` URLs and the `ContractName` each returns.
 
 ### Step 6 — DNZN's `create`
 
@@ -556,3 +675,199 @@ note. `make chain-doc` exits 0 and its `inflated sha256` is the one above. Note 
 rebuilds the **dev** bundle last, so `app/dist/index.html` afterwards is the dev build (128,047
 bytes) and will not match the chain's hash — which is exactly why step 4 checks the equality
 immediately after `dapp-nodev` and `chunks`, and why this document says `dapp-nodev`, never `dapp`.
+
+## Executed on testnets
+
+Steps 1, 2, 3 and 5 were executed on **Sepolia (11155111)** and then **Base Sepolia (84532)** in
+m04-t03, with Elanik's agent wallet `0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d`. **Step 4 was not
+run on either chain**, for two reasons in succession. First the architect held it until
+[#172](https://github.com/dnznlabs/rake/issues/172) merged, because #172 changes the dapp bundle and
+an upload before it would become a re-upload on both chains; that merged on 2026-11-08 at 21:46 CST
+([#177](https://github.com/dnznlabs/rake/pull/177), `7681d35`). Then the harder reason: **step 4 as
+written cannot be run by the engineer at all.** `App` takes its owner in the constructor and
+`addChunk`, `setChunks`, `addWidgetChunk` and `setWidgetChunks` are `onlyOwner`; § 0 sets `OWNER` to
+the Ops vault on every chain, and `APP_SALT` was mined against init code containing it, so the owner
+is part of `App`'s address. `scripts/forge/Chunks.s.sol` broadcasts from the engineer's key, which is
+not an Ops owner, so it reverts `Unauthorized` on any public chain. The only step-4 rehearsal used
+the anvil account as both signer and owner, which is why no rehearsal caught it. This was **ruled on
+2026-11-08 as decision 44** (M04-D4, [#178](https://github.com/dnznlabs/rake/issues/178)): step 4
+becomes an Ops vault action, permanently, for every future upload including `lock()` and M05's mirror.
+It is **five calls to `App` per chain** — `addChunk` ×2, `addWidgetChunk` ×1, then `setChunks` and
+`setWidgetChunks`.
+
+**The route is the unanimous one.** All three Ops owners are Denizen's and he has confirmed he can
+reach all three, so the five calls go through `TimelockExecutor.forward()` at **3-of-3**, executing
+**immediately** — no queue and no wait. Write it this way first; it is the plan, not a fallback.
+
+**The threshold route stays documented for the day a signer is unreachable.** With only `threshold()`
+signatures the call goes through `Multisig.execute()`, which **queues** it at
+`eta = block.timestamp + delay()`, and `executeQueued()` runs it after. All five can be queued
+back-to-back so they share one hour rather than costing five. **Order matters on this route and on
+the other**: both `addChunk` calls and the `addWidgetChunk` call must have *executed* before
+`setChunks` and `setWidgetChunks`, because the setters validate their pointers through
+`_requireChunk`, which reverts `CodelessChunk(ptr)` on a pointer with no code
+(`src/App.sol:125`, `:147`, `:198-207`). Queueing a setter beside the adds it depends on is a
+revert at execution, not at queue time.
+
+**`forward()` is not a threshold route**, which is the trap worth stating once: it requires
+`ownerCount()` signatures for everything except `cancelQueued`, plus `forwardEnabled`
+(`src/mods/TimelockExecutor.sol:41-47` of src-company/multisig, identical at `62eb905` and
+`cbfa345`), so a threshold signature set sent through it reverts `InvalidSig` on the
+`sigs.length == required * 65` check.
+Read on both chains 2026-11-08: Ops `ownerCount()` **3**, `threshold()` **2**, `delay()` **3600**,
+`forwardEnabled(Ops)` **true**. #178 carries the mechanics and is the authority on them. So there are
+**no bundle hashes in this section**, step 4's `record:` rows are blank on purpose, and criterion 3's
+chain half is not claimed here. **§ Step 4 via the Ops vault is written by the step-4 preparation
+task**, which was scoped after decision 44 and is recorded beside M04-D4; it is not this task's,
+whose `TASK.md` still describes step 4 as a `forge script` the engineer runs. Step 6 has not run on
+either chain:
+`cast code` at `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` prints `0x` on both and the Creator key
+is at **nonce 0** on both.
+
+**Sepolia's steps 2 and 3 were sent by a run that was killed before it recorded anything**, at
+09:44–09:51 CST on 2026-11-08 from commit `4b6f95b`. This section **records** those transactions; it
+does not repeat them, and they were not re-sent — the addresses are taken and a second CREATE2 would
+be the collision of #22. `git diff --stat 4b6f95b 308ca75 -- src/` prints nothing, so the bytecode on
+Sepolia is `main`'s, and step 1f recomputed both init-code hashes and both addresses at `308ca75` to
+prove it retroactively. **That chain's step 0 and step 1g gates were never recorded**, and no reading
+taken now can replace them: a `cast code` run after the send is not the check that was meant to
+precede it, whatever it returns. What each missing reading is worth afterwards differs, though, and
+the difference is the lesson — **a historical read is only evidence if something independent can fail
+when it is wrong**:
+
+- **The pre-send `0x` code read cannot be recovered as a reading.** Its pass value is the *empty*
+  answer, so it cannot self-validate: a wrong answer looks exactly like a right one. This is the
+  `ETH_RPC_URL` hazard of § 1g again, one level deeper, and on its own it settles the matter. A
+  historical `cast code` on `ethereum-sepolia-rpc.publicnode.com` is also only intermittently served,
+  being load-balanced across archive and pruned backends — which makes **the positive control
+  non-deterministic too**: `cast codesize` at the deploy block, where 1,320 bytes certainly exist,
+  errored for the architect and returned the true 1320 on 4 of 5 attempts here. At the pre-send block,
+  8 paired attempts gave the proxy's known 69 bytes 6 times and `historical state … is not available`
+  twice. The refusal is always explicit — a pruned backend errors rather than fabricating, and was
+  never observed returning a false `0x` — but a control you cannot reproduce on demand is not a
+  control, and a lone `0x` carries no evidence about which backend answered it. **Treat such a reading
+  as lost.**
+- **The emptiness those reads were checking for is nevertheless proven, by the chain rather than by
+  an RPC.** Both CREATE2s **succeeded**, at exactly the addresses step 1f predicted, with runtime
+  matching the artifacts — and a CREATE2 onto an address that already holds code **fails**.
+  Demonstrated on anvil at m04-t03: the same salt and init code through the proxy gave status 1 and a
+  10-byte runtime onto an empty address, then `execution reverted` at gas estimation when repeated
+  onto the now-occupied one. So the success of the deploy *is* the collision check, after the fact and
+  unconditionally. This is why **#22's one-way door closes only on a successful create** — and it is
+  stronger evidence than the gate would have produced.
+- **The balance at send time is recoverable**, because it has an independent control the code read
+  lacks: it reconciles against the receipts. `gasUsed × effectiveGasPrice` over the three
+  transactions is **31,130,197,802,436 wei**, and the pre-send balance minus that equals the recorded
+  post-send balance **to the wei**. A wrong figure from a pruned backend would not balance. That
+  control earned its keep at m04-t03: it caught an assumed `effectiveGasPrice` of 1,000,019 on the
+  failed attempt where the receipt says 1,000,020, an error of exactly one wei per gas.
+
+What is left genuinely and permanently lost is **whether those checks were run at all** — which is
+the thing the § 2 preamble's commit rule exists to stop losing, and no reading of any quality can
+supply it. m04-t03's handoff § Gates records the split above.
+
+The toolchain for every row: forge `1.7.1-dev`, node `v24.12.0`, solc `0.8.34`, `make slither`
+exit **0** with 0 results. `forge test` **102 passed**, `node --test` **90 passed**,
+`forge snapshot --check` exit 0, `forge build --force` 41 files with **0** `warning[` and **0**
+`Warning (`.
+
+### § Record — Sepolia (11155111)
+
+| | Step | What | Value |
+|--:|:--|:--|:--|
+| | 1a | commit · forge · node | `4b6f95b` sent, re-proved at `308ca75` · 1.7.1-dev · v24.12.0 |
+| | 1b | files compiled · tests · snapshot | 41 · 102 forge / 90 node · exit 0 |
+| | 1c | proxy bytes · keccak | 69 (141 chars) · `0x2fa86add…f7e4989`, equal to § 1 |
+| | 1e | factory runtime bytes · `cast estimate` | 1,320 · **16,730,843** (factory), 16,712,775 (App); block gas limit 36,000,000 |
+| | 1f | `FACTORY` · `APP` · init-code hashes | `0x00D18B5b…DBCDe71B` · `0x00A90943…6995BaE` · `0xd8a1208a…bc31cc5` and `0x0b2894a3…f7b9864a`, both equal to § 0 |
+| | § 1 | native-balance token check | **none** — all four aliases `cast code` `0x`; probe balance 104,863,387,533,085,144 wei non-zero; re-read 2026-11-08 |
+| 1 | 2 | `DistributionFactory` CREATE2 | tx: `0xa2d02cfbf870e63d9d236bafff9844a8ba66f4b9137dc5eb3aca524d868350de` · gas: **16,789,404** · addr: `0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B` · block 12,091,537 |
+| | 2 | `implementation()` | `IMPL`: `0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0` (9,271 bytes) |
+| 2 | 3 | `App` CREATE2 | tx: `0x6f8d868f381a5b0cda7fd6c397fc63d581ab08593e57d6eb1a318cd13275ad14` · gas: **11,506,694** · addr: `0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE` · block 12,091,543 |
+| | 3 | `owner()` · `version()` · `locked()` | `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790` · `v0.1` · false |
+| 3 | 4 | `addChunk` ×N · `setChunks` | **not run — blocked on M04-D4 (#178)** |
+| 4 | 4 | widget chunks | **not run — blocked on M04-D4 (#178)** |
+| | 4 | `inflated sha256` · `widget sha256` · byte counts | **not run — blocked on M04-D4 (#178)** |
+| 5 | 5 | explorer: factory / implementation / App | all three `Pass`, names `DistributionFactory` / `Distribution` / `App`; URLs below |
+| 6 | 6 | DNZN `create` | not run — Denizen's; `predict($DNZN_SALT)` = `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`, `cast code` `0x` |
+| | 6 | `owner()` on `DISTRO` | not run |
+
+One extra transaction belongs to this chain's record: **`0xf80fc26d6c99b686147c834eb35f8a19fdb2c39ede03d9aaa7c65e3e534b7c29`,
+nonce 1, gas limit 3,287,625, status 0, 2,833,494 gas burned, block 12,091,513** — a first step-2
+attempt that failed on gas, for the reason step 1e now writes down. It created nothing, so it is not
+a collision and the successful send that followed it is not a resend.
+
+### § Record — Base Sepolia (84532)
+
+| | Step | What | Value |
+|--:|:--|:--|:--|
+| | 1a | commit · forge · node | `e604b29` · 1.7.1-dev · v24.12.0 |
+| | 1b | files compiled · tests · snapshot | 41 · 102 forge / 90 node · exit 0 |
+| | 1c | proxy bytes · keccak | 69 (141 chars) · `0x2fa86add…f7e4989`, equal to § 1 |
+| | 1e | factory runtime bytes · `cast estimate` | 1,320 · **2,395,343** (factory), 1,666,249 (App); block gas limit 120,000,000 |
+| | 1f | `FACTORY` · `APP` · init-code hashes | identical to Sepolia's row — the same-address property, recomputed not copied |
+| | § 1 | native-balance token check | **none** — post-Bedrock OP Stack; all four aliases `0x`; probe balance 10,000,000,000,000,000 wei non-zero; read 2026-11-08 |
+| 1 | 2 | `DistributionFactory` CREATE2 | tx: `0xda05cbb975cf7477dcdac70b654361d8c1f0c94099e0eca708aa460dde2abf52` · gas: **2,380,182** · addr: `0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B` · block 56,161,390 |
+| | 2 | `implementation()` | `IMPL`: `0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0` (9,271 bytes) |
+| 2 | 3 | `App` CREATE2 | tx: `0xce1bdad0a3907098277ce40fe412aac1ac56b4bde62879349e4fc67886130e52` · gas: **1,655,660** · addr: `0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE` · block 56,161,508 |
+| | 3 | `owner()` · `version()` · `locked()` | `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790` · `v0.1` · false |
+| 3 | 4 | `addChunk` ×N · `setChunks` | **not run — blocked on M04-D4 (#178)** |
+| 4 | 4 | widget chunks | **not run — blocked on M04-D4 (#178)** |
+| | 4 | `inflated sha256` · `widget sha256` · byte counts | **not run — blocked on M04-D4 (#178)** |
+| 5 | 5 | explorer: factory / implementation / App | all three `Pass - Verified` this run; URLs below |
+| 6 | 6 | DNZN `create` | not run — Denizen's; `predict($DNZN_SALT)` = `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`, `cast code` `0x` |
+| | 6 | `owner()` on `DISTRO` | not run |
+
+### The runtime, compared to the artifact
+
+Identical on both chains. The factory is **1,320 bytes**, with **60** bytes differing from
+`forge inspect DistributionFactory deployedBytecode` and **none of the 60 outside** the three
+declared `immutableReferences` spans — offsets **275, 865 and 940**, 32 bytes each, every one holding
+`0x…31dd18b4c3ece3f123c285bdb045331364cfa4b0`, the implementation. `App` is **7,155 bytes** and `cmp`
+against `forge inspect App deployedBytecode` reports **equal, byte for byte**, on both chains.
+
+### Base fees and what the chains charged
+
+| | Sepolia | Base Sepolia |
+|:--|:--|:--|
+| base fee at step 2's block | 19 wei | 0.005 gwei (5,000,000 wei) |
+| base fee at step 3's block | 20 wei | 0.005 gwei |
+| `effectiveGasPrice` paid | 1,000,019 / 1,000,020 wei | 6,000,000 wei both |
+| step 2 + step 3 gas | 28,296,098 | 4,035,842 |
+| spent by the signer | 0.000031130197802436 ETH (includes the failed attempt) | 0.000024215052017478 ETH |
+| signer balance after | 0.104863387533085144 ETH, nonce 4 | 0.009975784947982522 ETH, nonce 2 |
+| Creator key balance, read 2026-11-08 | 0.010000000000000000 ETH, nonce 0 | 0.010000000000000000 ETH, nonce 0 |
+
+Both chains sat far under the 20 gwei stop of step 0. **Sepolia charged roughly 7× what cancun does
+for the same init code** (16,789,404 against anvil's 2,262,485, and 11,506,694 against 1,648,295)
+while Base Sepolia charged about 1.05× (2,380,182 and 1,655,660) — the per-chain creation pricing
+step 1e now reads from the node rather than from a simulation. **M05 must re-read it per mainnet; the
+anvil figures in § Rehearsed on anvil are a floor, not a budget.** Base Sepolia's 0.01 ETH was
+exactly at step 0's gate and proved ample at this base fee, as step 0 asks to be said.
+
+### Explorer verification
+
+Six of six `forge verify-contract … --watch` exited 0 and six `getsourcecode` reads name the
+contracts. On Sepolia the factory and the implementation reported `is already verified` rather than
+being submitted by this run — most likely verified by the killed run between 09:51 and 09:56, which
+`getsourcecode` carries no timestamp to confirm; `App` was submitted and verified here. All three on
+Base Sepolia were submitted and verified here.
+
+| contract | Sepolia | Base Sepolia |
+|:--|:--|:--|
+| `DistributionFactory` | [`#code`](https://sepolia.etherscan.io/address/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B#code) | [`#code`](https://sepolia.basescan.org/address/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B#code) |
+| `Distribution` (implementation) | [`#code`](https://sepolia.etherscan.io/address/0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0#code) | [`#code`](https://sepolia.basescan.org/address/0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0#code) |
+| `App` | [`#code`](https://sepolia.etherscan.io/address/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE#code) | [`#code`](https://sepolia.basescan.org/address/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE#code) |
+
+Every one reports solc `v0.8.34+commit.80d5c536`, optimizer on.
+
+### Step 6 is Denizen's
+
+**Step 6 was not run on either chain and is not this document's to run here**: the DNZN Creator key
+is Denizen's and the handbook forbids it on the engineer's host. Its two values are
+**decision 42's** — `DNZN_DELAY=86400` and the three-row `DNZN_TABLE` of Treasury 1,000 bps, Ops
+3,000 and `0x357836fF…902B` 6,000, in `_set`'s ascending address order, with
+`DNZN_DESCRIPTION="DNZN // FEE DISTRIBUTION"`. m04-t03's handoff § For Denizen — step 6 carries the
+complete command per chain, and that exact table string was rehearsed on anvil first: it parsed,
+`DISTRO` landed at the `predict` address `0x633e24C2320B8d86A2A36aB659b64850e5aC6148`,
+`owner()` the Ops vault and `delay()` 86400.
