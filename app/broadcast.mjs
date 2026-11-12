@@ -46,13 +46,18 @@ export function pairable(log) {
   return txs.filter(isCreate).length === 1 && receipts.length === txs.length;
 }
 
-/** Every contract `log` created, as `{ name, address, block }`.
+/** Every contract `log` created, as `{ name, address, block, args }`.
 
    The address comes off the transaction itself, so it is sound whatever the receipts say. The block
    does not — it comes off the hash join — so it is `null` unless the log is `pairable`, and `null`
    again where the matched receipt carries no block. A withheld block is not a silent omission: the
    caller offers no `<NAME>_BLOCK` for it, and a bundle that needs one then refuses by name rather
-   than substituting a figure nothing can stand behind. */
+   than substituting a figure nothing can stand behind.
+
+   `args` are the constructor arguments forge recorded, in order, or `null` where the log names
+   none. They come off the transaction like the address, so they are as sound as it is: the page's
+   version string is read from `App`'s (ROADMAP decision 45, `app/version.mjs`), which is what keeps
+   `v0.1` in one place instead of two. */
 export function creations(log) {
   /* Matched by hash rather than by index: the receipt order is forge's, not this file's contract. */
   const blocks = new Map((log.receipts || []).map(r => [r.transactionHash, r.blockNumber]));
@@ -61,5 +66,6 @@ export function creations(log) {
     name: t.contractName,
     address: t.contractAddress,
     block: trust && blocks.has(t.hash) ? blocks.get(t.hash) : null,
+    args: t.arguments || null,
   }));
 }

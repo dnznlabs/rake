@@ -968,6 +968,7 @@ async function landing() {
   V.innerHTML = `<div class="landing"><div class="hero"><div>
   <h1>Transparent fund distribution.</h1>
   <p class="prose">A distribution is a contract that receives funds and divides them according to a published table of beneficiaries. Changes to that table are subject to a public time lock. Protocol fees are the primary case; the mechanism applies to any allocation a project is accountable for.</p>
+  <a class="alpha" href="#/docs#disclaimer">alpha software is alpha, act accordingly.</a>
   <div class="actions"><a class="btn" href="#/create">Create a distribution</a><a class="btn sec" href="#/docs">Read the docs</a></div>
   </div><div class="side"><div id="featured"></div>
   <div class="sechead"><b>view a distribution</b></div>
@@ -1777,10 +1778,12 @@ async function list() {
 }
 
 /* ---- docs ------------------------------------------------------------------------------------ */
-/* Written for the owner of a distribution (ROADMAP decision 17): what it is, why, how, then the tasks.
+/* Written for the owner of a distribution (ROADMAP decision 17): what the software is while it is
+   alpha (decision 45, and first because a visitor who reads one section reads the first), then what a
+   distribution is, why, how, then the tasks.
    The contract's own surface is docs/REFERENCE.md in the repo, and the last section points there. The
    ids are what the rail and `#/docs#<section>` reach; the owner bar's widget link depends on `widget`. */
-const SECTIONS = [['what', 'Overview'], ['economics', 'Economics'], ['credits', 'Credits'], ['why', 'Purpose'], ['how', 'Mechanism'], ['create', 'Creating a distribution'], ['payin', 'Receiving funds'], ['payout', 'Distributing funds'], ['change', 'Changing a distribution'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['developers', 'For developers']];
+const SECTIONS = [['disclaimer', 'Disclaimer'], ['what', 'Overview'],['economics', 'Economics'], ['credits', 'Credits'], ['why', 'Purpose'], ['how', 'Mechanism'], ['create', 'Creating a distribution'], ['payin', 'Receiving funds'], ['payout', 'Distributing funds'], ['change', 'Changing a distribution'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['developers', 'For developers']];
 /* The two figures, hand-drawn rather than rendered from Mermaid: there is no Mermaid in the bundle and
    none at build time either, so the caption says what shipped. Colour comes through classes on
    currentColor, as the landing's fee path does, so theme.css owns every one. */
@@ -1847,6 +1850,11 @@ function docs() {
   V.innerHTML = `<div class="docgrid"><nav class="rail" aria-label="sections">${eyebrow('sections')}`
   + SECTIONS.map(s => `<a href="#/docs#${s[0]}">${s[1].toLowerCase()}</a>`).join('') + `</nav>
   <article class="doc">${eyebrow(`docs · ${CFG.version}`)}<h1>Rake Distributions</h1>
+
+  <h2 id="s-disclaimer">Disclaimer</h2>
+  <p>Alpha software. The contracts behind this page are reviewed, not audited: they have been read by the shared two-model agent method and by Slither, and both reviews are recorded in <a href="${REPO}/blob/main/SECURITY.md" target="_blank" rel="noopener">SECURITY.md</a>. No third party has audited them, and they are offered with no warranty of any kind.</p>
+  <p>The contracts are immutable, and that cuts both ways. Nobody can alter a distribution's rules behind your back; nobody can repair one either. A bug that is found is not patched — the remedy is new code at a new address, and a distribution that already exists keeps the code it was created with. Weigh that before you point a protocol fee or a payroll at a distribution, and before you ask a beneficiary to rely on one.</p>
+  <p>The alpha marks come off in one release — a re-upload of this page and an edit to the README, with no redeploy — on the day all three of these readings hold: the mainnet milestone's closeout is merged and ninety days have passed since that merge commit's date; <code class="brk">gh issue list -R dnznlabs/rake --label bug --state all --search "created:&gt;=&lt;that date&gt;"</code> prints nothing; and SECURITY.md records no finding dated after that merge whose disposition is <code>fix</code> or <code>accepted</code>. The release that removes the marks cites the three readings with the date they were taken.</p>
 
   <h2 id="s-what">Overview</h2>
   <p>A distribution is a contract that receives funds and divides them among a published table of beneficiaries. The table, with each beneficiary's address, share, name and note, is stored on chain together with the owner, the delay and a description, and can be read by anyone. Anyone may trigger a payout. Only the owner may propose a change, and every change is subject to a public delay before it can take effect.</p>

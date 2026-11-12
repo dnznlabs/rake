@@ -64,9 +64,14 @@ the decision wins and this file is fixed. Never `devbox run -- bash -c` with a p
    a wallet would see no version at all; the chain is instead read by the reviewer (AC 1).
 
    Check: `make dapp-nodev` on a dev chain prints the version it derived; `grep -c "0.1alpha"
-   app/dist/index.html` ≥ 2 (the footer and the docs eyebrow); `grep -c "v0.1" app/build.mjs` → 0;
+   app/dist/index.html` → 1 (the single `__VERSION__` in `CFG`), and `test/docs.test.mjs` pins the two
+   paint sites (footer `#ver`, docs eyebrow) reading `CFG.version`; `grep -c "v0.1" app/build.mjs` → 0;
    a test in `test/inline-scripts.test.mjs` or a new `test/build.test.mjs` pins the derivation on
    three inputs (`v0.1` → `0.1alpha`, `0.1` → `0.1alpha`, `v1` → refused).
+
+   *(Amended 2026-11-12 with AC 1's clause 3, by the architect's review on
+   [#186](https://github.com/dnznlabs/rake/pull/186): this check previously read `≥ 2`, the same
+   defect as the criterion — it counted source text for two runtime paints and could not hold.)*
 
 2. **The Disclaimer, first in `#/docs`.** Add `['disclaimer', 'Disclaimer']` as the **first** entry
    of `SECTIONS` (`index.html:1783`) and `<h2 id="s-disclaimer">Disclaimer</h2>` as the first
@@ -153,7 +158,13 @@ the decision wins and this file is fixed. Never `devbox run -- bash -c` with a p
    `DeployApp.s.sol` log exists derives the string from the log's `App` constructor argument, and
    on both testnets `cast call 0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE "version()(string)"
    --rpc-url "$RPC"` prints `v0.1`, so the derived string is `0.1alpha`; `grep -c 0.1alpha
-   app/dist/index.html` ≥ 2. Without a log and without `--set VERSION=`, the build refuses by name.
+   app/dist/index.html` → 1 (the single `__VERSION__` in `CFG`), and `test/docs.test.mjs` pins the two
+   paint sites (footer `#ver`, docs eyebrow) reading `CFG.version`. Without a log and without
+   `--set VERSION=`, the build refuses by name.
+
+   *(Clause 3 amended 2026-11-12 by the architect's review on [#186](https://github.com/dnznlabs/rake/pull/186):
+   it previously read `≥ 2`, which counted source text for two runtime paints and could not hold — see
+   the handoff's § Deviations 1 for the arithmetic.)*
 2. **Disclaimer first.** `SECTIONS[0][0] === 'disclaimer'` and the first `id="s-…"` in
    `app/src/index.html` is `s-disclaimer` (pinned in `test/docs.test.mjs`, fourteen sections);
    the section states the four things decision 45 names, with the `SECURITY.md` link, and the

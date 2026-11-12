@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import Eth from './src/eth.js';
 import { assertInlineScripts } from './inline-scripts.mjs';
 import { assertPairable, creations } from './broadcast.mjs';
+import { marked } from './version.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -46,13 +47,30 @@ function deployed() {
       out[name] = Eth.checksum(c.address);
       if (c.block != null) out[`${name}_BLOCK`] = '0x' + BigInt(c.block).toString(16);
       else withheld.set(`${name}_BLOCK`, { file, log });
+      /* `__VERSION__` is `App`'s own second constructor argument plus the marker, read from the log
+         that deployed it rather than hardcoded beside it: one source, and the marker comes off in a
+         chunk re-upload instead of a redeploy (ROADMAP decision 45). */
+      if (name === 'APP' && c.args && c.args.length > 1) {
+        const version = marked(c.args[1]);
+        if (version != null) out.VERSION = version;
+      }
     }
   }
   return { out, withheld };
 }
 
-const { out: onchain, withheld } = deployed();
-const values = { VERSION: 'v0.1', ...onchain, CHAIN_ID: chain };
+/* A log whose `App` carries a version nobody recognises is a refusal with a reason, not a stack
+   trace: the same shape every other stop in this file takes. */
+let onchain, withheld;
+try {
+  ({ out: onchain, withheld } = deployed());
+} catch (e) {
+  console.error(e.message);
+  process.exit(1);
+}
+/* No `VERSION` default: it is `onchain`'s, derived from the `App` creation above, and a chain whose
+   log offers none leaves `__VERSION__` to the refusal below unless `--set VERSION=` supplies it. */
+const values = { ...onchain, CHAIN_ID: chain };
 argv.forEach((a, i) => {
   if (a !== '--set') return;
   const [k, ...v] = (argv[i + 1] || '').split('=');

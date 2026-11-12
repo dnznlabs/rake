@@ -11,6 +11,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertPairable, creations, isCreate, pairable } from '../app/broadcast.mjs';
+import { marked, MARKER } from '../app/version.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -61,6 +62,7 @@ test('a one-creation log passes and gives up its block', () => {
     name: 'DistributionFactory',
     address: '0xeda72bb52b76818574d5cd6d7dd1dd695b8ddc7f',
     block: '0x7b',
+    args: null,
   }]);
   // The block is what `__DISTRIBUTIONFACTORY_BLOCK__` becomes, and a log scan's `fromBlock`.
   assert.equal('0x' + BigInt(got[0].block).toString(16), '0x7b');
@@ -86,6 +88,7 @@ test('a receipt that carries no block leaves the block null rather than guessing
     name: 'DistributionFactory',
     address: '0xeda72bb52b76818574d5cd6d7dd1dd695b8ddc7f',
     block: null,
+    args: null,
   }]);
 });
 
@@ -140,6 +143,91 @@ test('build.mjs refuses a withheld block by name rather than substituting one', 
   assert.ok(src.indexOf('creations(log)') > 0, 'app/build.mjs does not pair through creations()');
   // The AC's grep: one reference to the issue, in the file whose refusal it explains.
   assert.equal((src.match(/rake#140/g) || []).length, 1);
+});
+
+/* ---- the version string, derived rather than hardcoded (ROADMAP decision 45) ---------------- */
+
+/* The marker is not a version in the contract: `App.version` feeds `App`'s CREATE2 address and stays
+   `v0.1`, and the page string is that argument plus `alpha`. Two hardcoded `v0.1`s — one in `src/`
+   and one in `build.mjs` — is the state this replaces, and the one in `build.mjs` is the one that
+   could drift, since nothing compared them. */
+test('the page\'s version string is App\'s argument with the marker appended', () => {
+  /* The three inputs m04-t09 names: the argument `DeployApp.s.sol` passes today, the same argument
+     without its `v`, and a shape nobody has explained. */
+  assert.equal(marked('v0.1'), '0.1alpha');
+  assert.equal(marked('0.1'), '0.1alpha');
+  assert.throws(() => marked('v1'), err => {
+    /* Refused by name and with the reason: this stops a build whose bundle was about to be uploaded,
+       so the message has to say which argument and what was wrong with it. */
+    assert.match(err.message, /"v1"/);
+    assert.match(err.message, /not v<major>\.<minor>/);
+    assert.match(err.message, /decision 45/);
+    return true;
+  });
+  // One `v` comes off, not every one, and the marker is appended rather than interpolated.
+  assert.equal(marked('v1.0'), '1.0' + MARKER);
+  assert.equal(marked('12.34'), '12.34alpha');
+});
+
+test('a log that offers no version leaves it to the build\'s refusal rather than defaulting', () => {
+  /* `null` is not a string: it means this log said nothing, and `build.mjs` then has nothing to
+     substitute for `__VERSION__` and refuses by name — the same stop as a missing address. A
+     default here would paint a stale version on a bundle about to be uploaded. */
+  assert.equal(marked(null), null);
+  assert.equal(marked(undefined), null);
+  assert.equal(marked(''), null);
+});
+
+test('App\'s constructor arguments come off the log beside its address', () => {
+  /* The shape `DeployApp.s.sol` writes: `[owner, version]`, read 2026-11-12 from both testnet logs.
+     The address and the arguments both come off the transaction, so they are equally sound — unlike
+     the block, which comes off the receipt join rake#140 found mispairing. */
+  const log = {
+    transactions: [{
+      hash: '0xaa',
+      contractName: 'App',
+      contractAddress: '0x00a90943f58b6ab7fde05aae01c13a80e6995bae',
+      transactionType: 'CREATE2',
+      arguments: ['0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790', 'v0.1'],
+    }],
+    receipts: [receipt('0xaa', '0x7b')],
+  };
+
+  const got = creations(log);
+
+  assert.deepEqual(got[0].args, ['0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790', 'v0.1']);
+  assert.equal(marked(got[0].args[1]), '0.1alpha');
+});
+
+test('build.mjs carries no version of its own', () => {
+  const src = readFileSync(join(root, 'app/build.mjs'), 'utf8');
+
+  /* The AC's grep: the second hardcoded source is gone, so the only `v0.1` left in the repo that the
+     page depends on is `App`'s constructor argument. */
+  assert.equal((src.match(/v0\.1/g) || []).length, 0, 'app/build.mjs still hardcodes a version');
+  assert.doesNotMatch(src, /VERSION:\s*'/, 'app/build.mjs still defaults VERSION');
+  assert.ok(src.includes('marked('), 'app/build.mjs does not derive the version through marked()');
+});
+
+/* The repo's own logs are the oracle: if `DeployApp.s.sol` ever stops passing a version this
+   recognises, the build refuses, and it is better found here than at an upload. */
+test('every App creation in this working tree yields a derivable version', () => {
+  const dir = join(root, 'broadcast/DeployApp.s.sol');
+  if (!existsSync(dir)) return;   // a clean checkout has not deployed yet
+  const seen = [];
+  for (const chain of readdirSync(dir)) {
+    const file = join(dir, chain, 'run-latest.json');
+    if (!existsSync(file)) continue;
+    for (const c of creations(JSON.parse(readFileSync(file, 'utf8')))) {
+      if (c.name !== 'App' || !c.args || c.args.length < 2) continue;
+      seen.push([chain, marked(c.args[1])]);
+    }
+  }
+  if (!seen.length) return;
+
+  for (const [chain, version] of seen) {
+    assert.match(version, /^\d+\.\d+alpha$/, `chain ${chain} derives ${version}`);
+  }
 });
 
 /* And the shape it asserts is the shape this repo's own deploys produce — a log in `broadcast/`
