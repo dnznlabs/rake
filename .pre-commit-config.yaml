@@ -17,6 +17,16 @@ repos:
     hooks:
       - id: betterleaks
         stages: [pre-commit]
+      # The hook above runs `betterleaks git --staged`, which is right at commit time and scans
+      # nothing under `pre-commit run --all-files` — there is no staged diff, so it reports
+      # "scanned ~0 bytes" and passes whatever the tree holds. CI needs the tree, so it gets its own
+      # entry in `dir` mode. Keep both: one guards the commit, one guards the repository.
+      - id: betterleaks
+        alias: betterleaks-tree
+        name: Detect hardcoded secrets in the whole tree
+        entry: betterleaks dir . --redact --verbose
+        pass_filenames: false
+        stages: [manual]
 
   # `stages` and `always_run` are both load-bearing on these two.
   - repo: local
