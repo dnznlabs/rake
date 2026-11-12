@@ -556,6 +556,24 @@ Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
     are M05's to rule, so they live in `RUNBOOK.md` § Executed on testnets (m04-t03), not in § 0.
     Rejected: the anvil rehearsal's placeholders under DNZN's name on two public chains; skipping
     step 6 on testnets (criterion 1 and state-collection#74 both need code at the address).
+    **Amended 2026-11-08 (m04-t03 review).** Three things pinned before the first testnet `create`:
+    (i) **these are the values a testnet step 6 uses** — not placeholders and not M05's; `RUNBOOK.md`
+    § Step 6's "M05 values are M05's to fill" refers to the mainnet table, and the m04-t03 handoff's
+    § For Denizen carries exactly these. (ii) **Step 6 runs before step 4 on the testnets** (Denizen,
+    22:17 CST: he travels with the Creator key and one of three Ops signers, so the document upload
+    waits for his return while the `create` does not); step 6 touches only the factory and the clone,
+    so the order is sound and no runbook deviation is needed. (iii) **Precondition, unverifiable from
+    any agent host:** `RUNBOOK.md` § Step 6 requires the Creator key "backed up to the handbook's
+    standard for an owner key before step 6 runs anywhere" — #23 closed the *documentation* of that
+    requirement, not the backup — so Denizen confirms the backup in writing before the first send.
+    **Confirmed by Denizen, Telegram, 2026-11-08 22:26 CST: the Creator key is backed up to the
+    handbook's standard for an owner key.** The medium and location are deliberately not recorded here
+    or anywhere in this repo; the fact, the date and the channel are what the gate needs. The handoff
+    repeats that line beside the step-6 rows; the gate is satisfied. The address is
+    `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` on both chains (`predict(DNZN_SALT)` on the live
+    factory, `cast code` `0x` on both, 2026-11-08); the anvil rehearsal's `0x633e24C2…6148` differs by
+    design — a different salt prefix and a different implementation address fold into the clone's
+    init code — and is not a discrepancy.
 
 43. **`create` accepts a zero `owner_`; a born-renounced distribution is documented, not refused.**
     M04-D3, ruled by Denizen on 2026-11-08 on [#173](https://github.com/dnznlabs/rake/issues/173)
@@ -580,6 +598,27 @@ Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
     contract; an account; a never-used address) and requires an acknowledgement before step 2, the
     pattern the ownership drawer already uses. Rejected (option 2): a one-line zero check in `init`
     or `create`, M03 reopened for a state the contract already supports on another path.
+
+44. **Step 4 of the runbook — the document upload — is an Ops-vault action, permanently.** M04-D4,
+    ruled by Denizen on 2026-11-08 on [#178](https://github.com/dnznlabs/rake/issues/178) (Telegram,
+    22:06 CST: "I guess I was thinking we wouldn't set owner to the multisig until after everything is
+    fully deployed and tested - but agree, doesn't help future deploys that require ops ms anyway. yes
+    I have access to all three signers on the ms."). Found by m04-t03: `App` takes its owner in the
+    constructor, the chunk setters are `onlyOwner`, § 0 makes the owner the Ops vault on every chain and
+    `APP_SALT` was mined against init code containing it, so the engineer's key can never run step 4
+    on a public chain — and the only rehearsal had signer and owner as one anvil account. Five calls
+    per chain (`addChunk` ×2, `addWidgetChunk`, `setChunks`, `setWidgetChunks`), by one of two routes:
+    **unanimous via `TimelockExecutor.forward()`, immediate**, which Denizen can satisfy alone since
+    all three Ops signers are his; or **threshold via `Multisig.execute()`, queued for the vault's
+    3,600 s, then `executeQueued()`**, kept in the runbook as the fallback. `forward()` requires
+    `ownerCount()` signatures for anything but `cancelQueued` (`TimelockExecutor.sol:35-46`); the
+    handbook sentence that said threshold was corrected the same day (handbook#34). Every later
+    upload, `lock()` and M05's mirror take the same road. Rejected: redeploying `App` owned by the
+    deploying key and transferring afterwards (a new `APP_SALT`, a new live address, and it saves one
+    upload); the engineer's key as owner (decision 35, the handbook's agent rule). **Also ruled:** the
+    step-4 preparation is a new task, m04-t08, scoped after this ruling rather than widened into
+    m04-t03 under review — the engineer correctly refused to take it from an issue, since `TASK.md` on
+    `main` is the only task authority.
 
 Ruled by Denizen on 2026-11-11 over Telegram, for rake, runner and drop alike; the org convention is
 the handbook README § Conventions. Numbered 45 because 44 is taken by
