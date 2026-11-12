@@ -37,13 +37,13 @@ Re-measured on this branch's base, `origin/main` at `8507039`, on 2026-11-12. Ev
 | | raw bytes | budget | left |
 |:---|:---|:---|:---|
 | before (`origin/main` 8507039) | 8,132 | 10,240 | 2,108 |
-| after (head `ed0aa00`) | **8,144** | 10,240 | **2,096** |
+| after (`ed0aa00`, re-measured at head `6b05f99`) | **8,144** | 10,240 | **2,096** |
 
 The change is 12 bytes for `'alpha · '+` — eleven characters, of which the `·` is two bytes in UTF-8. Headroom is `10240 − 8144 = 2096` bytes. The gate in `build.mjs:98-104` is the test and it passes; the figure is identical on every chain, since `widget.js` carries no chain-dependent token.
 
 ## The bundle, per chain
 
-Built at the PR head `ed0aa00` with the prescribed `make dapp-nodev CHAIN_ID=<id>`, through the devbox-pinned toolchain (gzip output depends on the node build's zlib).
+Built with the prescribed `make dapp-nodev CHAIN_ID=<id>`, through the devbox-pinned toolchain (gzip output depends on the node build's zlib). Measured first at `ed0aa00`, the last commit that touches `app/`, and re-measured byte for byte at the pushed head `6b05f99`, which adds only this file under `docs/`: every digest and count below is identical at both.
 
 **Chain 11155111 (Sepolia)** — `dapp: raw 142949 bytes · gzip 45358 bytes`
 
@@ -124,7 +124,7 @@ The check every `app/` task ends with (`AGENTS.md` § The dapp), `playwright-cor
 
 ## For t08
 
-**These are the hashes to upload, or to re-upload.** They were built at this branch's head, `ed0aa00`, which is the head the PR opens from; if the PR is amended during review, t08's step 1 must rebuild and re-read them rather than trust this table.
+**These are the hashes to upload, or to re-upload.** They were measured at `ed0aa00` and again at the pushed head `6b05f99`, identically; if the PR is amended during review, t08's step 1 must rebuild and re-read them rather than trust this table.
 
 - Chain **11155111**: `index.html` `cb2e8301…99363` (142,949 B) · `index.html.gz` `0023521f…28097` (45,358 B) · `widget.js` `21dd3d13…ea24a` (8,144 B)
 - Chain **84532**: `index.html` `8c235917…76ea3` (142,947 B) · `index.html.gz` `bce7a41b…9b1a8e` (45,358 B) · `widget.js` `21dd3d13…ea24a` (8,144 B)
