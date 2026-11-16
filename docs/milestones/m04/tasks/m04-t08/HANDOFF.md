@@ -396,6 +396,11 @@ rows. That closes M04 criterion 3's chain half, which this PR deliberately does 
    - Default if nobody rules: the default salt, already built and encoded here.
    - Blocks: nothing before signing — but it is **much** cheaper to rule before Denizen signs than
      after, since a bundle change invalidates all ten digests.
+   - **Ruled 2026-11-16, before signing** (Denizen, Telegram 08:46 CST, quoted in
+     [#190](https://github.com/dnznlabs/rake/issues/190)'s closing comment): keep the dev-seed salt for
+     this upload; the featured panel is empty on both testnets until
+     [#193](https://github.com/dnznlabs/rake/issues/193) (carried, m04: set the featured distribution
+     and re-upload) lands. Carried: #193.
 
 ## For t04
 

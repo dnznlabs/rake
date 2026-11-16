@@ -125,15 +125,16 @@ Everything through `devbox run --`.
 (handbook README roster). Every command through `devbox run --`, every chain read with an explicit
 `--rpc-url "$RPC"`, each chain's run opened with `cast chain-id`.
 
-6a. **Gate: the featured salt is ruled, or its default is recorded.** [#190](https://github.com/dnznlabs/rake/issues/190)
-   (decision, open) asks which `FEATURED_SALT` a public testnet bundle features. Before step 7 on either
-   chain, one of: the ruling is written in #190 and the committed `batch.hex` is regenerated against it
-   (a new salt is a bundle change — new `index.html` hashes, all calldata and both digests regenerate);
-   or #190 is unruled and the handoff § Decisions records that the dev-seed default
-   (`mk/15-seed.mk`, `0xf39fd6e5…0001`) was uploaded **with its stated cost: a contrary ruling after the
-   upload is a second five-call `batch` upload per chain through this same procedure, two more
-   signatures and another hour each.** Check: the handoff names which of the two happened, with the
-   date; if the salt changed, step 7's `git diff` is still empty at the new head.
+6a. **Gate: the featured salt — ruled 2026-11-16: keep the dev-seed salt for this upload.**
+   [#190](https://github.com/dnznlabs/rake/issues/190) (decision, closed) asked which `FEATURED_SALT` a
+   public testnet bundle features. Denizen ruled by Telegram, 2026-11-16 08:46 CST, recorded in #190's
+   closing comment: *"that's fine - re-running the uploads ... it's really only this first ... in the future
+   will be regular updates... but we'll need a followup task created so that we set the featured distro
+   and re-upload chunks"*. So the committed `batch.hex` (dev-seed salt, `mk/15-seed.mk`,
+   `0xf39fd6e5…0001`) is what step 7 proposes, unchanged; the featured panel is empty on both testnets
+   until [#193](https://github.com/dnznlabs/rake/issues/193) (carried, m04: set the featured distribution
+   and re-upload) lands. Check: the handoff § Decisions cites #190's closing comment and the date; step 7's
+   `git diff` is empty at the committed head.
 
 6b. **Gate: the Sepolia queue is clean — the Product Owner's action; the engineer waits for his word.**
    The dapp lists stale 0/2 rows on Sepolia from the earlier plan: bare `addChunk` proposals at nonces
@@ -236,7 +237,7 @@ each replaces it. Every figure is read at the review head, not quoted from here.
   unchanged from `main` and stated; `git status --porcelain` empty.
 - **Gates recorded:** the handoff § Gates carries, per chain and dated, `isOwner($ENGINEER)` `true`,
   `ownerCount()` `4`, `threshold()` `2`, `delay()` `3600`, `nonce()` *N*, `cast nonce $APP` `1`; § Decisions
-  names #190's ruling or its recorded default with the stated cost; § Gates quotes the Product Owner's
+  cites #190's ruling (closing comment, 2026-11-16) and names #193 as the carried follow-up; § Gates quotes the Product Owner's
   word that the Sepolia queue is clean, dated.
 - ~~PR closes this task's issue.~~ The PR that carries step 8 closes [#185](https://github.com/dnznlabs/rake/issues/185);
   a PR that stops at step 7 says `Refs #185`. Handoff § Deviations empty or each item names its runbook hunk.
@@ -261,8 +262,10 @@ route is now a `batch` self-call with the engineer's signature on it.
   the handoff § For Denizen and he has said to send it. 4b and 4c are the Product Owner's.
 - **No mainnet.** Ops is one address on every chain; nothing in this task is proposed, signed or sent on
   chain 1 or any chain other than 11155111 and 84532.
-- Fixing the dapp bundle. If step 1's build is wrong, stop; a bundle change is a new upload. Ruling #190
-  before upload is the exception, and it is the Product Owner's, not the engineer's (step 6a).
+- Fixing the dapp bundle. If step 1's build is wrong, stop; a bundle change is a new upload. ~~Ruling #190
+  before upload is the exception, and it is the Product Owner's, not the engineer's (step 6a).~~ #190 is
+  ruled (2026-11-16): this upload keeps the committed bundle; the featured distribution is
+  [#193](https://github.com/dnznlabs/rake/issues/193)'s upload, not this one's.
 
 ## Open questions
 
@@ -270,19 +273,23 @@ route is now a `batch` self-call with the engineer's signature on it.
 three Ops signers ([#178](https://github.com/dnznlabs/rake/issues/178), 2026-11-08). If a signer is
 unreachable on the day, route (b) is already in the runbook and the engineer waits the hour.~~
 
-Since 2026-11-16: the route is settled (RUNBOOK 4a–4d, #191). One ruling is open, upstream of step 7:
+Since 2026-11-16: the route is settled (RUNBOOK 4a–4d, #191), and the one ruling upstream of step 7
+closed the same day. None open.
 
-1. **Which `FEATURED_SALT` does the public testnet bundle feature?** [#190](https://github.com/dnznlabs/rake/issues/190),
-   labelled `decision`, assigned to the Product Owner.
+1. ~~**Which `FEATURED_SALT` does the public testnet bundle feature?**~~ **Ruled 2026-11-16** — keep the
+   dev-seed salt for this upload; the featured panel is empty on both testnets until
+   [#193](https://github.com/dnznlabs/rake/issues/193) (carried, m04) lands. Denizen, Telegram 08:46 CST,
+   quoted in [#190](https://github.com/dnznlabs/rake/issues/190)'s closing comment. The question as it stood:
+   [#190](https://github.com/dnznlabs/rake/issues/190), labelled `decision`, assigned to the Product Owner.
    - *Keep the dev-seed default* (`0xf39fd6e5…0001`): cost, an empty featured panel on both testnets
      until a later upload (cosmetic; seen in t05's UAT).
    - *Pick a real testnet distribution now*: cost, a rebuild, new hashes, regenerated calldata and
      digests before step 7 — and nothing uploaded yet, so no second upload.
    - **Recommendation:** keep the default for this upload; feature a real distribution in a later one.
-   - **Default and deadline:** if unruled when step 7 starts, the committed default is uploaded and the
+   - ~~**Default and deadline:** if unruled when step 7 starts, the committed default is uploaded and the
      handoff records it with the cost (a contrary ruling after upload = a second five-call `batch`
-     per chain). Gates step 7 (step 6a).
-   - **Record:** #190's closing comment and `ROADMAP.md` § Decisions.
+     per chain). Gates step 7 (step 6a).~~ Ruled before step 7; no default was taken.
+   - **Record:** #190's closing comment (2026-11-16) and `ROADMAP.md` § Decisions; the follow-up is #193.
 
 ## Context
 
@@ -293,6 +300,7 @@ Since 2026-11-16: the route is settled (RUNBOOK 4a–4d, #191). One ruling is op
 - Handbook `docs/multisig-transactions.md` § How a transaction moves, § Doing it as a human, § Review
   checklist; `src-company/multisig` `src/mods/TimelockExecutor.sol:35-46` and `src/Multisig.sol:85-100,134-160` at `62eb905`.
 - Since 2026-11-16: `RUNBOOK.md` § Step 4 (4a–4d, § Gas) at `a1c1896`; [#191](https://github.com/dnznlabs/rake/pull/191)
-  and its review (live reads 2026-11-16 01:53Z); [#190](https://github.com/dnznlabs/rake/issues/190);
+  and its review (live reads 2026-11-16 01:53Z); [#190](https://github.com/dnznlabs/rake/issues/190) (ruled
+  and closed 2026-11-16) and its follow-up [#193](https://github.com/dnznlabs/rake/issues/193) (carried, m04);
   this task's `HANDOFF.md` (steps 1–7 of the 2026-11-08 plan, the gas table, the pointers); handbook
   `docs/multisig-transactions.md` § Doing it as an agent, § Review checklist.
