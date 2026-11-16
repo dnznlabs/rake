@@ -1,6 +1,16 @@
 # m04-t08 — handoff
 
-PR: #<n> · Branch: `m04/t08-step4-vault` · 2026-11-12
+PR: #<n> · Branch: `m04/t08-step4-vault` · 2026-11-12 · **revised for the batch route 2026-11-16 on
+`m04/t08-step7-propose`**
+
+> **Revision, 2026-11-16.** The route changed under this task and the vault moved with it, so three
+> sections carry live readings that supersede the ones below them: § Gates gains *Step 7's gates*
+> (`ownerCount` 4, the engineer an Ops owner, internal `nonce()` 3), § The digests gains *The batch
+> digest* (the ten five-call digests are dead — `addOwner` consumed nonce 2), and § For Denizen is
+> rewritten as the co-signing checklist and the two hand-set `executeQueued` limits, with the
+> 2026-11-12 signing tables kept below it as the record. Everything measured about the *bytes* —
+> § The bundle, § The pointers, § The five calls, § Gas, § The fork rehearsal — is unchanged and
+> re-verified at this head: both chains' calldata regenerates byte-identical, `batch.hex` included.
 
 Step 4's bytes are prepared, verified and committed for both chains, and `RUNBOOK.md` § Step 4 is
 now the Ops-vault procedure instead of a `forge script` no engineer can run. `tools/step4-calldata.mjs`
@@ -57,6 +67,41 @@ internal `nonce()`, which is 2.
 **The nonce is live and it moves if anyone transacts through the vault.** It read 2 at 14:12 and 2
 again at 14:23, immediately before the digests below were finalised. If it has moved when Denizen
 signs, every digest is recomputed — one re-run of the command in § For Denizen.
+
+### Step 7's gates, re-read 2026-11-16 (the batch route)
+
+The vault moved between the two plans, which is why this task was replanned: an `addOwner` executed
+at internal nonce 2 on both chains at **14:34Z 2026-11-16**, so `ownerCount()` is 4, the engineer's
+key is an Ops owner, and the ten digests above are dead. These are the readings step 7 runs on, taken
+at **15:17Z 2026-11-16** and identical on both chains, each chain's run opened with `cast chain-id`
+and every command carrying an explicit `--rpc-url`:
+
+| reading | Sepolia (11155111) | Base Sepolia (84532) | gate |
+|:--|:--|:--|:--|
+| `cast chain-id` | `11155111` | `84532` | matches `$CHAIN_ID` ✓ |
+| `isOwner(0x5A158aF8…C50d)` | **true** | **true** | the engineer can sign ✓ |
+| `ownerCount()` | **4** | **4** | was 3 ✓ |
+| `threshold()` | **2** | **2** | one co-signature is the quorum ✓ |
+| `delay()` | **3600** | **3600** | decision 44's 3,600 s ✓ |
+| `nonce()` — internal | **3** | **3** | the batch proposal's *N* ✓ |
+| `cast nonce $APP` | **1** | **1** | = 1, so the pointers still hold ✓ |
+| `App.locked()` | **false** | **false** | false ✓ |
+| `App.html()` | `""` | `""` | empty — nothing is uploaded yet ✓ |
+
+Re-read at **15:19Z** in the same run: the whole batch estimates **84,773,222** on Sepolia against a
+200,000,000 block limit and **12,188,581** on Base Sepolia against 120,000,000
+(`cast estimate --from $OWNER $OWNER $(cat batch.hex)`). § For Denizen turns those into the two
+hand-set `executeQueued` limits.
+
+**`cast nonce $OWNER` still reads 1 on both chains** and is recorded, again, only to show it was not
+used: it is the account nonce, and the digest takes the internal `nonce()`.
+
+**The featured-distribution gate is satisfied and its follow-up carried.**
+[#190](https://github.com/dnznlabs/rake/issues/190) is ruled and closed 2026-11-16: this upload ships
+the committed bundle with the dev-seed featured salt, so the featured panel is empty on both testnets
+until [#193](https://github.com/dnznlabs/rake/issues/193) sets the featured distribution and
+re-uploads. The ruling is in #190's closing comment and in `ROADMAP.md` § Decisions; #193 is carried
+in M04 and is not this task's.
 
 ## The bundle, per chain
 
@@ -178,6 +223,11 @@ runbook. Stated in § Step 4 and flagged as discovery 2.
 
 ## The digests
 
+**The ten digests below are dead, and kept as the record.** They sign five plain calls to `App` at
+nonces 2–6, the route this task was first planned for. `addOwner` consumed nonce 2 on both chains on
+2026-11-16, so every nonce in these two tables is wrong by one and every digest with it; the route is
+now one `batch` proposal per chain, whose live digest is in § The batch digest below.
+
 `cast call $OWNER 'getTransactionHash(address,uint256,bytes,uint32)(bytes32)' $APP 0 $(cat <file>) <nonce>`,
 with `N` = the vault's internal `nonce()` = **2**, re-read on both chains at **14:23 CST 2026-11-12**
 immediately before these were finalised. Call *k* signs at nonce `N + k − 1`.
@@ -206,6 +256,31 @@ immediately before these were finalised. Call *k* signs at nonce `N + k − 1`.
 the same bytes and the same nonce on both chains, the vault is at one address on both, and yet the
 digests differ — so `getTransactionHash` binds the chain, and a Sepolia signature cannot be replayed
 on Base Sepolia. Worth knowing before signing ten things that look like six.
+
+### The batch digest — one per chain, the live route
+
+The proposal is the vault calling itself: target `$OWNER`, value `0`, data `batch.hex`, nonce the
+live internal `nonce()`. So the digest's first argument is the **vault**, not `App` — the one
+difference from the command above, and the thing that makes a proposal targeting `App` not this one:
+
+```sh
+cast call $OWNER 'getTransactionHash(address,uint256,bytes,uint32)(bytes32)' \
+  $OWNER 0 "$(cat docs/milestones/m04/tasks/m04-t08/calldata/$CHAIN_ID/batch.hex)" 3 --rpc-url "$RPC"
+```
+
+Read at **15:18Z 2026-11-16** at `nonce() = 3` on both chains, from `batch.hex` as committed at
+`a1c1896` and regenerated byte-identical at this branch's head:
+
+| chain | nonce | `sha256sum batch.hex` | digest |
+|:--|--:|:--|:--|
+| Sepolia (11155111) | 3 | `d9cc558b95f3f0b9c4ed4498f83446e674cf22f8d4d31447cb8fd3190409f237` | `0xc65454f8a8109bf6d337fa7b9eaa40d6f7bd8cc14b658434ae8deba6b1eabbcf` |
+| Base Sepolia (84532) | 3 | `9b16ccc66a589c381f9542e04b9652005eaeb8a023270738eacddbb62ca0fd6e` | `0x9d83f01fa5f2112252749d6a6bc62b4e6d8ec63d941f0d4624b26a63e7378302` |
+
+Both files are 109,962 characters, `0x` included. The two digests differ for the same reason the ten
+above do: `getTransactionHash` binds the chain, so neither signature is replayable on the other.
+
+**If `nonce()` is not 3 when the proposal is opened, both digests are wrong** and are recomputed by
+one run of the command above. Only the nonce changes; `batch.hex` does not.
 
 ## The fork rehearsal
 
@@ -239,26 +314,91 @@ show the two instruments agreeing where they should and disagreeing where § 1e 
 
 ## For Denizen — step 4
 
-**What you sign, and nothing else.** Two blocks, Sepolia first. Each is five plain calls to `App` at
-`0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE` with `value = 0`, signed by **all three** Ops owners and
-routed by the dapp to `TimelockExecutor.forward()` — route (a), immediate, no queue. No `batch`, no
-vault self-call, nothing under `src/`, no `lock()`, no `setVersion`.
+**One proposal per chain, and your signature is the second of two.** Each is the Ops vault calling
+**itself**: target `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`, `value = 0`, data the committed
+`batch.hex`, at the vault's live internal `nonce()`. `batch` runs the five `App` calls in array order
+in one transaction and reverts all five if any one fails, so the `CodelessChunk` ordering constraint
+is satisfied inside the transaction and a partial upload cannot exist. The engineer's signature is
+already on it; yours takes it to the 2-of-4 threshold, which **queues** it for 3,600 s rather than
+executing it. Nothing under `src/`, no `lock()`, no `setVersion`, no other vault action of any kind.
 
-Before the first signature, re-read the nonce — if it is not 2, stop and tell me, and every digest
-below is recomputed by one command:
+### The checklist, per chain, before you sign
+
+Against a checkout of the commit the proposal's description names — not against the dapp's own
+decoding alone, which is the thing being checked. § The batch digest carries that commit's file
+hashes and the digest read at it. Five checks; any one failing is a stop and a message to me:
+
+1. **Target is the vault and value is 0.** `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`, **not**
+   `App` at `0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE`. A proposal whose target is `App` is one of
+   the old five-call rows, not this one.
+2. **The data is the committed file.** `sha256sum` of the proposal's data equals
+   `sha256sum docs/milestones/m04/tasks/m04-t08/calldata/$CHAIN_ID/batch.hex` — Sepolia
+   `d9cc558b…409f237`, Base Sepolia `9b16ccc6…ca0fd6e`, 109,962 characters each including `0x`.
+3. **It decodes to the five calls.**
+   `cast decode-calldata "batch(address[],uint256[],bytes[])" "$(cat …/batch.hex)"` gives five
+   targets, every one `App`; five values, every one `0`; and five `bytes` equal to
+   `1-addChunk-0.hex` … `5-setWidgetChunks.hex` in that order.
+4. **The nonce is live and the digest matches it.** `cast call $OWNER "nonce()(uint32)"` → **3** at
+   15:17Z 2026-11-16, and the digest equals § The batch digest's row for that chain — Sepolia
+   `0xc65454f8…eabbcf`, Base Sepolia `0x9d83f01f…378302`. If the nonce has moved, both digests are
+   recomputed by the one command in that section and the proposals are reopened; nothing else changes.
+5. **It is a vault self-call, so confirm it outside the chat that asked for it** before signing — the
+   review rule for self-calls, and this is one.
+
+Then sign, submit, wait the 3,600 s, and send `executeQueued()`.
+
+### The gas budget for `executeQueued`, set by hand
+
+A wallet's own estimate through a public RPC can report a false `DeploymentFailed()` on a batch this
+size, so set the limit rather than accept one. Running out of gas reverts the whole batch and leaves
+it queued, so it can simply be sent again with more — an under-estimate costs gas, not the upload.
+
+| chain | live batch estimate (15:19Z) | block limit | **set the limit to** |
+|:--|--:|--:|--:|
+| Sepolia (11155111) | 84,773,222 | 200,000,000 | **110,000,000** |
+| Base Sepolia (84532) | 12,188,581 | 120,000,000 | **16,000,000** |
+
+Both come from `cast estimate --from $OWNER $OWNER $(cat batch.hex)` — the vault as sender, which
+`eth_estimateGas` does not sign-check — and both carry roughly a 1.3× margin over it for
+`executeQueued`'s own queue bookkeeping, which is unmeasured on a real-priced chain. Sepolia's
+110,000,000 is RUNBOOK § Gas's figure, unchanged; Base Sepolia's is set here, because § Gas names only
+Sepolia's.
+
+### Then stop — step 8 is mine
+
+Send me both transaction hashes per chain, the `execute()` submit and the `executeQueued()`, and I run
+step 8: `cast nonce $APP` → 4, `chain-doc`'s `inflated sha256` and `widget sha256` against a rebuild
+of each chain's bundle, the three pointers from `chunks()`/`widgetChunks()`, and `cast receipt … gasUsed`
+for both transactions into step 4's `record:` rows. That closes M04 criterion 3's chain half, which
+the step-7 PR deliberately does not claim.
+
+---
+
+### Superseded — the 2026-11-12 route, kept as the record
+
+~~Everything from here to the end of this section is the five-call `forward()` route this task was
+first planned for: five plain calls to `App` at `value = 0`, signed by all three Ops owners,
+immediate, no queue.~~ It is dead twice over — `addOwner` consumed nonce 2 on both chains on
+2026-11-16, so all ten nonces and digests are wrong by one, and `forward()` needs every owner's
+signature, which is now four. The tables are kept whole rather than struck cell by cell, so that the
+digests remain readable as the record of what was prepared; nothing below is to be signed.
+
+~~Before the first signature, re-read the nonce — if it is not 2, stop and tell me, and every digest
+below is recomputed by one command:~~
 
 ```sh
 export RPC=<chain's url>; cast chain-id --rpc-url "$RPC"
 cast call 0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790 "nonce()(uint32)" --rpc-url "$RPC"   # expect 2
 ```
 
-Not `cast nonce` on the vault — that reads 1, and signing against it makes all five digests wrong.
+~~Not `cast nonce` on the vault — that reads 1, and signing against it makes all five digests wrong.~~
 
-The five must execute **in this order**, and **no other vault transaction may land between them**:
+~~The five must execute **in this order**, and **no other vault transaction may land between them**:
 each signature covers the vault's *current* nonce, and `setChunks`/`setWidgetChunks` revert
-`CodelessChunk` if their chunks are not on chain yet.
+`CodelessChunk` if their chunks are not on chain yet.~~ Inside `batch` this holds by construction,
+which is the live route's one real advantage over this one.
 
-### Sepolia (11155111) · vault nonce 2
+#### Sepolia (11155111) · vault nonce 2 — superseded
 
 | # | call | nonce | calldata file (under `docs/milestones/m04/tasks/m04-t08/calldata/11155111/`) | digest to sign |
 |--:|:--|--:|:--|:--|
@@ -272,7 +412,7 @@ Gas to allow: **37.9M**, **33.7M**, **13.1M**, ~**0.07M**, ~**0.04M**, plus `for
 Sepolia's block limit is ~200M, so each fits, but call 1 is a fifth of a block — expect it to be
 slow to include rather than to fail.
 
-### Base Sepolia (84532) · vault nonce 2
+#### Base Sepolia (84532) · vault nonce 2 — superseded
 
 | # | call | nonce | calldata file (under `…/calldata/84532/`) | digest to sign |
 |--:|:--|--:|:--|:--|
@@ -284,7 +424,11 @@ slow to include rather than to fail.
 
 Gas to allow: **5.3M**, **4.8M**, **1.9M**, ~**0.07M**, ~**0.04M**, against a 120M limit.
 
-### What to check in the dapp before each signature
+#### What to check in the dapp before each signature — superseded
+
+The live route's equivalent is § The checklist, per chain, above. Two of these four checks survive it
+unchanged, and are worth reading there: the pointer check is now check 3's decode, and the chain
+binding is check 4's. The rest applied to ten separate proposals that are no longer made.
 
 - **Calls 4 and 5** — read the *decoded* call. Call 4 must show `setChunks` with exactly
   `[0x0f8132D41Ea16c4536565cb2910EF801c2e35D0D, 0xAf5f9504714D4D441E836ef626633553ccF730a0]` and
@@ -299,10 +443,12 @@ Gas to allow: **5.3M**, **4.8M**, **1.9M**, ~**0.07M**, ~**0.04M**, against a 12
 - **Sepolia's digests are not Base Sepolia's**, even for calls 3–5 whose calldata is identical. Sign
   each chain's own.
 
-**Then stop — the rest is mine.** When the forwards have landed, tell me and I run step 8: `cast nonce
+~~**Then stop — the rest is mine.** When the forwards have landed, tell me and I run step 8: `cast nonce
 $APP` → 4, `chain-doc` hashes and byte counts against § The bundle, the three pointers from
 `chunks()`/`widgetChunks()`, and five `cast receipt` hashes and `gasUsed` into step 4's `record:`
-rows. That closes M04 criterion 3's chain half, which this PR deliberately does not claim.
+rows. That closes M04 criterion 3's chain half, which this PR deliberately does not claim.~~
+Step 8 is unchanged in substance and is stated live under § Then stop — step 8 is mine; only the
+transaction count changed, from five `Forwarded` receipts to two.
 
 ## Deviations from the plan
 
@@ -327,6 +473,20 @@ rows. That closes M04 criterion 3's chain half, which this PR deliberately does 
    § Executed on testnets as a paragraph saying what the blank rows wait for, so the runbook does not
    read as though step 4 silently never happened. Runbook hunk: § Executed on testnets, the
    "prepared and not yet executed" paragraph.
+4. **The superseded signing tables are kept whole under a labelled heading, not struck cell by cell.**
+   The revised plan's step 9 says to keep them struck. Ten rows of four cells wrapped in `~~` renders
+   as a wall of literal tildes in some viewers and makes the digests — the only reason to keep the
+   tables at all — unreadable. The struck text is the prose that told anyone to *act* on them, and
+   every heading over them says `— superseded`, so nothing in that block reads as live. Runbook hunk:
+   none; this is a handoff-formatting deviation only.
+5. **`executeQueued`'s gas is quoted from a live estimate, which RUNBOOK § Gas calls unmeasured.**
+   § Gas says a public RPC fails the simulation at any requested limit, and that is true of `eth_call`
+   with an explicit gas figure; `eth_estimateGas` on the same endpoint answers, and did — 84,773,222
+   on Sepolia, 12,188,581 on Base Sepolia, both at 15:19Z 2026-11-16. So the budgets in § For Denizen
+   rest on a measurement of the batch's *execution*, plus a margin for the queue bookkeeping that is
+   still unmeasured. § Gas's wording is narrower than it reads and names only Sepolia's figure;
+   Base Sepolia's **16,000,000** is set in the handoff, where the revised plan's step 9 puts it, and a
+   § Gas edit is not this step's. Runbook hunk: § Step 4 → *Gas*, unchanged by this PR.
 
 ## Decisions
 
