@@ -610,7 +610,9 @@ Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
     per chain (`addChunk` ×2, `addWidgetChunk`, `setChunks`, `setWidgetChunks`), by one of two routes:
     **unanimous via `TimelockExecutor.forward()`, immediate**, which Denizen can satisfy alone since
     all three Ops signers are his; or **threshold via `Multisig.execute()`, queued for the vault's
-    3,600 s, then `executeQueued()`**, kept in the runbook as the fallback. `forward()` requires
+    3,600 s, then `executeQueued()`**, kept in the runbook as the fallback. *Route changed 2026-11-15
+    ([#191](https://github.com/dnznlabs/rake/pull/191)): the threshold route is the one used, as one
+    `batch` proposal per chain with the engineer's signature first — RUNBOOK § Step 4 (4a–4d).* `forward()` requires
     `ownerCount()` signatures for anything but `cancelQueued` (`TimelockExecutor.sol:35-46`); the
     handbook sentence that said threshold was corrected the same day (handbook#34). Every later
     upload, `lock()` and M05's mirror take the same road. Rejected: redeploying `App` owned by the
