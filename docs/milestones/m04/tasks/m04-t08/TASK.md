@@ -234,7 +234,10 @@ second revision, kept for the record):**
    0x0f8132D41Ea16c4536565cb2910EF801c2e35D0D` (predicted doc 0) non-empty; before the batch,
    `cast nonce $APP` → `3` **and** both document pointers (`…35D0D`, `0xAf5f9504…730a0`) have code;
    after the batch, `cast nonce $APP` → `4` and the widget pointer `0xc39C7643…aC8e` has code. The
-   nonce alone reads `2` after either `addChunk`, so the code check is the gate, not the nonce. Any
+   nonce reads `2` and the doc-0 pointer holds code after *either* order, so neither is the gate against
+   the swap; the gate is content equality — `cast code` at the doc-0 pointer equals `0x00` followed by
+   the `bytes` argument decoded from `1-addChunk-0.hex` (`cast calldata-decode "addChunk(bytes)"`),
+   and likewise doc 1 against `2-addChunk-1.hex` before the batch (RUNBOOK 4c has the one-liner). Any
    other reading stops and messages the architect. `html()` is empty until the batch lands. **The
    hazard these guard** (RUNBOOK 4c, the engineer's source read of 2026-11-16): pointers are `App`'s
    CREATE addresses by nonce, so piece 2 before piece 1 puts doc 1 at the predicted doc-0 address,

@@ -573,10 +573,21 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
    | the batch | `3` | doc 0 as above **and** doc 1: `0xAf5f9504714D4D441E836ef626633553ccF730a0` |
    | (after the batch) | `4` | widget: `0xc39C7643cbfFE57114A1851Af499f1781c0daC8e` — step 4d's check |
 
-   The nonce alone is not the gate: it reads `2` after *either* `addChunk`. The code check on the
-   doc-0 pointer before piece 2 is what proves it was piece 1 that landed there, and both pointers
-   before the batch prove the order held. Any other reading is a stop and a message to the
-   architect, not a retry.
+   Neither the nonce nor a non-empty `cast code` is the gate against the swap: after piece 2
+   executed first, the nonce reads `2` *and* the doc-0 pointer holds code — chunk 1's. Only the
+   **contents** discriminate. Before piece 2, the code at the doc-0 pointer must equal `0x00`
+   followed by chunk 0's bytes, which are the `bytes` argument of the committed call:
+
+   ```sh
+   CHUNK0=$(cast calldata-decode "addChunk(bytes)" "$(cat calldata/$CHAIN_ID/1-addChunk-0.hex)")
+   [ "$(cast code 0x0f8132D41Ea16c4536565cb2910EF801c2e35D0D --rpc-url "$RPC")" = "0x00${CHUNK0#0x}" ] && echo chunk0-in-place
+   ```
+
+   (`SSTORE2.write` stores a `0x00` STOP byte then the data, `lib/solady/src/utils/SSTORE2.sol:52`,
+   so an SSTORE2 pointer's runtime code is exactly that.) The same comparison for the doc-1 pointer
+   against `2-addChunk-1.hex` before the batch. The nonce and code-presence rows above are the
+   cheap pre-checks; the content equality is what proves the order held. Any other reading is a
+   stop and a message to the architect, not a retry.
 
    Each `executeQueued` is the transaction that runs its call and pays for it, so **set each gas limit
    by hand** — three figures per chain, § Gas. A wallet's own estimate through a public RPC reports a
