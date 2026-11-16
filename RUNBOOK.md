@@ -1028,8 +1028,8 @@ five per-call files are unchanged; `batch.hex` is added beside them and carries 
 at 65,536 (#188), so step 7 stopped there; calls 1 and 2 go as plain proposals and calls 3–5 as
 `batch345.hex`, executed in nonce order. `batch.hex` is deleted (§ The five calls).
 
-**4a `record:` — Base Sepolia (84532) is proposed; Sepolia (11155111) stopped before proposing**
-(2026-11-16). Gates on both chains at **16:54Z**: `isOwner($ENGINEER)` `true`, `threshold()` `2`,
+**4a `record:` — both chains are proposed** (2026-11-16; Base Sepolia at 16:57Z, Sepolia at 21:10Z
+after the stop below was lifted). Gates on both chains at **16:54Z**: `isOwner($ENGINEER)` `true`, `threshold()` `2`,
 `nonce()` `3`, `cast nonce $APP` `1`. `make dapp-nodev` and `tools/step4-calldata.mjs` regenerated
 every committed file byte-identical on both chains, `git status --porcelain` empty. The three Base
 Sepolia proposals carry one signature, the engineer's, and were generated at commit **`9fa393f`**:
@@ -1083,6 +1083,46 @@ product owner's. It is **housekeeping, not safety** — once the nonces move it 
 reason it stays on the list is the one that survives the nonce moving: a phantom row an owner can
 neither see nor act on is a trust cost in the dapp every time a key is used on that chain. "Cosmetic"
 here does not mean it never mattered.
+
+**Sepolia's three, proposed 2026-11-16 21:10Z** on the product owner's go. Gates re-read immediately
+before: `isOwner($ENGINEER)` `true`, `threshold()` `2`, `nonce()` **`3`** — unmoved, so the digests
+TASK.md recorded at *N* = 3 still hold — `delay()` `3600`, `cast nonce $APP` `1`. `make dapp-nodev
+CHAIN_ID=11155111` and `node tools/step4-calldata.mjs --chain 11155111` regenerated every committed
+file byte-identical (`git status --porcelain` empty), and each digest was recomputed from the chain
+and compared against TASK.md's value before signing:
+
+| proposal | file | target | nonce | digest | proposal id |
+|--:|:--|:--|--:|:--|:--|
+| 1 | `1-addChunk-0.hex` | `$APP` | 3 | `0xe73c3f13c1b2f66f1d15e53a1cc2cefcd6da67b41599f1273d31e359caca326d` | `62b53064-2768-4da3-adf0-0df130d02b17` |
+| 2 | `2-addChunk-1.hex` | `$APP` | 4 | `0xc1e9b846b07a3c73ad80c4f168c7972b78e0d239342dc530ebe4668fa2d4bc47` | `3ad0d25f-a8d5-477f-9b7e-c01e5eae50b7` |
+| 3 | `batch345.hex` | `$OWNER` | 5 | `0x7d2d3128a3e3ee78c30a10c2e7e2834c9031d57c1c466c9900c91fa8e256c0f5` | `6760a9a5-df96-47b8-a659-5cbe2f45d664` |
+
+Read back through the dapp's own query, all three carry **exactly one** signature, `ecdsa`, signer
+`0x5a158af8…bc50d`, with `value 0`, `threshold 2`, calldata byte-equal to the committed file and the
+digest equal to TASK.md's. **The prediction above held:** the same read returns five rows for that
+vault and the two unsigned ones are still the only hidden pair, so the product owner sees exactly
+three signable rows on Sepolia.
+
+**4c, partial `record:` — Base Sepolia submitted and queued** (2026-11-16, by the product owner).
+Vault `nonce()` moved `3 → 6` and `queued()` is nonzero for all three digests; nothing has reached
+`App` yet. Read from the chain, not from the service:
+
+| proposal | nonce | submit tx | block | `gasUsed` | ETA |
+|--:|--:|:--|--:|--:|:--|
+| 1 | 3 | `0x2425762d26dafd86d303beea53e4bd4e64391f88ed5b96d84901702e30630e2f` | 59706961 | 1,984,890 | `1794866861` · 22:07:41Z |
+| 2 | 4 | `0x913236ed909b8ca76df1ff2d082f714c1a15f00aaddc96864826a418e2f64feb` | 59707098 | 1,773,830 | `1794866888` · 22:08:08Z |
+| 3 | 5 | `0x24b889609e17fc7ad11c8a09afee1d7036848ba9c1c19d5c7745bdc71b983b8a` | 59707756 | 748,940 | `1794867020` · 22:10:20Z |
+
+All three receipts are `status true`. **Two things a later reader will trip on.** First, the submits
+were *relayed*: each `from` is a different EOA (`0xB42F812A…EAD6`, `0xB01caEa8…9C2E`,
+`0xC066ac5D…8B8c`) and each `to` is `0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3`, not the vault and
+not the product owner's account — the signatures are what authorise the call, and with both slots
+ECDSA the vault does not care who sends it. Second, **the `cast receipt <hash> --field gasUsed`
+form this plan prescribes does not run** on the pinned `cast 1.8.1`: the field is positional,
+`cast receipt <hash> gasUsed`. The figures above come from the positional form.
+
+**`executeQueued` has not run on either chain.** It must go in nonce order — 1, then 2, then the
+batch (4c) — and the last Base Sepolia ETA is `1794867020`.
 
 Step 6 has not run on
 either chain:
