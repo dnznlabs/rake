@@ -1028,6 +1028,28 @@ five per-call files are unchanged; `batch.hex` is added beside them and carries 
 at 65,536 (#188), so step 7 stopped there; calls 1 and 2 go as plain proposals and calls 3–5 as
 `batch345.hex`, executed in nonce order. `batch.hex` is deleted (§ The five calls).
 
+**4a `record:` — Base Sepolia (84532) is proposed; Sepolia (11155111) stopped before proposing**
+(2026-11-16). Gates on both chains at **16:54Z**: `isOwner($ENGINEER)` `true`, `threshold()` `2`,
+`nonce()` `3`, `cast nonce $APP` `1`. `make dapp-nodev` and `tools/step4-calldata.mjs` regenerated
+every committed file byte-identical on both chains, `git status --porcelain` empty. The three Base
+Sepolia proposals carry one signature, the engineer's, and were generated at commit **`9fa393f`**:
+
+| proposal | file | target | nonce | digest |
+|--:|:--|:--|--:|:--|
+| 1 | `1-addChunk-0.hex` | `$APP` | 3 | `0xf9996757df4ac60bbf8fad2b779c39ef7c82215390a8a12dc7bf17284706d702` |
+| 2 | `2-addChunk-1.hex` | `$APP` | 4 | `0xa2f30eebdcdc15eaa2ee322bf050796e72a12707b72eb4a38232fb10fa70f9a1` |
+| 3 | `batch345.hex` | `$OWNER` | 5 | `0xc691bc7e6ca4098f7b37ec1207fc0a7389ccead111ad762296d8758ff320f521` |
+
+**Sepolia's nonces 3 and 4 were already occupied when step 7 ran**, by two live proposals from the
+product owner's account `0x357836ff…902b` of 2026-11-16 00:21Z and 00:26Z: at nonce 3 a call to
+`$APP` whose calldata is byte-identical to `2-addChunk-1.hex` (sha256
+`cdb5fe891727c7cb98e26d84e3e0f79acb91b95694fd90da94069da66ca06357`, 42,890 characters), and at
+nonce 4 a second `addOwner($ENGINEER)`, which nonce 2 already executed on both chains. The first is
+**chunk 1 at the nonce chunk 0 must occupy** — the one misorder 4c calls silent: it does not revert,
+and `App` would serve the document's two halves swapped. Proposing calls 1–3 at nonces 3–5 there
+would put two `addChunk` proposals at nonce 3 and leave which one executes to whoever signs, so step
+7 stopped on that chain and messaged the architect rather than competing with it.
+
 Step 6 has not run on
 either chain:
 `cast code` at `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` prints `0x` on both and the Creator key

@@ -282,6 +282,57 @@ above do: `getTransactionHash` binds the chain, so neither signature is replayab
 **If `nonce()` is not 3 when the proposal is opened, both digests are wrong** and are recomputed by
 one run of the command above. Only the nonce changes; `batch.hex` does not.
 
+## Step 7's `record:` — Base Sepolia proposed, Sepolia stopped
+
+Run 2026-11-16. Gates on both chains at **16:54Z**: `isOwner($ENGINEER)` `true`, `threshold()` `2`,
+`nonce()` `3`, `cast nonce $APP` `1` — all four as the plan requires. `make dapp-nodev
+CHAIN_ID=$CHAIN_ID` then `node tools/step4-calldata.mjs --chain $CHAIN_ID` left
+`git status --porcelain` empty on both chains, so no committed file is stale.
+
+**Base Sepolia (84532) — three proposals, one signature each (the engineer's), generated at `9fa393f`:**
+
+| proposal | file | target | nonce | digest | proposal id |
+|--:|:--|:--|--:|:--|:--|
+| 1 | `1-addChunk-0.hex` | `$APP` | 3 | `0xf9996757df4ac60bbf8fad2b779c39ef7c82215390a8a12dc7bf17284706d702` | `59c0deed-a379-4663-90cf-539fa4f34e09` |
+| 2 | `2-addChunk-1.hex` | `$APP` | 4 | `0xa2f30eebdcdc15eaa2ee322bf050796e72a12707b72eb4a38232fb10fa70f9a1` | `461b6148-2114-4f4c-b480-8da6f36a437b` |
+| 3 | `batch345.hex` | `$OWNER` | 5 | `0xc691bc7e6ca4098f7b37ec1207fc0a7389ccead111ad762296d8758ff320f521` | `46dc9e52-67de-4796-be02-117b0f680bbd` |
+
+Each digest equals the `cast call $OWNER 'getTransactionHash(address,uint256,bytes,uint32)(bytes32)'`
+reading for its own target and nonce, and all three match the values TASK.md recorded at `N = 3`.
+Read back from the coordination service: `status proposed`, `value 0`, `threshold 2`,
+`proposed_by 0x5a158af8…bc50d`, and calldata of 48,138 / 42,890 / 18,314 characters whose sha256s are
+`8cee870c…5691a`, `1747296…8fea3` and `7946270a…1438f` — the committed files.
+
+**`POST /proposals` needs `p_threshold`**, which neither the handbook's agent recipe nor § Step 4
+mentions: without it the service answers `400 Invalid proposal threshold`. It must be at least the
+vault's on-chain `threshold()` and at most `ownerCount()`; `2` was sent. Nothing is stored on a 400,
+so the retry is the same POST with the field added.
+
+**The signature count could not be read, and the control says so rather than the proposals.** A
+reader token minted through `POST /session` returns `[]` from `signatures` for all four Base Sepolia
+proposals — *including the executed nonce-2 `addOwner`, which has two by definition*. So this is read
+visibility, not a missing signature: the service's cached `owners` for that vault still lists only
+the three owners of its deployment block and not `$ENGINEER`, and its cached `nonce` is `2` where the
+chain says `3`. The chain is what the vault enforces, and the service read it — it accepted all three
+proposals, which it does only after `isOwner` at the current block.
+
+**Sepolia (11155111) — not proposed; step 7 stopped there.** Nonces 3 and 4 already carry live
+proposals from `0x357836ff…902b` (the product owner's smart account), opened 2026-11-16 00:21Z and
+00:26Z, before the three-proposal route was ruled:
+
+| nonce | target | what it is | status |
+|--:|:--|:--|:--|
+| 3 | `$APP` | calldata byte-identical to `2-addChunk-1.hex` — sha256 `cdb5fe89…06357`, 42,890 chars, digest `0x03525096…275026` | proposed |
+| 4 | `$OWNER` | `addOwner($ENGINEER)` — a second one; nonce 2 already executed it on both chains | proposed |
+
+The nonce-3 proposal is **document chunk 1 at the nonce chunk 0 must occupy**. That is the misorder
+4c calls silent: `_requireChunk` checks code and a `0x00` first byte and nothing about contents, so
+nothing reverts and `App` serves the two gzip halves swapped. Proposing call 1 at nonce 3 as the plan
+prescribes would leave two `addChunk` proposals at one nonce and make which bytes land a property of
+which one gets the second signature first. Not the engineer's call to cancel: the proposer is the
+product owner, and `cancelQueued` needs the threshold. Messaged to the architect; Sepolia's row
+above waits on the ruling.
+
 ## The fork rehearsal
 
 Calls 4 and 5 revert `CodelessChunk` until 1–3 land, so the prescribed `cast estimate` cannot reach
