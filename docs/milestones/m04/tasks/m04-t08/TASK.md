@@ -12,8 +12,7 @@ Milestone: [M04](../../MILESTONE.md) · Phase: 2 — The runbook, for real
 > Elanik was added as an Ops owner instead (`addOwner` queued at vault nonce 2 on both chains, 2026-11-16).
 > Steps 1–6 are done and merged (#187, #191; `HANDOFF.md` records them). This revision changes **steps
 > 7–9, two gates, § Acceptance criteria, § Out of scope and § Open questions** to the route the runbook
-> now describes; the superseded text is struck (~~like this~~) and kept. Elanik is she/her (handbook README
-> roster, [handbook#41](https://github.com/dnznlabs/handbook/pull/41)). The mechanism is unchanged:
+> now describes; the superseded text is struck (~~like this~~) and kept. The mechanism is unchanged:
 > decision 44 still rules that step 4 is an Ops vault action.
 
 When this is done, `App` at `0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE` serves the shipping bundle on
