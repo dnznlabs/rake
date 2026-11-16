@@ -254,8 +254,8 @@ which proves the deployed bytes are the right bytes, retroactively.
 
 ## § For Denizen — step 6
 
-**Not run on either chain, and not this task's**: the DNZN Creator key is Denizen's and the handbook
-forbids it on the engineer's host. Both chains are ready for it — `cast code` at the predicted
+**Not run on either chain, and not this task's**: the DNZN Creator key is Denizen's and never
+lives on the engineer's host. Both chains are ready for it — `cast code` at the predicted
 `DISTRO` prints `0x` on Sepolia and Base Sepolia, and the Creator key is at **nonce 0** on both with
 **0.01 ETH** on each (read 2026-11-08 22:05 CST).
 

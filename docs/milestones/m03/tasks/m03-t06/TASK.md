@@ -214,7 +214,7 @@ commit's and are re-run, not quoted.
    `OWNER`. Then the sentence #23 requires, with the word `unrecoverable`: the creator key is part
    of this address on every chain; a chain not reached while the key is live can never carry this
    distribution at this address, so the `create` is done once per chain in § 1's table while the
-   key is live, and the key is backed up to the handbook's standard before step 6 runs anywhere.
+   key is live, and the key is backed up to the org's standard before step 6 runs anywhere.
 
    Step 7 — stop. Nothing closes; § Not in this runbook is the authority.
 

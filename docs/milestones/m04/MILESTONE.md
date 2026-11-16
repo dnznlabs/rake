@@ -142,8 +142,8 @@ than quote. "Both chains" means Sepolia and Base Sepolia, every time.
   `DNZN // FEE DISTRIBUTION`, delay 86,400 s, 60/30/10 to `0x3578…902B` (Denizen's address, the row
   the ruling calls "Creator" — not the Creator key), Ops and Treasury; written in `_set`'s ascending
   address order in the record. Owner stays the Ops vault.
-- **Testnet ETH, two keys.** Steps 1–5 are signed by Elanik's agent wallet (the handbook roster's
-  address), which needs about **0.1 Sepolia ETH** and **0.02 Base Sepolia ETH**: the anvil
+- **Testnet ETH, two keys.** Steps 1–5 are signed by Elanik's agent wallet
+  (`0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d`), which needs about **0.1 Sepolia ETH** and **0.02 Base Sepolia ETH**: the anvil
   rehearsal totals 14.7 M gas per chain (factory 2,262,485 + `App` 1,648,295 + chunks 10,820,875),
   and the base fee read on 2026-11-07 was 15 wei on Sepolia and 0.005 gwei on Base Sepolia, so the
   figures are a margin against a busier hour (14.7 M gas at 5 gwei is 0.07 ETH), not a forecast.

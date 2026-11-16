@@ -156,7 +156,7 @@ Figures below were read on 2026-11-07; re-run rather than quote.
 
    Check: the section exists with both chains' commands and the anvil rehearsal's receipt.
 
-8. **`HANDOFF.md`** from the handbook template: the AC table with chain-read figures, § Gates,
+8. **`HANDOFF.md`**: the AC table with chain-read figures, § Gates,
    § Deviations, § For Denizen — step 6, and § For t04 (the two gateway URLs to measure:
    `https://0x00a90943f58b6ab7fde05aae01c13a80e6995bae.11155111.w3link.io/` and `…84532…`, and the
    `App` document hashes per chain).
@@ -186,7 +186,7 @@ Figures below were read on 2026-11-07; re-run rather than quote.
 
 ## Out of scope
 
-- **Step 6** on either chain: the Creator key is Denizen's and the handbook forbids it on this host.
+- **Step 6** on either chain: the Creator key is Denizen's and never lives on this host.
 - Any mainnet; any `src/` byte; `lock()`, renounce, any ownership change.
 - The hosted gateway and the host page (t04); the UAT (t05).
 - Re-mining, re-verifying or re-deploying anything after a mistake: a wrong address on a public

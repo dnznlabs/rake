@@ -110,7 +110,7 @@ bytes of gzip, so the third chunk starts at 48,000 and there is room.
    what the dapp shows; superseding one means a five-line entry in `docs/ROADMAP.md` § Decisions
    before the code lands, so the record and the dapp never disagree. The five lines: question,
    options with costs, recommendation, default, where recorded.
-3. **One PR per item or per coherent batch**, from the handbook's `templates/PR.md` (no task line —
+3. **One PR per item or per coherent batch**, from the PR template (no task line —
    this is work outside the loop; the paragraph and the review line stay), reviewed by the architect against the criteria it touches, merged by
    Denizen. **Merge commit, not squash or rebase**, or the authorship and signatures on the branch
    are lost (as #65's were). Each PR's row goes in the Phase 5 table in `MILESTONE.md`; the architect

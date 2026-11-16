@@ -275,15 +275,15 @@ should be priced when the item is filed rather than discovered at review.
 
 ## Carried issues at close-out
 
-Listed 2026-10-25, with t05 merged and Phase 5 not yet started, per handbook `roles/architect.md`
-§ Carrying forward: a milestone does not close with a `carried` issue labelled `m02` open.
+Listed 2026-10-25, with t05 merged and Phase 5 not yet started, under the loop's carrying rule:
+a milestone does not close with a `carried` issue labelled `m02` open.
 
 | Issue | Disposition |
 |:------|:------------|
 | [#35](https://github.com/dnznlabs/rake/issues/35), [#42](https://github.com/dnznlabs/rake/issues/42), [#66](https://github.com/dnznlabs/rake/issues/66) | `m02-t06`, above. Scripts, make and tools; no `src/`. |
 | [#43](https://github.com/dnznlabs/rake/issues/43), [#21](https://github.com/dnznlabs/rake/issues/21) | Relabelled `m03` → `m02` and folded into `m02-t06`: one is `app/` only, the other `test/` only, and neither waits on the review to be right. |
 | [#22](https://github.com/dnznlabs/rake/issues/22) | Stays `m03`. `m02-t06` lands the gas assertion; the `SECURITY.md` entry is the review's. |
-| [#41](https://github.com/dnznlabs/rake/issues/41) | Closed by the PR that added this section: the submodule line is in `AGENTS.md` § Contracts and in the handbook's checkout runbook. |
+| [#41](https://github.com/dnznlabs/rake/issues/41) | Closed by the PR that added this section: the submodule line is in `AGENTS.md` § Contracts and in the org's checkout procedure. |
 | [#50](https://github.com/dnznlabs/rake/issues/50) | Phase 5 row, above. |
 | [#68](https://github.com/dnznlabs/rake/issues/68) | Phase 5 row, above; a ruling. Whatever it decides about decision 12 reaches M04's acceptance and M03's review scope. |
 | [#18](https://github.com/dnznlabs/rake/issues/18), [#19](https://github.com/dnznlabs/rake/issues/19), [#20](https://github.com/dnznlabs/rake/issues/20), [#23](https://github.com/dnznlabs/rake/issues/23), [#54](https://github.com/dnznlabs/rake/issues/54), [#61](https://github.com/dnznlabs/rake/issues/61) | `m03`, unchanged: each needs `SECURITY.md`, the runbook, or a `Distribution.sol` decision, none of which exists before the review. M03's `MILESTONE.md` lists them as its queue. |

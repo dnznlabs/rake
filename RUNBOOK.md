@@ -672,7 +672,7 @@ anyone else putting a different table at this address on a chain DNZN has not re
 distribution's address on every chain: ownership can be transferred per chain, but no other sender
 can ever place a distribution at this address on a chain that does not already have one. So the
 `create` is done **once per chain in § 1's table while the key is live**, not on demand years later,
-and the key is backed up to the handbook's standard for an owner key **before step 6 runs anywhere**
+and the key is backed up to the org's standard for an owner key **before step 6 runs anywhere**
 ([#23](https://github.com/dnznlabs/rake/issues/23)).
 
 `record:` `DNZN_SALT`, `DISTRO`, the transaction hash, `gasUsed`, and the `owner()` read.
@@ -1024,7 +1024,7 @@ Every one reports solc `v0.8.34+commit.80d5c536`, optimizer on.
 ### Step 6 is Denizen's
 
 **Step 6 was not run on either chain and is not this document's to run here**: the DNZN Creator key
-is Denizen's and the handbook forbids it on the engineer's host. Its two values are
+is Denizen's and never lives on the engineer's host. Its two values are
 **decision 42's** — `DNZN_DELAY=86400` and the three-row `DNZN_TABLE` of Treasury 1,000 bps, Ops
 3,000 and `0x357836fF…902B` 6,000, in `_set`'s ascending address order, with
 `DNZN_DESCRIPTION="DNZN // FEE DISTRIBUTION"`. m04-t03's handoff § For Denizen — step 6 carries the

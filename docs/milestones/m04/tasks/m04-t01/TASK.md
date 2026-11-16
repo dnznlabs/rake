@@ -125,7 +125,7 @@ dapp describes — which step 5 corrects first, so do step 5 early.
    dev stack: the distribution page, the pending view with an expired entry, the widget's queued
    line with its title, and the Limits page. Screenshots or DOM text in the handoff.
 
-8. **`HANDOFF.md`** from the handbook template beside this file: the AC table with measured
+8. **`HANDOFF.md`** beside this file: the AC table with measured
    figures, the MetaMask cap measurements from step 1 (both chains), § Deviations, and the widget
    byte count.
 

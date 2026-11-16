@@ -381,7 +381,7 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     rake"). The key that calls `create` is a fresh cold EOA, **DNZN Creator** (keystore
     `dnzn-creator`), held by Denizen and backed up to the standard of an owner key; it is the one
     creator key for every DNZN project whose contracts are placed by a salted `create`, not a key for
-    rake alone. Two conditions, recorded org-wide in the handbook beside the vaults, which the M03
+    rake alone. Two conditions, recorded org-wide, which the M03
     runbook references rather than restates: salted creates only (it is a CREATE2 `msg.sender`, never
     a plain CREATE, where the address would depend on the order of every other deploy across projects
     and chains; a project that needs nonce-based addresses gets its own throwaway key); and never an
@@ -441,9 +441,9 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     code, the same three owners, 2-of-3, delays 86,400 s and 3,600 s, Ops's fast path on, on all
     eight chains of M03 criterion 7. So `App`'s owner and the owner passed to DNZN's `create` are
     one constant, the Ops vault, on every chain, and `App` is same-address on all eight. The
-    question existed because the handbook's vault table said "mainnet + Sepolia", which was stale
-    by six chains; the chain, not the roster, is the source for deployment state (handbook#32
-    corrects the row). Rejected: Denizen's EOA as owner on chains without a vault, handed over
+    question existed because the org's vault roster said "mainnet + Sepolia", which was stale
+    by six chains; the chain, not the roster, is the source for deployment state (the row was
+    corrected 2026-11-06). Rejected: Denizen's EOA as owner on chains without a vault, handed over
     later (two owners to keep straight, and `App` at a different address on one testnet).
 36. **F8 is documented, not capped: the ERC-20 push keeps all its gas.** D14, opened at m03-t05's
     scoping on [#123](https://github.com/dnznlabs/rake/issues/123), ruled by Denizen on 2026-10-31
@@ -563,11 +563,11 @@ Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
     22:17 CST: he travels with the Creator key and one of three Ops signers, so the document upload
     waits for his return while the `create` does not); step 6 touches only the factory and the clone,
     so the order is sound and no runbook deviation is needed. (iii) **Precondition, unverifiable from
-    any agent host:** `RUNBOOK.md` § Step 6 requires the Creator key "backed up to the handbook's
+    any agent host:** `RUNBOOK.md` § Step 6 requires the Creator key "backed up to the org's
     standard for an owner key before step 6 runs anywhere" — #23 closed the *documentation* of that
     requirement, not the backup — so Denizen confirms the backup in writing before the first send.
     **Confirmed by Denizen, Telegram, 2026-11-08 22:26 CST: the Creator key is backed up to the
-    handbook's standard for an owner key.** The medium and location are deliberately not recorded here
+    org's standard for an owner key.** The medium and location are deliberately not recorded here
     or anywhere in this repo; the fact, the date and the channel are what the gate needs. The handoff
     repeats that line beside the step-6 rows; the gate is satisfied. The address is
     `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` on both chains (`predict(DNZN_SALT)` on the live
@@ -614,16 +614,16 @@ Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
     ([#191](https://github.com/dnznlabs/rake/pull/191)): the threshold route is the one used, as one
     `batch` proposal per chain with the engineer's signature first — RUNBOOK § Step 4 (4a–4d).* `forward()` requires
     `ownerCount()` signatures for anything but `cancelQueued` (`TimelockExecutor.sol:35-46`); the
-    handbook sentence that said threshold was corrected the same day (handbook#34). Every later
+    org record that said threshold was corrected the same day. Every later
     upload, `lock()` and M05's mirror take the same road. Rejected: redeploying `App` owned by the
     deploying key and transferring afterwards (a new `APP_SALT`, a new live address, and it saves one
-    upload); the engineer's key as owner (decision 35, the handbook's agent rule). **Also ruled:** the
+    upload); the engineer's key as owner (decision 35). **Also ruled:** the
     step-4 preparation is a new task, m04-t08, scoped after this ruling rather than widened into
     m04-t03 under review — the engineer correctly refused to take it from an issue, since `TASK.md` on
     `main` is the only task authority.
 
-Ruled by Denizen on 2026-11-11 over Telegram, for rake, runner and drop alike; the org convention is
-the handbook README § Conventions. Numbered 45 because 44 is taken by
+Ruled by Denizen on 2026-11-11 over Telegram, for rake, runner and drop alike, as an org
+convention. Numbered 45 because 44 is taken by
 [#180](https://github.com/dnznlabs/rake/pull/180), open when this was written.
 
 45. **Alpha marker: `0.1alpha`, the tag line, the Disclaimer; removed by a test.** "Alpha" is a
