@@ -120,8 +120,7 @@ Everything through `devbox run --`.
    ~~both gateway URLs and the hashes t04 measures against.~~
 
 **Steps 6a–9 since 2026-11-16, against RUNBOOK § Step 4 (4a–4d) at `a1c1896`.** Steps 1–6 are merged
-(#187, #191). Variables as RUNBOOK § 0; `$ENGINEER` = `0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d`
-(handbook README roster). Every command through `devbox run --`, every chain read with an explicit
+(#187, #191). Variables as RUNBOOK § 0; `$ENGINEER` = `0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d`. Every command through `devbox run --`, every chain read with an explicit
 `--rpc-url "$RPC"`, each chain's run opened with `cast chain-id`.
 
 6a. **Gate, satisfied — ruled 2026-11-16 ([#190](https://github.com/dnznlabs/rake/issues/190)): the dev-seed
