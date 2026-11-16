@@ -243,7 +243,9 @@ second revision, kept for the record):**
    CREATE addresses by nonce, so piece 2 before piece 1 puts doc 1 at the predicted doc-0 address,
    `_requireChunk` (`src/App.sol:198-209`) checks code and a `0x00` first byte and nothing about
    contents, `setChunks` passes, and `App` silently serves the two gzip chunks swapped — the one
-   out-of-order permutation that does not revert `CodelessChunk`. If `inflated sha256` differs with
+   out-of-order permutation that does not revert `CodelessChunk` — measured on a Sepolia fork
+   2026-11-16: three `0x1` receipts, chunk sizes 21,359 / 24,001 the wrong way round, `chain-doc`
+   throws `Z_DATA_ERROR` on inflate. If `chain-doc` fails to inflate or `inflated sha256` differs with
    all six landed, that is the first suspect, `cast code` at the two pointers tells which chunk sits
    where, and the fix is one corrective `setChunks` proposal with the pointers in order, scoped then;
    no re-upload. Check: M04 criterion 3's chain half, per chain, in the handoff AC table with the

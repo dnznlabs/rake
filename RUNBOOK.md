@@ -558,7 +558,11 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
      at the address it names as pointer 1; `_requireChunk` checks only that each has code whose first
      byte is `0x00` (`src/App.sol:198-209`) — which chunk it is, it cannot tell — so the batch then
      succeeds and the page is served with its halves
-     swapped. Nothing stops it until 4d's `inflated sha256` differs. The repair is a further vault
+     swapped. Nothing on chain refuses it — measured on an anvil fork of Sepolia with the vault
+     impersonated, 2026-11-16: all three pieces return status `0x1`, the pointers are the predicted
+     three, the chunk code sizes come back 21,359 and 24,001 instead of 24,001 and 21,359, and the
+     served `html()` is an unservable gzip stream (`chain-doc` throws `Z_DATA_ERROR` on inflate, so
+     4d cannot miss it). The repair is a further vault
      proposal — a corrective `setChunks` with the two pointers in the right order — not a redeploy.
      So the order 1 → 2 is load-bearing in itself, not only relative to the batch.
    So each piece has a **gate, read from the chain before it is sent**. `App` starts at account nonce
@@ -687,7 +691,7 @@ third, rather than quoting a measured figure — **three limits per chain**, all
 |:--|--:|--:|--:|--:|
 | proposal 1 — call 1 | 37,859,277 | **50,000,000** | 5,343,761 | **7,000,000** |
 | proposal 2 — call 2 | 33,740,257 | **44,000,000** | 4,767,004 | **6,200,000** |
-| proposal 3 — `batch345` | **derived** ≈13.17M — the whole-batch estimate less calls 1 and 2, consistent with `addWidgetChunk` 13,140,215 plus the setters (sum 13,254,251, loop excluded) | **18,000,000** | **derived** ≈2.08M — the 2026-11-16 whole-batch estimate of 12,188,581 less calls 1 and 2, consistent with `addWidgetChunk` 1,883,560 plus the setters | **2,800,000** |
+| proposal 3 — `batch345` | **derived** ≈13.17M — the whole-batch estimate less calls 1 and 2, consistent with `addWidgetChunk` 13,140,215 plus the setters (sum 13,254,251, loop excluded); **fork figure 1,925,936** (anvil fork of Sepolia, 2026-11-16, identical in two runs — a lower bound, since anvil does not price code deposit as Sepolia does: the same fork gave 5,300,538 and 4,711,210 for pieces 1 and 2 against 37,859,277 and 33,740,257 live) | **18,000,000** | **derived** ≈2.08M — the 2026-11-16 whole-batch estimate of 12,188,581 less calls 1 and 2, consistent with `addWidgetChunk` 1,883,560 plus the setters | **2,800,000** |
 | block `gasLimit` | 200,000,000 | | 120,000,000 | |
 
 **These three limits replace the single 110,000,000 of the one-`batch` route**, which was set by
