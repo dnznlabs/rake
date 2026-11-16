@@ -478,9 +478,12 @@ target: `$APP` for 1 and 2, `$OWNER` for 3.
 
 `batch345.hex` keeps the setters atomic with the widget chunk: calls 4 and 5 validate their pointers
 through `_requireChunk` (§ The five calls), so the widget pointer is created and consumed inside one
-transaction, and the two setters either both land or neither does. The document pointers are created
-by proposals 1 and 2, which is why the batch executes last (4c). `batch` is `onlySelf`, so the vault is
-its target and it calls `App` as its owner.
+transaction, and the two setters either both land or neither does. That works only because the
+widget chunk is the **third** CREATE: `addWidgetChunk` inside the batch deploys at `App` nonce 3, the
+address `5-setWidgetChunks.hex` names, and that is where the nonce stands only after proposals 1 and
+2 have each executed once, in that order (4c's gates). The document pointers are created by
+proposals 1 and 2, which is why the batch executes last and why 1 precedes 2 (4c). `batch` is
+`onlySelf`, so the vault is its target and it calls `App` as its owner.
 
 The engineer signs each digest and proposes through the dapp's API — handbook
 `docs/multisig-transactions.md` § Doing it as an agent, steps 1–3, three times: `getTransactionHash`
@@ -545,7 +548,7 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
    each receipt, in the order 1, 2, batch. What each misorder does, from the source:
    - **The batch before 1 or 2 reverts and stays queued.** Call 4, `setChunks`, validates both
      document pointers through `_requireChunk` and reverts `CodelessChunk(ptr)` (`src/App.sol:125`,
-     `:198-207`) on the one whose chunk has not landed; `batch` re-raises the inner revert
+     `:198-209`) on the one whose chunk has not landed; `batch` re-raises the inner revert
      (`Multisig.sol:212`), `executeQueued` re-raises that (`:195`), and the state change — `delete
      queued[hash]` — is rolled back with it, so the piece can be sent again after 1 and 2. The whole
      piece reverts: `addWidgetChunk` inside it does not land either.
@@ -553,17 +556,45 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
      deploy a pointer at `App`'s next CREATE address; nothing in `addChunk` knows which chunk it is
      carrying. Executed 2 then 1, chunk 1 lands at the address call 4 names as pointer 0 and chunk 0
      at the address it names as pointer 1; `_requireChunk` checks only that each has code whose first
-     byte is `0x00` (`src/App.sol:198-207`) — which chunk it is, it cannot tell — so the batch then
+     byte is `0x00` (`src/App.sol:198-209`) — which chunk it is, it cannot tell — so the batch then
      succeeds and the page is served with its halves
      swapped. Nothing stops it until 4d's `inflated sha256` differs. The repair is a further vault
      proposal — a corrective `setChunks` with the two pointers in the right order — not a redeploy.
      So the order 1 → 2 is load-bearing in itself, not only relative to the batch.
+   So each piece has a **gate, read from the chain before it is sent**. `App` starts at account nonce
+   1 (the precondition above), and every `add*Chunk` is one CREATE, so the nonce counts the chunks
+   that have landed and the predicted pointers (handoff § The pointers, identical on both chains) say
+   where:
+
+   | before sending | `cast nonce $APP` | `cast code <ptr>` non-empty at |
+   |:--|--:|:--|
+   | piece 1 | `1` | nothing yet — both document pointers print `0x` |
+   | piece 2 | `2` | doc 0: `0x0f8132D41Ea16c4536565cb2910EF801c2e35D0D` |
+   | the batch | `3` | doc 0 as above **and** doc 1: `0xAf5f9504714D4D441E836ef626633553ccF730a0` |
+   | (after the batch) | `4` | widget: `0xc39C7643cbfFE57114A1851Af499f1781c0daC8e` — step 4d's check |
+
+   The nonce alone is not the gate: it reads `2` after *either* `addChunk`. The code check on the
+   doc-0 pointer before piece 2 is what proves it was piece 1 that landed there, and both pointers
+   before the batch prove the order held. Any other reading is a stop and a message to the
+   architect, not a retry.
+
    Each `executeQueued` is the transaction that runs its call and pays for it, so **set each gas limit
    by hand** — three figures per chain, § Gas. A wallet's own estimate through a public RPC reports a
    false `DeploymentFailed()`. Running out of gas reverts that one call and leaves it queued, so it
-   can be sent again with more; the ones already executed stay executed. `cast nonce $APP` reads `2`
-   after the first, `3` after the second, `4` after the batch; check it before sending the next, since
-   the account nonce is the one thing that proves the previous piece landed.
+   can be sent again with more; the ones already executed stay executed.
+
+**The one silent misorder, and its repair.** The pointer predictions depend on execution *order*,
+not on the proposals: `App`'s CREATE address is a function of its nonce, and `addChunk` records
+whatever lands at it. Every out-of-order permutation of the three pieces but one reverts
+`CodelessChunk` and leaves the piece queued. The one that does not is **piece 2 before piece 1**:
+doc 1 lands at nonce 1 (the predicted doc-0 address), doc 0 at nonce 2, both hold valid SSTORE2
+chunks, `_requireChunk` (`src/App.sol:198-209`) checks `extcodesize != 0` and a `0x00` first byte and
+nothing about contents, so the batch's `setChunks` passes and `App` serves the document with its two
+gzip chunks swapped — no revert anywhere, caught only by 4d's `inflated sha256`. `executeQueued`
+imposes no order (above). The repair is **one corrective `setChunks` proposal** with the two pointers
+in the right order, through 4a–4c again at the then-live nonce; no chunk is re-uploaded, since both
+are on chain and the list is the only thing wrong. The gates above exist so the repair is never
+needed.
 
 `TimelockExecutor.forward()` skips the delay but needs **every** owner's signature, not the
 threshold, and nothing here is in a hurry; it is not this runbook's route.
@@ -616,7 +647,7 @@ a regenerated directory with `batch.hex` still in it is a stale checkout.
 
 **Calls 1–3 must have executed before calls 4 and 5.** The setters take their pointers from calldata
 and validate each through `_requireChunk`, which reverts `CodelessChunk(ptr)` on an address with no
-code (`src/App.sol:125`, `:147`, `:198-207`). `cast estimate` on call 4 against a chain where calls
+code (`src/App.sol:125`, `:147`, `:198-209`). `cast estimate` on call 4 against a chain where calls
 1–3 have not landed reverts `0xef9230eb` naming the first pointer. The three proposals satisfy this
 by executing in nonce order (4c): 1 and 2 create the document pointers, and `batch345` creates the
 widget pointer and runs both setters in array order inside one transaction. Five separate proposals
@@ -645,7 +676,7 @@ third, rather than quoting a measured figure — **three limits per chain**, all
 |:--|--:|--:|--:|--:|
 | proposal 1 — call 1 | 37,859,277 | **50,000,000** | 5,343,761 | **7,000,000** |
 | proposal 2 — call 2 | 33,740,257 | **44,000,000** | 4,767,004 | **6,200,000** |
-| proposal 3 — `batch345` | 13,254,251 — calls 3, 4, 5 summed, loop excluded | **18,000,000** | ≈2,077,816 — the 2026-11-16 whole-batch estimate of 12,188,581 less calls 1 and 2 | **2,800,000** |
+| proposal 3 — `batch345` | **derived** ≈13.17M — the whole-batch estimate less calls 1 and 2, consistent with `addWidgetChunk` 13,140,215 plus the setters (sum 13,254,251, loop excluded) | **18,000,000** | **derived** ≈2.08M — the 2026-11-16 whole-batch estimate of 12,188,581 less calls 1 and 2, consistent with `addWidgetChunk` 1,883,560 plus the setters | **2,800,000** |
 | block `gasLimit` | 200,000,000 | | 120,000,000 | |
 
 **These three limits replace the single 110,000,000 of the one-`batch` route**, which was set by
@@ -653,10 +684,12 @@ budget because its ~85M total could not be estimated through a public RPC. Each 
 from a per-call figure the node did return (≈38M, ≈34M and ≈13M on Sepolia; Base Sepolia from the
 handoff's figures), with the margin above, and the question that route carried — whether 110M clears
 the block limit and leaves headroom — goes away: the largest limit is a quarter of Sepolia's block
-and under 6% of Base Sepolia's. `batch345` cannot be estimated from the node until proposals 1
-and 2 have executed — `setChunks` reverts `CodelessChunk` on their pointers before that — so its two
-figures are derived, not read; after the second `executeQueued`, `cast estimate --from $OWNER $OWNER
-$(cat batch345.hex)` gives the live one, and the margin above is for that figure. The old
+and under 6% of Base Sepolia's. **`batch345` cannot be estimated from the node before the upload**:
+`cast estimate --from $OWNER $OWNER $(cat batch345.hex)` reverts `CodelessChunk` on both chains
+until proposals 1 and 2 have executed (measured 2026-11-16), because `setChunks` validates their
+pointers. Its two figures are therefore a **derivation**, labelled so in the table, until the fork
+rehearsal or the live read; the hand limit is the derivation plus margin. After the second
+`executeQueued` the same command gives the live figure, and the limit is re-set from that one. The old
 single-batch total (~85M on Sepolia, budgeted at 110M) was unmeasurable there, because public RPCs
 cap `eth_call` gas below it; a single `addChunk` is under that cap, so the per-proposal figures are.
 
@@ -951,7 +984,7 @@ back-to-back so they share one hour rather than costing five. **Order matters on
 the other**: both `addChunk` calls and the `addWidgetChunk` call must have *executed* before
 `setChunks` and `setWidgetChunks`, because the setters validate their pointers through
 `_requireChunk`, which reverts `CodelessChunk(ptr)` on a pointer with no code
-(`src/App.sol:125`, `:147`, `:198-207`). Queueing a setter beside the adds it depends on is a
+(`src/App.sol:125`, `:147`, `:198-209`). Queueing a setter beside the adds it depends on is a
 revert at execution, not at queue time.
 
 **`forward()` is not a threshold route**, which is the trap worth stating once: it requires

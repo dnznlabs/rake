@@ -229,12 +229,22 @@ second revision, kept for the record):**
    "chunks(uint256)(address)" 0|1` and `"widgetChunks(uint256)(address)" 0` equal § The pointers;
    `cast receipt <hash> --field gasUsed` for **all six** transactions. Fill step 4's `record:` rows in
    RUNBOOK § Executed on testnets: pointers, six hashes, six `gasUsed`, the two sha256s and byte counts.
-   Nothing is verified after the first or second `executeQueued` beyond `cast nonce $APP` reading 2 then 3;
-   `html()` is empty until the batch lands. If `inflated sha256` differs with all six landed, the first
-   suspect is the order of the first two `executeQueued` (RUNBOOK 4c: 2 before 1 swaps the halves and
-   nothing reverts); `cast code` at the two predicted pointers tells which chunk sits where, and the
-   fix is a corrective `setChunks` proposal, scoped then, not a redeploy. Check: M04 criterion 3's chain half, per chain, in the
-   handoff AC table with the commands and figures.
+   **Gates between pieces, RUNBOOK 4c's table, read by whoever sends the `executeQueued` calls and
+   recorded in the handoff with the time:** before piece 2, `cast nonce $APP` → `2` **and** `cast code
+   0x0f8132D41Ea16c4536565cb2910EF801c2e35D0D` (predicted doc 0) non-empty; before the batch,
+   `cast nonce $APP` → `3` **and** both document pointers (`…35D0D`, `0xAf5f9504…730a0`) have code;
+   after the batch, `cast nonce $APP` → `4` and the widget pointer `0xc39C7643…aC8e` has code. The
+   nonce alone reads `2` after either `addChunk`, so the code check is the gate, not the nonce. Any
+   other reading stops and messages the architect. `html()` is empty until the batch lands. **The
+   hazard these guard** (RUNBOOK 4c, the engineer's source read of 2026-11-16): pointers are `App`'s
+   CREATE addresses by nonce, so piece 2 before piece 1 puts doc 1 at the predicted doc-0 address,
+   `_requireChunk` (`src/App.sol:198-209`) checks code and a `0x00` first byte and nothing about
+   contents, `setChunks` passes, and `App` silently serves the two gzip chunks swapped — the one
+   out-of-order permutation that does not revert `CodelessChunk`. If `inflated sha256` differs with
+   all six landed, that is the first suspect, `cast code` at the two pointers tells which chunk sits
+   where, and the fix is one corrective `setChunks` proposal with the pointers in order, scoped then;
+   no re-upload. Check: M04 criterion 3's chain half, per chain, in the handoff AC table with the
+   commands and figures, and the three gate readings dated.
 
 9. **`HANDOFF.md` § For Denizen rewritten as three 4b checklists and three gas limits**, one block per
    chain, replacing the one-batch checklist (keep it struck as the record, as the five-row signing tables
