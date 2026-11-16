@@ -123,7 +123,7 @@ rather than quote.
    Check: the handoff has both tables, or the engineer's and an empty row labelled "Denizen:
    pending" that the architect fills at review.
 
-6. **`HANDOFF.md`** from the handbook template beside this file: the AC table with the figures
+6. **`HANDOFF.md`** beside this file: the AC table with the figures
    measured on the branch head, § Deviations, and § For M04 risks 1 and 2 — one sentence each on
    what this task settled about the software and what it leaves for t04 to settle about the hosted
    service.

@@ -36,7 +36,7 @@ than fixed.
 | 10 — `forge test` 91, `node --test` 90, `forge snapshot --check` 0 | pass | After `forge build --force` (required: Slither's compile leaves `out/` with six artifacts and none of the suites'): `forge test` → `Ran 5 test suites … 91 tests passed, 0 failed, 0 skipped (91 total tests)`; `node --test test/*.test.mjs` → `ℹ tests 90 / ℹ pass 90 / ℹ fail 0`; `forge snapshot --check` → `rc=0`; `make fmt` → `rc=0`. Baseline before any change, at `a90fa61`: the same 91 / 90 / 0. |
 | 11 — porcelain empty after `make slither && forge test` | pass | `git status --porcelain` → empty (one run showed only the then-untracked `slither.db.json`, which this PR tracks; it is empty with the file committed). |
 | 12 — `AGENTS.md` § Contracts gains the two facts | pass | `AGENTS.md:62-81`, three bullets: the triage database and the table move together; Slither's compile rebuilds `out/` without the tests; and the third fact this task discovered — `filter_paths` filters results, not the compilation unit. |
-| 13 — PR closes this task's issue | pending | Issue **#168** ("m04-t06 — Slither as the third leg, before the first public byte"), verified OPEN at the time of writing. Denizen opens the PR; the body from `templates/PR.md` carries the closing keyword. |
+| 13 — PR closes this task's issue | pending | Issue **#168** ("m04-t06 — Slither as the third leg, before the first public byte"), verified OPEN at the time of writing. Denizen opens the PR; the PR body carries the closing keyword. |
 
 ## CI
 

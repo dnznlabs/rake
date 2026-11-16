@@ -148,7 +148,7 @@ the decision wins and this file is fixed. Never `devbox run -- bash -c` with a p
 
    Check: the sentence is in `#/docs` § Disclaimer and in the handoff.
 
-7. **`HANDOFF.md`** from the handbook template: the AC table with evidence per row, § Baselines
+7. **`HANDOFF.md`**: the AC table with evidence per row, § Baselines
    (step 0, re-measured), the widget byte line before and after, the per-chain hashes of step 5,
    § Deviations, and § For t08 naming the hashes to upload.
 
@@ -215,8 +215,8 @@ None that gate a step. Two defaults the engineer takes, stated so the review can
 - Decision 45 (`docs/ROADMAP.md` § Decisions): the ruling, verbatim; decision 12 (the widget's one
   link); decision 5 (`lock()` not at launch); decision 44 and [#180](https://github.com/dnznlabs/rake/pull/180)
   (step 4 via the Ops vault, m04-t08's plan).
-- Handbook README § Conventions, "Alpha marker" (handbook#35, branch `docs/alpha-marker`, open
-  2026-11-12): the org convention this task implements.
+- The org "Alpha marker" convention, ruled 2026-11-11 and recorded as decision 45: the convention
+  this task implements.
 - `README.md` § Release Info and § Disclaimer ([#181](https://github.com/dnznlabs/rake/pull/181)).
 - `app/build.mjs:55` (the hardcoded `VERSION`), `:63-72` (the refusal), `:77-78` (the minifier),
   `:98-104` (the widget gate); `app/broadcast.mjs:56-65` (`creations()`).

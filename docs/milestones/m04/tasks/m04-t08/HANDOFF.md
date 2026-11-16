@@ -351,7 +351,7 @@ rows. That closes M04 criterion 3's chain half, which this PR deliberately does 
 1. **`getTransactionHash` binds the chain.** Calls 3–5 are byte-identical on both chains at the same
    nonce against a vault at one address, and their digests still differ — so there is no cross-chain
    replay of an Ops signature, and the two signing blocks are genuinely ten signatures and not six.
-   Worth a line in the handbook's multisig doc if it does not already say so.
+   Worth a line in the org's multisig doc if it does not already say so.
 2. **`MAX_CHUNK = 24_000` has no gas term, and Sepolia charges ~7× for code deposit.** One chunk
    costs 37.9M gas there, 19% of a 200M block. It fits, and nothing on that chain caps a transaction
    below 82M (block 12121145 carries an 81,965,912-gas transaction), so this is a headroom
@@ -376,7 +376,7 @@ rows. That closes M04 criterion 3's chain half, which this PR deliberately does 
      criteria, and M04 criterion 3 tracked nowhere.
    - *Refs only, close after step 8.* The issue stays open across Denizen's signing, and whoever runs
      step 8 pushes to the same branch or a second PR that closes it. Cost: a merged PR with an open
-     issue, which the handbook's loop does not otherwise produce.
+     issue, which the loop does not otherwise produce.
    - **Recommendation: refs only.** Step 8 is the half that closes M04 criterion 3, and an issue is
      the only thing tracking it.
    - Default if nobody rules: `.pr-body.md` says `Refs #185`, so merging closes nothing. One word

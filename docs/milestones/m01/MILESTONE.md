@@ -120,7 +120,7 @@ closed the milestone: its goal is the contract under the rulings, and 10 is one 
 
 ## Carried out of M01
 
-Opened under the loop's carrying rule (`agents` `roles/architect.md` § Carrying forward), each
+Opened under the loop's carrying rule, each
 labelled `carried` and the milestone that first acts on it. None is labelled `m01`, so none holds the
 close. **M02:** [#18](https://github.com/dnznlabs/rake/issues/18) stipend guidance for payers,
 [#20](https://github.com/dnznlabs/rake/issues/20) render a `false`-word revert from `release`,

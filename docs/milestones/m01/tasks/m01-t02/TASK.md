@@ -29,7 +29,7 @@ its hooks; a fresh clone gets them with `devbox run -- pre-commit install --inst
 installs both stages because `.pre-commit-config.yaml:1` sets `default_install_hook_types: [pre-commit,
 post-commit]`. Verify with `ls .git/hooks | grep -v sample` → `pre-commit`, `post-commit`. **Do not
 run `make init` (`init.sh`) on `rake`:** measured 2026-10-11 by both of us, it creates and bind-mounts
-a `.planning/` directory unconditionally, and `roles/README.md:3` makes that directory the test for a
+a `.planning/` directory unconditionally, and the roles loop reads that directory as the test for a
 GSD project, which `rake` is not. Both trees carried one and both have been unmounted and removed.
 That `init.sh` does this is a `shared` defect for Denizen, not something to work around here.
 

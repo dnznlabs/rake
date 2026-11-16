@@ -115,13 +115,13 @@ Everything through `devbox run --`.
    ~~`cast receipt`. Fill step 4's `record:` rows in RUNBOOK § Executed on testnets. Check: M04~~
    ~~criterion 3's chain half, per chain, in the handoff AC table.~~
 
-~~9. **`HANDOFF.md`** from the handbook template: AC table, § Gates (step 0), the hashes, the pointers,~~
+~~9. **`HANDOFF.md`**: AC table, § Gates (step 0), the hashes, the pointers,~~
    ~~the estimates, § For Denizen — step 4, § Deviations (each naming its runbook hunk), § For t04 with~~
    ~~both gateway URLs and the hashes t04 measures against.~~
 
 **Steps 6a–9 since 2026-11-16, against RUNBOOK § Step 4 (4a–4d) at `a1c1896`.** Steps 1–6 are merged
-(#187, #191). Variables as RUNBOOK § 0; `$ENGINEER` = `0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d`
-(handbook README roster). Every command through `devbox run --`, every chain read with an explicit
+(#187, #191). Variables as RUNBOOK § 0; `$ENGINEER` = `0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d`.
+Every command through `devbox run --`, every chain read with an explicit
 `--rpc-url "$RPC"`, each chain's run opened with `cast chain-id`.
 
 6a. **Gate, satisfied — ruled 2026-11-16 ([#190](https://github.com/dnznlabs/rake/issues/190)): the dev-seed

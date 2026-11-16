@@ -124,7 +124,7 @@ quote.
 
    Check: `grep -c 'm03-t10' SECURITY.md` → 1.
 
-6. **`HANDOFF.md`** from the handbook template, beside this file: the AC table with every figure
+6. **`HANDOFF.md`** beside this file: the AC table with every figure
    re-measured at the branch head; § For close-out with the two salts, the two init-code hashes,
    the four addresses, and the sentence M04's milestone file needs ("`src/` final at `<merge>`;
    salts mined against it; any `src/` byte after this is a new factory and a new mining run").
