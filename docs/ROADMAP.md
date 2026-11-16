@@ -653,7 +653,7 @@ the handbook README § Conventions. Numbered 45 because 44 is taken by
     is what step 4 signs; the landing page's featured panel is empty on Sepolia and Base Sepolia until
     [#193](https://github.com/dnznlabs/rake/issues/193) (carried, m04) creates the featured distribution
     per chain and re-uploads. Rejected: creating the distribution first (a day's delay before the
-    first upload, and the Creator key spent on a testnet seed) and hiding the panel when the salt
+    first upload, and the Creator key used for a testnet seed) and hiding the panel when the salt
     resolves to no code (a bundle change inside a task that forbids one; reconsidered in #193).
 
 ## Findings carried forward
