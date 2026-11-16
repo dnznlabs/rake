@@ -414,14 +414,18 @@ is what would catch a future change to that pattern, and it is cheap.
 
 `record:` the transaction hash, `gasUsed`, `APP`, and the three reads.
 
-### Step 4 — the document
+### Step 4 — the document, via the Ops vault
 
 The bundle that ships, then the chunks, then the comparison that proves the chain serves the bytes
-that were built:
+that were built. **The middle line is not a command the engineer runs**: `App`'s chunk setters are
+`onlyOwner` and the owner is the Ops vault, so the upload is five vault transactions on signatures
+Denizen produces (decision 44, [#178](https://github.com/dnznlabs/rake/issues/178)). The engineer
+prepares the bytes and verifies the result; nobody here needs a key they do not hold.
 
 ```sh
 make dapp-nodev CHAIN_ID=$CHAIN_ID
-APP=$APP forge script scripts/forge/Chunks.s.sol --rpc-url "$RPC" --broadcast $SIGNER
+node tools/step4-calldata.mjs --chain $CHAIN_ID    # writes the five calldatas; Denizen signs them
+#   … the five vault transactions land, by route (a) or (b) below …
 node tools/chain-doc.mjs --app $APP --rpc "$RPC" --chain $CHAIN_ID
 sha256sum app/dist/index.html app/dist/widget.js
 ```
@@ -435,6 +439,81 @@ counts, every transaction hash.
 
 **`make deploy` is not used on a public chain.** Its later recipes run `Seed.s.sol`,
 `Fixtures.s.sol` and a dev build, all of which are dev-chain only (decision 29).
+
+**`scripts/forge/Chunks.s.sol` is dev-chain only.** It broadcasts from one key, and on a dev chain
+that key is both signer and owner, so it works there and reverts `Unauthorized` on every public
+chain. It stays for `make deploy`; it is never the public-chain route. That collapse is also why no
+rehearsal caught this — a dev chain cannot tell the two roles apart.
+
+#### The five calls, and their order
+
+`tools/step4-calldata.mjs` writes them to `docs/milestones/m04/tasks/m04-t08/calldata/$CHAIN_ID/`,
+splitting `app/dist/index.html.gz` at `MAX_CHUNK = 24_000` bytes exactly as `Chunks.s.sol:_upload`
+does. They are committed, so what Denizen signs is reviewable before he signs it and re-derivable
+after:
+
+| # | call | file |
+|--:|:--|:--|
+| 1 | `addChunk(bytes)` — document chunk 0 | `1-addChunk-0.hex` |
+| 2 | `addChunk(bytes)` — document chunk 1 | `2-addChunk-1.hex` |
+| 3 | `addWidgetChunk(bytes)` | `3-addWidgetChunk.hex` |
+| 4 | `setChunks(address[],bool)` — the two document pointers, `true` | `4-setChunks.hex` |
+| 5 | `setWidgetChunks(address[])` — the widget pointer | `5-setWidgetChunks.hex` |
+
+**Both `addChunk` calls and the `addWidgetChunk` call must have *executed* before calls 4 and 5.**
+The setters take their pointers from calldata and validate each through `_requireChunk`, which
+reverts `CodelessChunk(ptr)` on an address with no code (`src/App.sol:125`, `:147`, `:198-207`).
+This is not a theoretical ordering: `cast estimate` on call 4 against a chain where calls 1–3 have
+not landed reverts `0xef9230eb` naming the first pointer, which is how the order was checked here.
+
+**The pointers are `App`'s own CREATE addresses and are identical on every chain**, because `App` is
+at one address everywhere (decision 35) and at account nonce 1 before step 4. So calls 4 and 5 —
+and call 3, whose bytes carry no chain-dependent token — are **byte-identical across chains**; only
+calls 1 and 2 differ, because `index.html` carries `__CHAIN_ID__`. The digests are not identical
+across chains even where the calldata is: `getTransactionHash` binds the chain, so a Sepolia
+signature cannot be replayed on Base Sepolia. `cast nonce $APP` is the right instrument for these
+pointers and the wrong one for the vault's digests, which use its internal `nonce()`.
+
+#### Route (a) — unanimous, immediate
+
+The route to use. All three Ops owners are Denizen's, so the five calls go through
+`TimelockExecutor.forward()` at **3-of-3** and execute immediately, with no queue and no wait. In
+the multisig dapp this is the human procedure of handbook `docs/multisig-transactions.md`
+§ Doing it as a human: propose each call, sign it with each of the three owners, and the dapp routes
+a unanimous proposal to `forward()`. `forward()` requires `ownerCount()` signatures for anything but
+`cancelQueued`, plus `forwardEnabled` for the vault
+(`src/mods/TimelockExecutor.sol:35-46` of src-company/multisig at `62eb905`) — so it is **not** a
+threshold route, and a threshold signature set sent through it reverts on the
+`sigs.length == required * 65` check.
+
+Each signature covers `getTransactionHash(target, value, data, nonce())` at the vault's **current**
+nonce, and executing a call increments it. So the five must land in order, and **no other vault
+transaction may land between them**; if the nonce moves before Denizen signs, every digest below it
+is recomputed. Re-read `cast call $OWNER "nonce()(uint32)"` immediately before signing — not
+`cast nonce $OWNER`, which is the account nonce and would put every digest one off.
+
+#### Route (b) — threshold, queued
+
+The fallback for the day a signer is unreachable. With `threshold()` signatures the call goes
+through `Multisig.execute()`, which **queues** it at `eta = block.timestamp + delay()` — 3,600 s on
+this vault, read on both chains — and `executeQueued()` runs it afterwards, callable by anyone. All
+five can be queued back to back so they share one hour rather than costing five, but the order
+constraint above still binds: a setter queued beside the adds it depends on reverts at execution,
+not at queue time.
+
+#### Gas
+
+Per-call figures come from `cast estimate --from $OWNER $APP $(cat <file>)` against the node — the
+vault as sender, which `eth_estimateGas` does not sign-check — never from a broadcast log, which
+files hashes under the wrong transaction. A `forward()` wraps each call in the overhead of its
+signature loop; that overhead is **unmeasured**, because `forward()` cannot be estimated without
+valid signatures. Budget for it rather than quoting a number.
+
+**Sepolia prices code deposit about 7× (§ 1e), and `MAX_CHUNK` has no gas term.** A 24,000-byte
+chunk estimates ~37.9M gas there against ~5.3M on Base Sepolia — 19% of Sepolia's 200M block limit
+for one call. The constant is a byte budget, chosen against the 24,576-byte code limit; if Sepolia's
+block gas limit ever drops below ~38M, step 4's first call stops fitting and the chunk size, not the
+runbook, is what has to change.
 
 ### Step 5 — explorer verification, named and not run
 
@@ -719,7 +798,15 @@ Read on both chains 2026-11-08: Ops `ownerCount()` **3**, `threshold()` **2**, `
 **no bundle hashes in this section**, step 4's `record:` rows are blank on purpose, and criterion 3's
 chain half is not claimed here. **§ Step 4 via the Ops vault is written by the step-4 preparation
 task**, which was scoped after decision 44 and is recorded beside M04-D4; it is not this task's,
-whose `TASK.md` still describes step 4 as a `forge script` the engineer runs. Step 6 has not run on
+whose `TASK.md` still describes step 4 as a `forge script` the engineer runs.
+
+**Step 4 is prepared and not yet executed, on either chain** (m04-t08, 2026-11-12). § Step 4 now
+carries the vault procedure, `tools/step4-calldata.mjs` writes the five calldatas and they are
+committed per chain, and the per-call estimates and digests are in that task's `HANDOFF.md`
+§ For Denizen. The rows below stay blank until Denizen's signatures land the forwards; the engineer
+holds no Ops key and broadcast nothing. Criterion 3's chain half is still open.
+
+Step 6 has not run on
 either chain:
 `cast code` at `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` prints `0x` on both and the Creator key
 is at **nonce 0** on both.
