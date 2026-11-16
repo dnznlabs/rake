@@ -610,7 +610,9 @@ Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
     per chain (`addChunk` ×2, `addWidgetChunk`, `setChunks`, `setWidgetChunks`), by one of two routes:
     **unanimous via `TimelockExecutor.forward()`, immediate**, which Denizen can satisfy alone since
     all three Ops signers are his; or **threshold via `Multisig.execute()`, queued for the vault's
-    3,600 s, then `executeQueued()`**, kept in the runbook as the fallback. `forward()` requires
+    3,600 s, then `executeQueued()`**, kept in the runbook as the fallback. *Route changed 2026-11-15
+    ([#191](https://github.com/dnznlabs/rake/pull/191)): the threshold route is the one used, as one
+    `batch` proposal per chain with the engineer's signature first — RUNBOOK § Step 4 (4a–4d).* `forward()` requires
     `ownerCount()` signatures for anything but `cancelQueued` (`TimelockExecutor.sol:35-46`); the
     handbook sentence that said threshold was corrected the same day (handbook#34). Every later
     upload, `lock()` and M05's mirror take the same road. Rejected: redeploying `App` owned by the
@@ -642,6 +644,17 @@ the handbook README § Conventions. Numbered 45 because 44 is taken by
     Rejected: the marker in `App.version` (a new `App` address, and M03's predicted addresses
     redone); a README-only disclaimer (the dapp is the surface a user reaches without ever seeing the
     repo).
+
+46. **The first public-testnet document upload ships the dev-seed `FEATURED_SALT`; a real featured
+    distribution comes with the next upload.** [#190](https://github.com/dnznlabs/rake/issues/190).
+    Ruled by Denizen on 2026-11-16 (Telegram, 08:46 CST): "that's fine - re-running the uploads ...
+    it's really only this first ... in the future will be regular updates... but we'll need a followup
+    task created so that we set the featured distro and re-upload chunks." So the committed `batch.hex`
+    is what step 4 signs; the landing page's featured panel is empty on Sepolia and Base Sepolia until
+    [#193](https://github.com/dnznlabs/rake/issues/193) (carried, m04) creates the featured distribution
+    per chain and re-uploads. Rejected: creating the distribution first (a day's delay before the
+    first upload, and the Creator key used for a testnet seed) and hiding the panel when the salt
+    resolves to no code (a bundle change inside a task that forbids one; reconsidered in #193).
 
 ## Findings carried forward
 

@@ -47,6 +47,7 @@ export APP_VERSION=v0.1
 export FACTORY_SALT=0xc7b08946793948e2cb78adf914cfa19ac8341e52b8a7a96ab26034fe6c476693  # mined, decision 37
 export APP_SALT=0xd9ad8a57dc1d24c639881670feb590b06bb437e8c698f3e9fc53d5920c04b7ef      # mined, decision 37
 export CREATOR=0x68e0741D8d693e14BF56914567eADdC130b186eE  # DNZN Creator, decision 32
+export ENGINEER=0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d # Elanik's key, an Ops owner since 2026-11-16 (§ Step 4)
 export DNZN_SALT=${CREATOR}000000000000000000000001        # top 20 bytes CREATOR (decision 10), low 12 bytes 1
 # filled in by step 1, never by hand
 export PROXY=0x4e59b44847b379578588920cA78FbF26c0B4956C FACTORY= IMPL= APP= DISTRO=
@@ -433,7 +434,7 @@ re-read `nonce()` there — the vault's internal counter, not `cast nonce $OWNER
 account nonce and would put every digest one off:
 
 ```sh
-cast call $OWNER "isOwner(address)(bool)" <engineer> --rpc-url "$RPC"   # must be true
+cast call $OWNER "isOwner(address)(bool)" $ENGINEER --rpc-url "$RPC"  # must be true
 cast call $OWNER "threshold()(uint16)" --rpc-url "$RPC"                 # 2
 cast call $OWNER "nonce()(uint32)" --rpc-url "$RPC"                     # the proposal's nonce
 cast nonce $APP --rpc-url "$RPC"                                        # must be 1: the pointers assume it
