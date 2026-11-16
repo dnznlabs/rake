@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-/* Emit step 4's five calldatas, in execution order, for the Ops vault to forward.
+/* Emit step 4's five calldatas, in execution order, for the Ops vault, and the batch that carries them.
 
-   node tools/step4-calldata.mjs --chain 11155111 [--app 0x…] [--out docs/…/calldata]
+   node tools/step4-calldata.mjs --chain 11155111 [--app 0x…] [--vault 0x…] [--out docs/…/calldata]
 
    Step 4 is an Ops-vault action (decision 44, #178): `App`'s chunk setters are `onlyOwner` and the
-   owner is the vault, so the engineer prepares bytes and Denizen signs them. These files are what he
-   signs and what the reviewer re-derives, so they are committed, and the tool is deterministic —
+   owner is the vault, so the engineer proposes the bytes and the product owner signs them. These files
+   are what is signed and what the reviewer re-derives, so they are committed, and the tool is deterministic —
    running it twice at one commit gives byte-identical output.
 
    The split is `scripts/forge/Chunks.s.sol:_upload`'s, re-implemented rather than reused because the
@@ -18,6 +18,12 @@
    The call order is the task's: both document chunks, then the widget chunk, then the two setters.
    `App._requireChunk` reverts `CodelessChunk` on a pointer with no code (`src/App.sol:119-120`), so
    every `add*Chunk` must land before the setter that names its pointer.
+
+   `batch.hex` is the one proposal the vault actually carries (RUNBOOK § Step 4): the five calls in
+   that order, wrapped in the vault's own `batch(address[],uint256[],bytes[])`. Its target is the
+   vault, not `App` — `batch` is `onlySelf` — and it runs the five sequentially and atomically, so the
+   ordering constraint above holds inside one transaction. The numbered files stay as its review
+   copy: each is one element of the `bytes[]` a reviewer gets back from `cast decode-calldata`.
 
    ABI encoding comes from `cast calldata` rather than from a hand-rolled encoder here, the same way
    `tools/abi-vectors.sh` generates the codec's fixtures: the oracle is never the thing under test. */
@@ -36,12 +42,13 @@ const arg = (name, fallback) => {
 
 const chain = arg('chain');
 if (!chain) {
-  console.error('usage: node tools/step4-calldata.mjs --chain <id> [--app 0x…] [--out <dir>]');
+  console.error('usage: node tools/step4-calldata.mjs --chain <id> [--app 0x…] [--vault 0x…] [--out <dir>]');
   process.exit(2);
 }
 /* `App` is the same address on every chain of RUNBOOK § 1 (decision 35), so this is a default and
    not a per-chain table. */
 const app = arg('app', '0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE');
+const vault = arg('vault', '0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790'); // RUNBOOK § 0 OWNER, one value on every chain
 const outDir = join(arg('out', 'docs/milestones/m04/tasks/m04-t08/calldata'), chain);
 
 const payload = readFileSync('app/dist/index.html.gz'); // Chunks.s.sol's GZIP default is true
@@ -63,8 +70,8 @@ const sha = (s) => createHash('sha256').update(s).digest('hex');
 const docParts = cut(payload);
 const widgetParts = cut(widget);
 if (widgetParts.length !== 1) {
-  /* A second widget chunk would need a second `addWidgetChunk` call, a fourth `App` nonce and a
-     sixth vault nonce — a plan change, not a loop iteration. */
+  /* A second widget chunk would need a second `addWidgetChunk` call and a fourth `App` pointer — a
+     plan change, not a loop iteration. */
   console.error(`widget needs ${widgetParts.length} chunks; the plan's five calls assume 1`);
   process.exit(1);
 }
@@ -101,8 +108,19 @@ calls.push({
   data: cast('calldata', 'setWidgetChunks(address[])', `[${widgetPointers.join(',')}]`),
 });
 
+calls.push({
+  file: 'batch.hex',
+  data: cast(
+    'calldata',
+    'batch(address[],uint256[],bytes[])',
+    `[${calls.map(() => app).join(',')}]`,
+    `[${calls.map(() => '0').join(',')}]`,
+    `[${calls.map((c) => c.data).join(',')}]`,
+  ),
+});
+
 mkdirSync(outDir, { recursive: true });
-console.log(`chain ${chain} · App ${app} · App nonce ${appNonce}`);
+console.log(`chain ${chain} · App ${app} · App nonce ${appNonce} · batch target (vault) ${vault}`);
 console.log(`payload ${payload.length} bytes → ${docParts.length} chunks (${docParts.map((p) => p.length).join(' + ')})`);
 console.log(`widget  ${widget.length} bytes → ${widgetParts.length} chunk`);
 console.log(`pointers ${pointers.join(' ')}`);
