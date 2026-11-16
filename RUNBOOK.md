@@ -419,12 +419,15 @@ is what would catch a future change to that pattern, and it is cheap.
 
 The bundle that ships, then the chunks, then the comparison that proves the chain serves the bytes
 that were built. **No command here sends a transaction to `App`**: its chunk setters are `onlyOwner`
-and the owner is the Ops vault, so the upload is one vault proposal (decision 44,
-[#178](https://github.com/dnznlabs/rake/issues/178)). It moves between two roles, and neither holds
-the other's authority:
+and the owner is the Ops vault, so the upload is a vault action (decision 44,
+[#178](https://github.com/dnznlabs/rake/issues/178)) — **three proposals per chain** since
+2026-11-16 (decision 47; one `batch` proposal before that, which the coordination service's
+proposal-size cap refused, [#188](https://github.com/dnznlabs/rake/issues/188)). It moves between
+two roles, and neither holds the other's authority:
 
-- **The engineer** (Elanik) builds the bytes, proposes them to the vault with her own signature, and
-  verifies the result. One signature is not a quorum, so proposing moves nothing.
+- **The engineer** (Elanik) builds the bytes, proposes them to the vault with her own signature — one
+  signature per proposal, three per chain — and verifies the result. One signature is not a quorum, so
+  proposing moves nothing.
 - **The product owner** (Denizen) reviews the proposal against this repository and adds the second
   signature. That signature is the only thing that makes the upload happen.
 
@@ -452,54 +455,86 @@ reaches a wallet (`mk/30-onchain.mk`). The calldata is committed under
 `docs/milestones/m04/tasks/m04-t08/calldata/$CHAIN_ID/`, so a non-empty `git diff` is a stale
 proposal and stops here.
 
-The proposal is **one transaction**:
+The upload is **three proposals, in nonce order**, all value `0`. ~~The proposal is **one
+transaction**: target `$OWNER`, data `calldata/$CHAIN_ID/batch.hex`, nonce the live `nonce()`.~~
+That single `batch` over all five calls is 109,962 hex characters, and the coordination service that
+carries proposals to the signers caps a proposal's calldata at **65,536 characters** (32,768 bytes; the
+request body at 72 KiB), enforced identically by the dapp — measured live on 2026-11-16 with a paired
+control, recorded on [#188](https://github.com/dnznlabs/rake/issues/188). It cannot be proposed.
+Ruled 2026-11-16 (decision 47):
 
-| field | value |
-|:--|:--|
-| target | `$OWNER` — the vault itself, **not** `App` |
-| value | `0` |
-| data | `calldata/$CHAIN_ID/batch.hex` |
-| nonce | the live `nonce()` read above |
+| proposal | file | target | value | nonce | size, hex chars (cap 65,536, measured 2026-11-16) |
+|--:|:--|:--|--:|:--|--:|
+| 1 | `1-addChunk-0.hex` — `addChunk(bytes)`, document chunk 0 | `$APP` — a plain call | `0` | *N* | 48,138 |
+| 2 | `2-addChunk-1.hex` — `addChunk(bytes)`, document chunk 1 | `$APP` — a plain call | `0` | *N* + 1 | 42,890 |
+| 3 | `batch345.hex` — the vault's `batch(address[],uint256[],bytes[])` over calls 3, 4, 5 | `$OWNER` — the vault itself, **not** `App` | `0` | *N* + 2 | 18,314 |
 
-`batch.hex` is the vault's own `batch(address[],uint256[],bytes[])` over the five calls of
-§ The five calls, all targeting `App` at value 0. `batch` is `onlySelf`, so the vault is the target
-and it calls `App` as its owner; it runs the five in order and reverts all of them if any one fails,
-so the ordering constraint below holds inside one transaction and a partial upload cannot exist.
+*N* is the live `nonce()` read above (3 on both chains, read 2026-11-16 16:04Z); the sizes are
+`wc -c` of the committed files on both chains the same day, `0x` included. Each proposal carries its
+own digest, `getTransactionHash(<target>, 0, <file>, <nonce>)` on the vault, with the proposal's own
+target: `$APP` for 1 and 2, `$OWNER` for 3.
 
-The engineer signs the digest and proposes through the dapp's API — handbook
-`docs/multisig-transactions.md` § Doing it as an agent, steps 1–3: `getTransactionHash($OWNER, 0,
-$(cat batch.hex), <nonce>)`, `cast wallet sign --no-hash`, `POST /proposals`. The description names
-this step, the chain and the commit the calldata was generated at; it is not signed and proves
-nothing, which is why 4b does not read it.
+`batch345.hex` keeps the setters atomic with the widget chunk: calls 4 and 5 validate their pointers
+through `_requireChunk` (§ The five calls), so the widget pointer is created and consumed inside one
+transaction, and the two setters either both land or neither does. The document pointers are created
+by proposals 1 and 2, which is why the batch executes last (4c). `batch` is `onlySelf`, so the vault is
+its target and it calls `App` as its owner.
 
-`record:` the proposal's nonce and digest, and the commit `batch.hex` was generated at.
+The engineer signs each digest and proposes through the dapp's API — handbook
+`docs/multisig-transactions.md` § Doing it as an agent, steps 1–3, three times: `getTransactionHash`
+as above, `cast wallet sign --no-hash`, `POST /proposals`. Each description names this step, the
+chain, the proposal's number of three and the commit the calldata was generated at; it is not signed
+and proves nothing, which is why 4b does not read it.
+
+`record:` the three nonces and digests, and the commit the files were generated at.
 
 #### 4b — the product owner reviews and signs
 
-In the multisig dapp, open the proposal — handbook § Doing it as a human, *Sign* — and before
-signing, against a checkout of the commit 4a recorded:
+In the multisig dapp, open each of the three proposals — handbook § Doing it as a human, *Sign* —
+and before signing it, against a checkout of the commit 4a recorded. **Proposals 1 and 2** (the plain
+`addChunk` calls):
 
-1. **The target is the vault and the value is 0.** A proposal whose target is `App` is not this one.
+1. **The target is `App` and the value is 0.** `$APP`, not the vault; a proposal whose target is the
+   vault is proposal 3 or not this upload.
 2. **The data is the committed file.** `sha256sum` of the proposal's data equals
-   `sha256sum calldata/$CHAIN_ID/batch.hex`, and that file regenerates byte-identically (4a's
-   `git diff`).
-3. **It decodes to the five calls.** `cast decode-calldata "batch(address[],uint256[],bytes[])"
-   $(cat batch.hex)` gives five targets, all `$APP`, five values, all `0`, and five `bytes` equal to
-   `1-addChunk-0.hex` … `5-setWidgetChunks.hex` in that order.
-4. **The nonce is the live one** and the digest equals `getTransactionHash()` on the vault.
+   `sha256sum calldata/$CHAIN_ID/1-addChunk-0.hex` (proposal 1) or `…/2-addChunk-1.hex` (proposal
+   2), and the file regenerates byte-identically (4a's `git diff`).
+3. **It decodes to one `addChunk(bytes)`.** `cast decode-calldata "addChunk(bytes)" $(cat <file>)`
+   gives one `bytes` argument, whose `sha256` is the handoff's figure for that chunk.
+4. **The nonce is the live one** for proposal 1 and the live one plus one for proposal 2, and the
+   digest equals `getTransactionHash($APP, 0, <file>, <nonce>)` on the vault.
+
+**Proposal 3** (`batch345.hex`):
+
+1. **The target is the vault and the value is 0.** `$OWNER`, not `App`.
+2. **The data is the committed file.** `sha256sum` of the proposal's data equals
+   `sha256sum calldata/$CHAIN_ID/batch345.hex`, and that file regenerates byte-identically.
+3. **It decodes to calls 3, 4 and 5 in order.** `cast decode-calldata
+   "batch(address[],uint256[],bytes[])" $(cat batch345.hex)` gives three targets, all `$APP`, three
+   values, all `0`, and three `bytes` equal to `3-addWidgetChunk.hex`, `4-setChunks.hex`,
+   `5-setWidgetChunks.hex` in that order.
+4. **The nonce is the live one plus two** and the digest equals `getTransactionHash($OWNER, 0,
+   batch345.hex, <nonce>)` on the vault.
 
 `batch` is a vault self-call, which the handbook's review checklist marks high risk; confirm it
-outside the chat that requested it. Then sign. With two signatures the proposal is at threshold.
+outside the chat that requested it. Then sign. With two signatures a proposal is at threshold. Sign
+all three before submitting any (4c): a gap in the nonce sequence stalls the ones behind it.
 
 #### 4c — submit, wait, execute
 
-1. **Submit** (either signer). The vault's `execute()` checks the signatures, consumes the nonce and
-   **queues** the batch at `eta = block.timestamp + delay()` — nothing reaches `App` yet.
-2. **Wait** out the delay, 3,600 s on Ops on both testnets.
-3. **`executeQueued()`** (anyone). This is the transaction that runs the five calls and pays for
-   them, so **set its gas limit by hand** — see § Gas. A wallet's own estimate through a public RPC
-   reports a false `DeploymentFailed()`. Running out of gas reverts the whole batch and leaves it
-   queued, so it can be sent again with more.
+1. **Submit all three** (either signer), in nonce order: 1, then 2, then the batch. Each `execute()`
+   checks the signatures, consumes its nonce and **queues** the call at
+   `eta = block.timestamp + delay()` — nothing reaches `App` yet. A proposal at nonce *N* + 1 cannot
+   be submitted until *N* has been consumed, so the order is enforced by the vault, not by care.
+2. **Wait** out the delay, 3,600 s on Ops on both testnets. The three etas are seconds apart.
+3. **`executeQueued()` three times** (anyone), **in the order 1 → 2 → batch** and each after the one
+   before it has succeeded. Calls 4 and 5, inside the batch, validate the two document pointers that
+   proposals 1 and 2 create; the batch executed first reverts `CodelessChunk` and stays queued. Each
+   is the transaction that runs its call and pays for it, so **set each gas limit by hand** — three
+   figures per chain, § Gas. A wallet's own estimate through a public RPC reports a false
+   `DeploymentFailed()`. Running out of gas reverts that one call and leaves it queued, so it can be
+   sent again with more; the ones already executed stay executed. Between the second and the third,
+   `cast nonce $APP` reads `3`.
 
 `TimelockExecutor.forward()` skips the delay but needs **every** owner's signature, not the
 threshold, and nothing here is in a hurry; it is not this runbook's route.
@@ -516,8 +551,8 @@ The equality to check is the one `docs/milestones/m03/tasks/m03-t03/HANDOFF.md` 
 `inflated sha256` equals `sha256sum app/dist/index.html`, `widget sha256` equals
 `sha256sum app/dist/widget.js`, and the byte counts match both ways. Rebuild for this chain first:
 `index.html` carries `__CHAIN_ID__`, so a bundle built for the other testnet hashes differently.
-`record:` the chunk pointers, `inflated sha256`, `widget sha256`, both byte counts, and the submit
-and `executeQueued` transaction hashes.
+`record:` the chunk pointers, `inflated sha256`, `widget sha256`, both byte counts, and the three
+submit and three `executeQueued` transaction hashes.
 
 **`make deploy` is not used on a public chain.** Its later recipes run `Seed.s.sol`,
 `Fixtures.s.sol` and a dev build, all of which are dev-chain only (decision 29).
@@ -531,52 +566,83 @@ rehearsal caught this — a dev chain cannot tell the two roles apart.
 
 `tools/step4-calldata.mjs` writes them to `docs/milestones/m04/tasks/m04-t08/calldata/$CHAIN_ID/`,
 splitting `app/dist/index.html.gz` at `MAX_CHUNK = 24_000` bytes exactly as `Chunks.s.sol:_upload`
-does, and wraps them into `batch.hex`. They are committed, so what the product owner signs is
+does, and wraps calls 3–5 into `batch345.hex`. They are committed, so what the product owner signs is
 reviewable before it is signed and re-derivable after:
 
-| # | call | file |
-|--:|:--|:--|
-| 1 | `addChunk(bytes)` — document chunk 0 | `1-addChunk-0.hex` |
-| 2 | `addChunk(bytes)` — document chunk 1 | `2-addChunk-1.hex` |
-| 3 | `addWidgetChunk(bytes)` | `3-addWidgetChunk.hex` |
-| 4 | `setChunks(address[],bool)` — the two document pointers, `true` | `4-setChunks.hex` |
-| 5 | `setWidgetChunks(address[])` — the widget pointer | `5-setWidgetChunks.hex` |
+| # | call | file | proposed as |
+|--:|:--|:--|:--|
+| 1 | `addChunk(bytes)` — document chunk 0 | `1-addChunk-0.hex` | proposal 1, plain, target `$APP` |
+| 2 | `addChunk(bytes)` — document chunk 1 | `2-addChunk-1.hex` | proposal 2, plain, target `$APP` |
+| 3 | `addWidgetChunk(bytes)` | `3-addWidgetChunk.hex` | proposal 3, element 1 of `batch345.hex` |
+| 4 | `setChunks(address[],bool)` — the two document pointers, `true` | `4-setChunks.hex` | proposal 3, element 2 |
+| 5 | `setWidgetChunks(address[])` — the widget pointer | `5-setWidgetChunks.hex` | proposal 3, element 3 |
+| 3–5 | the vault's `batch(address[],uint256[],bytes[])` over the three above, all `$APP`, all `0` | `batch345.hex` | proposal 3, target `$OWNER` |
+
+**`batch.hex` — the one `batch` over all five — is deleted, not kept.** It was the route of
+2026-11-15 (#191) and could not be proposed: 109,962 hex characters against the service's 65,536 cap
+(4a, [#188](https://github.com/dnznlabs/rake/issues/188)). The record of that route is this
+paragraph, decision 47 and #188; a second `batch*.hex` beside the live one is one more file to
+mistake for it, and the 4b checklist names exactly one batch file. The tool no longer writes it, so
+a regenerated directory with `batch.hex` still in it is a stale checkout.
 
 **Calls 1–3 must have executed before calls 4 and 5.** The setters take their pointers from calldata
 and validate each through `_requireChunk`, which reverts `CodelessChunk(ptr)` on an address with no
 code (`src/App.sol:125`, `:147`, `:198-207`). `cast estimate` on call 4 against a chain where calls
-1–3 have not landed reverts `0xef9230eb` naming the first pointer. `batch` satisfies this by running
-the calls in array order; five separate proposals would have to execute strictly in order, with
-nothing else landing between them.
+1–3 have not landed reverts `0xef9230eb` naming the first pointer. The three proposals satisfy this
+by executing in nonce order (4c): 1 and 2 create the document pointers, and `batch345` creates the
+widget pointer and runs both setters in array order inside one transaction. Five separate proposals
+would also work, executed strictly in order, but the setters would no longer be atomic with the chunk
+they name (decision 47, rejected).
 
 **The pointers are `App`'s own CREATE addresses and are identical on every chain**, because `App` is
 at one address everywhere (decision 35) and at account nonce 1 before step 4. So calls 3, 4 and 5 are
-**byte-identical across chains**; only calls 1 and 2 differ, because `index.html` carries
-`__CHAIN_ID__`, and so does `batch.hex`. The digest is not identical across chains even where the
-calldata is: `getTransactionHash` binds the chain, so a Sepolia signature cannot be replayed on Base
-Sepolia.
+**byte-identical across chains, and so is `batch345.hex`** (one `sha256`, `7946270a…`, on both
+chains at `61322ca`); only calls 1 and 2 differ, because `index.html` carries `__CHAIN_ID__`. The
+digest is not identical across chains even where the calldata is: `getTransactionHash` binds the
+chain, so a Sepolia signature cannot be replayed on Base Sepolia.
 
 #### Gas
 
 Per-call figures come from `cast estimate --from $OWNER $APP $(cat <file>)` against the node — the
 vault as sender, which `eth_estimateGas` does not sign-check — never from a broadcast log, which
 files hashes under the wrong transaction. On Sepolia on 2026-11-15 calls 1–3 estimated **37,859,277**,
-**33,740,257** and **13,140,215**; the setters are tens of thousands. `executeQueued` carries their
-sum plus the batch's loop and the queue bookkeeping, which is **unmeasured** on a real-priced chain:
-public RPCs cap `eth_call` gas below the batch's ~85M, so a simulation there fails with
-`DeploymentFailed()` at any requested limit. Set the gas limit to the sum plus a margin — **110M on
-Sepolia**, under its 200M block limit — rather than quoting a measured figure.
+**33,740,257** and **13,140,215**; on Base Sepolia **5,343,761**, **4,767,004** and **1,883,560**;
+the setters are tens of thousands (71,317 and 42,719 estimated on a fork). Each `executeQueued`
+carries its call plus the queue bookkeeping, and the third adds the batch's loop; that overhead is
+**unmeasured** on a real-priced chain. Set each gas limit to its estimate plus a margin of about a
+third, rather than quoting a measured figure — **three limits per chain**, all **estimates**:
 
-The batch was rehearsed on an anvil fork of Sepolia on 2026-11-15, impersonating the vault: it
-executed, and `chain-doc` then read `inflated sha256` and `widget sha256` equal to `app/dist/`'s.
+| `executeQueued` | Sepolia estimate | **set to** | Base Sepolia estimate | **set to** |
+|:--|--:|--:|--:|--:|
+| proposal 1 — call 1 | 37,859,277 | **50,000,000** | 5,343,761 | **7,000,000** |
+| proposal 2 — call 2 | 33,740,257 | **44,000,000** | 4,767,004 | **6,200,000** |
+| proposal 3 — `batch345` | 13,254,251 — calls 3, 4, 5 summed, loop excluded | **18,000,000** | ≈2,077,816 — the 2026-11-16 whole-batch estimate of 12,188,581 less calls 1 and 2 | **2,800,000** |
+| block `gasLimit` | 200,000,000 | | 120,000,000 | |
+
+Every limit is under its block limit. `batch345` cannot be estimated from the node until proposals 1
+and 2 have executed — `setChunks` reverts `CodelessChunk` on their pointers before that — so its two
+figures are derived, not read; after the second `executeQueued`, `cast estimate --from $OWNER $OWNER
+$(cat batch345.hex)` gives the live one, and the margin above is for that figure. The old
+single-batch total (~85M on Sepolia, budgeted at 110M) was unmeasurable there, because public RPCs
+cap `eth_call` gas below it; a single `addChunk` is under that cap, so the per-proposal figures are.
+
+The five-call batch was rehearsed on an anvil fork of Sepolia on 2026-11-15, impersonating the vault:
+it executed, and `chain-doc` then read `inflated sha256` and `widget sha256` equal to `app/dist/`'s.
 Anvil does not reproduce Sepolia's code-deposit pricing (11,896,347 gas there), so it proves the
-bytes and the order, not the gas.
+bytes and the order, not the gas. The three-proposal split changes the transaction boundaries and
+nothing about the bytes or their order, so that rehearsal still stands for both.
 
-**Sepolia prices code deposit about 7× (§ 1e), and `MAX_CHUNK` has no gas term.** A 24,000-byte
-chunk estimates ~37.9M gas there against ~5.3M on Base Sepolia. The constant is a byte budget, chosen
-against the 24,576-byte code limit; if Sepolia's block gas limit ever drops below the batch's total,
-the batch stops fitting — split it into two proposals at the add/set boundary before touching the
-chunk size.
+**`MAX_CHUNK = 24_000` is sized against one constraint and bound by three**
+([#188](https://github.com/dnznlabs/rake/issues/188)). The constant is a byte budget, chosen
+against the **24,576-byte code limit**. It has no **gas** term: Sepolia prices code deposit about 7×
+(§ 1e), so a 24,000-byte chunk estimates ~37.9M gas there against ~5.3M on Base Sepolia, 19% of a 200M
+block for one call, and a chain with a 30M block limit and Sepolia's pricing could not land it. And
+it has no **proposal-size** term: the coordination service and the dapp refuse a proposal whose
+calldata exceeds 65,536 hex characters (32,768 bytes), measured 2026-11-16; one `addChunk` of a
+24,000-byte chunk is 48,138 characters, 73% of the cap, and anything above ~32,700 bytes per chunk
+stops being proposable even as a plain call. That cap is what split the upload into three proposals
+(4a). Sizing the constant against all three at once is #188's question for the milestone that next
+touches the upload; this runbook does not change it.
 
 ### Step 5 — explorer verification, named and not run
 
@@ -878,6 +944,11 @@ The product owner's signing app does not support Sepolia, so the unanimous route
 were not all reachable there; the engineer becomes an Ops owner instead, which makes her signature
 plus one of the product owner's the 2-of-*n* threshold and puts the upload behind the vault's one-hour delay. The
 five per-call files are unchanged; `batch.hex` is added beside them and carries them.
+
+**And again on 2026-11-16, still before anything was signed**: three proposals per chain (§ Step 4,
+4a). The single `batch.hex` was 109,962 hex characters and the coordination service caps a proposal
+at 65,536 (#188), so step 7 stopped there; calls 1 and 2 go as plain proposals and calls 3–5 as
+`batch345.hex`, executed in nonce order. `batch.hex` is deleted (§ The five calls).
 
 Step 6 has not run on
 either chain:
