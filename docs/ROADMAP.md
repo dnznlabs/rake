@@ -645,6 +645,17 @@ the handbook README § Conventions. Numbered 45 because 44 is taken by
     redone); a README-only disclaimer (the dapp is the surface a user reaches without ever seeing the
     repo).
 
+46. **The first public-testnet document upload ships the dev-seed `FEATURED_SALT`; a real featured
+    distribution comes with the next upload.** [#190](https://github.com/dnznlabs/rake/issues/190).
+    Ruled by Denizen on 2026-11-16 (Telegram, 08:46 CST): "that's fine - re-running the uploads ...
+    it's really only this first ... in the future will be regular updates... but we'll need a followup
+    task created so that we set the featured distro and re-upload chunks." So the committed `batch.hex`
+    is what step 4 signs; the landing page's featured panel is empty on Sepolia and Base Sepolia until
+    [#193](https://github.com/dnznlabs/rake/issues/193) (carried, m04) creates the featured distribution
+    per chain and re-uploads. Rejected: creating the distribution first (a day's delay before the
+    first upload, and the Creator key spent on a testnet seed) and hiding the panel when the salt
+    resolves to no code (a bundle change inside a task that forbids one; reconsidered in #193).
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
