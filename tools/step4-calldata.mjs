@@ -19,11 +19,26 @@
    `App._requireChunk` reverts `CodelessChunk` on a pointer with no code (`src/App.sol:119-120`), so
    every `add*Chunk` must land before the setter that names its pointer.
 
-   `batch.hex` is the one proposal the vault actually carries (RUNBOOK § Step 4): the five calls in
-   that order, wrapped in the vault's own `batch(address[],uint256[],bytes[])`. Its target is the
-   vault, not `App` — `batch` is `onlySelf` — and it runs the five sequentially and atomically, so the
-   ordering constraint above holds inside one transaction. The numbered files stay as its review
-   copy: each is one element of the `bytes[]` a reviewer gets back from `cast decode-calldata`.
+   **Three proposals carry step 4, not one** (decision 47, ruled 2026-11-16): call 1 plain, call 2
+   plain, then `batch345.hex` over calls 3, 4 and 5. A single `batch` over all five was the route
+   until it turned out to be unproposable — the coordination API caps a proposal's calldata at 65,536
+   characters and that batch was 109,962 — so the upload is split at the boundary where splitting
+   costs least. `batch345.hex` targets the vault, not `App`, because `batch` is `onlySelf`; it runs
+   its three sequentially and atomically, which is what keeps the widget chunk and the two setters
+   that name its pointer in one transaction. Calls 1 and 2 are proposed as plain calls to `App`.
+
+   **The ordering is now the operator's, and it protects correctness and not merely liveness.** The
+   three execute at the vault's nonces N, N+1 and N+2 and must be `executeQueued` in that order. The
+   contract will not enforce it: `Multisig.executeQueued` takes the nonce as an argument and checks
+   only the timelock, and `App._requireChunk` checks that a pointer has code and begins `0x00` —
+   nothing about its contents. So running call 2 before call 1 puts valid chunks at both predicted
+   addresses with the document's two halves **swapped**, `setChunks` passes both guards, and `App`
+   serves a broken document with no revert anywhere. The single batch made that unreachable; this
+   shape makes it a procedure. RUNBOOK § Step 4 names the hazard and the repair.
+
+   The numbered files stay as the review copy: files 1 and 2 are proposals in their own right, and
+   3, 4 and 5 are the elements of the `bytes[]` a reviewer gets back from `cast decode-calldata` on
+   `batch345.hex`.
 
    ABI encoding comes from `cast calldata` rather than from a hand-rolled encoder here, the same way
    `tools/abi-vectors.sh` generates the codec's fixtures: the oracle is never the thing under test. */
@@ -108,14 +123,17 @@ calls.push({
   data: cast('calldata', 'setWidgetChunks(address[])', `[${widgetPointers.join(',')}]`),
 });
 
+/* Calls 3, 4 and 5 — the widget chunk and the two setters — in one vault self-call. Sliced after the
+   five are built, so the numbered files and this wrapper cannot disagree about what is in it. */
+const batched = calls.slice(2);
 calls.push({
-  file: 'batch.hex',
+  file: 'batch345.hex',
   data: cast(
     'calldata',
     'batch(address[],uint256[],bytes[])',
-    `[${calls.map(() => app).join(',')}]`,
-    `[${calls.map(() => '0').join(',')}]`,
-    `[${calls.map((c) => c.data).join(',')}]`,
+    `[${batched.map(() => app).join(',')}]`,
+    `[${batched.map(() => '0').join(',')}]`,
+    `[${batched.map((c) => c.data).join(',')}]`,
   ),
 });
 
@@ -130,4 +148,23 @@ for (const c of calls) {
   writeFileSync(join(outDir, c.file), c.data);
   const argSha = c.bytes ? ` · bytes arg sha256 ${sha(c.bytes)}` : '';
   console.log(`${c.file}  ${(c.data.length - 2) / 2} bytes  sha256 ${sha(c.data)}${argSha}`);
+}
+
+/* The three files that are actually proposed, against the cap that decided this shape: the
+   coordination API refuses `p_call_data` over 65,536 characters (measured on the live service, with
+   a control), and the dapp enforces the same limit client-side. A file over it is not a slow
+   proposal, it is an impossible one, so this refuses here rather than at the POST. */
+const CAP = 65_536;
+const proposals = ['1-addChunk-0.hex', '2-addChunk-1.hex', 'batch345.hex'];
+let over = 0;
+console.log(`proposal sizes against the ${CAP}-character cap:`);
+for (const file of proposals) {
+  const n = calls.find((c) => c.file === file).data.length;
+  const verdict = n <= CAP ? `fits, ${CAP - n} spare` : `OVER by ${n - CAP}`;
+  if (n > CAP) over++;
+  console.log(`  ${file.padEnd(20)} ${String(n).padStart(7)} chars  ${verdict}`);
+}
+if (over) {
+  console.error(`${over} proposal file(s) exceed the ${CAP}-character cap and cannot be proposed`);
+  process.exit(1);
 }
