@@ -1048,7 +1048,41 @@ nonce 4 a second `addOwner($ENGINEER)`, which nonce 2 already executed on both c
 **chunk 1 at the nonce chunk 0 must occupy** — the one misorder 4c calls silent: it does not revert,
 and `App` would serve the document's two halves swapped. Proposing calls 1–3 at nonces 3–5 there
 would put two `addChunk` proposals at nonce 3 and leave which one executes to whoever signs, so step
-7 stopped on that chain and messaged the architect rather than competing with it.
+7 stopped on that chain and escalated rather than competing with it.
+
+**Amended 2026-11-16: that stop rested on a wrong premise, and Sepolia is proposable.** The two rows
+above carry **no signature at all**, and an unsigned proposal is hidden from every owner by design —
+the dapp drops any proposal with no valid owner signature that the chain does not hold queued, with
+only a `console.warn`; its user-facing notice fires only when the signatures could not be *read*,
+which is not this case, so the rows vanish silently. Measured with a paired control, using the query
+the dapp itself sends (`tx_summary` with `signatures(signer,sig_type)` embedded, as anon): Base
+Sepolia's three return one `ecdsa` row each, signer `0x5a158af8…bc50d`; Sepolia's two return `[]`.
+That is why the product owner sees three rows on Base Sepolia and **zero** on Sepolia. The
+`sig_count` column reads `0` on every `proposed` row on both chains and is not a usable signal; the
+embedded rows are. A duplicate-nonce rendering theory was tested and rejected — one mainnet vault
+carries four duplicate-nonce rows and renders.
+
+So the hidden pair never contested nonce 3 as the stop assumed: unsigned, not queued on chain
+(`queued()` returns `0` for both digests), and unsignable through the dapp because it does not
+display them.
+
+**The hazard that remains is bounded by the nonce, and the upload is what closes it.** A signature
+collected outside the dapp is only dangerous if the vault accepts it: `execute()` requires every
+signature slot — ECDSA-recovered or the `v == 0` approval form — to resolve to an address in the
+vault's own owner mapping, so a non-owner's signature is worthless at execution. And the digest is
+nonce-bound: `getTransactionHash` puts `nonce` inside the EIP-712 `Execute` struct hash, and
+`execute()` computes its hash from the live counter it increments, never from a caller-supplied
+nonce (`Multisig.sol` at `e767b88`, lines 85 and 136–137). **Say the window plainly: the hidden
+nonce-3 row is executable only while Sepolia's `nonce()` is exactly 3, and it stops being executable
+the moment that nonce is consumed** — proposal 1 executing at nonce 3 kills its digest permanently,
+and proposal 2 at nonce 4 does the same to the duplicate `addOwner`. It is a real hazard in that
+window; it is not an open door, and it argues for proposing sooner rather than for pruning first.
+
+**Follow-on, not a gate: prune the hidden pair.** It needs the proposer's own address, so it is the
+product owner's. It is **housekeeping, not safety** — once the nonces move it protects nothing. The
+reason it stays on the list is the one that survives the nonce moving: a phantom row an owner can
+neither see nor act on is a trust cost in the dapp every time a key is used on that chain. "Cosmetic"
+here does not mean it never mattered.
 
 Step 6 has not run on
 either chain:

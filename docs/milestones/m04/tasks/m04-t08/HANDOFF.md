@@ -330,8 +330,52 @@ The nonce-3 proposal is **document chunk 1 at the nonce chunk 0 must occupy**. T
 nothing reverts and `App` serves the two gzip halves swapped. Proposing call 1 at nonce 3 as the plan
 prescribes would leave two `addChunk` proposals at one nonce and make which bytes land a property of
 which one gets the second signature first. Not the engineer's call to cancel: the proposer is the
-product owner, and `cancelQueued` needs the threshold. Messaged to the architect; Sepolia's row
-above waits on the ruling.
+product owner. Escalated; Sepolia's row above waited on the answer.
+
+### Amended 2026-11-16 — the stop's premise was wrong, twice over
+
+**Both corrections are mine, and both were measurement, not argument.**
+
+**1. `cancelQueued` was the wrong instrument.** It applies to *queued* transactions. Neither hidden
+row is queued: `queued(0x03525096…275026)` and `queued(0x80aaf81a…3342a)` both return `0` on the
+vault. They exist only in the coordination service, so removing them is a service-side prune, not an
+on-chain cancel — no gas, no threshold, no co-signer.
+
+**2. They carry no signature, which is why they are invisible.** First reported here as the
+signatures-not-public read limit; that was wrong. The embed *is* readable to anon and is genuinely
+empty on Sepolia. Using the dapp's own query (`tx_summary` with `signatures(signer,sig_type)`, anon)
+as a paired control:
+
+| chain | nonce | `sig_count` | embedded `signatures` | shown in dapp |
+|:--|--:|--:|:--|:--|
+| Base Sepolia 84532 | 3, 4, 5 | 0 | one `ecdsa` row each, signer `0x5a158af8…bc50d` | yes, three rows |
+| Sepolia 11155111 | 3, 4 | 0 | `[]` | **no — zero rows** |
+
+The dapp hides any proposal with no valid owner signature that the chain does not hold queued, with
+only a `console.warn`; its user-facing notice is gated on the signatures being *unreadable*, which is
+not this case, so the rows disappear with no explanation. `sig_count` reads `0` on every `proposed`
+row on both chains, so that column discriminates nothing — **the embedded rows are the signal, and a
+column that reads the same for a signed and an unsigned proposal is the trap this walked into.** A
+duplicate-nonce rendering theory was raised and rejected: one mainnet vault carries four
+duplicate-nonce rows and renders.
+
+**Consequence: the hidden pair never contested nonce 3.** Unsigned, not queued, and unsignable
+through the dapp because it is not displayed. Sepolia is proposable.
+
+**The residual hazard is nonce-bounded and self-closing.** `execute()` requires every signature slot
+— ECDSA-recovered or the `v == 0` approval form — to resolve to an address in the vault's own owner
+mapping, so a signature gathered from a non-owner is worthless at execution. And the digest is
+nonce-bound: `getTransactionHash` puts `nonce` inside the EIP-712 `Execute` struct hash and
+`execute()` hashes against the live counter it increments, never a caller-supplied nonce
+(`Multisig.sol` at `e767b88`, lines 85 and 136–137). So the hidden nonce-3 row is executable **only
+while Sepolia's `nonce()` is exactly 3**: proposal 1 executing there kills its digest permanently,
+and proposal 2 at nonce 4 does the same to the duplicate `addOwner`. Real inside that window, not an
+open door, and an argument for proposing sooner rather than pruning first.
+
+**Pruning the pair is a follow-on, not a gate**, and it needs the proposer's own address. It is
+housekeeping rather than safety — after the nonces move it protects nothing — and it stays on the
+list for the reason that outlives the nonce: a phantom row an owner can neither see nor act on is a
+trust cost in the dapp every time a key is used on that chain.
 
 ## The fork rehearsal
 
