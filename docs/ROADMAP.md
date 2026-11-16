@@ -612,7 +612,9 @@ Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
     all three Ops signers are his; or **threshold via `Multisig.execute()`, queued for the vault's
     3,600 s, then `executeQueued()`**, kept in the runbook as the fallback. *Route changed 2026-11-15
     ([#191](https://github.com/dnznlabs/rake/pull/191)): the threshold route is the one used, as one
-    `batch` proposal per chain with the engineer's signature first — RUNBOOK § Step 4 (4a–4d).* `forward()` requires
+    `batch` proposal per chain with the engineer's signature first — RUNBOOK § Step 4 (4a–4d). And
+    again 2026-11-16: three proposals per chain, because the one `batch` exceeds the proposal-size cap —
+    decision 47.* `forward()` requires
     `ownerCount()` signatures for anything but `cancelQueued` (`TimelockExecutor.sol:35-46`); the
     org record that said threshold was corrected the same day. Every later
     upload, `lock()` and M05's mirror take the same road. Rejected: redeploying `App` owned by the
@@ -650,11 +652,38 @@ convention. Numbered 45 because 44 is taken by
     Ruled by Denizen on 2026-11-16 (Telegram, 08:46 CST): "that's fine - re-running the uploads ...
     it's really only this first ... in the future will be regular updates... but we'll need a followup
     task created so that we set the featured distro and re-upload chunks." So the committed `batch.hex`
+    (since decision 47: the committed `1-addChunk-0.hex`, `2-addChunk-1.hex` and `batch345.hex`)
     is what step 4 signs; the landing page's featured panel is empty on Sepolia and Base Sepolia until
     [#193](https://github.com/dnznlabs/rake/issues/193) (carried, m04) creates the featured distribution
     per chain and re-uploads. Rejected: creating the distribution first (a day's delay before the
     first upload, and the Creator key used for a testnet seed) and hiding the panel when the salt
     resolves to no code (a bundle change inside a task that forbids one; reconsidered in #193).
+
+47. **Step 4 is three vault proposals per chain, not one `batch`: the two `addChunk` calls plain,
+    then one `batch` over calls 3–5.** Ruled by Denizen on 2026-11-16 (Telegram, 10:00 CST):
+    "option 2". Found at step 7 of m04-t08, the first time the route of #191 was tried for real: the
+    multisig coordination service caps a proposal's calldata at **65,536 hex characters** (32,768
+    bytes) and the request body at 72 KiB, and the dapp enforces the same limits; the five-call
+    `batch.hex` is 109,962 characters and was refused — measured live with a paired control (413 at
+    the batch's size, 400 just over the cap, past every size check at 64,000), recorded on
+    [#188](https://github.com/dnznlabs/rake/issues/188), which this widens: `MAX_CHUNK = 24_000`
+    is now bound by the code limit, by gas and by the proposal cap, and one `addChunk` of a full chunk
+    is 48,138 characters, 73% of it. The shape: proposal 1 = `1-addChunk-0.hex` (48,138 chars) and
+    proposal 2 = `2-addChunk-1.hex` (42,890) as plain calls to `App`; proposal 3 = `batch345.hex`
+    (18,314), the vault's `batch(address[],uint256[],bytes[])` over `addWidgetChunk`, `setChunks`,
+    `setWidgetChunks`, so the setters stay atomic with the widget chunk where `CodelessChunk` bites.
+    Each has its own digest at nonce *N*, *N* + 1, *N* + 2; each is proposed with the engineer's
+    signature and co-signed by the Product Owner; submit queues each at its own eta and
+    `executeQueued` runs 1, 2, then the batch, because calls 4 and 5 validate the pointers 1 and 2
+    create. `batch.hex` is deleted, not kept beside the live file. RUNBOOK § Step 4 (4a–4c, § The five
+    calls, § Gas) and m04-t08's steps 7–9 are amended to match. Rejected: **five plain proposals**
+    (the setters no longer atomic with the chunk they name, and five signing rounds for the Product
+    Owner); **on-chain `approve()` from both owners with one packed `execute`** (needs the Product
+    Owner to send raw transactions on Sepolia — the limitation that moved the route off `forward()` in
+    #191 — and the approve path is unverified in source); **shrinking `MAX_CHUNK`** (a contract
+    constant that re-chunks every later upload; #188's question, owned by the milestone that next
+    touches the upload). Supersedes the route line of decision 44 (one `batch` proposal per chain),
+    not the decision: step 4 is still an Ops-vault action.
 
 ## Findings carried forward
 
