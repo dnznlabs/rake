@@ -36,8 +36,8 @@ figures come from a forked-chain rehearsal, which is § Deviations 1 and the onl
 | Every upload transaction hash and `gasUsed` from `cast receipt`; step 4's `record:` rows filled; route stated | **pass** | ~~Nothing was broadcast.~~ Twelve transactions now: six submits (three per chain, the product owner's) and six `executeQueued` (the engineer's), every one `status true`, with block and `gasUsed` from `cast receipt <hash> gasUsed`. RUNBOOK § Executed on testnets carries three 4c `record:` blocks and both § Record tables' step-4 rows are filled; the route is the three-proposal threshold one, stated there. |
 | The five node estimates and block gas limit per chain recorded | **partial — 3 of 5 live per chain** | Calls 1–3 from `cast estimate --from $OWNER`: Sepolia 37,859,277 / 33,740,257 / 13,140,215; Base Sepolia 5,343,761 / 4,767,004 / 1,883,560. Calls 4–5 revert `CodelessChunk` pre-upload on the prescribed command, left red; fork figures 71,317 / 42,719. Block gas limits 199,609,569 (Sepolia, 200,000,000 earlier the same hour) and 120,000,000. Every figure is under its limit. § Gas and § Deviations 1. |
 | RUNBOOK § Step 4 carries both routes in order, the `CodelessChunk` constraint, no `forge script … $SIGNER` for a public chain; `Chunks.s.sol` labelled dev-chain only | pass | `RUNBOOK.md:417-517`. Route (a) unanimous/immediate first, (b) threshold/queued second with `delay()` = 3,600 s read live; the ordering constraint stated as a measurement; `grep -c "forge script"` over `RUNBOOK.md:417-517` prints `0`; "**`scripts/forge/Chunks.s.sol` is dev-chain only**" is its own paragraph. Also names the chain-identical pointers and the calldata tool. |
-| `git diff --stat origin/main -- src/ test/ .gas-snapshot` empty; `forge test` and `node --test` counts unchanged and stated; `git status --porcelain` empty | pass | The diff is empty (so `test/` is byte-identical to `main` and the counts cannot have moved). After `forge build --force`: **107** forge tests pass in 7 suites; `make test` → **102** node tests pass, 0 fail. `git status --porcelain` prints exactly one line, `?? .pr-body.md` — the PR body, written to that path on instruction and deliberately not committed, since the PR is opened by hand after review of this branch. Nothing else is untracked or modified. |
-| PR closes this task's issue; § Deviations empty or each item names its runbook hunk | **see § Open questions 1** | The PR body says `Refs #185`, not `Closes #185`, because step 8 was still owed when it was written — closing it on merge would have closed a task with three blocked criteria. **That reason expired on 2026-11-16**: step 8 ran on this branch and no criterion is blocked now, so the keyword is the right one. Still the reviewer's call and still one word in `.pr-body.md`; § Open questions 1. § Deviations each name their hunk. (Both appearances of the keyword in this file are inside backticks and in a file, not a PR body or a commit message, so neither can fire.) |
+| `git diff --stat origin/main -- src/ test/ .gas-snapshot` empty; `forge test` and `node --test` counts unchanged and stated; `git status --porcelain` empty | pass | The diff is empty (so `test/` is byte-identical to `main` and the counts cannot have moved). After `forge build --force`: **107** forge tests pass in 7 suites; `make test` → **102** node tests pass, 0 fail. `git status --porcelain` is **empty**. (Corrected 2026-11-16: this row previously said it printed one line, `?? .pr-body.md`. That was true when written, but the PR body was ultimately composed outside the repository and no such file exists — so the criterion passes outright rather than with an exception, and the stale exception is removed rather than carried.) |
+| PR closes this task's issue; § Deviations empty or each item names its runbook hunk | **met, by a different route** | **The question is moot: the Product Owner closed [#185](https://github.com/dnznlabs/rake/issues/185) by hand on 2026-11-16 at 15:03:08Z, `COMPLETED`, before this PR existed** (read from the issue timeline, not inferred). So there is nothing left for a keyword to do, and the PR body carries `Refs #185`, which is also what the AC's second sentence prescribes for a body that does not close it. § Open questions 1 is closed on that fact rather than ruled. § Deviations each name their hunk. |
 
 ## Gates
 
@@ -109,7 +109,9 @@ in M04 and is not this task's.
 measurement reads — `git diff --stat ad7371d..HEAD -- tools/ app/ RUNBOOK.md docs/…/calldata/` is
 empty, so every figure in this file is the head's, whatever the head is by the time it is read. That
 check is the citation; a handoff cannot name its own commit. Through the devbox-pinned toolchain
-(forge/cast/anvil `1.7.1-dev`, node `v24.21.0`). `app/` is unchanged since `ed0aa00`
+(forge/cast/anvil `1.7.1-dev`, node `v24.12.0` — corrected 2026-11-16 at review from `v24.21.0`,
+which is the host's; the recorded `gzip 45358` is itself the proof, since `v24.21.0` deflates the
+same bytes to 45,624, per § Deviations 2). `app/` is unchanged since `ed0aa00`
 (`git diff --stat ed0aa00..HEAD -- app/` is empty), so these are m04-t09's figures re-measured, not
 quoted — and they match that handoff's § For t08 byte for byte, on both chains.
 
@@ -391,7 +393,7 @@ Each digest was recomputed from the chain with
 `getTransactionHash(<target>, 0, <file>, <nonce>)` and compared to TASK.md **before** signing; all
 three matched. Signatures are `cast wallet sign --no-hash`, verified back to
 `0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d` with `cast wallet verify --no-hash` — note that form is
-**positional** on the pinned `cast 1.8.1`, not `--signature <sig>`.
+**positional** on the pinned `cast 1.7.1`, not `--signature <sig>`.
 
 | proposal | file | target | nonce | digest | proposal id |
 |--:|:--|:--|--:|:--|:--|
@@ -430,8 +432,14 @@ were confirmed against `queued()` on the vault, so the outcome is established on
 of who sent it.
 
 **Deviation from the plan's measurement command:** TASK.md prescribes
-`cast receipt <hash> --field gasUsed`, which errors on the pinned `cast 1.8.1` — the field is
+`cast receipt <hash> --field gasUsed`, which errors on the pinned `cast 1.7.1` — the field is
 positional (`cast receipt <hash> gasUsed`). Every figure above is the positional form's output.
+**Corrected 2026-11-16 at review:** this file first attributed the error to `cast 1.8.1`, which is
+the *host* binary at `~/.foundry/bin/cast` and not what the gates run through; the pin is
+`1.7.1-dev` from devbox and it rejects `--field` identically (`error: unexpected argument '--field'
+found`, exit 2), with `cast receipt <hash> gasUsed` returning `33404902` for Sepolia's second write.
+So the deviation stands and every figure is unaffected — only the instrument was named wrong, which
+is the same wrong-instrument trap the m01 handoffs record for `forge lint`.
 
 ~~`executeQueued` has not run on either chain and must go in nonce order: 1, then 2, then the batch
 (4c). Step 8's verification — `chain-doc` hashes and the three pointers read from the chain — waits
@@ -475,7 +483,7 @@ digests recomputed from the chain with `getTransactionHash` and matched TASK.md'
 | Sepolia | 3 | 5 | `batch345.hex` | `$OWNER` | `0x08a15c2649adc1c4051d6e4ff4f9a27233c6227d69831941b6d86cc5ef78805a` | 12150251 | 13,197,961 | 14,043,126 |
 
 All six `status true`. Every figure is `cast receipt <hash> gasUsed` in the positional form (the
-`--field` spelling errors on `cast 1.8.1`, as the submit note above says).
+`--field` spelling errors on `cast 1.7.1`, as the submit note above says).
 
 **The order gate was read between every send, not assumed.** `cast nonce $APP` returned `1` before
 order 1, `2` before order 2, `3` before order 3, and `4` after the batch, on each chain separately —
@@ -540,9 +548,12 @@ environment two things break, and the second one is the one that would mislead a
    figures above were first read with — but `make chain-doc` is what the acceptance criterion names,
    and it was re-run inside `devbox` on both chains to claim it, returning the same figures.
 2. **`app/dist/index.html.gz` compresses to a different byte count**, and with it two of the four
-   calldata files. The VM's `/usr/bin/node` and devbox's nix `node` are both `v24.21.0` and produce
-   **byte-identical `index.html`** — same 142,949/142,947 bytes, same sha256 — but different deflate
-   output: 45,624 bytes against devbox's **45,358**. So outside devbox,
+   calldata files. **They are different node versions**, which is the whole reason: the VM's
+   `/usr/bin/node` is `v24.21.0` and devbox's nix `node` is `v24.12.0` (corrected 2026-11-16 at
+   review; this file first said both were `v24.21.0`, which made the difference look inexplicable).
+   Either one produces **byte-identical `index.html`** — same 142,949/142,947 bytes, same sha256 —
+   but a different deflate output from the same input: 45,624 bytes against devbox's **45,358**, a
+   zlib difference between the two versions. So outside devbox,
    `tools/step4-calldata.mjs` rewrites `1-addChunk-0.hex` and `2-addChunk-1.hex` (the latter also
    changing length, 42,890 → 43,402 chars) and the "regenerates byte-identical" criterion appears to
    fail. Inside devbox the gzip is 45,358, which is exactly the payload `chain-doc` reads back off
@@ -572,7 +583,7 @@ identical document, and the version pin is the only thing stopping it. **Worth s
 **Both reconcile to the wei.** Sepolia: `gasUsed × effectiveGasPrice` summed is exactly the balance
 delta. Base Sepolia needs the OP Stack L1 data fee added — `gasUsed × effectiveGasPrice` leaves
 38,764 wei unexplained, which is precisely the three receipts' `l1Fee` fields summed. That field is
-not a `cast receipt` field on `cast 1.8.1` (`Error: invalid receipt field: l1Fee`); it comes from
+not a `cast receipt` field on `cast 1.7.1` (`Error: invalid receipt field: l1Fee`); it comes from
 `eth_getTransactionReceipt` over raw JSON-RPC. **m04-t03's reconciliation did not need it** because
 it compared Base Sepolia totals loosely; anyone balancing an OP Stack chain to the wei does.
 
@@ -778,7 +789,7 @@ transaction count changed, from five `Forwarded` receipts to two.
 4. **Two things the plan prescribed turned out not to be needed, and both are written down rather
    than silently skipped.** The hand-set gas limits of § Gas (`cast estimate` returned clean figures
    for all six, no false `DeploymentFailed()`) and `cast receipt --field` (positional on `cast
-   1.8.1`). Neither changes what was sent; both change what M05's mirror should be told to do.
+   1.7.1`). Neither changes what was sent; both change what M05's mirror should be told to do.
    Runbook hunk: the note under 4c's `executeQueued` `record:`.
 5. **The superseded signing tables are kept whole under a labelled heading, not struck cell by cell.**
    The revised plan's step 9 says to keep them struck. Ten rows of four cells wrapped in `~~` renders
@@ -840,23 +851,14 @@ transaction count changed, from five `Forwarded` receipts to two.
 
 ## Open questions
 
-1. **Should this PR carry a closing keyword for issue #185, when step 8 is still owed?**
-   (Deliberately not written as the keyword itself anywhere in this file.)
-   **The premise expired on 2026-11-16**: step 8 ran on this branch the same day, so no criterion is
-   blocked any more and the "issue marked done with three blocked criteria" cost is gone. The
-   recommendation below is therefore withdrawn — on the facts as they now stand the closing keyword is
-   the right one, and it is still one word in the PR body and still the architect's call, not mine.
-   - *Close it.* The task's AC says the PR closes its issue, and the preparation is complete; step 8
-     lands as a follow-up commit or a second PR. Cost: an issue marked done with three blocked
-     criteria, and M04 criterion 3 tracked nowhere.
-   - *Refs only, close after step 8.* The issue stays open across Denizen's signing, and whoever runs
-     step 8 pushes to the same branch or a second PR that closes it. Cost: a merged PR with an open
-     issue, which the loop does not otherwise produce.
-   - **Recommendation: refs only.** Step 8 is the half that closes M04 criterion 3, and an issue is
-     the only thing tracking it.
-   - Default if nobody rules: `.pr-body.md` says `Refs #185`, so merging closes nothing. One word
-     changes it.
-   - Blocks: nothing in this PR. Recorded wherever the architect rules it.
+1. ~~**Should this PR carry a closing keyword for issue #185, when step 8 is still owed?**~~
+   **Closed 2026-11-16 by fact, not by ruling: the Product Owner closed
+   [#185](https://github.com/dnznlabs/rake/issues/185) by hand at 15:03:08Z, `COMPLETED`** — read
+   from the issue's own timeline — and step 8 ran on this branch later the same day, so neither half
+   of the question survives. The issue is already done and no criterion is blocked; a keyword would
+   have nothing to close. The PR body carries `Refs #185`, which is what this task's AC prescribes
+   for a body that does not close it, and `closingIssuesReferences` on the PR is empty, checked after
+   the body was last edited. Nothing here needed the architect's call in the end.
 2. **Which `FEATURED_SALT` should a public testnet bundle feature?** m04-t09 raised this and called
    it not its call; this task's plan does not rule it either, and its § Out of scope forbids changing
    the bundle, so the prescribed default was built.

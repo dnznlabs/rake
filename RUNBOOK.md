@@ -1126,7 +1126,7 @@ were *relayed*: each `from` is a different EOA (`0xB42F812A…EAD6`, `0xB01caEa8
 `0xC066ac5D…8B8c`) and each `to` is `0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3`, not the vault and
 not the product owner's account — the signatures are what authorise the call, and with both slots
 ECDSA the vault does not care who sends it. Second, **the `cast receipt <hash> --field gasUsed`
-form this plan prescribes does not run** on the pinned `cast 1.8.1`: the field is positional,
+form this plan prescribes does not run** on the pinned `cast 1.7.1`: the field is positional,
 `cast receipt <hash> gasUsed`. The figures above come from the positional form.
 
 **4c `record:` — Sepolia submitted and queued too** (2026-11-16 22:18Z, by the product owner). Not
