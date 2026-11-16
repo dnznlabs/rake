@@ -37,6 +37,7 @@ figures come from a forked-chain rehearsal, which is § Deviations 1 and the onl
 | The five node estimates and block gas limit per chain recorded | **partial — 3 of 5 live per chain** | Calls 1–3 from `cast estimate --from $OWNER`: Sepolia 37,859,277 / 33,740,257 / 13,140,215; Base Sepolia 5,343,761 / 4,767,004 / 1,883,560. Calls 4–5 revert `CodelessChunk` pre-upload on the prescribed command, left red; fork figures 71,317 / 42,719. Block gas limits 199,609,569 (Sepolia, 200,000,000 earlier the same hour) and 120,000,000. Every figure is under its limit. § Gas and § Deviations 1. |
 | RUNBOOK § Step 4 carries both routes in order, the `CodelessChunk` constraint, no `forge script … $SIGNER` for a public chain; `Chunks.s.sol` labelled dev-chain only | pass | `RUNBOOK.md:417-517`. Route (a) unanimous/immediate first, (b) threshold/queued second with `delay()` = 3,600 s read live; the ordering constraint stated as a measurement; `grep -c "forge script"` over `RUNBOOK.md:417-517` prints `0`; "**`scripts/forge/Chunks.s.sol` is dev-chain only**" is its own paragraph. Also names the chain-identical pointers and the calldata tool. |
 | `git diff --stat origin/main -- src/ test/ .gas-snapshot` empty; `forge test` and `node --test` counts unchanged and stated; `git status --porcelain` empty | pass | The diff is empty (so `test/` is byte-identical to `main` and the counts cannot have moved). After `forge build --force`: **107** forge tests pass in 7 suites; `make test` → **102** node tests pass, 0 fail. `git status --porcelain` is **empty**. (Corrected 2026-11-16: this row previously said it printed one line, `?? .pr-body.md`. That was true when written, but the PR body was ultimately composed outside the repository and no such file exists — so the criterion passes outright rather than with an exception, and the stale exception is removed rather than carried.) |
+| **Gates recorded:** § Gates carries per chain and dated `isOwner($ENGINEER)` `true`, `ownerCount()` `4`, `threshold()` `2`, `delay()` `3600`, `nonce()` *N*, `cast nonce $APP` `1`; cites #190's closing comment and names #193 as carried; and quotes the Product Owner's dated word that the Sepolia queue is clean | **met in substance, one element recorded instead of quoted** — § Deviations 7 | (Row added 2026-11-16 at review; this criterion had no row at all, which is why the gap went unseen rather than being marked.) Every other element is in § Gates: the six readings per chain in the step-7 table dated 15:17Z, `ownerCount()` **4** on both, #190's closing comment cited and #193 named as carried in M04. **The last element is not quotable as written: the Sepolia queue was not clean.** His dated words are that he could not see anything there — true of his screen, false of the chain, where two unsigned proposals of his own sat at nonces 3 and 4, hidden by design. § Gates records how the gate actually closed instead: the pair measured inert (`signatures` empty against a paired control, `queued()` `0`), the hazard shown nonce-bounded, his explicit go for Sepolia dated 21:10:57Z, and both digests permanently unexecutable after the upload consumed those nonces. |
 | PR closes this task's issue; § Deviations empty or each item names its runbook hunk | **met, by a different route** | **The question is moot: the Product Owner closed [#185](https://github.com/dnznlabs/rake/issues/185) by hand on 2026-11-16 at 15:03:08Z, `COMPLETED`, before this PR existed** (read from the issue timeline, not inferred). So there is nothing left for a keyword to do, and the PR body carries `Refs #185`, which is also what the AC's second sentence prescribes for a body that does not close it. § Open questions 1 is closed on that fact rather than ruled. § Deviations each name their hunk. |
 
 ## Gates
@@ -102,6 +103,33 @@ the committed bundle with the dev-seed featured salt, so the featured panel is e
 until [#193](https://github.com/dnznlabs/rake/issues/193) sets the featured distribution and
 re-uploads. The ruling is in #190's closing comment and in `ROADMAP.md` § Decisions; #193 is carried
 in M04 and is not this task's.
+
+**The Sepolia-queue gate, and why it is recorded rather than quoted** (added 2026-11-16 at review;
+§ Deviations 7). The plan asks § Gates to quote the Product Owner's dated word that the Sepolia queue
+is clean. **It was not clean, so there is no such word to quote without recording something untrue.**
+What he said, dated, is that he could not see it: *"i don't see the two stale proposals in sepolia ops
+vault"* (2026-11-16 20:08:15Z) and *"shows no rows at all on sepolia ops vault"* (20:13:28Z). Both
+were accurate about his screen and wrong about the chain — two proposals from his own account were
+sitting at that vault's nonces 3 and 4, and the dapp hides an unsigned proposal the chain does not
+hold queued, so they were invisible rather than absent. How the gate actually closed, in order:
+
+1. The pair was **measured inert**, not assumed clean: `signatures` empty through the dapp's own
+   query against a paired control that returned one `ecdsa` row per Base Sepolia proposal,
+   `queued()` `0` for both digests, and therefore unsignable through the only surface an owner uses.
+2. The hazard was shown **nonce-bounded** — `getTransactionHash` binds the nonce inside the EIP-712
+   struct hash and `execute()` hashes against the live counter it increments — so consuming nonces 3
+   and 4 would end it, and the upload is what consumes them.
+3. The Product Owner then gave an **explicit go for Sepolia, dated 2026-11-16 21:10:57Z**, with the
+   pair's state on the record: *"sure, you can execute them as they become ready as long as they are
+   executed in the right order"* is his go for execution at 21:35:09Z, and the go to propose on
+   Sepolia came at 21:10:57Z.
+4. Both digests are now **permanently unexecutable**, confirmed after the upload: nonces 3 and 4 are
+   consumed, so `execute()` can never recompute either hash. Pruning the two rows is housekeeping for
+   the proposer and is carried, not a gate — § Step 7's amendment says why in the terms that outlive
+   the nonce.
+
+So the gate is **met in substance and not in the form the plan names**. A quotation would have
+asserted a clean queue that measurement had already contradicted; this records what was true instead.
 
 ## The bundle, per chain
 
@@ -809,6 +837,17 @@ transaction count changed, from five `Forwarded` receipts to two.
    **12,009,880** on Base Sepolia, against those pre-upload whole-batch estimates of 84,773,222 and
    12,188,581 — 0.7% and 1.5% high. The estimate was sound and the margin for unmeasured queue
    bookkeeping was never needed.
+7. **The Sepolia-queue gate is recorded, not quoted, because the queue was not clean** (added
+   2026-11-16 at review). The Gates criterion asks § Gates to quote the Product Owner's dated word
+   that the Sepolia queue is clean. His dated words are that he could not *see* anything there, which
+   was true of his screen and false of the chain: two unsigned proposals from his own account sat at
+   nonces 3 and 4, hidden by design rather than absent. Quoting them as an attestation of a clean
+   queue would have put a measured falsehood in the record behind a ✓. § Gates therefore carries how
+   the gate actually closed — the pair measured inert, the hazard shown nonce-bounded, his explicit go
+   for Sepolia at 21:10:57Z, and both digests now permanently unexecutable — and this item marks the
+   substitution rather than letting the row read as a clean pass. **Nothing in the runbook changes:**
+   the gate is the task plan's, not a runbook step, so there is no hunk to name. Escalated and
+   authorised at review rather than decided here.
 
 ## Decisions
 
