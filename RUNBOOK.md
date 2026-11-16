@@ -589,7 +589,12 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
 
    (`SSTORE2.write` stores a `0x00` STOP byte then the data, `lib/solady/src/utils/SSTORE2.sol:52`,
    so an SSTORE2 pointer's runtime code is exactly that.) The same comparison for the doc-1 pointer
-   against `2-addChunk-1.hex` before the batch. The nonce and code-presence rows above are the
+   against `2-addChunk-1.hex` before the batch. A cheaper first look that happens to discriminate for
+   this bundle: `cast codesize` reads **24,001** at the doc-0 pointer and **21,359** at doc 1 (the
+   45,358-byte gzip cuts at `MAX_CHUNK` into 24,000 + 21,358, plus the STOP byte); swapped, the two
+   numbers trade places. It is an accident of the payload — a gzip that is an exact multiple of
+   24,000 gives equal sizes — so the byte equality above is the gate and the sizes are only the
+   glance. The nonce and code-presence rows above are the
    cheap pre-checks; the content equality is what proves the order held. Any other reading is a
    stop and a message to the architect, not a retry.
 
