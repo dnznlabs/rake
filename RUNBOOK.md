@@ -1013,8 +1013,16 @@ whose `TASK.md` still describes step 4 as a `forge script` the engineer runs.
 **Step 4 is prepared and not yet executed, on either chain** (m04-t08, 2026-11-12). § Step 4 now
 carries the vault procedure, `tools/step4-calldata.mjs` writes the five calldatas and they are
 committed per chain, and the per-call estimates and digests are in that task's `HANDOFF.md`
-§ For Denizen. The rows below stay blank until the upload executes. Criterion 3's chain half is
-still open.
+§ For Denizen. ~~The rows below stay blank until the upload executes. Criterion 3's chain half is
+still open.~~
+
+**Step 4 executed on both chains on 2026-11-16** — Base Sepolia and then Sepolia, three
+`executeQueued` calls each in nonce order, every receipt `status true`. The rows below are filled
+from the chain, and **criterion 3's chain half is closed**: `cast nonce $APP` reads `4` on both, the
+three pointers equal the committed predictions in the right slots, and `chain-doc`'s `inflated
+sha256` and `widget sha256` equal `sha256sum` of each chain's rebuilt bundle. The three submit and
+three `executeQueued` hashes per chain are in this section's 4c `record:` blocks below, and the
+verification figures in m04-t08's `HANDOFF.md` § Step 8's `record:`.
 
 **The route changed on 2026-11-15, before anything was signed**: one `batch` proposal per chain
 through the threshold route, proposed by the engineer and signed by the product owner (§ Step 4).
@@ -1121,8 +1129,49 @@ ECDSA the vault does not care who sends it. Second, **the `cast receipt <hash> -
 form this plan prescribes does not run** on the pinned `cast 1.8.1`: the field is positional,
 `cast receipt <hash> gasUsed`. The figures above come from the positional form.
 
-**`executeQueued` has not run on either chain.** It must go in nonce order — 1, then 2, then the
-batch (4c) — and the last Base Sepolia ETA is `1794867020`.
+**4c `record:` — Sepolia submitted and queued too** (2026-11-16 22:18Z, by the product owner). Not
+recorded when sent; recovered from the vault's own `Queued(bytes32,uint256,uint256)` logs, topic0
+`0x51c73878…6fdcf39`, one `cast logs --address $OWNER <topic0> <digest>` per digest — the event is
+emitted by `execute()` on the vault, so it is better evidence than the service's rows:
+
+| proposal | nonce | submit tx | block | `gasUsed` | ETA |
+|--:|--:|:--|--:|--:|:--|
+| 1 | 3 | `0xfa83fb4c8bccf54aaaa640f7aa80afeb739369102cef85c4aa1c1a2f1d1df627` | 12149932 | 1,651,608 | `1794867504` · 22:18:24Z |
+| 2 | 4 | `0xec93f725db2d8d362ab0d61ad21597f7d3bd581fc71a2358cf2d40a7a1400924` | 12149934 | 1,483,672 | `1794867528` · 22:18:48Z |
+| 3 | 5 | `0x9005224aa5bcf9af5f0e6d2882d1268f7c6dcf100b6155a59b33d6912fffed8d` | 12149936 | 697,240 | `1794867552` · 22:19:12Z |
+
+All three `status true`. **Sepolia's submits were not relayed the way Base Sepolia's were:** each
+`from` is the product owner's own account `0x357836fFcB45307FA7ff2A574F505753c961902B`, through the
+same relay `to` of `0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3`. The relay contract is constant
+across both chains; the sending EOA is not. Which is why **`from` is never a signer attribution on
+either chain** — the signatures authorise the call and `execute()` does not read `msg.sender`.
+
+**4c `record:` — the six `executeQueued` calls, both chains, 2026-11-16** (by the engineer, on the
+product owner's explicit go of 21:35Z, after every ETA had passed). Pre-send gates re-read on both
+chains at 22:20Z: all six digests recomputed from the chain with `getTransactionHash` and equal to
+4a's table, `queued()` nonzero for all six, every ETA past, vault `nonce()` `6`, `cast nonce $APP`
+**`1`** — nothing had run.
+
+| chain | order | nonce | file | target | `executeQueued` tx | block | `gasUsed` | estimate |
+|:--|--:|--:|:--|:--|:--|--:|--:|--:|
+| Base Sepolia | 1 | 3 | `1-addChunk-0.hex` | `$APP` | `0x542f24c8bff7a15c91f3b9a067472bd5c8a60a5e0f37cf6c9f01d0417e0a0154` | 59729067 | 5,330,923 | 5,555,812 |
+| Base Sepolia | 2 | 4 | `2-addChunk-1.hex` | `$APP` | `0xaaaa14162deb7d56a8cdbc50a71a03366d4f4d62d22004e783fe1738ae7c12bf` | 59729117 | 4,739,420 | 4,961,962 |
+| Base Sepolia | 3 | 5 | `batch345.hex` | `$OWNER` | `0x6fba77ffcc25d2d7a37180b5e19ce40d99436afa4eff96f797ac69281caee533` | 59729165 | 1,939,537 | 2,085,800 |
+| Sepolia | 1 | 3 | `1-addChunk-0.hex` | `$APP` | `0x7d902b542d993503245d4156847f2dc3f27c0f55d23f33a3d03848f3992e44fb` | 12150245 | 37,591,595 | 38,202,423 |
+| Sepolia | 2 | 4 | `2-addChunk-1.hex` | `$APP` | `0xeff1ea245e51e77ce07f51953615412517dd47e9612caff43aa9d3e921555d20` | 12150247 | 33,404,902 | 34,214,503 |
+| Sepolia | 3 | 5 | `batch345.hex` | `$OWNER` | `0x08a15c2649adc1c4051d6e4ff4f9a27233c6227d69831941b6d86cc5ef78805a` | 12150251 | 13,197,961 | 14,043,126 |
+
+All six `status true`, every figure from `cast receipt <hash> gasUsed` positionally. **The order gate
+was read between every send:** `cast nonce $APP` returned `1`, `2`, `3` before orders 1, 2, 3 and `4`
+after the batch, per chain — the table above walked, so the silent misorder was never reachable.
+
+**The hand-set gas limits of § Gas were not needed on these RPCs, and the reason given for them did
+not hold.** `cast estimate --from` the signer returned a clean figure for all six against the same
+public RPCs — no `DeploymentFailed()` — within 2% of the gas actually used every time; what was sent
+was each estimate plus 30% headroom. The batch still cannot be estimated before its chunks land, as
+written; it was estimated after order 2 on each chain. **Keep the table as a fallback and prefer
+estimate-then-send**: the false `DeploymentFailed()` is a wallet-path observation, not an
+`eth_estimateGas` one.
 
 Step 6 has not run on
 either chain:
@@ -1190,9 +1239,10 @@ exit **0** with 0 results. `forge test` **102 passed**, `node --test` **90 passe
 | | 2 | `implementation()` | `IMPL`: `0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0` (9,271 bytes) |
 | 2 | 3 | `App` CREATE2 | tx: `0x6f8d868f381a5b0cda7fd6c397fc63d581ab08593e57d6eb1a318cd13275ad14` · gas: **11,506,694** · addr: `0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE` · block 12,091,543 |
 | | 3 | `owner()` · `version()` · `locked()` | `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790` · `v0.1` · false |
-| 3 | 4 | `addChunk` ×N · `setChunks` | **not run — blocked on M04-D4 (#178)** |
-| 4 | 4 | widget chunks | **not run — blocked on M04-D4 (#178)** |
-| | 4 | `inflated sha256` · `widget sha256` · byte counts | **not run — blocked on M04-D4 (#178)** |
+| 3 | 4 | `addChunk` ×2 · `setChunks` | **done** 2026-11-16 via the vault (m04-t08, § Step 4) · chunk 0 tx `0x7d902b54…f992e44fb` block 12,150,245 gas **37,591,595** · chunk 1 tx `0xeff1ea24…921555d20` block 12,150,247 gas **33,404,902** · `setChunks` inside `batch345` |
+| 4 | 4 | widget chunk · `setWidgetChunks` | **done** · both in `batch345` tx `0x08a15c26…5ef78805a` block 12,150,251 gas **13,197,961** |
+| | 4 | pointers · `cast nonce $APP` | `chunks(0)` `0x0f8132D4…5D0D` · `chunks(1)` `0xAf5f9504…30a0` · `widgetChunks(0)` `0xc39C7643…aC8e`, all equal to the predictions · nonce **4** |
+| | 4 | `inflated sha256` · `widget sha256` · byte counts | `cb2e8301…b99363` = `sha256sum app/dist/index.html` · `21dd3d13…eea24a` = `sha256sum app/dist/widget.js` · 142,949 and 8,144 both ways · `html()` 61,157 bytes, payload 45,358 |
 | 5 | 5 | explorer: factory / implementation / App | all three `Pass`, names `DistributionFactory` / `Distribution` / `App`; URLs below |
 | 6 | 6 | DNZN `create` | not run — Denizen's; `predict($DNZN_SALT)` = `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`, `cast code` `0x` |
 | | 6 | `owner()` on `DISTRO` | not run |
@@ -1216,9 +1266,10 @@ a collision and the successful send that followed it is not a resend.
 | | 2 | `implementation()` | `IMPL`: `0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0` (9,271 bytes) |
 | 2 | 3 | `App` CREATE2 | tx: `0xce1bdad0a3907098277ce40fe412aac1ac56b4bde62879349e4fc67886130e52` · gas: **1,655,660** · addr: `0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE` · block 56,161,508 |
 | | 3 | `owner()` · `version()` · `locked()` | `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790` · `v0.1` · false |
-| 3 | 4 | `addChunk` ×N · `setChunks` | **not run — blocked on M04-D4 (#178)** |
-| 4 | 4 | widget chunks | **not run — blocked on M04-D4 (#178)** |
-| | 4 | `inflated sha256` · `widget sha256` · byte counts | **not run — blocked on M04-D4 (#178)** |
+| 3 | 4 | `addChunk` ×2 · `setChunks` | **done** 2026-11-16 via the vault (m04-t08, § Step 4) · chunk 0 tx `0x542f24c8…17e0a0154` block 59,729,067 gas **5,330,923** · chunk 1 tx `0xaaaa1416…1738ae7c12bf` block 59,729,117 gas **4,739,420** · `setChunks` inside `batch345` |
+| 4 | 4 | widget chunk · `setWidgetChunks` | **done** · both in `batch345` tx `0x6fba77ff…281caee533` block 59,729,165 gas **1,939,537** |
+| | 4 | pointers · `cast nonce $APP` | identical to Sepolia's row — `0x0f8132D4…5D0D`, `0xAf5f9504…30a0`, `0xc39C7643…aC8e`, all equal to the predictions · nonce **4** |
+| | 4 | `inflated sha256` · `widget sha256` · byte counts | `8c235917…576ea3` = `sha256sum app/dist/index.html` · `21dd3d13…eea24a`, the same widget hash as Sepolia · 142,947 and 8,144 both ways · `html()` 61,157 bytes, payload 45,358 |
 | 5 | 5 | explorer: factory / implementation / App | all three `Pass - Verified` this run; URLs below |
 | 6 | 6 | DNZN `create` | not run — Denizen's; `predict($DNZN_SALT)` = `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`, `cast code` `0x` |
 | | 6 | `owner()` on `DISTRO` | not run |

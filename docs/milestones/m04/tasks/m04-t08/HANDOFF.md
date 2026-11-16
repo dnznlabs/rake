@@ -29,15 +29,15 @@ figures come from a forked-chain rehearsal, which is § Deviations 1 and the onl
 
 | AC | Result | Evidence |
 |:---|:-------|:---------|
-| M04 criterion 3's chain half, both chains | **blocked** — not claimable before the forwards land | TASK.md step 7 ends in "then stop and wait", so step 8 is after Denizen's signatures. Proven *in advance* on a fork of each chain, where the five calldatas produce exactly the built bundle: Sepolia `inflated sha256 cb2e8301…99363` = `sha256sum app/dist/index.html`, `widget sha256 21dd3d13…ea24a` = `sha256sum app/dist/widget.js`, inflated 142,949 = `wc -c index.html`, widget 8,144; Base Sepolia `inflated sha256 8c235917…76ea3`, same widget hash, inflated 142,947. `cast nonce $APP` → **4** on both forks, `chunks(0|1)` and `widgetChunks(0)` equal the committed predictions. § The fork rehearsal. The live readings are step 8's. |
-| The five committed calldata files per chain regenerate byte-identical (`sha256sum -c`) | pass | At head `ad7371d`, per chain: `diff -r <committed> <regenerated>` exit 0, and `sha256sum -c` prints `OK` for all five. § The five calls, per chain. |
+| M04 criterion 3's chain half, both chains | **pass** — claimed 2026-11-16 after the upload executed on both chains | ~~Blocked before the forwards landed; proven in advance on a fork of each chain (§ The fork rehearsal).~~ **Read live from both chains at 22:4xZ** after the six `executeQueued` calls: `cast nonce $APP` → **4** on both; `chunks(0)` `0x0f8132D4…5D0D`, `chunks(1)` `0xAf5f9504…30a0`, `widgetChunks(0)` `0xc39C7643…aC8e`, equal to the committed predictions and in the right slots on both; Sepolia `inflated sha256 cb2e8301…99363` = `sha256sum app/dist/index.html` with 142,949 bytes both ways, `widget sha256 21dd3d13…ea24a` = `sha256sum app/dist/widget.js` with 8,144 both ways; Base Sepolia `inflated sha256 8c235917…76ea3` with 142,947 bytes both ways, same widget hash and byte count. **Every live figure equals the fork rehearsal's prediction.** § Step 8's `record:`. |
+| The five committed calldata files per chain regenerate byte-identical (`sha256sum -c`) | pass | At head `ad7371d`, per chain: `diff -r <committed> <regenerated>` exit 0, and `sha256sum -c` prints `OK` for all five. § The five calls, per chain. **Re-run at this head after the upload**, `make dapp-nodev` + `tools/step4-calldata.mjs` on both chains: `git status --porcelain` clean over `calldata/`. Only inside `devbox run` — the VM's `/usr/bin/node` deflates the same `index.html` to 45,624 bytes instead of 45,358 and rewrites two of the four files; § Step 8's verification, note 2. |
 | Files 1–3's `bytes` concatenate to the payload and the widget (`cmp` exit 0) | pass | Reading each file's ABI length word and taking exactly that many bytes from offset 68 — no signature of mine in the path: `cmp doc.bin app/dist/index.html.gz` and `cmp 3-addWidgetChunk.bin app/dist/widget.js` both exit 0, both chains. Length words read 24,000 / 21,358 / 8,144. |
 | Files 4–5 decode to the pointers | pass | `cast calldata-decode 'setChunks(address[],bool)'` → `[0x0f8132D4…35D0D, 0xAf5f9504…730a0] true`; `'setWidgetChunks(address[])'` → `[0xc39C7643…aC8e]`. Identical on both chains. |
-| Every upload transaction hash and `gasUsed` from `cast receipt`; step 4's `record:` rows filled; route stated | **blocked** | Nothing was broadcast. § Executed on testnets now records *why* the rows are blank and what they wait for; the route chosen is (a), stated in § Step 4 with its reason. |
+| Every upload transaction hash and `gasUsed` from `cast receipt`; step 4's `record:` rows filled; route stated | **pass** | ~~Nothing was broadcast.~~ Twelve transactions now: six submits (three per chain, the product owner's) and six `executeQueued` (the engineer's), every one `status true`, with block and `gasUsed` from `cast receipt <hash> gasUsed`. RUNBOOK § Executed on testnets carries three 4c `record:` blocks and both § Record tables' step-4 rows are filled; the route is the three-proposal threshold one, stated there. |
 | The five node estimates and block gas limit per chain recorded | **partial — 3 of 5 live per chain** | Calls 1–3 from `cast estimate --from $OWNER`: Sepolia 37,859,277 / 33,740,257 / 13,140,215; Base Sepolia 5,343,761 / 4,767,004 / 1,883,560. Calls 4–5 revert `CodelessChunk` pre-upload on the prescribed command, left red; fork figures 71,317 / 42,719. Block gas limits 199,609,569 (Sepolia, 200,000,000 earlier the same hour) and 120,000,000. Every figure is under its limit. § Gas and § Deviations 1. |
 | RUNBOOK § Step 4 carries both routes in order, the `CodelessChunk` constraint, no `forge script … $SIGNER` for a public chain; `Chunks.s.sol` labelled dev-chain only | pass | `RUNBOOK.md:417-517`. Route (a) unanimous/immediate first, (b) threshold/queued second with `delay()` = 3,600 s read live; the ordering constraint stated as a measurement; `grep -c "forge script"` over `RUNBOOK.md:417-517` prints `0`; "**`scripts/forge/Chunks.s.sol` is dev-chain only**" is its own paragraph. Also names the chain-identical pointers and the calldata tool. |
 | `git diff --stat origin/main -- src/ test/ .gas-snapshot` empty; `forge test` and `node --test` counts unchanged and stated; `git status --porcelain` empty | pass | The diff is empty (so `test/` is byte-identical to `main` and the counts cannot have moved). After `forge build --force`: **107** forge tests pass in 7 suites; `make test` → **102** node tests pass, 0 fail. `git status --porcelain` prints exactly one line, `?? .pr-body.md` — the PR body, written to that path on instruction and deliberately not committed, since the PR is opened by hand after review of this branch. Nothing else is untracked or modified. |
-| PR closes this task's issue; § Deviations empty or each item names its runbook hunk | **see § Open questions 1** | The PR body says `Refs #185`, not `Closes #185`, because step 8 is still owed — closing it on merge would close a task with three blocked criteria. That is the reviewer's call to make, not mine, and it is one word in `.pr-body.md`. § Deviations each name their hunk. (Both appearances of the keyword in this file are inside backticks and in a file, not a PR body or a commit message, so neither can fire.) |
+| PR closes this task's issue; § Deviations empty or each item names its runbook hunk | **see § Open questions 1** | The PR body says `Refs #185`, not `Closes #185`, because step 8 was still owed when it was written — closing it on merge would have closed a task with three blocked criteria. **That reason expired on 2026-11-16**: step 8 ran on this branch and no criterion is blocked now, so the keyword is the right one. Still the reviewer's call and still one word in `.pr-body.md`; § Open questions 1. § Deviations each name their hunk. (Both appearances of the keyword in this file are inside backticks and in a file, not a PR body or a commit message, so neither can fire.) |
 
 ## Gates
 
@@ -406,7 +406,10 @@ byte-identical to the committed file (sha256 `3b5891a8…`, `cdb5fe89…`, `7946
 unsigned ones are still the only hidden pair, so the product owner sees exactly three signable rows.
 `p_threshold` was sent as `2` — without it the service answers `400 Invalid proposal threshold`.
 
-### Step 8 is not done: Base Sepolia is queued, nothing has executed
+### The submits — Base Sepolia is queued, nothing has executed (superseded the same day)
+
+**Superseded 2026-11-16 22:23Z**, when all six `executeQueued` calls landed: § Step 8's `record:`.
+The submit rows below are kept as the queue's record.
 
 Submitted by the product owner 2026-11-16 (before Sepolia was proposed). Vault `nonce()` moved
 `3 → 6` and `queued()` is nonzero for all three digests; `cast nonce $APP` is still `1`, so nothing
@@ -430,9 +433,152 @@ of who sent it.
 `cast receipt <hash> --field gasUsed`, which errors on the pinned `cast 1.8.1` — the field is
 positional (`cast receipt <hash> gasUsed`). Every figure above is the positional form's output.
 
-`executeQueued` has not run on either chain and must go in nonce order: 1, then 2, then the batch
+~~`executeQueued` has not run on either chain and must go in nonce order: 1, then 2, then the batch
 (4c). Step 8's verification — `chain-doc` hashes and the three pointers read from the chain — waits
-on it.
+on it.~~ All six ran the same day, in that order; § Step 8's `record:` below.
+
+### Sepolia's three submits, read from the chain
+
+Not recorded when they were sent. Recovered afterwards from the vault's own
+`Queued(bytes32,uint256,uint256)` logs — `cast logs --address $OWNER <topic0> <digest>` for each of
+the three digests, topic0 `0x51c73878…6fdcf39` — which is a stronger source than the service: the
+event is emitted by `execute()` on the vault itself.
+
+| proposal | nonce | submit tx | block | `gasUsed` | ETA |
+|--:|--:|:--|--:|--:|:--|
+| 1 | 3 | `0xfa83fb4c8bccf54aaaa640f7aa80afeb739369102cef85c4aa1c1a2f1d1df627` | 12149932 | 1,651,608 | `1794867504` · 22:18:24Z |
+| 2 | 4 | `0xec93f725db2d8d362ab0d61ad21597f7d3bd581fc71a2358cf2d40a7a1400924` | 12149934 | 1,483,672 | `1794867528` · 22:18:48Z |
+| 3 | 5 | `0x9005224aa5bcf9af5f0e6d2882d1268f7c6dcf100b6155a59b33d6912fffed8d` | 12149936 | 697,240 | `1794867552` · 22:19:12Z |
+
+All three `status true`. **Sepolia's submits were not relayed the way Base Sepolia's were:** each
+`from` is the product owner's own account `0x357836fFcB45307FA7ff2A574F505753c961902B`, with the same
+`to` of `0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3`. So the relay contract is constant across both
+chains and the sending EOA is not — which is the point the Base Sepolia note makes in reverse, and
+the reason `from` is not a signer attribution on either.
+
+## Step 8's `record:` — the six `executeQueued` calls, both chains
+
+Sent by the engineer 2026-11-16, Base Sepolia **22:21:22–22:21:41Z** and Sepolia
+**22:22:12–22:23:24Z** by block timestamp, on the product owner's explicit go of 21:35Z, after every
+ETA had passed. **Pre-send gates, re-read on both chains at 22:20Z:** all six
+digests recomputed from the chain with `getTransactionHash` and matched TASK.md's table exactly,
+`queued()` nonzero for all six, every ETA in the past, vault `nonce()` `6`, and `cast nonce $APP`
+**`1`** on both — so nothing had run and the whole upload was still ahead.
+
+| chain | order | nonce | file | target | `executeQueued` tx | block | `gasUsed` | estimate |
+|:--|--:|--:|:--|:--|:--|--:|--:|--:|
+| Base Sepolia | 1 | 3 | `1-addChunk-0.hex` | `$APP` | `0x542f24c8bff7a15c91f3b9a067472bd5c8a60a5e0f37cf6c9f01d0417e0a0154` | 59729067 | 5,330,923 | 5,555,812 |
+| Base Sepolia | 2 | 4 | `2-addChunk-1.hex` | `$APP` | `0xaaaa14162deb7d56a8cdbc50a71a03366d4f4d62d22004e783fe1738ae7c12bf` | 59729117 | 4,739,420 | 4,961,962 |
+| Base Sepolia | 3 | 5 | `batch345.hex` | `$OWNER` | `0x6fba77ffcc25d2d7a37180b5e19ce40d99436afa4eff96f797ac69281caee533` | 59729165 | 1,939,537 | 2,085,800 |
+| Sepolia | 1 | 3 | `1-addChunk-0.hex` | `$APP` | `0x7d902b542d993503245d4156847f2dc3f27c0f55d23f33a3d03848f3992e44fb` | 12150245 | 37,591,595 | 38,202,423 |
+| Sepolia | 2 | 4 | `2-addChunk-1.hex` | `$APP` | `0xeff1ea245e51e77ce07f51953615412517dd47e9612caff43aa9d3e921555d20` | 12150247 | 33,404,902 | 34,214,503 |
+| Sepolia | 3 | 5 | `batch345.hex` | `$OWNER` | `0x08a15c2649adc1c4051d6e4ff4f9a27233c6227d69831941b6d86cc5ef78805a` | 12150251 | 13,197,961 | 14,043,126 |
+
+All six `status true`. Every figure is `cast receipt <hash> gasUsed` in the positional form (the
+`--field` spelling errors on `cast 1.8.1`, as the submit note above says).
+
+**The order gate was read between every send, not assumed.** `cast nonce $APP` returned `1` before
+order 1, `2` before order 2, `3` before order 3, and `4` after the batch, on each chain separately —
+the table of 4c, walked. The silent misorder 4c names (piece 2 before piece 1, which does not revert)
+was therefore never possible, and the `inflated sha256` equality below closes it independently.
+
+**The hand-set gas limits were not used, and the plan's reason for them did not hold.** TASK.md
+prescribes three figures per chain because a wallet's estimate through a public RPC may report a
+false `DeploymentFailed()`. `cast estimate --from` the signer against the same public RPCs returned a
+clean figure for every one of the six, within 2% of the gas actually used in all six cases; the
+limits sent were those estimates with 30% headroom (`--gas-limit`, 1.3×, and 8,400,000 / 7,500,000 /
+3,200,000 on Base Sepolia). The batch could not be estimated before its chunks landed, exactly as the
+plan says — it was estimated after order 2 each time. **So the plan's figures were a correct
+precaution and not a necessity on these two RPCs**, and the estimate-then-send route is the cheaper
+one to recommend for M05's mirror; the false-`DeploymentFailed()` hazard is a wallet-path
+observation, not an `eth_estimateGas` one.
+
+**Base Sepolia costs about 7× less gas for the identical calldata**, which is worth stating because
+it inverts the usual direction: 12,009,880 gas across the three against Sepolia's 84,194,458, for
+byte-identical inputs. Same pattern as m04-t03's step 2/3 figures (§ Executed on testnets, *Base fees
+and what the chains charged*) — Sepolia prices contract creation far above the cancun schedule and
+Base Sepolia at roughly 1.05× — and the three `addChunk`/`addWidgetChunk` CREATEs are what this
+upload is. **M05 must re-read it per mainnet.**
+
+### Step 8's verification, per chain
+
+`make dapp-nodev CHAIN_ID=$CHAIN_ID` then `make chain-doc CHAIN_ID=$CHAIN_ID RPC="$RPC"`, against
+`sha256sum app/dist/index.html app/dist/widget.js`, at commit `f08f2bc`, **all of it inside `devbox
+run`** — see the note below, which is not optional advice.
+
+| | Sepolia (11155111) | Base Sepolia (84532) |
+|:--|:--|:--|
+| `cast nonce $APP` | `4` | `4` |
+| `chunks(0)` | `0x0f8132D41Ea16c4536565cb2910EF801c2e35D0D` | same |
+| `chunks(1)` | `0xAf5f9504714D4D441E836ef626633553ccF730a0` | same |
+| `widgetChunks(0)` | `0xc39C7643cbfFE57114A1851Af499f1781c0daC8e` | same |
+| `html()` bytes · sha256 | 61,157 · `d5ec53f13207805b034058032091a190fda9e8c15a23c5ebffafe7c92933a4fc` | 61,157 · `141bf19df9ba7db0c12c28d2359021958ec725da3baf3cc7b3a92e45b65952d0` |
+| payload bytes | 45,358 | 45,358 |
+| `inflated bytes` | 142,949 | 142,947 |
+| `inflated sha256` | `cb2e83012c9d716217dcd321e3b45b7e1ce39afce93dd1bdbf95b2fb70b99363` | `8c235917fd1f7a26ce61f07d4a41ef13450bf82b17c463910514425f12576ea3` |
+| `sha256sum app/dist/index.html` | **equal** · 142,949 bytes | **equal** · 142,947 bytes |
+| `widget` status · bytes · sha256 | 200 · 8,144 · `21dd3d131c9f7dfccc3f92776f89433f469d85232607e21229ca4d9c97eea24a` | 200 · 8,144 · same |
+| `sha256sum app/dist/widget.js` | **equal** · 8,144 bytes | **equal** · 8,144 bytes |
+
+All three pointers equal the predictions of § The pointers, **in the right slots**, on both chains.
+The `inflated sha256` equality is the check that proves the halves are not swapped: a swap leaves
+both pointers holding valid SSTORE2 chunks and `_requireChunk` passing, and shows up only here.
+
+**The two chains' `html()` hashes differ and must.** `index.html` carries `__CHAIN_ID__`, so the
+Sepolia bundle is 2 bytes longer than Base Sepolia's (142,949 against 142,947) and every hash down
+the column differs. The widget carries no chain id and hashes identically on both — which is the
+control that the difference is the chain id and nothing else. The compressed `bytes` and `payload
+bytes` coincide at 61,157 / 45,358 on both chains; gzip absorbed the two bytes.
+
+**Run every step-8 command inside `devbox run`, which is where the trap is.** Outside the project
+environment two things break, and the second one is the one that would mislead a reader:
+
+1. `make chain-doc` fails `eth_call html() on --rpc: Invalid params`. The recipe resolves `--app`
+   through `DEPLOYED`, which pipes through `jq`; `jq` is in `devbox.json` but not on the VM's PATH,
+   so `--app` comes out empty and the next argument shifts into its place. Not a verification gap —
+   § 4d's `node tools/chain-doc.mjs --app $APP` form is the documented equivalent and was what the
+   figures above were first read with — but `make chain-doc` is what the acceptance criterion names,
+   and it was re-run inside `devbox` on both chains to claim it, returning the same figures.
+2. **`app/dist/index.html.gz` compresses to a different byte count**, and with it two of the four
+   calldata files. The VM's `/usr/bin/node` and devbox's nix `node` are both `v24.21.0` and produce
+   **byte-identical `index.html`** — same 142,949/142,947 bytes, same sha256 — but different deflate
+   output: 45,624 bytes against devbox's **45,358**. So outside devbox,
+   `tools/step4-calldata.mjs` rewrites `1-addChunk-0.hex` and `2-addChunk-1.hex` (the latter also
+   changing length, 42,890 → 43,402 chars) and the "regenerates byte-identical" criterion appears to
+   fail. Inside devbox the gzip is 45,358, which is exactly the payload `chain-doc` reads back off
+   both chains, and `git status --porcelain` is clean over `calldata/`. `3-addWidgetChunk.hex` and
+   `batch345.hex` are unaffected: the widget is stored uncompressed and the batch carries only the
+   widget chunk and the two setters.
+
+**The lesson is about which check is load-bearing.** A gzip byte count is a property of the
+compressor, not of the document, so `sha256sum` of the *committed calldata* is only meaningful under
+the pinned toolchain — whereas `inflated sha256` compares what the chain actually serves against the
+source bundle and holds under any zlib. Both chains pass both, so nothing here is in doubt; a future
+upload that regenerates calldata on a stray `node` would produce a pointless re-upload with an
+identical document, and the version pin is the only thing stopping it. **Worth stating in RUNBOOK
+§ Step 4** and left out of this task's diff as out of scope.
+
+### What it cost, and the reconciliation
+
+| | Sepolia | Base Sepolia |
+|:--|:--|:--|
+| gas across the three | 84,194,458 | 12,009,880 |
+| `effectiveGasPrice` | 10,000,018 / 10,000,016 / 5,000,506 wei | 5,010,000 wei all three |
+| block gas limit at send | 199,609,378 | 120,000,000 |
+| L2 fee | 775,962,664,295,408 wei | 60,169,498,800,000 wei |
+| L1 data fee | n/a | 38,764 wei (18,494 / 16,475 / 3,795) |
+| signer balance before · after | 0.204863387533085144 → 0.204087424868789736 ETH | 0.034975784947982522 → 0.034915615449143758 ETH |
+
+**Both reconcile to the wei.** Sepolia: `gasUsed × effectiveGasPrice` summed is exactly the balance
+delta. Base Sepolia needs the OP Stack L1 data fee added — `gasUsed × effectiveGasPrice` leaves
+38,764 wei unexplained, which is precisely the three receipts' `l1Fee` fields summed. That field is
+not a `cast receipt` field on `cast 1.8.1` (`Error: invalid receipt field: l1Fee`); it comes from
+`eth_getTransactionReceipt` over raw JSON-RPC. **m04-t03's reconciliation did not need it** because
+it compared Base Sepolia totals loosely; anyone balancing an OP Stack chain to the wei does.
+
+**Largest single transaction either chain has seen in this project: 37,591,595 gas**, 19% of
+Sepolia's 199,609,378 block limit. The 50,000,000 limit sent had ample room and the plan's
+110,000,000 single-`batch` figure, had the cap not forced the split, would have fitted too.
 
 ## The fork rehearsal
 
@@ -518,11 +664,11 @@ Sepolia's.
 
 ### Then stop — step 8 is mine
 
-Send me both transaction hashes per chain, the `execute()` submit and the `executeQueued()`, and I run
-step 8: `cast nonce $APP` → 4, `chain-doc`'s `inflated sha256` and `widget sha256` against a rebuild
-of each chain's bundle, the three pointers from `chunks()`/`widgetChunks()`, and `cast receipt … gasUsed`
-for both transactions into step 4's `record:` rows. That closes M04 criterion 3's chain half, which
-the step-7 PR deliberately does not claim.
+~~Send me both transaction hashes per chain, the `execute()` submit and the `executeQueued()`, and I run
+step 8.~~ **Done 2026-11-16.** You submitted and queued all six; I sent the six `executeQueued` calls
+myself on your go of 21:35Z, recovered the Sepolia submit hashes from the vault's `Queued` logs
+rather than asking for them, and ran step 8 on both chains. Criterion 3's chain half is claimed above
+and § Step 8's `record:` carries the figures. Nothing is outstanding on your side for this task.
 
 ---
 
@@ -620,18 +766,27 @@ transaction count changed, from five `Forwarded` receipts to two.
    orders satisfy `_requireChunk`; noted only because the dev-chain gas table in § Step 4, rehearsed
    on 31337 lists the script's order and a reviewer comparing the two tables will see five calls in
    two sequences. Runbook hunk: § Step 4 → *The five calls, and their order*.
-3. **Step 8 is not in this PR.** The plan's step 7 ends "**Then stop and wait**", so steps 8 and the
-   `record:` rows are after Denizen's signatures and cannot be in the same branch state. Recorded in
-   § Executed on testnets as a paragraph saying what the blank rows wait for, so the runbook does not
-   read as though step 4 silently never happened. Runbook hunk: § Executed on testnets, the
-   "prepared and not yet executed" paragraph.
-4. **The superseded signing tables are kept whole under a labelled heading, not struck cell by cell.**
+3. ~~**Step 8 is not in this PR.** The plan's step 7 ends "**Then stop and wait**", so steps 8 and the
+   `record:` rows are after Denizen's signatures and cannot be in the same branch state.~~
+   **Reversed on 2026-11-16: step 8 is in this PR.** The product owner submitted and queued all six
+   proposals the same day and gave an explicit go at 21:35Z for the engineer to send the
+   `executeQueued` calls as each ETA passed, which collapsed the branch boundary the deviation was
+   describing — the wait that step 7 ends in turned out to be hours, not a release. So this branch
+   carries 4c's and step 8's `record:` blocks and claims criterion 3's chain half. Runbook hunks:
+   § Step 4 4c's two `record:` blocks, § Executed on testnets' superseded "prepared and not yet
+   executed" paragraph, and both § Record tables' step-4 rows.
+4. **Two things the plan prescribed turned out not to be needed, and both are written down rather
+   than silently skipped.** The hand-set gas limits of § Gas (`cast estimate` returned clean figures
+   for all six, no false `DeploymentFailed()`) and `cast receipt --field` (positional on `cast
+   1.8.1`). Neither changes what was sent; both change what M05's mirror should be told to do.
+   Runbook hunk: the note under 4c's `executeQueued` `record:`.
+5. **The superseded signing tables are kept whole under a labelled heading, not struck cell by cell.**
    The revised plan's step 9 says to keep them struck. Ten rows of four cells wrapped in `~~` renders
    as a wall of literal tildes in some viewers and makes the digests — the only reason to keep the
    tables at all — unreadable. The struck text is the prose that told anyone to *act* on them, and
    every heading over them says `— superseded`, so nothing in that block reads as live. Runbook hunk:
    none; this is a handoff-formatting deviation only.
-5. **`executeQueued`'s gas is quoted from a live estimate, which RUNBOOK § Gas calls unmeasured.**
+6. **`executeQueued`'s gas is quoted from a live estimate, which RUNBOOK § Gas calls unmeasured.**
    § Gas says a public RPC fails the simulation at any requested limit, and that is true of `eth_call`
    with an explicit gas figure; `eth_estimateGas` on the same endpoint answers, and did — 84,773,222
    on Sepolia, 12,188,581 on Base Sepolia, both at 15:19Z 2026-11-16. So the budgets in § For Denizen
@@ -639,6 +794,10 @@ transaction count changed, from five `Forwarded` receipts to two.
    still unmeasured. § Gas's wording is narrower than it reads and names only Sepolia's figure;
    Base Sepolia's **16,000,000** is set in the handoff, where the revised plan's step 9 puts it, and a
    § Gas edit is not this step's. Runbook hunk: § Step 4 → *Gas*, unchanged by this PR.
+   **Settled by the upload:** the three calls actually used **84,194,458** gas on Sepolia and
+   **12,009,880** on Base Sepolia, against those pre-upload whole-batch estimates of 84,773,222 and
+   12,188,581 — 0.7% and 1.5% high. The estimate was sound and the margin for unmeasured queue
+   bookkeeping was never needed.
 
 ## Decisions
 
@@ -683,6 +842,10 @@ transaction count changed, from five `Forwarded` receipts to two.
 
 1. **Should this PR carry a closing keyword for issue #185, when step 8 is still owed?**
    (Deliberately not written as the keyword itself anywhere in this file.)
+   **The premise expired on 2026-11-16**: step 8 ran on this branch the same day, so no criterion is
+   blocked any more and the "issue marked done with three blocked criteria" cost is gone. The
+   recommendation below is therefore withdrawn — on the facts as they now stand the closing keyword is
+   the right one, and it is still one word in the PR body and still the architect's call, not mine.
    - *Close it.* The task's AC says the PR closes its issue, and the preparation is complete; step 8
      lands as a follow-up commit or a second PR. Cost: an issue marked done with three blocked
      criteria, and M04 criterion 3 tracked nowhere.
