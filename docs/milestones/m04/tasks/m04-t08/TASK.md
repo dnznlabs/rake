@@ -230,7 +230,10 @@ second revision, kept for the record):**
    `cast receipt <hash> --field gasUsed` for **all six** transactions. Fill step 4's `record:` rows in
    RUNBOOK § Executed on testnets: pointers, six hashes, six `gasUsed`, the two sha256s and byte counts.
    Nothing is verified after the first or second `executeQueued` beyond `cast nonce $APP` reading 2 then 3;
-   `html()` is empty until the batch lands. Check: M04 criterion 3's chain half, per chain, in the
+   `html()` is empty until the batch lands. If `inflated sha256` differs with all six landed, the first
+   suspect is the order of the first two `executeQueued` (RUNBOOK 4c: 2 before 1 swaps the halves and
+   nothing reverts); `cast code` at the two predicted pointers tells which chunk sits where, and the
+   fix is a corrective `setChunks` proposal, scoped then, not a redeploy. Check: M04 criterion 3's chain half, per chain, in the
    handoff AC table with the commands and figures.
 
 9. **`HANDOFF.md` § For Denizen rewritten as three 4b checklists and three gas limits**, one block per
@@ -248,17 +251,29 @@ second revision, kept for the record):**
      `0xf9996757…6d702` and `0xa2f30eeb…0f9a1` — recompute if the nonce moved).
    - **Proposal 3** (`batch345.hex`): target is `$OWNER` (`0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`),
      **not** `$APP`; value `0`; `sha256sum` equals `sha256sum …/calldata/$CHAIN_ID/batch345.hex`
-     (`7946270a…1438f` on both chains at `61322ca`, 18,314 hex chars); `cast decode-calldata
+     (`7946270a…1438f` on both chains at `61322ca`, 18,314 hex chars / 9,156 bytes — the real `cast
+     calldata` encoding, identical on both chains; proposals 1 and 2 are 24,068 and 21,444 bytes; the
+     deleted `batch.hex` was 109,962 chars, 44,426 over the cap); `cast decode-calldata
      "batch(address[],uint256[],bytes[])" $(cat batch345.hex)` → three targets all `$APP`, three values all
      `0`, three `bytes` equal to `3-addWidgetChunk.hex`, `4-setChunks.hex`, `5-setWidgetChunks.hex` in
      order; the nonce is *N* + 2 and the digest equals `getTransactionHash($OWNER, 0, batch345.hex, N + 2)`
      (at *N* = 3: Sepolia `0x7d2d3128…6c0f5`, Base Sepolia `0xc691bc7e…0f521`); `batch` is a vault
      self-call: confirm it outside the chat that requested it (handbook § Review checklist).
-   - Then sign all three, submit all three in nonce order, wait 3,600 s, `executeQueued()` **1 → 2 →
-     batch**, each after the one before it succeeded.
+   - Then sign all three, submit all three back to back in nonce order (the vault refuses 2 before 1:
+     `execute` hashes against `nonce++`), **wait one hour once, not three** — each submit queues its
+     own digest at `block.timestamp + 3,600 s` and the three windows run concurrently — then
+     `executeQueued()` **1 → 2 → batch**, each after the one before it has a receipt. The block says
+     in so many words that **the vault does not enforce this order at execution**: `queued` is keyed
+     by digest and `executeQueued` checks only `eta != 0 && block.timestamp >= eta`
+     (`src-company/multisig` `src/Multisig.sol:29,187-192` at `62eb905`), so whoever sends the three
+     calls sends them 1, then 2, then the batch. It names both misorders from RUNBOOK 4c: the batch
+     before 1 or 2 reverts the whole piece with `CodelessChunk(ptr)` and leaves it queued; 2 before 1
+     succeeds and serves the page with its halves swapped, repaired only by a further `setChunks`
+     proposal. `cast nonce $APP` reads 2, 3, 4 after each; he checks it before sending the next.
    And the **three gas limits for `executeQueued`**, set by hand because a wallet's estimate through a
    public RPC may report a false `DeploymentFailed()`, copied from RUNBOOK § Gas's table and labelled
-   estimates: **Sepolia 50,000,000 / 44,000,000 / 18,000,000** (calls 1 and 2 estimated 37,859,277 and
+   estimates — they replace the single 110,000,000 of the one-`batch` route, and with them the question
+   of its headroom under the block limit: **Sepolia 50,000,000 / 44,000,000 / 18,000,000** (calls 1 and 2 estimated 37,859,277 and
    33,740,257 live; the batch 13,140,215 + 71,317 + 42,719 plus the loop, under the 200,000,000 block
    limit); **Base Sepolia 7,000,000 / 6,200,000 / 2,800,000** (5,343,761 and 4,767,004 live; the batch
    derived from the handoff's whole-batch 12,188,581 less calls 1 and 2, under 120,000,000). The batch

@@ -463,14 +463,16 @@ request body at 72 KiB), enforced identically by the dapp — measured live on 2
 control, recorded on [#188](https://github.com/dnznlabs/rake/issues/188). It cannot be proposed.
 Ruled 2026-11-16 (decision 47):
 
-| proposal | file | target | value | nonce | size, hex chars (cap 65,536, measured 2026-11-16) |
-|--:|:--|:--|--:|:--|--:|
-| 1 | `1-addChunk-0.hex` — `addChunk(bytes)`, document chunk 0 | `$APP` — a plain call | `0` | *N* | 48,138 |
-| 2 | `2-addChunk-1.hex` — `addChunk(bytes)`, document chunk 1 | `$APP` — a plain call | `0` | *N* + 1 | 42,890 |
-| 3 | `batch345.hex` — the vault's `batch(address[],uint256[],bytes[])` over calls 3, 4, 5 | `$OWNER` — the vault itself, **not** `App` | `0` | *N* + 2 | 18,314 |
+| proposal | file | target | value | nonce | size, hex chars (cap 65,536, measured 2026-11-16) | calldata bytes |
+|--:|:--|:--|--:|:--|--:|--:|
+| 1 | `1-addChunk-0.hex` — `addChunk(bytes)`, document chunk 0 | `$APP` — a plain call | `0` | *N* | 48,138 | 24,068 |
+| 2 | `2-addChunk-1.hex` — `addChunk(bytes)`, document chunk 1 | `$APP` — a plain call | `0` | *N* + 1 | 42,890 | 21,444 |
+| 3 | `batch345.hex` — the vault's `batch(address[],uint256[],bytes[])` over calls 3, 4, 5 | `$OWNER` — the vault itself, **not** `App` | `0` | *N* + 2 | 18,314 | 9,156 |
 
 *N* is the live `nonce()` read above (3 on both chains, read 2026-11-16 16:04Z); the sizes are
-`wc -c` of the committed files on both chains the same day, `0x` included. Each proposal carries its
+`wc -c` of the committed files on both chains the same day, `0x` included, and the bytes are
+`(chars − 2) / 2`. The batch is the real `cast calldata batch(...)` encoding, identical on both
+chains; the deleted `batch.hex` was 109,962 characters, **44,426 over the cap**. Each proposal carries its
 own digest, `getTransactionHash(<target>, 0, <file>, <nonce>)` on the vault, with the proposal's own
 target: `$APP` for 1 and 2, `$OWNER` for 3.
 
@@ -522,19 +524,46 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
 
 #### 4c — submit, wait, execute
 
-1. **Submit all three** (either signer), in nonce order: 1, then 2, then the batch. Each `execute()`
-   checks the signatures, consumes its nonce and **queues** the call at
-   `eta = block.timestamp + delay()` — nothing reaches `App` yet. A proposal at nonce *N* + 1 cannot
-   be submitted until *N* has been consumed, so the order is enforced by the vault, not by care.
-2. **Wait** out the delay, 3,600 s on Ops on both testnets. The three etas are seconds apart.
-3. **`executeQueued()` three times** (anyone), **in the order 1 → 2 → batch** and each after the one
-   before it has succeeded. Calls 4 and 5, inside the batch, validate the two document pointers that
-   proposals 1 and 2 create; the batch executed first reverts `CodelessChunk` and stays queued. Each
-   is the transaction that runs its call and pays for it, so **set each gas limit by hand** — three
-   figures per chain, § Gas. A wallet's own estimate through a public RPC reports a false
-   `DeploymentFailed()`. Running out of gas reverts that one call and leaves it queued, so it can be
-   sent again with more; the ones already executed stay executed. Between the second and the third,
-   `cast nonce $APP` reads `3`.
+1. **Submit all three** (either signer), back to back, in nonce order: 1, then 2, then the batch. Each
+   `execute()` checks the signatures, consumes its nonce and **queues** the call at
+   `eta = block.timestamp + delay()` — nothing reaches `App` yet. Here the vault does enforce the
+   order: `execute` hashes against `nonce++` (`src/Multisig.sol:136` of src-company/multisig at
+   `62eb905`), so proposal 2's signatures, made over the digest at *N* + 1, are `InvalidSig` while the
+   nonce is still *N*. Submit 2 before 1 and it is refused; nothing is lost but the gas.
+2. **Wait one hour, not three.** Each submit queues its digest at its own
+   `eta = block.timestamp + _delay` (`:165-166`), and the three submits are seconds apart, so the
+   three 3,600 s windows run **concurrently**: one wait of 3,600 s from the third submit, then three
+   `executeQueued` in a row. "Three timelocks" is the natural misreading and it is wrong; the delay
+   is per proposal, not cumulative.
+3. **`executeQueued()` three times** (anyone), **in the order 1 → 2 → batch**, each after the one
+   before it has succeeded. **The vault does not enforce this order; the operator does.** `queued` is
+   keyed by digest, not by nonce (`mapping(bytes32 txHash => uint256) public queued;`, `:29`), and
+   `executeQueued(target, value, data, _nonce)` (`:187`) checks only
+   `require(eta != 0 && (msg.sender == address(this) || block.timestamp >= eta), NotReady(eta));`
+   (`:192`) — any queued, matured digest runs when asked, whatever its nonce and whatever is still
+   queued ahead of it. The three calls are therefore sent by one person, one at a time, waiting for
+   each receipt, in the order 1, 2, batch. What each misorder does, from the source:
+   - **The batch before 1 or 2 reverts and stays queued.** Call 4, `setChunks`, validates both
+     document pointers through `_requireChunk` and reverts `CodelessChunk(ptr)` (`src/App.sol:125`,
+     `:198-207`) on the one whose chunk has not landed; `batch` re-raises the inner revert
+     (`Multisig.sol:212`), `executeQueued` re-raises that (`:195`), and the state change — `delete
+     queued[hash]` — is rolled back with it, so the piece can be sent again after 1 and 2. The whole
+     piece reverts: `addWidgetChunk` inside it does not land either.
+   - **2 before 1 does not revert, and that is the worse case.** Both are plain `addChunk` calls that
+     deploy a pointer at `App`'s next CREATE address; nothing in `addChunk` knows which chunk it is
+     carrying. Executed 2 then 1, chunk 1 lands at the address call 4 names as pointer 0 and chunk 0
+     at the address it names as pointer 1; `_requireChunk` checks only that each has code whose first
+     byte is `0x00` (`src/App.sol:198-207`) — which chunk it is, it cannot tell — so the batch then
+     succeeds and the page is served with its halves
+     swapped. Nothing stops it until 4d's `inflated sha256` differs. The repair is a further vault
+     proposal — a corrective `setChunks` with the two pointers in the right order — not a redeploy.
+     So the order 1 → 2 is load-bearing in itself, not only relative to the batch.
+   Each `executeQueued` is the transaction that runs its call and pays for it, so **set each gas limit
+   by hand** — three figures per chain, § Gas. A wallet's own estimate through a public RPC reports a
+   false `DeploymentFailed()`. Running out of gas reverts that one call and leaves it queued, so it
+   can be sent again with more; the ones already executed stay executed. `cast nonce $APP` reads `2`
+   after the first, `3` after the second, `4` after the batch; check it before sending the next, since
+   the account nonce is the one thing that proves the previous piece landed.
 
 `TimelockExecutor.forward()` skips the delay but needs **every** owner's signature, not the
 threshold, and nothing here is in a hurry; it is not this runbook's route.
@@ -619,7 +648,12 @@ third, rather than quoting a measured figure — **three limits per chain**, all
 | proposal 3 — `batch345` | 13,254,251 — calls 3, 4, 5 summed, loop excluded | **18,000,000** | ≈2,077,816 — the 2026-11-16 whole-batch estimate of 12,188,581 less calls 1 and 2 | **2,800,000** |
 | block `gasLimit` | 200,000,000 | | 120,000,000 | |
 
-Every limit is under its block limit. `batch345` cannot be estimated from the node until proposals 1
+**These three limits replace the single 110,000,000 of the one-`batch` route**, which was set by
+budget because its ~85M total could not be estimated through a public RPC. Each of the three is set
+from a per-call figure the node did return (≈38M, ≈34M and ≈13M on Sepolia; Base Sepolia from the
+handoff's figures), with the margin above, and the question that route carried — whether 110M clears
+the block limit and leaves headroom — goes away: the largest limit is a quarter of Sepolia's block
+and under 6% of Base Sepolia's. `batch345` cannot be estimated from the node until proposals 1
 and 2 have executed — `setChunks` reverts `CodelessChunk` on their pointers before that — so its two
 figures are derived, not read; after the second `executeQueued`, `cast estimate --from $OWNER $OWNER
 $(cat batch345.hex)` gives the live one, and the margin above is for that figure. The old
