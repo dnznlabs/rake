@@ -853,6 +853,8 @@ blank transaction hash is a step that did not run.
 | 4 | 4 | widget chunks | tx: · gas: · pointers: |
 | | 4 | `inflated sha256` · `widget sha256` · both byte counts | |
 | 5 | 5 | explorer: factory / implementation / App | |
+| | 5 | Sourcify: factory / implementation / App | |
+| | 5 | OpenChain signatures | |
 | 6 | 6 | DNZN `create` | tx: · gas: · `DNZN_SALT`: · `DISTRO`: |
 | | 6 | `owner()` on `DISTRO` | |
 
@@ -1246,6 +1248,8 @@ exit **0** with 0 results. `forge test` **102 passed**, `node --test` **90 passe
 | | 4 | pointers · `cast nonce $APP` | `chunks(0)` `0x0f8132D4…5D0D` · `chunks(1)` `0xAf5f9504…30a0` · `widgetChunks(0)` `0xc39C7643…aC8e`, all equal to the predictions · nonce **4** |
 | | 4 | `inflated sha256` · `widget sha256` · byte counts | `cb2e8301…b99363` = `sha256sum app/dist/index.html` · `21dd3d13…eea24a` = `sha256sum app/dist/widget.js` · 142,949 and 8,144 both ways · `html()` 61,157 bytes, payload 45,358 |
 | 5 | 5 | explorer: factory / implementation / App | all three `Pass`, names `DistributionFactory` / `Distribution` / `App`; URLs below |
+| | 5 | Sourcify: factory / implementation / App | all three **`exact_match`**, with `creationMatch` and `runtimeMatch` also `exact_match`; read from `/v2/contract/11155111/<address>` on 2026-11-17 — factory `05:56:42Z`, implementation `05:56:56Z`, `App` `05:57:11Z` |
+| | 5 | OpenChain signatures | uploaded for `Distribution`, `DistributionFactory` and `App`. A `Distribution` clone is **not** verifiable on Sourcify (`match: null`), which is what these signatures exist to cover; a second upload prints `Duplicated:` per signature and changes nothing |
 | 6 | 6 | DNZN `create` | not run — Denizen's; `predict($DNZN_SALT)` = `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`, `cast code` `0x` |
 | | 6 | `owner()` on `DISTRO` | not run |
 
@@ -1273,6 +1277,8 @@ a collision and the successful send that followed it is not a resend.
 | | 4 | pointers · `cast nonce $APP` | identical to Sepolia's row — `0x0f8132D4…5D0D`, `0xAf5f9504…30a0`, `0xc39C7643…aC8e`, all equal to the predictions · nonce **4** |
 | | 4 | `inflated sha256` · `widget sha256` · byte counts | `8c235917…576ea3` = `sha256sum app/dist/index.html` · `21dd3d13…eea24a`, the same widget hash as Sepolia · 142,947 and 8,144 both ways · `html()` 61,157 bytes, payload 45,358 |
 | 5 | 5 | explorer: factory / implementation / App | all three `Pass - Verified` this run; URLs below |
+| | 5 | Sourcify: factory / implementation / App | all three **`exact_match`**, with `creationMatch` and `runtimeMatch` also `exact_match`; read from `/v2/contract/84532/<address>` on 2026-11-17 — factory `05:58:43Z`, implementation `05:58:57Z`, `App` `05:59:13Z` |
+| | 5 | OpenChain signatures | the same three uploads cover this chain: signatures are keyed by selector, not by chain, so one upload serves every deployment of the same ABI |
 | 6 | 6 | DNZN `create` | not run — Denizen's; `predict($DNZN_SALT)` = `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`, `cast code` `0x` |
 | | 6 | `owner()` on `DISTRO` | not run |
 
