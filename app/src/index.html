@@ -344,11 +344,13 @@ const BAD_SUM = 'checksum does not match — a character is likely wrong';
 // button, because a list row puts one inside its own <a>. An address carries its value in
 // `data-addr`, which is what lets `nameSweep` replace the ones that have a name in place.
 const COPY = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><g class="i-c"><rect x="4" y="4" width="6.5" height="6.5"/><path d="M8 2.5v-1H1.5V8h1"/></g><path class="i-k" d="M2 6.5l2.5 2.5 5-6"/></svg>';
-const ext = (kind, v, text) => {
+// `inLink` drops the ↗ for a value printed inside an <a>: a nested <a> makes the parser close the
+// outer one early, and the row's later cells fall out of its grid (only on a chain with an explorer).
+const ext = (kind, v, text, inLink) => {
   const known = kind === 'address' ? NAMED.get(String(v).toLowerCase()) : null;
   const body = known ? esc(known) : text, mark = kind === 'address' ? ` data-addr="${v}"` : '';
   return `<span title="${v}"${mark}>${body}</span><span class="cp" role="button" tabindex="0" title="copy" aria-label="copy ${v}" data-copy="${v}">${COPY}</span>`
-    + (EXPLORER[CFG.chainId] && kind !== 'hash' ? ` ${xlink(kind, v, '↗')}` : '');
+    + (EXPLORER[CFG.chainId] && kind !== 'hash' && !inLink ? ` ${xlink(kind, v, '↗')}` : '');
 };
 const xlink = (kind, v, text) => EXPLORER[CFG.chainId]
   ? `<a class="xl" href="${EXPLORER[CFG.chainId]}/${kind}/${v}" target="_blank" rel="noopener" title="open in explorer">${text}</a>` : '';
@@ -1772,7 +1774,7 @@ async function list() {
     loadField();
     return;
   }
-  fill('rows', items.map(d => `<a class="list-row" href="#/distros/${d.addr}"><span><b>${esc(d.description)}</b><span class="sub">${cname(CFG.chainId)} · ${ext('address', d.addr, short(d.addr))}</span></span>`
+  fill('rows', items.map(d => `<a class="list-row" href="#/distros/${d.addr}"><span><b>${esc(d.description)}</b><span class="sub">${cname(CFG.chainId)} · ${ext('address', d.addr, short(d.addr), true)}</span></span>`
     + `${d.pending.length ? '<span class="dot" title="change queued"></span>' : '<span></span>'}${mini(d.table)}</a>`).join('') + short_);
 }
 
