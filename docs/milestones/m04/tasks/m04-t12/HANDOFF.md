@@ -135,6 +135,12 @@ numbered in § The planted reds and cited from the row that needed each.
   **a boundary row is the only row a `>=`-for-`>` slip can move** (§ Deviations 2). Both are general,
   and both surfaced only by planting the reds the plan named and reading what actually failed instead of
   what was predicted.
+- **Red 7's repaint is skipped if `absorb` rejects**, because the `.catch` that guards the chain
+  swallows it. `decimalsOf` and `symbolOf` cannot reject — each swallows its own failure and caches
+  `null` — but `readFunds` reads balances over RPC, so the path is reachable in principle and would
+  leave the section at zero over a populated store again. A `.finally` would close it; the fix is the
+  one the review named, and nothing measured here reaches the reject path, so this is left as a note
+  rather than widened into a second change.
 - `npx serve` drops the query string on its extension redirect (§ Deviations 9). Worth a line in
   `AGENTS.md` § The dapp if another task's browser check depends on a query parameter; not changed here.
 
