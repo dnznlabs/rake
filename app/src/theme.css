@@ -183,9 +183,9 @@ input.narrow{max-width:160px}
 .ticks.pending .nm{opacity:.75}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 footer{display:flex;justify-content:space-between;border-top:1px solid var(--rule);margin-top:64px;padding:16px 0 40px;font-size:11px;color:var(--dim)}
-/* The alpha tag line (ROADMAP decision 45), in the header under the nav. The footer's dim and
-   size, because it is the same register — a standing statement about the software rather than part
-   of the view. One line, no box and no icon: it is read once and then lived with. It is never
+/* The alpha tag line (ROADMAP decisions 45 and 48), in the header under the nav. The footer's dim
+   and size, because it is the same register — a standing statement about the software rather than
+   part of the view. One line, no box and no icon: it is read once and then lived with. It is never
    hidden, at any width; the header's copy wraps on a phone instead, since a header is where the
    line is for. */
 .alpha{display:block;font:11px/1.5 var(--sans);color:var(--dim);padding:10px 0 0}
