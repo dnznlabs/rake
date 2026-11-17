@@ -473,16 +473,21 @@ const logCache = {
      not at all, so a quota or a close mid-sweep cannot leave the store half-evicted. */
   drop: keys => logTx('readwrite', s => { let last = null; for (const k of keys) last = s.delete(k); return last || s.count(); }),
 };
-/* Run once per load, before the first history read: the records this device is no longer keeping.
-   `Model.evict` names them and this applies them, which is the whole division of labour — the rule is
-   testable under node and the store is not. */
-let LOGSWEEP = null;
-const logSweep = () => (LOGSWEEP ??= (async () => {
+/* The records this device is no longer keeping. `Model.evict` names them and this applies them, which
+   is the whole division of labour — the rule is testable under node and the store is not. Run at two
+   points, for two different reasons: once per load before the first history read, which is where the
+   age rule bites because nothing but the passage of time moves it; and after a record is written,
+   because that is the only moment the count can rise, and decision 52's "at most 50" is a claim about
+   the store rather than about one instant of one load. A page whose route changes by hash never opens
+   again, so without the second point a device could sit at 51 indefinitely. */
+const logSweepRun = async () => {
   const recs = await logCache.all();
   if (!recs || !recs.length) return;
   const gone = Model.evict(recs.map(r => ({ key: logKey(r.chainId, r.address), visited: r.visited })), Date.now(), LOGKEEP);
   if (gone.length) await logCache.drop(gone);
-})());
+};
+let LOGSWEEP = null;
+const logSweep = () => (LOGSWEEP ??= logSweepRun());
 
 /* ---- names ---------------------------------------------------------------------------------- */
 /* Ported from state-collection `app/src/index.html:224-279`, which took it from its own
@@ -739,6 +744,8 @@ async function histLogs(addr, from, to) {
      slice below it. The rescan above covers the record's own range, so there it replaces it. */
   const into = base || (rec && to != null && Number(to) < rec.first ? rec : null);
   await logCache.put({ ...Model.mergeHist(into, live), schema: LOGSCHEMA, chainId: String(CFG.chainId), address: addr, visited: Date.now() });
+  // The one moment the record count can rise, and so the one that can put the store over the cap.
+  await logSweepRun();
   if (!base) return { changes, funds, ins };
   /* Served: the record's logs below `through` and the live tail above it, as one range. Its boundary
      is the record's own `first` where that record was itself built by a partial scan — the history
