@@ -1,6 +1,6 @@
 # m04-t04 — handoff
 
-PR: pending · Branch: `m04/t04-gateway` · 2026-11-17
+PR: [#230](https://github.com/dnznlabs/rake/pull/230) · Branch: `m04/t04-gateway` · 2026-11-17
 
 `tools/gateway-check.sh` learned a hosted base as a mode rather than a fork, and criterion 3 was measured through `w3link.io` on both testnets with it. The origin probe ran headless against both gateway URLs and is recorded below with both of its predicted reds. The host page of M04-D1 exists as one tracked file carrying the `#/docs` widget snippet for Sepolia and nothing else of ours, with a headless screenshot of it rendering. `app/src` had the two-leg front-end review once, nine files under a web-security prompt, and all 24 findings are dispositioned in a new `SECURITY.md` § Front end — one of them fixed here, the rest carried. Nothing under `src/` moved and no transaction was sent on any chain.
 
