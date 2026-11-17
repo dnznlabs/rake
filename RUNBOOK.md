@@ -782,7 +782,7 @@ cast code $DISTRO --rpc-url "$RPC"      # must print 0x — #22, the second plac
 ```
 
 Then the send, with the table and the delay as § 0 variables added for this step. Their M05 values —
-the 60/40 table — are M05's to fill; this document carries them as variables, and § Rehearsed on
+the Sepolia table, `DNZN_DELAY` 604800 and `OWNER` the Ops vault, decision 50 — are M05's to fill; this document carries them as variables, and § Rehearsed on
 anvil marks its own values as the rehearsal's placeholders.
 
 ```sh
@@ -920,7 +920,7 @@ reason the check is not decoration.
 reproducible: `DNZN_DELAY=3600`, `DNZN_DESCRIPTION="rehearsal placeholder"`, and a two-row
 `DNZN_TABLE` of `0x3C44CdDd…4293BC` at 6,000 bps and `0x70997970…dc79C8` at 4,000 bps, both named
 `A`/`B` with note `rehearsal placeholder` — sorted strictly ascending by account and summing to
-10,000, as `BadTable()` requires. M05 fills the real 60/40 table. The `create` transaction hashes
+10,000, as `BadTable()` requires. M05 fills the real table (decision 50: the Sepolia one, 20/40/40). The `create` transaction hashes
 above are this run's and move with those placeholder strings; the three addresses do not, because
 the salt and the factory determine them.
 
