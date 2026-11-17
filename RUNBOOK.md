@@ -769,6 +769,46 @@ curl -s "https://api.etherscan.io/v2/api?chainid=$CHAIN_ID&module=contract&actio
 
 `record:` the three `#code` URLs and the `ContractName` each returns.
 
+Then the same three on Sourcify, which is where wallets look to decode a call to these contracts.
+**Unset `ETHERSCAN_API_KEY` for these commands**: while it is set, forge ignores
+`--verifier sourcify` and goes to Etherscan, which reports `already verified` and exits 0, so the
+Sourcify verification looks done when it never ran.
+
+```sh
+env -u ETHERSCAN_API_KEY forge verify-contract $FACTORY src/Distribution.sol:DistributionFactory \
+  --chain "$CHAIN_ID" --verifier sourcify --watch
+
+env -u ETHERSCAN_API_KEY forge verify-contract $IMPL src/Distribution.sol:Distribution \
+  --chain "$CHAIN_ID" --verifier sourcify --watch
+
+env -u ETHERSCAN_API_KEY forge verify-contract $APP src/App.sol:App \
+  --chain "$CHAIN_ID" --verifier sourcify --watch \
+  --constructor-args "$(cast abi-encode 'constructor(address,string)' "$OWNER" "$APP_VERSION")"
+
+for a in $FACTORY $IMPL $APP; do
+  curl -s "https://sourcify.dev/server/v2/contract/$CHAIN_ID/$a" | jq -r .match   # exact_match
+done
+```
+
+`record:` each address's `match`.
+
+A distribution is a clone, and Sourcify does not report one as verified (`match: null`). What covers
+it is the function, error and event signatures on OpenChain, keyed by selector rather than by chain,
+so a wallet that cannot find the source can still show the function name. Upload them from the
+artifacts this deployment was built from, after the verifications above and before Step 6:
+
+```sh
+forge build
+cast upload-signature out/Distribution.sol/Distribution.json \
+  out/Distribution.sol/DistributionFactory.json out/App.sol/App.json \
+  | awk '{print $1}' | sort | uniq -c        # Imported: / Duplicated: counts, 82 in all for this ABI
+```
+
+A second upload of the same signatures prints `Duplicated:` for each one and changes nothing, so an
+unchanged ABI on a new chain is all `Duplicated:`; an ABI change shows up as `Imported:` lines.
+
+`record:` the date, and the `Imported:` and `Duplicated:` counts.
+
 ### Step 6 — DNZN's `create`
 
 **This is the one step the DNZN Creator key signs**, and the only one. Re-export `SIGNER` to that

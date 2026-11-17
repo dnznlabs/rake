@@ -27,9 +27,9 @@
    and replacing those two files reskins the app without touching this one.
    Addresses and the chain are substituted by app/build.mjs; a deployed contract's token is its name,
    uppercased, between double underscores. DEV-fenced blocks are stripped unless the build is --dev. */
-/* `featuredSalt` is the dev chain's seeded distribution, as a salt and never as an address: the
-   address is `factory.predict(salt)`, which the page reads at boot rather than carrying a token per
-   chain. `factoryBlock` is the block the factory was created in, so a `Created` scan never starts at
+/* `featuredSalt` is the featured distribution, as a salt and never as an address, picked per chain by
+   mk/15-seed.mk: the address is `factory.predict(salt)`, which the page reads at boot rather than
+   carrying a token per chain. `factoryBlock` is the block the factory was created in, so a `Created` scan never starts at
    genesis on a real chain. */
 const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTRIBUTIONFACTORY__', factoryBlock: '__DISTRIBUTIONFACTORY_BLOCK__', featuredSalt: '__FEATURED_SALT__', app: '__APP__' };
 const CONTRACTS = [['DistributionFactory', CFG.factory]];
@@ -344,11 +344,13 @@ const BAD_SUM = 'checksum does not match — a character is likely wrong';
 // button, because a list row puts one inside its own <a>. An address carries its value in
 // `data-addr`, which is what lets `nameSweep` replace the ones that have a name in place.
 const COPY = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><g class="i-c"><rect x="4" y="4" width="6.5" height="6.5"/><path d="M8 2.5v-1H1.5V8h1"/></g><path class="i-k" d="M2 6.5l2.5 2.5 5-6"/></svg>';
-const ext = (kind, v, text) => {
+// `inLink` drops the ↗ for a value printed inside an <a>: a nested <a> makes the parser close the
+// outer one early, and the row's later cells fall out of its grid (only on a chain with an explorer).
+const ext = (kind, v, text, inLink) => {
   const known = kind === 'address' ? NAMED.get(String(v).toLowerCase()) : null;
   const body = known ? esc(known) : text, mark = kind === 'address' ? ` data-addr="${v}"` : '';
   return `<span title="${v}"${mark}>${body}</span><span class="cp" role="button" tabindex="0" title="copy" aria-label="copy ${v}" data-copy="${v}">${COPY}</span>`
-    + (EXPLORER[CFG.chainId] && kind !== 'hash' ? ` ${xlink(kind, v, '↗')}` : '');
+    + (EXPLORER[CFG.chainId] && kind !== 'hash' && !inLink ? ` ${xlink(kind, v, '↗')}` : '');
 };
 const xlink = (kind, v, text) => EXPLORER[CFG.chainId]
   ? `<a class="xl" href="${EXPLORER[CFG.chainId]}/${kind}/${v}" target="_blank" rel="noopener" title="open in explorer">${text}</a>` : '';
@@ -853,7 +855,7 @@ function editorHTML(rows) {
     + rows.map((r, i) => `<div class="erow">`
       + `<input aria-label="name" data-ed="name" data-i="${i}" value="${esc(r.name)}" placeholder="name">`
       + `<input aria-label="note" class="note-in" data-ed="note" data-i="${i}" value="${esc(r.note)}" placeholder="note (prose)">`
-      + `<div><input aria-label="address or name" data-ed="addr" data-i="${i}" value="${esc(r.addr)}" placeholder="0x… or .eth / .wei / .gwei"><div class="res" data-edres="${i}"></div></div>`
+      + `<div><input aria-label="address or name" class="addr-in" data-ed="addr" data-i="${i}" value="${esc(r.addr)}" placeholder="0x… or .eth / .wei / .gwei"><div class="res" data-edres="${i}"></div></div>`
       + `<input aria-label="percent" class="bps" data-ed="pct" data-i="${i}" value="${esc(r.pct)}" inputmode="decimal">`
       + `<button class="rm" data-edrm="${i}" title="remove" aria-label="remove this row">×</button></div>`).join('')
     + `</div><div class="sum"><button class="link" data-edadd="1">+ add a beneficiary</button><span id="ed-sum"></span></div>`;
@@ -865,7 +867,7 @@ function editorPaint(rows) {
   const el = document.getElementById('ed-bar');
   if (el) el.innerHTML = bar(preview, {}) + ticks(preview, {});
   const sum = document.getElementById('ed-sum');
-  if (sum) { sum.className = st.ok ? 'ok' : 'bad'; sum.innerHTML = `${rows.length} of ${S.maxRows} beneficiar${S.maxRows === 1 ? 'y' : 'ies'} · total <b>${+st.total.toFixed(2)}%</b>`; }
+  if (sum) { sum.className = st.ok ? 'ok' : 'bad'; sum.innerHTML = `${rows.length} beneficiar${rows.length === 1 ? 'y' : 'ies'} · total <b>${+st.total.toFixed(2)}%</b>`; }
   return st;
 }
 function editorBind(rows, redraw, after) {
@@ -968,7 +970,6 @@ async function landing() {
   V.innerHTML = `<div class="landing"><div class="hero"><div>
   <h1>Transparent fund distribution.</h1>
   <p class="prose">A distribution is a contract that receives funds and divides them according to a published table of beneficiaries. Changes to that table are subject to a public time lock. Protocol fees are the primary case; the mechanism applies to any allocation a project is accountable for.</p>
-  <a class="alpha" href="#/docs#disclaimer">alpha software is alpha, act accordingly.</a>
   <div class="actions"><a class="btn" href="#/create">Create a distribution</a><a class="btn sec" href="#/docs">Read the docs</a></div>
   </div><div class="side"><div id="featured"></div>
   <div class="sechead"><b>view a distribution</b></div>
@@ -1773,7 +1774,7 @@ async function list() {
     loadField();
     return;
   }
-  fill('rows', items.map(d => `<a class="list-row" href="#/distros/${d.addr}"><span><b>${esc(d.description)}</b><span class="sub">${cname(CFG.chainId)} · ${ext('address', d.addr, short(d.addr))}</span></span>`
+  fill('rows', items.map(d => `<a class="list-row" href="#/distros/${d.addr}"><span><b>${esc(d.description)}</b><span class="sub">${cname(CFG.chainId)} · ${ext('address', d.addr, short(d.addr), true)}</span></span>`
     + `${d.pending.length ? '<span class="dot" title="change queued"></span>' : '<span></span>'}${mini(d.table)}</a>`).join('') + short_);
 }
 
