@@ -20,6 +20,9 @@ const require = createRequire(import.meta.url);
 
 const url = process.argv[2];
 const core = process.env.PLAYWRIGHT_CORE;
+/* The fallback is the cached chromium on the machine the recorded runs were taken on, kept so those
+   runs reproduce verbatim rather than needing a second variable. It is one host's path and will not
+   exist on yours: set CHROMIUM to your own, which is why the override comes first. */
 const exe = process.env.CHROMIUM
   || '/home/openclaw/.cache/ms-playwright/chromium-1243/chrome-linux-arm64/chrome';
 const settle = Number(process.env.SETTLE_MS || 4000);

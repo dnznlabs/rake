@@ -314,22 +314,39 @@ into the document are computed in `version.mjs` and `broadcast.mjs`, and `inline
 guard that keeps the DOMParser swap executing our scripts at all, so auditing the injection point
 without its inputs reviews the pipe and not the water (TASK.md step 6, amended 2026-11-17).
 
-**Scope commit:** the legs ran at **`b04af65`**, the branch head when step 6 started. **The rebase
-onto `3d4f4cf` rewrote that commit:** it still resolves in this clone but is no longer in the
-branch's history (`git merge-base --is-ancestor b04af65 HEAD` → not an ancestor), so the sha the
-rollup records cannot be read off this branch's log. The bytes the legs read are nevertheless the
-bytes the branch carried, because **the nine scoped files are byte-identical between `b04af65` and
-`08fee62`**, the head the rollup was committed at:
+**Scope commit:** the legs ran at **`b04af65`**, the branch head when step 6 started, and that commit
+is kept as the tag **`audit/2026-11-17-frontend-scope`**. **The rebase onto `3d4f4cf` rewrote it out
+of the branch's history** (`git merge-base --is-ancestor b04af65 HEAD` → not an ancestor), so the sha
+the rollup records cannot be read off this branch's log; the tag is what makes it fetchable, and
+without it the check below could only be run in the clone that did the rebase. The bytes the legs
+read are the bytes the branch carried, because **the nine scoped files are byte-identical between the
+tag and `08fee62`**, the head the rollup was committed at:
 
 ```
-git diff b04af65 08fee62 -- app/src/index.html app/src/model.js app/src/eth.js \
+git fetch origin tag audit/2026-11-17-frontend-scope
+git diff audit/2026-11-17-frontend-scope 08fee62 -- \
+  app/src/index.html app/src/model.js app/src/eth.js \
   app/src/widget.js app/src/layout.html app/build.mjs app/inline-scripts.mjs \
   app/broadcast.mjs app/version.mjs
 ```
 
 → no output. **The audit did not run at this PR's head**, and this section does not substitute the
-new sha for `b04af65`: one scoped file has moved since, `app/src/index.html`, and the move is R2's
+new sha for the tag: one scoped file has moved since, `app/src/index.html`, and the move is R2's
 fix row below.
+
+**Line numbers in this section are the scope commit's**, not this PR's head, because that is the tree
+the legs read and the rollup checked its citations against. The only scoped file that has moved since
+is `app/src/index.html`, and R2's fix lands there in **two** hunks, so the offset is not one number:
+
+| Scope-commit line | Offset at the head |
+|:--|:--|
+| up to `:354` | none |
+| `:355`–`:360` | **+9** |
+| `:361` and below | **+15** |
+
+(`git diff audit/2026-11-17-frontend-scope HEAD -- app/src/index.html` → `@@ -349,6 +349,15 @@` and
+`@@ -361,12 +370,18 @@`; 16 lines added, 1 removed.) The reliable move is to resolve a citation
+against the tag rather than to add an offset, which is why the tag is pushed.
 
 **Results:** leg 1 reported **9** findings (F-01 to F-09; its scale has no Info level), leg 2 **21**
 (F1 to F21: 15 rated Low or above, 6 Info) — **30 read in total**, of which **6 were reported by
