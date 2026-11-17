@@ -137,11 +137,14 @@ provider (`:74`) live inside.
 5. **The browser check**, against a dev stack on spare ports as t01 ran it (`ANVIL_PORT=8745
    APP_PORT=3200`, `make deploy` then `make dapp CHAIN_ID=31337`, `serve app/dist`), the chain shaped
    so the first window is wider than 200 blocks and an entry is ripe: from the seed's owner
-   (`0xf39F…2266`) `cast send --rpc-url <anvil> --unlocked --from 0xf39F…2266 <featured>
+   (`0xf39F…2266`) `cast send --rpc-url <anvil> --unlocked --from <owner> <featured>
    "propose(bytes)" $(cast calldata "setDescription(string)" "<new name>")` *(amended 2026-11-17 at
-   the review of #222: the flags go before the address, because `cast send`'s trailing arguments are
-   variadic and swallow anything after the signature; the sender flag is `--from` — `--sender` is
-   `forge script`'s, and `cast send --help` lists only `-f, --from <ADDRESS>`)*, then `cast rpc evm_increaseTime 608400` (7 d + 1 h,
+   the review of #222: as scoped, the command named the owner and `--unlocked` in prose and carried no
+   sender flag at all — neither `--from` nor `--sender`. `--unlocked` sends via `eth_sendTransaction`
+   from the `--from` address, so without it the request has no sender; `--sender` is `forge script`'s
+   flag and `cast send --help` lists only `-f, --from <ADDRESS>`. The flags go before the address,
+   because `cast send`'s trailing arguments are variadic and swallow anything after the signature)*,
+   then `cast rpc evm_increaseTime 608400` (7 d + 1 h,
    inside `GRACE`) and `cast rpc anvil_mine 0x400`. The featured address is `cast call <factory>
    "predict(bytes32)(address)" 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266000000000000000000000001`.
    Read every DOM figure through playwright; `page errors: none` on every run.
