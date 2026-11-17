@@ -74,6 +74,8 @@ run (decision 5 — a new version is a new factory anyway), and because `OWNER` 
 inside `App`'s hash, `APP_SALT` holds only for the Ops vault and `v0.1`. Step 1f recomputes both
 addresses from these variables on every chain; it never copies them.
 
+> **Stale since [#201](https://github.com/dnznlabs/rake/pull/201) (merged 2026-11-16, solc 0.8.34 → 0.8.38, no `src/` change).** Both salts above were mined against the 0.8.34 init-code hashes quoted here; `main` now compiles to different bytes, so step 1f computes different hashes and neither salt yields its `0x00…` prefix any more. Do not run the deploy steps against `main` until decision 37's mining run has been repeated for the new hashes and this block updated. The Sepolia and Base Sepolia deployments recorded below were made from the 0.8.34 bytes and remain self-consistent; they cannot share an address with anything deployed from `main`.
+
 **`CREATOR` is named** (decision 32; [#90](https://github.com/dnznlabs/rake/issues/90) closed at M03
 close-out): `0x68e0741D8d693e14BF56914567eADdC130b186eE`, and the salt's low 12 bytes are `…0001`,
 so **DNZN's distribution is `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`** on every chain where the
