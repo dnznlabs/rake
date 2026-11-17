@@ -697,6 +697,19 @@ convention. Numbered 45 because 44 is taken by
     (decision 45) is unchanged and now touches one place fewer. Amends decision 45's placement, not
     its content or its removal clause.
 
+49. **The DNZN fee distribution exists on every chain the dapp is deployed to, so the featured panel
+    is not hidden when its salt resolves to no code.** Ruled by Denizen on 2026-11-16, recorded in the
+    body of [#203](https://github.com/dnznlabs/rake/pull/203): "The featured panel is not hidden when
+    the salt has no code: ruled 2026-11-16 that the fee distribution will exist on every chain the
+    dapp is deployed to." `mk/15-seed.mk` picks `FEATURED_SALT` per chain: the seed's on 31337, the
+    DNZN fee distribution's (`0x357836ff…902b` + `…0001`, which `predict()`s
+    `0x71a4221974Fc2E95081AE513248918dF27CF7a4A` on Sepolia and Base Sepolia) everywhere else. This
+    answers the second open question of [#193](https://github.com/dnznlabs/rake/issues/193) (hide the
+    panel on an empty salt: no) and amends decision 46's rejected clause on hiding; 46's first-upload
+    ruling and #193's re-upload are unchanged. Consequence for M05: Step 6 (`create` from the Creator
+    key at that salt) is a precondition of the page reading correctly on each mainnet, not an
+    optional last step.
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
