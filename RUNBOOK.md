@@ -790,13 +790,24 @@ for a in $FACTORY $IMPL $APP; do
 done
 ```
 
-A distribution is a clone, and Sourcify does not report one as verified (`match: null`). The
-function and event signatures are registered on OpenChain (`cast upload-signature
-out/Distribution.sol/Distribution.json out/Distribution.sol/DistributionFactory.json
-out/App.sol/App.json`), so a wallet that cannot find the source can still show the function name.
-A second upload of the same signatures prints `Duplicated:` for each one and changes nothing.
-
 `record:` each address's `match`.
+
+A distribution is a clone, and Sourcify does not report one as verified (`match: null`). What covers
+it is the function, error and event signatures on OpenChain, keyed by selector rather than by chain,
+so a wallet that cannot find the source can still show the function name. Upload them from the
+artifacts this deployment was built from, after the verifications above and before Step 6:
+
+```sh
+forge build
+cast upload-signature out/Distribution.sol/Distribution.json \
+  out/Distribution.sol/DistributionFactory.json out/App.sol/App.json \
+  | awk '{print $1}' | sort | uniq -c        # Imported: / Duplicated: counts, 82 in all for this ABI
+```
+
+A second upload of the same signatures prints `Duplicated:` for each one and changes nothing, so an
+unchanged ABI on a new chain is all `Duplicated:`; an ABI change shows up as `Imported:` lines.
+
+`record:` the date, and the `Imported:` and `Duplicated:` counts.
 
 ### Step 6 — DNZN's `create`
 
