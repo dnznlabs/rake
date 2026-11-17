@@ -38,8 +38,8 @@ A `Distribution` is not listed here: there is one address per distribution, crea
 
 | CHAIN | CHAIN ID | FACTORY | APP | DOCUMENT | SOURCE VERIFIED |
 |:---|:---|:---|:---|:---|:---|
-| Sepolia | `11155111` | live | live | uploaded 2026-11-16 | [factory](https://sepolia.etherscan.io/address/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B#code) · [app](https://sepolia.etherscan.io/address/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE#code) |
-| Base Sepolia | `84532` | live | live | uploaded 2026-11-16 | [factory](https://sepolia.basescan.org/address/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B#code) · [app](https://sepolia.basescan.org/address/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE#code) |
+| Sepolia | `11155111` | live, pre-#201 bytes | live, pre-#201 bytes | uploaded 2026-11-16 | [factory](https://sepolia.etherscan.io/address/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B#code) · [app](https://sepolia.etherscan.io/address/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE#code) |
+| Base Sepolia | `84532` | live, pre-#201 bytes | live, pre-#201 bytes | uploaded 2026-11-16 | [factory](https://sepolia.basescan.org/address/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B#code) · [app](https://sepolia.basescan.org/address/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE#code) |
 | Ethereum, Base, Arbitrum, OP Mainnet | — | not deployed | not deployed | — | — |
 
 Read live rather than trusted: `make addresses CHAIN_ID=<id>` prints the addresses from the broadcast logs, and `cast codesize <address> --rpc-url <rpc>` is the check that one is really there — `1320` for the factory and `7155` for `App` on both testnets today. Sources of record are `broadcast/<Script>/<chain id>/run-latest.json` and [`RUNBOOK.md`](RUNBOOK.md) § Executed on testnets. All four deployments are source-verified on their explorers (solc `0.8.34`).
