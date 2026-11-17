@@ -769,6 +769,35 @@ curl -s "https://api.etherscan.io/v2/api?chainid=$CHAIN_ID&module=contract&actio
 
 `record:` the three `#code` URLs and the `ContractName` each returns.
 
+Then the same three on Sourcify, which is where wallets look to decode a call to these contracts.
+**Unset `ETHERSCAN_API_KEY` for these commands**: while it is set, forge ignores
+`--verifier sourcify` and goes to Etherscan, which reports `already verified` and exits 0, so the
+Sourcify verification looks done when it never ran.
+
+```sh
+env -u ETHERSCAN_API_KEY forge verify-contract $FACTORY src/Distribution.sol:DistributionFactory \
+  --chain "$CHAIN_ID" --verifier sourcify --watch
+
+env -u ETHERSCAN_API_KEY forge verify-contract $IMPL src/Distribution.sol:Distribution \
+  --chain "$CHAIN_ID" --verifier sourcify --watch
+
+env -u ETHERSCAN_API_KEY forge verify-contract $APP src/App.sol:App \
+  --chain "$CHAIN_ID" --verifier sourcify --watch \
+  --constructor-args "$(cast abi-encode 'constructor(address,string)' "$OWNER" "$APP_VERSION")"
+
+for a in $FACTORY $IMPL $APP; do
+  curl -s "https://sourcify.dev/server/v2/contract/$CHAIN_ID/$a" | jq -r .match   # exact_match
+done
+```
+
+A distribution is a clone, and Sourcify does not report one as verified (`match: null`). The
+function and event signatures are registered on OpenChain (`cast upload-signature
+out/Distribution.sol/Distribution.json out/Distribution.sol/DistributionFactory.json
+out/App.sol/App.json`), so a wallet that cannot find the source can still show the function name.
+A second upload of the same signatures prints `Duplicated:` for each one and changes nothing.
+
+`record:` each address's `match`.
+
 ### Step 6 — DNZN's `create`
 
 **This is the one step the DNZN Creator key signs**, and the only one. Re-export `SIGNER` to that
