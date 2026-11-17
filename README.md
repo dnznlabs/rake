@@ -14,13 +14,48 @@ A distribution is one address with a published table of beneficiaries. Anything 
 |:---|:---|:---|
 | `pre-mvp` | `0.1alpha` | two-model agent review, 2026-11-06 ([SECURITY.md](SECURITY.md)) |
 
-This is pre-release software. The contracts are unaudited and deployed only to a local dev chain. Milestones and their status are in the [roadmap](docs/ROADMAP.md).
+This is pre-release software. The contracts are unaudited and are deployed to **Sepolia and Base Sepolia only** — see [Contracts](#contracts) for addresses and per-chain status. No mainnet deployment exists. Milestones and their status are in the [roadmap](docs/ROADMAP.md).
 
 **Alpha software is alpha, act accordingly.** See [Disclaimer](#disclaimer).
 
 ### Disclaimer
 
 Alpha software. The contracts are reviewed by the shared two-model method and Slither ([SECURITY.md](SECURITY.md)), not audited. No warranty. The contracts are immutable: a found bug is not patched, it is a new address. The alpha marks come off 90 days after the mainnet milestone closes with no `bug` issue filed and no accepted security finding ([decision 45](docs/ROADMAP.md#decisions)).
+
+## Contracts
+
+Every address below is **the same on every chain**. Both contracts are placed by a salted `CREATE2` from a shared factory, so deploying to a new chain reproduces the addresses rather than inventing them, and a bookmark or an integration does not change when a chain is added.
+
+| CONTRACT | ADDRESS | ROLE |
+|:---|:---|:---|
+| `DistributionFactory` | [`0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B`](https://sepolia.etherscan.io/address/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B) | Places each `Distribution`, one per distribution |
+| `App` | [`0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE`](https://sepolia.etherscan.io/address/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE) | Serves the dapp and the widget from the chain over [ERC-5219](https://eips.ethereum.org/EIPS/eip-5219) |
+| Owner of both | [`0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`](https://sepolia.etherscan.io/address/0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790) | DNZN Ops, a multisig behind a time lock. Only it can change what `App` serves |
+
+A `Distribution` is not listed here: there is one address per distribution, created on demand through the factory.
+
+### Deployment Status
+
+| CHAIN | CHAIN ID | FACTORY | APP | DOCUMENT | SOURCE VERIFIED |
+|:---|:---|:---|:---|:---|:---|
+| Sepolia | `11155111` | live | live | uploaded 2026-11-16 | [factory](https://sepolia.etherscan.io/address/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B#code) · [app](https://sepolia.etherscan.io/address/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE#code) |
+| Base Sepolia | `84532` | live | live | uploaded 2026-11-16 | [factory](https://sepolia.basescan.org/address/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B#code) · [app](https://sepolia.basescan.org/address/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE#code) |
+| Ethereum, Base, Arbitrum, OP Mainnet | — | not deployed | not deployed | — | — |
+
+Read live rather than trusted: `make addresses CHAIN_ID=<id>` prints the addresses from the broadcast logs, and `cast codesize <address> --rpc-url <rpc>` is the check that one is really there — `1320` for the factory and `7155` for `App` on both testnets today. Sources of record are `broadcast/<Script>/<chain id>/run-latest.json` and [`RUNBOOK.md`](RUNBOOK.md) § Executed on testnets. All four deployments are source-verified on their explorers (solc `0.8.34`).
+
+### Opening the App
+
+`App` holds the dapp as gzipped chunks and answers ERC-5219 requests, so it needs a client that speaks [`web3://`](https://eips.ethereum.org/EIPS/eip-4804) — either natively or through a gateway.
+
+| HOW | SEPOLIA | BASE SEPOLIA |
+|:---|:---|:---|
+| A `web3://`-capable browser or extension | `web3://0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE:11155111/` | `web3://0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE:84532/` |
+| Any browser, through the w3link gateway | [`…11155111.w3link.io`](https://0x00a90943f58b6ab7fde05aae01c13a80e6995bae.11155111.w3link.io/) | [`…84532.w3link.io`](https://0x00a90943f58b6ab7fde05aae01c13a80e6995bae.84532.w3link.io/) |
+
+The widget is the same URL plus `/widget.js`. The gateway form is `https://<app address>.<chain id>.w3link.io/`, lowercase address, and it is a third-party service reading the same contract — nothing about the document depends on it. `make gateway` runs a gateway locally against the dev chain instead ([AGENTS.md](AGENTS.md) § The dapp).
+
+**Two things to expect on a first visit.** The page arrives as a small self-extracting wrapper that inflates the document in the browser, so `curl` shows a short script rather than the dapp and a byte comparison against a local build will not match — a browser is the only valid check. And a gateway may inject a script of its own into the response; w3link does.
 
 ## Documentation
 
