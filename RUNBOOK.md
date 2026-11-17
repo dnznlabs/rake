@@ -1027,12 +1027,48 @@ head, where `--rpc` would read today's nonce and emit different pointers.
 
 | # | date | chain | commit | App nonce | pointers (doc 0 · doc 1 · widget) | vault nonces | `inflated sha256` · `widget sha256` | six tx hashes | gas across the three |
 |--:|:--|:--|:--|--:|:--|:--|:--|:--|--:|
-| 1 | 2026-11-17 | Sepolia | `9fdf0f1` | 4 | `0x831f740F…1268` · `0x02d5AcDA…A0C3` · `0x80bDDA62…FC38` | 6, 7, 8 | `2d27b603…3f9a9d4a` · `07e808ed…d51b8ca` | filled at 4d | filled at 4d |
-| 2 | 2026-11-17 | Base Sepolia | `9fdf0f1` | 4 | the same three — the pointers are a function of `App`'s address and nonce, and both are identical per chain | 6, 7, 8 | `1111b791…0920e17` · `07e808ed…d51b8ca` | filled at 4d | filled at 4d |
+| 1 | 2026-11-17 | Sepolia | `9fdf0f1` | 4 | `0x831f740F…1268` · `0x02d5AcDA…A0C3` · `0x80bDDA62…FC38` | 6, 7, 8 | `2d27b603…3f9a9d4a` · `07e808ed…d51b8ca` | in full below | **83,827,120** |
+| 2 | 2026-11-17 | Base Sepolia | `9fdf0f1` | 4 | the same three — the pointers are a function of `App`'s address and nonce, and both are identical per chain | 6, 7, 8 | `1111b791…0920e17` · `07e808ed…d51b8ca` | in full below | **11,947,862** |
 
-The hashes in rows 1 and 2 are the build's, read from a fork of each chain before the proposals were
-signed; 4d replaces that provenance with the live `chain-doc` reading and fills the transactions and
-gas. **The first upload of all, m04-t08's on 2026-11-16, is deliberately not a row here.** It was not
+The `inflated sha256` and `widget sha256` in rows 1 and 2 were the build's when the rows were written,
+read from a fork of each chain before the proposals were signed; **4d re-read both from the chain
+after execution and they are unchanged**, so the column now carries a live `chain-doc` reading rather
+than a prediction. The gas column is the sum of the three `executeQueued` receipts.
+
+**The six transactions per row, in full.** Three submits (the proposal, which queues it) and three
+`executeQueued` (which runs it), in nonce order. The submits are not the engineer's: `from` is the
+Product Owner's account on Sepolia and a relayer EOA on Base Sepolia, both through the same relay
+`to` of `0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3` — so **`from` is never a signer attribution on
+either chain**, since the signatures authorise the call and `execute()` does not read `msg.sender`.
+All twelve `status true`.
+
+Row 1 — Sepolia, `eth_estimateGas` and `gasUsed` per `executeQueued`:
+
+| vault nonce | call | submit tx | `executeQueued` tx | block | `gasUsed` | estimate |
+|--:|:--|:--|:--|--:|--:|--:|
+| 6 | `addChunk` doc 0 | `0x9629018a60bd73fd2d34b3eedf7222e9db5eeac1c7dbe2513c8a81dc5b1c88fa` | `0x9559ca95b77595cf54980b9668b08f5760adb2c4715565ac0abb88e11cda59a2` | 12155608 | 37,493,831 | 38,474,885 |
+| 7 | `addChunk` doc 1 | `0x7df581c038f35cdc29e85c976fe215e74f553dd358dd60caa956696aea22f083` | `0xf5d6dcf20fa0dcfa1e9bab8cdcb62f8e1a85478436b568bda4d8aa0d77a2965e` | 12155609 | 33,434,368 | 34,479,858 |
+| 8 | `batch345` | `0x9ec56529a28121218d87e2aa5dca9db0760c55e73377ce19f213029498d4395d` | `0xe1f955983bbef0aa908968abda15762cadbe1ae90f5747c0dc50abb259855005` | 12155610 | 12,898,921 | 13,881,217 |
+
+Row 2 — Base Sepolia:
+
+| vault nonce | call | submit tx | `executeQueued` tx | block | `gasUsed` | estimate |
+|--:|:--|:--|:--|--:|--:|--:|
+| 6 | `addChunk` doc 0 | `0xb9c0e46e3a8e7aa371c1de43d48b730d798440e539167aff66f98b2a42012bff` | `0x1109d70289ae81f0138a148eb9ca870b94a88d3256deb13546cd27c9586b81b1` | 60056890 | 5,313,847 | 5,538,669 |
+| 7 | `addChunk` doc 1 | `0x13d73ce6f37e3a3f2843c99b01731a35c01785332588e55aed6e4c7d3865d253` | `0x51ebc2842191f3804fbea1bf1cf8f54a57e48f39d3e3c904a6874a33fe640206` | 60056912 | 4,742,766 | 4,965,321 |
+| 8 | `batch345` | `0xc5b7abb9b36a9b4d082c56ec4a94c19db937591ad3280d57384509380ae72e41` | `0x3b3c01042a857123233c8396ae967201ca5011c78965b913b56bf1510bb15714` | 60056932 | 1,891,249 | 2,016,300 |
+
+**Estimate-then-send was used for all six, and the hand limits of § Gas were not needed** — the second
+upload reproducing t08's finding. `cast estimate --from $ENGINEER` returned a clean figure for every
+one, including `batch345` once its chunks had landed, and each estimate was within 7% above the gas
+actually used; what was sent was estimate + 30%. Keep § Gas's table as the fallback for an RPC that
+refuses to estimate.
+
+**The order gate was read between every send**, per chain: `cast nonce $APP` returned `4`, `5`, `6`
+before orders 1, 2, 3 and `7` after the batch — the gate walked rather than assumed, so the silent
+misorder § Step 4 describes was never reachable.
+
+**The first upload of all, m04-t08's on 2026-11-16, is deliberately not a row here.** It was not
 routine — it is the one whose calldata lives under its own task directory, it predates this table, and
 its figures survive only in that handoff. Reconstructing them into this table would make a record
 whose rule is *filled in as the steps execute* carry two rows that were not, which is the one thing a
