@@ -312,7 +312,7 @@ measurement of the same date that it is checked against.
   make gateway-check` exits 0 with `ok body minus block vs html(): equal`, `ok content-type:
   text/html…`, the three `ok web3-*` lines, `ok cmp vs app/dist/widget.js: identical`, `ok
   content-type: application/javascript…`, `ok status: 404`; `curl -sI "$GATEWAY_BASE/widget.js" |
-  grep -ic 'content-type: application/javascript'` → 1. Baseline: `GATEWAY_BASE` does not exist in
+  grep -ic 'content-type: application/javascript'` → 1. **Amended 2026-11-17 at the engineer's finding (#225): the two local-build clauses — `inflated sha256` = `sha256sum app/dist/index.html` and `cmp vs app/dist/widget.js: identical` — are measured at the branch point, before the rebase onto t11 and t12 that step 4 requires, and recorded with that commit; after the rebase the local build differs from the served document by design until the next Run B, so the handoff row reads "measured green at `<commit>`; re-measured at step 7" and the PR may merge on it. The chain-against-chain clause — `ok body minus block vs html(): equal` — holds at every head and is measured at the final head.** Baseline: `GATEWAY_BASE` does not exist in
   the script (grep → 0) and the dev target cannot reach a hosted URL. Predicted red: the Base Sepolia
   base with the Sepolia `RPC` → `FAIL body minus block vs html(): differs` (rehearsed: 61,177 vs
   61,181 bytes).
