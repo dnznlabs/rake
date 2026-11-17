@@ -316,9 +316,15 @@ measurement of the same date that it is checked against.
   the script (grep → 0) and the dev target cannot reach a hosted URL. Predicted red: the Base Sepolia
   base with the Sepolia `RPC` → `FAIL body minus block vs html(): differs` (rehearsed: 61,177 vs
   61,181 bytes).
-- (b) **The hosted mode is a mode, not a fork.** `GATEWAY_BASE= make gateway-check` against the dev
+- (b) **The hosted mode is a mode, not a fork.** ~~`GATEWAY_BASE= make gateway-check` against the dev
   stack prints the same assertion lines as `main`'s script (diff the two outputs; the three-label
-  line present); with `GATEWAY_BASE` set and `RPC` unset the script exits 1 before its first `curl`
+  line present)~~ **Amended 2026-11-17 at the engineer's finding (#225, #228): `main`'s script fails
+  about 70% of runs on the real 69 KB body under its own `set -o pipefail` construction (SIGPIPE from
+  `grep -m1` into `tail`, exit 141), so a diff against that baseline is not evidence. Instead: the
+  handoff records the mechanism measurement (the script's own invocation, trials and failure count,
+  beside the 0-failure command-substitution control), and `git diff main -- tools/gateway-check.sh`
+  shows every changed hunk other than the #228 fix inside a `GATEWAY_BASE` guard, quoted; the dev-stack
+  run with `GATEWAY_BASE=` unset exits 0 and prints the three-label line.** With `GATEWAY_BASE` set and `RPC` unset the script exits 1 before its first `curl`
   (`grep -c curl` on its output → 0). `grep -ci 'GATEWAY_BASE' tools/gateway-check.sh` ≥ 3
   (baseline 0).
 - (c) **The origin probe is recorded for both chains.** The handoff's table has `window.top ===
