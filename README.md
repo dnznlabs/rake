@@ -24,7 +24,7 @@ Alpha software. The contracts are reviewed by the shared two-model method and Sl
 
 ## Contracts
 
-Every address below is **the same on every chain**. Both contracts are placed by a salted `CREATE2` from a shared factory, so deploying to a new chain reproduces the addresses rather than inventing them, and a bookmark or an integration does not change when a chain is added.
+Every address below is **the same on both chains it is deployed to**, so a bookmark or an integration does not change from one chain to the next. Both contracts are placed by a salted `CREATE2`, which binds the address to the init code — so the address repeats on a new chain only while the compiled bytes are unchanged. **They have changed:** `main` has compiled with solc `0.8.38` since [#201](https://github.com/dnznlabs/rake/pull/201), the salts were mined against the `0.8.34` init-code hashes, and a deploy from `main` today would land somewhere else entirely until that mining run is repeated ([RUNBOOK.md](RUNBOOK.md) § 0 — variables, [#202](https://github.com/dnznlabs/rake/pull/202)). The deployments below were made from the `0.8.34` bytes and are self-consistent; read the addresses here as a record of what is deployed, not as a prediction of where the next chain lands.
 
 | CONTRACT | ADDRESS | ROLE |
 |:---|:---|:---|
