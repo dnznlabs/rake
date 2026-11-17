@@ -85,14 +85,14 @@ for (const heading of ['### Functions', '### Events', '### Errors', '## Distribu
   });
 }
 
-test('the rail and the headings are the same fourteen sections, in one order', () => {
+test('the rail and the headings are the same fifteen sections, in one order', () => {
   const m = PAGE.match(/const SECTIONS\s*=\s*(\[[\s\S]*?\]);/);
   assert.ok(m, 'SECTIONS is not an array literal in app/src/index.html');
   const sections = new Function(`return ${m[1]}`)();
 
   const ids = [...PAGE.matchAll(/id="s-([a-z]+)"/g)].map(m => m[1]);
 
-  assert.equal(sections.length, 14);
+  assert.equal(sections.length, 15);
   assert.deepEqual(ids, sections.map(s => s[0]));
   assert.ok(ids.includes('widget'), 'the owner bar\'s widget link points at #/docs#widget');
   /* ROADMAP decision 45: the Disclaimer is the *first* section, in the rail and in the article, so a
@@ -100,6 +100,41 @@ test('the rail and the headings are the same fourteen sections, in one order', (
      either alone would pass while the page disagreed with its own rail. */
   assert.equal(sections[0][0], 'disclaimer', 'the rail does not open with the Disclaimer');
   assert.equal(ids[0], 'disclaimer', 'the article does not open with the Disclaimer');
+});
+
+/* ROADMAP decision 52: the Cache section says what the store holds, how much of it there is, how it
+   is evicted, and carries the control that empties it. Its prose is a draft under decision 17 — the
+   docs page's voice is Denizen's — so what is pinned here is the section's shape and the two numbers
+   the eviction rule is ruled at, not the wording around them. Asserted against the section rather
+   than the page, so a sentence drifting into Limits or For developers cannot pass this. */
+test('the Cache section says what is stored, the eviction rule and carries the clear control', () => {
+  const at = PAGE.indexOf('<h2 id="s-cache">');
+  assert.ok(at >= 0, 'the docs page has no Cache heading');
+  const sec = PAGE.slice(at, PAGE.indexOf('<h2 id="s-developers">', at));
+
+  // What is stored, and what is not: public chain data, no account state, nothing signed.
+  assert.match(sec, /public chain data/);
+  assert.match(sec, /No account state/);
+  // The eviction rule, at decision 52's two numbers.
+  assert.match(sec, /30 days/, 'the Cache section does not say the thirty-day rule');
+  assert.match(sec, /at most 50/, 'the Cache section does not say the fifty-record cap');
+  assert.match(sec, /least recently opened/);
+  // The count and the bytes are painted into this slot after `docs()` returns, not built into it.
+  assert.ok(sec.includes('id="cache-stat"'), 'the Cache section has no slot for the count and the bytes');
+
+  /* The control, in both of its shapes: the live button and the disabled one a browser with no
+     storage gets. Both live in `cacheBind`, which is outside the section's own markup, so they are
+     asserted against the page — the section above is what holds the slot they are painted into. */
+  assert.ok(PAGE.includes('<button class="btn sm" id="cache-clear">clear cache</button>'), 'the page has no clear cache button');
+  assert.ok(PAGE.includes('<button class="btn off sm" disabled>clear cache</button>'), 'the page has no disabled clear cache button for a browser with no storage');
+  assert.match(PAGE, /Storage is unavailable/, 'the page does not say so where storage is unavailable');
+
+  /* The numbers the prose prints and the numbers the store evicts by are two copies of one ruling, so
+     a change to one that misses the other fails here rather than shipping a page that lies about what
+     it does. `Model.evict` carries the same pair as its defaults, pinned in model.test.mjs. */
+  const keep = PAGE.match(/const LOGKEEP = (\{[^}]*\});/);
+  assert.ok(keep, 'the page does not name the eviction rule in one place');
+  assert.deepEqual(new Function(`return ${keep[1]}`)(), { days: 30, cap: 50 });
 });
 
 /* Decision 45: the four things the Disclaimer has to say, and the removal rule that makes the day the

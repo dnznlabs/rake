@@ -197,8 +197,16 @@ const word = a => '0x' + Eth.pad(a);
 /* One `eth_getLogs` from `fromBlock` to `latest` is the query a public endpoint is likeliest to
    refuse (#76). Measured 2026-11-07: `ethereum-sepolia-rpc.publicnode.com` caps the range at 50,000
    blocks, `sepolia.base.org` at **200**, and `ethereum-sepolia.publicnode.com` serves 50,000 but has
-   pruned the history behind it. Base Sepolia mints a block every 2 s — 43,200 a day — so a week-old
-   distribution read in one window through that endpoint is not a slow query, it is 1,500 refusals.
+   pruned the history behind it. The Base chains mint a block every **0.2 s** — 432,000 a day — not
+   every 2 s as this comment said until 2026-11-17: measured that day at 0.2000 s per block on
+   `base.drpc.org`, `base-rpc.publicnode.com` and `mainnet.base.org` for Base, and on
+   `base-sepolia.drpc.org`, `base-sepolia-rpc.publicnode.com` and `sepolia.base.org` for Base Sepolia,
+   over spans of 500,000 and 10,000 blocks on each. So a 200-block window is 40 s of chain and the
+   40-window budget below is 8,000 blocks — about 27 minutes of either Base chain through that
+   endpoint, and a day of factory age is 432,000 blocks. Reading a distribution's whole history in one
+   window through that endpoint is not a slow query, it is thousands of refusals; reading it in 40 is
+   a scan that stops short of the factory block the day after the distribution is created, which is
+   what the finalized-log cache below exists to answer (decision 52).
    So: the head is read once per page load, every scan walks back from it in windows, the window
    shrinks to whatever a refusal names, and a scan that runs out of budget answers a boundary block
    instead of throwing. The cap belongs to the provider the wallet picked, not to the chain, which is
@@ -217,6 +225,24 @@ if (Q.get('maxwin')) MAX_WINDOWS = Number(Q.get('maxwin'));
    windows against the same `latest`, or the sections disagree about where the end is. */
 let HEAD = null;
 const head = async () => HEAD ?? (HEAD = parseInt(await P.request({ method: 'eth_blockNumber' }), 16));
+/* The highest block the chain has promised not to replace, read once per page load beside the head
+   and the boundary the log cache is written at (decision 52): a log at or below it can be kept
+   between visits, and one above it belongs to this load alone. The promise is memoised rather than
+   the number, so the three queries of one history share a single request even though they start
+   together — and `?? ` rather than `||`, because a fresh chain answers genesis and `0` is an answer.
+   Every endpoint measured answers the tag: `mainnet.base.org` and `base-rpc.publicnode.com`
+   (finalized 4,814 and 4,818 blocks behind latest), `sepolia.base.org` and
+   `base-sepolia-rpc.publicnode.com` (5,724 and 5,728 behind) and
+   `ethereum-sepolia-rpc.publicnode.com` (86 behind), all read 2026-11-17 19:44 UTC. None refused it,
+   so the fallback below names no provider yet; a provider that does refuse it leaves the page reading
+   1,000 blocks of tail live, which is one window on anything that answers `eth_getLogs` at all. */
+let FINP = null;
+const fin = () => (FINP ??= (async () => {
+  try {
+    const b = await P.request({ method: 'eth_getBlockByNumber', params: ['finalized', false] });
+    return parseInt(b.number, 16);
+  } catch (e) { return (await head()) - 1000; }
+})());
 /* A refusal, wherever the wallet put the text: MetaMask wraps the provider's JSON-RPC error and the
    message naming the cap can sit a level or two down from `message`. */
 const errText = e => [e && e.message, e && e.data && e.data.message, e && e.cause && e.cause.message]
@@ -387,6 +413,76 @@ addEventListener('keydown', copyClick, true);
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 const recents = () => { try { const r = JSON.parse(store.get('rake.recent') || '[]'); return Array.isArray(r) ? r.filter(isAddr) : []; } catch (e) { return []; } };
 const addRecent = a => store.set('rake.recent', JSON.stringify([a, ...recents().filter(x => x !== a)].slice(0, 8)));
+
+/* ---- the finalized-log cache (decision 52) --------------------------------------------------- */
+/* One IndexedDB database holding the event history the three sections of a distribution page are
+   built from, per chain and per distribution, complete up to the chain's `finalized` block as of the
+   last visit. The live scan then covers only the tail above it, which is one `eth_getLogs` per kind
+   on an uncapped provider instead of the whole span from the factory block on every load (#165).
+   Under the same guard shape as `store` above: a missing `indexedDB` (a sandboxed frame), a refused
+   open (private mode) and a quota error all resolve to `null`, and the page then behaves exactly as
+   it did before this store existed. Nothing here throws at a caller. No library. */
+const LOGDB = 'rake.logs', LOGSTORE = 'logs';
+/* The database's version number *is* the schema version, so a decoder change is one edit: bump this,
+   and `onupgradeneeded` drops the old store and recreates it. The value carries its own `schema` as
+   well, which is what a record read through a future migration would be told apart by. */
+const LOGSCHEMA = 1;
+/* Decision 52's eviction, in one place: the docs page's Cache section prints these two numbers in
+   prose, and `Model.evict` carries the same pair as its defaults, which `test/model.test.mjs` pins. */
+const LOGKEEP = { days: 30, cap: 50 };
+let LOGDBP = null;
+const logOpen = () => (LOGDBP ??= new Promise(done => {
+  try {
+    if (!self.indexedDB) return done(null);
+    const rq = indexedDB.open(LOGDB, LOGSCHEMA);
+    rq.onupgradeneeded = () => {
+      const db = rq.result;
+      if (db.objectStoreNames.contains(LOGSTORE)) db.deleteObjectStore(LOGSTORE);
+      db.createObjectStore(LOGSTORE, { keyPath: ['chainId', 'address'] });
+    };
+    rq.onsuccess = () => done(rq.result);
+    // A refused open, and an open blocked by another tab still holding an older version: both are no cache.
+    rq.onerror = () => done(null);
+    rq.onblocked = () => done(null);
+  } catch (e) { done(null); }
+}));
+/* One request in one transaction, as a promise that resolves `null` for every way it can fail. The
+   transaction's own `abort` is where a quota error arrives — the request succeeds and the commit is
+   what the browser refuses — so both ends are listened to. */
+const logTx = async (mode, fn) => {
+  const db = await logOpen();
+  if (!db) return null;
+  try {
+    return await new Promise(done => {
+      const t = db.transaction(LOGSTORE, mode), rq = fn(t.objectStore(LOGSTORE));
+      t.onabort = () => done(null);
+      t.onerror = () => done(null);
+      rq.onsuccess = () => done(rq.result);
+      rq.onerror = () => done(null);
+    });
+  } catch (e) { return null; }
+};
+const logKey = (chainId, address) => [String(chainId), String(address)];
+const logCache = {
+  get: (chainId, address) => logTx('readonly', s => s.get(logKey(chainId, address))),
+  all: () => logTx('readonly', s => s.getAll()),
+  count: () => logTx('readonly', s => s.count()),
+  put: rec => logTx('readwrite', s => s.put(rec)),
+  clear: () => logTx('readwrite', s => s.clear()),
+  /* Every delete in one transaction, and the last request is the one awaited: they commit together or
+     not at all, so a quota or a close mid-sweep cannot leave the store half-evicted. */
+  drop: keys => logTx('readwrite', s => { let last = null; for (const k of keys) last = s.delete(k); return last || s.count(); }),
+};
+/* Run once per load, before the first history read: the records this device is no longer keeping.
+   `Model.evict` names them and this applies them, which is the whole division of labour — the rule is
+   testable under node and the store is not. */
+let LOGSWEEP = null;
+const logSweep = () => (LOGSWEEP ??= (async () => {
+  const recs = await logCache.all();
+  if (!recs || !recs.length) return;
+  const gone = Model.evict(recs.map(r => ({ key: logKey(r.chainId, r.address), visited: r.visited })), Date.now(), LOGKEEP);
+  if (gone.length) await logCache.drop(gone);
+})());
 
 /* ---- names ---------------------------------------------------------------------------------- */
 /* Ported from state-collection `app/src/index.html:224-279`, which took it from its own
@@ -602,11 +698,59 @@ function tokenIn(log) {
    to. Separate from the decode below because `load older` adds to these lists and the decode then
    runs again over the union: a `Queued` that only arrives in the older slice still has to close
    against the `Applied` that was already on the page. */
+/* Wrapped around the three queries since decision 52, and nothing above it changed shape: the record
+   holds the same raw arrays this function has always answered, so `histOf` below and every section it
+   paints read what they read before. What is new is where the scan starts. */
 async function histLogs(addr, from, to) {
-  const pick = set => logs(addr, [set.map(([sig]) => topic(sig))], from, to);
-  const [changes, funds, ins] = await Promise.all([pick(CHANGE_EVENTS), pick(FUND_EVENTS),
-    logs(null, [TRANSFER, null, word(addr)], from, to).catch(() => null)]);
-  return { changes, funds, ins };
+  const lo = Number(BigInt(from));
+  const scan = a => Promise.all([
+    logs(addr, [CHANGE_EVENTS.map(([sig]) => topic(sig))], a, to),
+    logs(addr, [FUND_EVENTS.map(([sig]) => topic(sig))], a, to),
+    logs(null, [TRANSFER, null, word(addr)], a, to).catch(() => null),
+  ]);
+  const rec = await logCache.get(CFG.chainId, addr);
+  /* The record is served where it reaches the block below the one asked for — contiguous, so the
+     served range is one interval and not two — and where this read is the tail above it. A `to`
+     at or below `through` is `load older` asking for the older half, which the record cannot answer
+     and which is read live from `from` as it always was. */
+  let base = rec && rec.through != null && rec.through >= lo - 1 && (to == null || Number(to) > rec.through) ? rec : null;
+  let [changes, funds, ins] = await scan(base ? base.through + 1 : lo);
+  /* A tail scan that ran out of budget leaves a gap between the record and what it read, and the
+     group carries a single boundary block, which cannot describe a hole (the reason `logs` above
+     keeps a batch only as far as its first refusal). So the record is dropped for this load and the
+     whole range is read as it was before this store existed. Unreachable on a provider that answers
+     a 10,000-block window — the tail above `finalized` was 4,814 blocks on Base and 5,728 on Base
+     Sepolia when this was written — and 29 windows of the strictest endpoint measured, under the 40. */
+  if (base && (changes.partial != null || funds.partial != null || (ins && ins.partial != null))) {
+    base = null;
+    [changes, funds, ins] = await scan(lo);
+  }
+  /* The boundary of what the live scan covered, by the same rule `histOf` uses for the group: the
+     highest block the two queries carrying the history stopped at, and the block asked for where
+     neither stopped short. */
+  const floors = [changes.partial, funds.partial].filter(n => n != null);
+  const at = await fin();
+  const cut = r => (r ? Model.splitFinal(r.logs, at).final : null);
+  const live = {
+    first: floors.length ? Math.max(...floors) : (base ? base.through + 1 : lo),
+    through: at, changes: cut(changes), funds: cut(funds), ins: cut(ins),
+  };
+  /* Merged with the record only where the two cover different blocks: the tail above it, or the older
+     slice below it. The rescan above covers the record's own range, so there it replaces it. */
+  const into = base || (rec && to != null && Number(to) < rec.first ? rec : null);
+  await logCache.put({ ...Model.mergeHist(into, live), schema: LOGSCHEMA, chainId: String(CFG.chainId), address: addr, visited: Date.now() });
+  if (!base) return { changes, funds, ins };
+  /* Served: the record's logs below `through` and the live tail above it, as one range. Its boundary
+     is the record's own `first` where that record was itself built by a partial scan — the history
+     below it has never been read on this device — and nothing where it reaches the block asked for.
+     `ins` survives only where both halves have it, as in `older()`: a half-read list of other tokens
+     cannot be told from a complete one. */
+  const edge = base.first > lo ? base.first : null;
+  return {
+    changes: { logs: [...base.changes, ...changes.logs], partial: edge },
+    funds: { logs: [...base.funds, ...funds.logs], partial: edge },
+    ins: base.ins && ins ? { logs: [...base.ins, ...ins.logs], partial: edge } : null,
+  };
 }
 async function history(addr, from, to) {
   return histOf(await histLogs(addr, from, to));
@@ -1809,7 +1953,7 @@ async function list() {
    distribution is, why, how, then the tasks.
    The contract's own surface is docs/REFERENCE.md in the repo, and the last section points there. The
    ids are what the rail and `#/docs#<section>` reach; the owner bar's widget link depends on `widget`. */
-const SECTIONS = [['disclaimer', 'Disclaimer'], ['what', 'Overview'],['economics', 'Economics'], ['credits', 'Credits'], ['why', 'Purpose'], ['how', 'Mechanism'], ['create', 'Creating a distribution'], ['payin', 'Receiving funds'], ['payout', 'Distributing funds'], ['change', 'Changing a distribution'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['developers', 'For developers']];
+const SECTIONS = [['disclaimer', 'Disclaimer'], ['what', 'Overview'],['economics', 'Economics'], ['credits', 'Credits'], ['why', 'Purpose'], ['how', 'Mechanism'], ['create', 'Creating a distribution'], ['payin', 'Receiving funds'], ['payout', 'Distributing funds'], ['change', 'Changing a distribution'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['cache', 'Cache'], ['developers', 'For developers']];
 /* The two figures, hand-drawn rather than rendered from Mermaid: there is no Mermaid in the bundle and
    none at build time either, so the caption says what shipped. Colour comes through classes on
    currentColor, as the landing's fee path does, so theme.css owns every one. */
@@ -1954,12 +2098,51 @@ function docs() {
   <p>The contracts cannot be upgraded. A defect is remedied by deploying a new distribution.</p>
   <p>The contracts have not yet been audited. Security issues should be reported through the repository's <a href="${REPO}/security/advisories/new" target="_blank" rel="noopener">advisory form</a>.</p>
 
+  <h2 id="s-cache">Cache</h2>
+  <p>This page keeps a copy of each distribution's event history in this browser, so that opening the same distribution a second time reads only the blocks the chain has added since. What is kept is public chain data: the events the chain has already published, and only those in blocks it has undertaken not to replace. No account state is stored, nothing a wallet signed, and nothing is sent anywhere — the copy stays on this device and is read by nothing but this page.</p>
+  <p>A distribution not opened for 30 days is dropped, and this browser keeps at most 50 of them, the least recently opened going first. Clearing the cache costs nothing but the next read: everything in it is on chain, and the page reads it again.</p>
+  <div id="cache-stat"></div>
+
   <h2 id="s-developers">For developers</h2>
   <p>The source is published at <a href="${REPO}" target="_blank" rel="noopener">github.com/dnznlabs/rake</a> under the MIT licence. Both contracts reside in one file with no imports. Every function, event and error, and the <code>Snapshot</code> struct the widget reads, are documented in <a href="${REPO}/blob/main/docs/REFERENCE.md" target="_blank" rel="noopener">docs/REFERENCE.md</a>. This page is itself served by the <code>html()</code> view of a contract; see <a href="#/docs#credits">credits</a>.</p>
   <div class="scroll"><table class="dtab"><tr><th>chain</th><th>factory</th><th>status</th></tr>${chainRows()}</table></div>
   </article></div>`;
   widgetDemo();
   giveBind();
+  cacheBind();
+}
+/* The Cache section's two live figures and its control, read after the paint rather than built into
+   it — `docs()` is synchronous and both figures are IndexedDB reads. The count is the store's own
+   `count()` and the size is the summed `JSON.stringify` length of the records, which is why the page
+   calls it approximate: it is the shape the records are held in, not the bytes the browser spent.
+   With storage unavailable the section says so in one line and the button is the disabled shape the
+   apply and send controls already use. */
+async function cacheBind() {
+  const slot = document.getElementById('cache-stat');
+  if (!slot) return;
+  if (!await logOpen()) {
+    slot.innerHTML = `<div class="status">Storage is unavailable in this browser, so nothing is cached here and every load reads the chain in full.</div><button class="btn off sm" disabled>clear cache</button>`;
+    return;
+  }
+  const n = (await logCache.count()) ?? 0, recs = (await logCache.all()) || [];
+  const bytes = recs.reduce((sum, r) => sum + JSON.stringify(r).length, 0);
+  slot.innerHTML = `<div class="status">${n} distribution${n === 1 ? '' : 's'} cached · about ${bytes} bytes</div><button class="btn sm" id="cache-clear">clear cache</button>`;
+  const go = document.getElementById('cache-clear');
+  go.onclick = async () => {
+    go.disabled = true; go.textContent = 'clearing…';
+    await logCache.clear();
+    // The sweep's one run per load has nothing left to judge, and a fresh store is swept again.
+    LOGSWEEP = null;
+    await cacheBind();
+    /* A distribution page open behind this route holds its history in `DS`, built from the record
+       that has just gone. It is read again now, from the chain, so returning to that page does not
+       show rows the store no longer backs. */
+    const d = DS.d;
+    if (d) {
+      const t = TOKEN;
+      history(d.addr, FIRST.get(d.addr) || CFG.factoryBlock).then(h => absorb(t, d, h)).catch(() => {});
+    }
+  };
 }
 /* The support form under Economics: a plain payment to the featured distribution, any amount, nothing
    pre-filled (decision 1). It goes through `tx` like every write, so it is preflighted and confirmed. */
@@ -2047,6 +2230,10 @@ document.addEventListener('click', () => toggle(null)); document.addEventListene
 (async () => {
   await discover();
   if (P) { try { await load(); } catch (e) { S.error = (e && e.message) || String(e); } }
+  /* Before the first history read, which is `detail()`'s, and before the docs page prints a count:
+     the records this device has stopped keeping go now, so neither the scan nor the Cache section
+     ever reads a store the eviction rule has already judged (decision 52). */
+  await logSweep();
   who(); route();
 })();
 </script>
