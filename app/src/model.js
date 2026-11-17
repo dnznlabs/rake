@@ -257,6 +257,57 @@ const Model = (() => {
     return d != null && typeof d === 'object' && d.httpStatus === 413;
   }
 
+  /* ---- the finalized-log cache (decision 52) ------------------------------------------------- */
+
+  /* The three pure parts of the store that keeps a distribution's event history between visits: where
+     to cut the logs a load read, which records to drop, and what to write back. Each is over plain
+     data so it can be driven under node; the store itself — IndexedDB, and every way it can refuse —
+     lives in index.html, which is where the DOM and the provider are. */
+
+  /** The logs a load may keep, and the logs it may not: `final` is everything at or below the chain's
+     `finalized` block, `tail` the rest. The boundary is inclusive on the final side — a log *in* the
+     finalized block is final, since that block is the last one the chain has promised not to replace.
+     `blockNumber` arrives as hex off the wire, so it is read as hex and never compared as a string. */
+  function splitFinal(logs, finalized) {
+    const at = Number(finalized), final = [], tail = [];
+    for (const l of logs || []) (parseInt(l.blockNumber, 16) <= at ? final : tail).push(l);
+    return { final, tail };
+  }
+
+  /** The keys to delete, over `[{ key, visited }]`: every record older than `days`, then, of what is
+     left, the least recently visited beyond `cap`. Pure — the store applies it — and in that order,
+     because the age rule can take a record out of the way of the count. `days` is read as an age
+     rather than as a date, so a record visited exactly `days` ago is still inside the window and
+     stays; one second more and it goes. */
+  function evict(records, now, { days = 30, cap = 50 } = {}) {
+    const ms = Number(days) * 86400000;
+    const old = r => Number(now) - Number(r.visited) > ms;
+    const stale = (records || []).filter(old);
+    /* Newest first, so what falls past `cap` is exactly the least recently visited. */
+    const fresh = (records || []).filter(r => !old(r)).sort((a, b) => Number(b.visited) - Number(a.visited));
+    return [...stale, ...fresh.slice(Number(cap))].map(r => r.key);
+  }
+
+  /** The record a load writes back: the cached logs plus the finalized logs this load read, per kind,
+     `through` the finalized block of this load and `first` the lower of the two lower bounds. The
+     `load older` pass calls this the same way with the older slice as `live`, which is what lowers
+     `first`. `ins` — the address-less `Transfer` query — is kept only where both halves have it: a
+     half-read list of other tokens cannot be told from a complete one, which is the rule `older()`
+     already applies to the same query. */
+  function mergeHist(cached, live) {
+    const through = Number(live.through);
+    if (!cached) {
+      return { first: Number(live.first), through, changes: [...live.changes], funds: [...live.funds], ins: live.ins ? [...live.ins] : null };
+    }
+    return {
+      first: Math.min(Number(cached.first), Number(live.first)),
+      through,
+      changes: [...cached.changes, ...live.changes],
+      funds: [...cached.funds, ...live.funds],
+      ins: cached.ins && live.ins ? [...cached.ins, ...live.ins] : null,
+    };
+  }
+
   /* Recovering a queued entry's nonce without reading a log. `propose` commits to
      `keccak256(abi.encode(action, nonce))` (`src/Distribution.sol:224`) and `applyQueued` recomputes
      the same hash from the arguments it is handed (`:243`), so the nonce is not extra information the
@@ -288,6 +339,6 @@ const Model = (() => {
     return '0x' + node;
   }
 
-  return { SNAPSHOT_T, BENEFICIARY_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash, windows, rangeCap, isPruned, isWrappedRefusal, nonceOf };
+  return { SNAPSHOT_T, BENEFICIARY_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash, windows, rangeCap, isPruned, isWrappedRefusal, splitFinal, evict, mergeHist, nonceOf };
 })();
 export default Model;

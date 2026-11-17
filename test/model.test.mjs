@@ -15,7 +15,8 @@ globalThis.Eth = Eth;
 const { SNAPSHOT_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt } = Model;
 const { revertMessage, tableFrom, parseDelay, wei, namehash } = Model;
 const { windows, rangeCap, isPruned, isWrappedRefusal, nonceOf } = Model;
-const FUNCTIONS = ['countdown', 'dateText', 'deadline', 'decodePending', 'isPruned', 'isWrappedRefusal', 'namehash', 'nonceOf', 'ownerChange', 'ownerKind', 'parseDelay', 'pct', 'rangeCap', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei', 'windows'];
+const { splitFinal, evict, mergeHist } = Model;
+const FUNCTIONS = ['countdown', 'dateText', 'deadline', 'decodePending', 'evict', 'isPruned', 'isWrappedRefusal', 'mergeHist', 'namehash', 'nonceOf', 'ownerChange', 'ownerKind', 'parseDelay', 'pct', 'rangeCap', 'revertMessage', 'salt', 'splitFinal', 'supersededBy', 'tableFrom', 'wei', 'windows'];
 const SET_BENEFICIARIES = 'setBeneficiaries((address,uint96,string,string)[])';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/abi');
@@ -503,6 +504,126 @@ test('isWrappedRefusal is false for a provider that kept its text, and for what 
   /* The last two matter most: the string is the *message* of the object that is true above, so a
      predicate reading text rather than shape would pass it and this test would not discriminate. */
   assert.deepEqual(got, [false, false, false, false, false, false, false]);
+});
+
+/* ---- the finalized-log cache (decision 52) --------------------------------------------------- */
+
+/* A log as the wire carries one, which is the shape the store holds: `blockNumber` hex, never a
+   number, because these arrays go into IndexedDB exactly as `eth_getLogs` answered them. */
+const at = (n, tag) => ({ blockNumber: '0x' + n.toString(16), tag });
+const DAY = 86400000;
+
+test('splitFinal keeps the finalized block itself on the final side', () => {
+  /* The boundary is the whole question: block 100 is final — the chain has promised not to replace
+     it — and 101 is not, so a record built with `<` here would persist a log that can still move. */
+  const got = splitFinal([at(99, 'a'), at(100, 'b'), at(101, 'c')], 100);
+
+  assert.deepEqual(got.final.map(l => l.tag), ['a', 'b']);
+  assert.deepEqual(got.tail.map(l => l.tag), ['c']);
+});
+
+test('splitFinal puts everything above the boundary in the tail, and nothing in neither', () => {
+  const logs = [at(1, 'a'), at(64, 'b'), at(65, 'c'), at(200, 'd')];
+
+  const got = splitFinal(logs, 64);
+
+  assert.deepEqual(got.final.map(l => l.tag), ['a', 'b']);
+  assert.deepEqual(got.tail.map(l => l.tag), ['c', 'd']);
+  assert.equal(got.final.length + got.tail.length, logs.length);
+});
+
+test('splitFinal answers two empty lists for no logs at all', () => {
+  /* A fresh anvil answers `finalized` as genesis, so this is also the first load on a dev chain. */
+  assert.deepEqual(splitFinal([], 0), { final: [], tail: [] });
+});
+
+test('evict drops a record not visited for more than thirty days, and keeps one at twenty-nine', () => {
+  const now = 1794944611000;
+  const recs = [
+    { key: ['1', '0xold'], visited: now - (30 * DAY + 1000) },
+    { key: ['1', '0xedge'], visited: now - 30 * DAY },
+    { key: ['1', '0xyoung'], visited: now - 29 * DAY },
+  ];
+
+  const got = evict(recs, now, { days: 30, cap: 50 });
+
+  /* Three rows, not two: 30 days exactly is the boundary the rule is written at, and without a row
+     sitting on it a `>=`-for-`>` slip moves the boundary with nothing to catch it — the 30-days-plus-
+     one-second row reds for either comparison, so it cannot discriminate. */
+  assert.deepEqual(got, [['1', '0xold']]);
+});
+
+/* Fifty-one fresh records, visited one minute apart, oldest last. */
+const fresh = (n, now) => Array.from({ length: n }, (_, i) => ({ key: ['1', `0x${i}`], visited: now - i * 60000 }));
+
+test('evict takes the least recently visited one record past the cap, and none at the cap', () => {
+  const now = 1794944611000;
+
+  const over = evict(fresh(51, now), now, { days: 30, cap: 50 });
+  const level = evict(fresh(50, now), now, { days: 30, cap: 50 });
+
+  assert.deepEqual(over, [['1', '0x50']]);
+  assert.deepEqual(level, []);
+});
+
+test('evict reads the thirty days and the fifty records as its own defaults', () => {
+  /* Driven with no options at all, and with the counts that make each default bite — a two-record
+     call exercises neither, so a default moved to 51 or to 31 days would pass it. The store names
+     both numbers at its call site and the docs page prints them; this is the row that holds the
+     function's own copy of them to the same pair. */
+  const now = 1794944611000;
+  const aged = [{ key: ['1', '0xold'], visited: now - (30 * DAY + 1000) }, { key: ['1', '0xnew'], visited: now }];
+
+  assert.deepEqual(evict(aged, now), [['1', '0xold']]);
+  assert.deepEqual(evict(fresh(51, now), now), [['1', '0x50']]);
+  assert.deepEqual(evict(fresh(50, now), now), []);
+});
+
+test('evict answers no keys for an empty store', () => {
+  assert.deepEqual(evict([], Date.now()), []);
+});
+
+test('mergeHist writes back the cached logs plus this load\'s finalized ones, per kind', () => {
+  const cached = { first: 100, through: 500, changes: [at(120, 'c1')], funds: [at(130, 'f1')], ins: [at(140, 'i1')] };
+  const live = { first: 501, through: 900, changes: [at(600, 'c2')], funds: [at(700, 'f2')], ins: [at(800, 'i2')] };
+
+  const got = mergeHist(cached, live);
+
+  assert.deepEqual(got.changes.map(l => l.tag), ['c1', 'c2']);
+  assert.deepEqual(got.funds.map(l => l.tag), ['f1', 'f2']);
+  assert.deepEqual(got.ins.map(l => l.tag), ['i1', 'i2']);
+  // `through` is this load's finalized block, and `first` the lower of the two lower bounds.
+  assert.equal(got.through, 900);
+  assert.equal(got.first, 100);
+});
+
+test('mergeHist lowers first when the older slice is the live half, as load older passes it', () => {
+  const cached = { first: 1000, through: 5000, changes: [at(1200, 'c1')], funds: [], ins: null };
+  const older = { first: 400, through: 5000, changes: [at(500, 'c0')], funds: [], ins: null };
+
+  const got = mergeHist(cached, older);
+
+  assert.equal(got.first, 400);
+  assert.equal(got.through, 5000);
+  assert.deepEqual(got.changes.map(l => l.tag), ['c1', 'c0']);
+});
+
+test('mergeHist is the live half alone on the first load of a device', () => {
+  const live = { first: 7, through: 900, changes: [at(10, 'c')], funds: [at(20, 'f')], ins: [at(30, 'i')] };
+
+  const got = mergeHist(null, live);
+
+  assert.deepEqual(got, { first: 7, through: 900, changes: [live.changes[0]], funds: [live.funds[0]], ins: [live.ins[0]] });
+});
+
+test('mergeHist keeps the other-token list only where both halves carry it', () => {
+  /* A provider that refuses the address-less `Transfer` query leaves `ins` null, and a half-read list
+     of other tokens cannot be told from a complete one — the rule `older()` already applies. */
+  const cached = { first: 1, through: 50, changes: [], funds: [], ins: [at(2, 'i')] };
+
+  assert.equal(mergeHist(cached, { first: 51, through: 90, changes: [], funds: [], ins: null }).ins, null);
+  assert.equal(mergeHist({ ...cached, ins: null }, { first: 51, through: 90, changes: [], funds: [], ins: [at(60, 'j')] }).ins, null);
+  assert.equal(mergeHist(null, { first: 51, through: 90, changes: [], funds: [], ins: null }).ins, null);
 });
 
 /* The two queued entries below were read off a local anvil with
