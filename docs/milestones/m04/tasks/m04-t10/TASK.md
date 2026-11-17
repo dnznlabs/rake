@@ -39,8 +39,10 @@ count than devbox's, which would propose a full-gas re-upload of an identical do
    reads `--app-nonce` with a default of `1`, which was right once and is wrong for every upload after the
    first. Change it to **require** the flag or read `cast nonce $APP --rpc-url` itself when `--rpc` is
    given, and exit non-zero with the instruction otherwise; keep the `--app-nonce` override for the
-   anvil rehearsal. Add a unit test in `test/` that the tool refuses with neither (the existing test
-   pattern for a tool is `test/abi.test.mjs`, which runs `tools/` scripts as child processes). The pointers for this upload are `App`'s CREATEs at
+   anvil rehearsal. Add a unit test in `test/` that the tool refuses with neither (~~the existing test
+   pattern for a tool is `test/abi.test.mjs`, which runs `tools/` scripts as child processes~~ —
+   corrected 2026-11-17: `abi.test.mjs` asserts against fixtures and spawns nothing; no test in `test/`
+   spawned a child process before this task, so the test introduces the pattern). The pointers for this upload are `App`'s CREATEs at
    nonces **4, 5, 6** (two document chunks, one widget chunk, if the payload still splits in two under
    `MAX_CHUNK = 24_000`; if it splits in three, the tool says so and the proposal count changes —
    stop and report, do not improvise a fourth proposal).
@@ -114,10 +116,18 @@ Every figure is read at the review head, not quoted from here.
   byte counts both ways; `cast nonce $APP` → 7; the chunk pointers equal the committed predictions.
 - **The bundle is #203's:** built `widget.js` contains `alpha` 0 times (`grep -c`); built `index.html`
   carries the DNZN salt `0x357836ff…0001` as `featuredSalt` and no `0xf39f…2266` salt (`grep -c` 0).
-- **Regeneration is reproducible under the pin:** on each chain, `make dapp-nodev CHAIN_ID=$CHAIN_ID &&
-  node tools/step4-calldata.mjs --chain $CHAIN_ID --rpc "$RPC" --out calldata` inside `devbox run --`
-  leaves `git status --porcelain` empty at the PR head; every `calldata/$CHAIN_ID/*.hex` is under 65,536
-  characters by `wc -c`; `ls calldata/*/batch.hex` prints nothing.
+- **Regeneration is reproducible under the pin** (amended 2026-11-17, before 4c, on the engineer's
+  finding: once the tool reads the live nonce, the live-read command regenerates pointers at 7, 8, 9 after
+  execution, so the as-written criterion could not hold at a post-execution head). Two measurements, both
+  inside `devbox run --`, on each chain: **(a) pre-execution, at App nonce 4,** `make dapp-nodev
+  CHAIN_ID=$CHAIN_ID && node tools/step4-calldata.mjs --chain $CHAIN_ID --rpc "$RPC" --out calldata`
+  leaves `git status --porcelain` empty — recorded in `HANDOFF.md` with the nonce it read; **(b) at any
+  head, including the review head after 4c,** the same with `--app-nonce 4` in place of `--rpc` leaves
+  `git status --porcelain` empty, and `4` is the nonce RUNBOOK § Uploads names for this upload. Every
+  `calldata/$CHAIN_ID/*.hex` is under 65,536 characters by `wc -c`; `ls calldata/*/batch.hex` prints
+  nothing. ~~on each chain, `make dapp-nodev CHAIN_ID=$CHAIN_ID && node tools/step4-calldata.mjs --chain
+  $CHAIN_ID --rpc "$RPC" --out calldata` inside `devbox run --` leaves `git status --porcelain` empty at
+  the PR head~~
 - **The tool refuses a defaulted nonce:** `node tools/step4-calldata.mjs --chain 11155111 --out /tmp/x`
   with neither `--rpc` nor `--app-nonce` exits non-zero and names the flag; the test in `test/` reds
   when the default is restored (plant it, quote the red, revert).
