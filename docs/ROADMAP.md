@@ -17,7 +17,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 | [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain, and Denizen has ironed out the experience against it | done 2026-10-26 — t01 (#33), t02 (#40), t03 (#52), t04 (#60), t05 (#65), t06 done; Phase 5 signed off by Denizen in [#73](https://github.com/dnznlabs/rake/pull/73) |
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | **done 2026-11-07** — ten tasks (t01–t10), three two-leg reviews (`audits/2026-10-30`, `10-31`, `11-06`), 14 `SECURITY.md` rows, decisions 20–40; `src/` final at `3ad48ec` ([#153](https://github.com/dnznlabs/rake/pull/153)), `FACTORY_SALT`/`APP_SALT` mined against it (decision 37: `0x00D18B5b…`, `0x00A90943…`), `RUNBOOK.md` rehearsed on two anvils with the real Creator key; DNZN's predicted address `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`; criteria 1–8 re-run in [CLOSEOUT.md](milestones/m03/CLOSEOUT.md) |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | in progress — scoped 2026-11-07: seven tasks in four phases (Phase 1 done the same day: the dapp's carried items #164 and the `web3://` gateway in the dev stack #163, the ERC-5219 surface's first real consumer; then Slither as a third audit leg gating the deploy, invariant tests beside it, the runbook for real, then the gateway and a host page, then a scripted wallet session with a signoff line); two decisions open ([#156](https://github.com/dnznlabs/rake/issues/156) the test host, [#157](https://github.com/dnznlabs/rake/issues/157) DNZN's testnet table); needs testnet ETH on two keys and an Etherscan API key |
-| [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; the DNZN fee distribution live at its Sepolia address with the Sepolia table, the Ops vault as owner and a 7-day delay (decision 50); dapp mirrored and widget embedded in one DNZN app | not started |
+| [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; the DNZN fund distribution live at its Sepolia address with the Sepolia table, the Ops vault as owner and a 7-day delay (decision 50); dapp mirrored and widget embedded in one DNZN app | not started |
 | [M06 — Owner integrations](milestones/m06/MILESTONE.md) | Optional, after mainnet. When the connected wallet is a member of the owner rather than the owner, route `propose`/`cancel` into the multisig vault's or Majeur DAO's own submit flow instead of copy-calldata. UI only; no contract change | not started |
 
 ## Order
@@ -732,6 +732,20 @@ convention. Numbered 45 because 44 is taken by
     Rejected: the Creator EOA as owner, as on Sepolia (a 7-day delay guards a mistaken action, not a
     compromised single key, and this contract routes DNZN's fees); `create` then transfer to Ops (two
     extra transactions for a value `create` already takes).
+
+51. **The DNZN distribution is described `DNZN // FUND DISTRIBUTION`, not `FEE`.** Ruled by Denizen on
+    2026-11-17 (Telegram, 00:51–00:53 CST): "we should call our distro 'DNZN // FUND DISTRIBUTION'
+    instead of 'FEE' ... since on our first three projects we're not taking a fee (donation only)";
+    "go for it". `FEE` claimed something the first three projects do not do; `FUND` names what flows
+    through it and stays true if a fee is added later. Cost: none to the address, which depends on the
+    factory and the salt only (`src/Distribution.sol:445`). On every mainnet `DNZN_DESCRIPTION` is the
+    new string at `create`. On Sepolia and Base Sepolia the live distribution keeps `FEE` until its
+    owner (the Creator EOA, decision 50) queues `setDescription` and applies it after the 3,600 s
+    delay — [#209](https://github.com/dnznlabs/rake/issues/209), carried, m04, which doubles as a
+    rehearsal of the owner path before t05's UAT reads the page. Amends the description in decisions
+    42 and 50; the rest of both stands. Design history under `docs/brainstorming/` that says "fee
+    distribution" is left as written. Rejected: `DNZN // DISTRIBUTION` (claims nothing, and says
+    nothing).
 
 ## Findings carried forward
 
