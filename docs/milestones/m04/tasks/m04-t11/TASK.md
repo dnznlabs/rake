@@ -42,6 +42,11 @@ provider (`:74`) live inside.
      the architect's and is not in the repo, so re-run it only if `logs()` has moved since `6394f16`,
      otherwise record this paragraph as the architect's measurement, dated.
 
+   *Amended 2026-11-17 at the review of [#222](https://github.com/dnznlabs/rake/pull/222): the
+   baselines above are re-run at the branch point and recorded in the handoff, not carried from
+   scoping — the test count moved 102 → 105 when #214 merged between scoping and branching, and the
+   plan's "at or after `6394f16`" opened that gap.*
+
    The object, as measured through MetaMask on Base Sepolia (#215) and answered by the proxy:
 
    ```
@@ -132,8 +137,11 @@ provider (`:74`) live inside.
 5. **The browser check**, against a dev stack on spare ports as t01 ran it (`ANVIL_PORT=8745
    APP_PORT=3200`, `make deploy` then `make dapp CHAIN_ID=31337`, `serve app/dist`), the chain shaped
    so the first window is wider than 200 blocks and an entry is ripe: from the seed's owner
-   (`0xf39F…2266`, `--unlocked`) `cast send <featured> "propose(bytes)" $(cast calldata
-   "setDescription(string)" "<new name>")`, then `cast rpc evm_increaseTime 608400` (7 d + 1 h,
+   (`0xf39F…2266`) `cast send --rpc-url <anvil> --unlocked --from 0xf39F…2266 <featured>
+   "propose(bytes)" $(cast calldata "setDescription(string)" "<new name>")` *(amended 2026-11-17 at
+   the review of #222: the flags go before the address, because `cast send`'s trailing arguments are
+   variadic and swallow anything after the signature; the sender flag is `--from` — `--sender` is
+   `forge script`'s, and `cast send --help` lists only `-f, --from <ADDRESS>`)*, then `cast rpc evm_increaseTime 608400` (7 d + 1 h,
    inside `GRACE`) and `cast rpc anvil_mine 0x400`. The featured address is `cast call <factory>
    "predict(bytes32)(address)" 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266000000000000000000000001`.
    Read every DOM figure through playwright; `page errors: none` on every run.
@@ -144,7 +152,10 @@ provider (`:74`) live inside.
      `1034, 625, 409, 312, 156, 98` — the nominal window halves 10,000 → 5,000 → 2,500 → 1,250 →
      625 → 312 → 156 and each probe above the range re-asks the whole range; `changes` carried both
      `queued` rows with their nonces. The same page with `?cap=200` and no `wrap`: **7 per kind**,
-     sizes `1034, 200, 36` — the named cap is read on the first refusal. Record both.
+     sizes `1034, 200, 34` ~~`1034, 200, 36`~~ *(amended 2026-11-17 at the review of #222: the
+     last window is head − 5 × 200 = 34; the plan's figure was wrong by two blocks, and two
+     independent runs at head 1,034 measured 34)* — the named cap is read on the first refusal.
+     Record both.
    - (b) the same with the log provider failing outright. Either point `?rpc=` at a proxy that
      answers every `eth_getLogs` with `{ code: -32603, message: 'Internal JSON-RPC error.' }` and
      forwards the rest, or add a `/*DEV*/`-fenced `&nologs=1` to `capped` that throws that object
@@ -199,7 +210,8 @@ from, so a vacuous pass has nowhere to hide.
   `base-sepolia-rpc.publicnode.com`, whose refusal arrives at HTTP 200 with a parseable cap (#215).
 - `git diff --stat origin/main -- src/ test/*.t.sol .gas-snapshot app/src/widget.js` prints
   nothing; `forge test` unchanged.
-- PR closes #215.
+- PR closes #220 (the task issue; #215 was closed by #218). ~~PR closes #215.~~ *Amended
+  2026-11-17 at the review of #222.*
 
 ## Out of scope
 
