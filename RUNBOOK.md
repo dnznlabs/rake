@@ -651,26 +651,42 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
      swapped. Nothing stops it until 4d's `inflated sha256` differs. The repair is a further vault
      proposal — a corrective `setChunks` with the two pointers in the right order — not a redeploy.
      So the order 1 → 2 is load-bearing in itself, not only relative to the batch.
-   So each piece has a **gate, read from the chain before it is sent**. `App` starts at account nonce
-   1 (the precondition above), and every `add*Chunk` is one CREATE, so the nonce counts the chunks
-   that have landed and the predicted pointers (handoff § The pointers, identical on both chains) say
-   where:
+   So each piece has a **gate, read from the chain before it is sent**. Let ***N*** be the `App`
+   account nonce the calldata was generated for — the precondition above reads it, and § Uploads
+   records it per upload. Every `add*Chunk` is one CREATE, so the nonce counts the chunks that have
+   landed, and the three pointers are `App`'s CREATEs at *N*, *N* + 1 and *N* + 2. **Read them out of
+   the committed calldata rather than retyping them**, which is both shorter and the only form that
+   stays correct across uploads:
+
+   ```sh
+   # the two document pointers, in order, and the widget pointer
+   cast calldata-decode 'setChunks(address[],bool)'   "$(cat calldata/$CHAIN_ID/4-setChunks.hex)"
+   cast calldata-decode 'setWidgetChunks(address[])'  "$(cat calldata/$CHAIN_ID/5-setWidgetChunks.hex)"
+   # the same three, independently, from the nonce — the two must agree
+   for i in $N $((N+1)) $((N+2)); do cast compute-address $APP --nonce $i; done
+   ```
+
+   Those two routes agreeing is itself a check: the first reads what the setters will be told, the
+   second what the EVM will create, and a mismatch means the calldata was generated for a different
+   nonce than the one you are about to execute at.
 
    | before sending | `cast nonce $APP` | `cast code <ptr>` non-empty at |
    |:--|--:|:--|
-   | piece 1 | `1` | nothing yet — both document pointers print `0x` |
-   | piece 2 | `2` | doc 0: `0x0f8132D41Ea16c4536565cb2910EF801c2e35D0D` |
-   | the batch | `3` | doc 0 as above **and** doc 1: `0xAf5f9504714D4D441E836ef626633553ccF730a0` |
-   | (after the batch) | `4` | widget: `0xc39C7643cbfFE57114A1851Af499f1781c0daC8e` — step 4d's check |
+   | piece 1 | *N* | nothing yet — both document pointers print `0x` |
+   | piece 2 | *N* + 1 | doc 0 (the `CREATE` at *N*) |
+   | the batch | *N* + 2 | doc 0 **and** doc 1 (the `CREATE` at *N* + 1) |
+   | (after the batch) | *N* + 3 | widget (the `CREATE` at *N* + 2) — step 4d's check |
 
    Neither the nonce nor a non-empty `cast code` is the gate against the swap: after piece 2
-   executed first, the nonce reads `2` *and* the doc-0 pointer holds code — chunk 1's. Only the
+   executed first, the nonce reads *N* + 1 *and* the doc-0 pointer holds code — chunk 1's. Only the
    **contents** discriminate. Before piece 2, the code at the doc-0 pointer must equal `0x00`
    followed by chunk 0's bytes, which are the `bytes` argument of the committed call:
 
    ```sh
-   CHUNK0=$(cast calldata-decode "addChunk(bytes)" "$(cat calldata/$CHAIN_ID/1-addChunk-0.hex)")
-   [ "$(cast code 0x0f8132D41Ea16c4536565cb2910EF801c2e35D0D --rpc-url "$RPC")" = "0x00${CHUNK0#0x}" ] && echo chunk0-in-place
+   DOC0=$(cast calldata-decode 'setChunks(address[],bool)' \
+            "$(cat calldata/$CHAIN_ID/4-setChunks.hex)" | sed -n '1p' | tr -d '[] ' | cut -d, -f1)
+   CHUNK0=$(cast calldata-decode 'addChunk(bytes)' "$(cat calldata/$CHAIN_ID/1-addChunk-0.hex)")
+   [ "$(cast code $DOC0 --rpc-url "$RPC")" = "0x00${CHUNK0#0x}" ] && echo chunk0-in-place
    ```
 
    (`SSTORE2.write` stores a `0x00` STOP byte then the data, `lib/solady/src/utils/SSTORE2.sol:52`,
@@ -679,10 +695,22 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
    cheap pre-checks; the content equality is what proves the order held. Any other reading is a
    stop and a message to the architect, not a retry.
 
-   Each `executeQueued` is the transaction that runs its call and pays for it, so **set each gas limit
-   by hand** — three figures per chain, § Gas. A wallet's own estimate through a public RPC reports a
-   false `DeploymentFailed()`. Running out of gas reverts that one call and leaves it queued, so it
-   can be sent again with more; the ones already executed stay executed.
+   Each `executeQueued` is the transaction that runs its call and pays for it, so it needs a gas
+   limit. **Estimate, then send estimate + 30%**, and keep § Gas's hand table only as the fallback for
+   an RPC that refuses to estimate:
+
+   ```sh
+   cast estimate --from $ENGINEER <target> "$(cat calldata/$CHAIN_ID/<file>)" --rpc-url "$RPC"
+   ```
+
+   The batch cannot be estimated until its chunks have landed — `CodelessChunk` — so estimate it
+   *between* piece 2 and the batch rather than before piece 1. Measured across all six sends of the
+   2026-11-17 upload, every estimate came back clean from the public RPCs and sat between **2.62%**
+   (Sepolia doc 0) and **7.62%** (the Sepolia batch) above the gas actually used; § Uploads carries
+   the figures. The `DeploymentFailed()` that the hand table exists for is a **wallet-path**
+   observation and did not reproduce on `cast estimate` against either chain. Running out of gas
+   reverts that one call and leaves it queued, so it can be sent again with more; the ones already
+   executed stay executed.
 
 **The one silent misorder, and its repair.** The pointer predictions depend on execution *order*,
 not on the proposals: `App`'s CREATE address is a function of its nonce, and `addChunk` records
