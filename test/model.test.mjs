@@ -359,10 +359,10 @@ test('parseDelay takes the delay the field offers, and refuses the rest', () => 
   assert.deepEqual(got, [604800, 172800, 0, 1800, 3600, 90, 604800, 604800, null, null, null, null, null]);
 });
 
-test('wei reads a decimal deposit, and an empty field is no deposit', () => {
+test('wei reads a decimal deposit, `.5` as `0.5`, and an empty field is no deposit', () => {
   const got = ['1', '0.5', '', '0', '1.000000000000000001', '0.1 ', 'lots', '.5', '1.'].map(wei);
 
-  assert.deepEqual(got, [10n ** 18n, 5n * 10n ** 17n, 0n, 0n, 10n ** 18n + 1n, 10n ** 17n, null, null, null]);
+  assert.deepEqual(got, [10n ** 18n, 5n * 10n ** 17n, 0n, 0n, 10n ** 18n + 1n, 10n ** 17n, null, 5n * 10n ** 17n, null]);
 });
 
 /* EIP-137's own worked example. Derived independently with cast on 2026-10-11:

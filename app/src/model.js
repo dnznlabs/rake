@@ -182,8 +182,9 @@ const Model = (() => {
   /** A decimal amount of ETH as wei. An empty field is `0n`: the deposit is optional. Null is "not a
      number", which the field reports rather than sending. */
   function wei(text) {
-    const s = String(text == null ? '' : text).trim();
+    let s = String(text == null ? '' : text).trim();
     if (!s) return 0n;
+    if (s[0] === '.') s = '0' + s; // `.1` is how people type a tenth
     if (!/^\d+(\.\d+)?$/.test(s)) return null;
     const [whole, frac = ''] = s.split('.');
     if (frac.length > 18) return null;
