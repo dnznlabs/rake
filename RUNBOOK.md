@@ -1013,8 +1013,16 @@ whose `TASK.md` still describes step 4 as a `forge script` the engineer runs.
 **Step 4 is prepared and not yet executed, on either chain** (m04-t08, 2026-11-12). § Step 4 now
 carries the vault procedure, `tools/step4-calldata.mjs` writes the five calldatas and they are
 committed per chain, and the per-call estimates and digests are in that task's `HANDOFF.md`
-§ For Denizen. The rows below stay blank until the upload executes. Criterion 3's chain half is
-still open.
+§ For Denizen. ~~The rows below stay blank until the upload executes. Criterion 3's chain half is
+still open.~~
+
+**Step 4 executed on both chains on 2026-11-16** — Base Sepolia and then Sepolia, three
+`executeQueued` calls each in nonce order, every receipt `status true`. The rows below are filled
+from the chain, and **criterion 3's chain half is closed**: `cast nonce $APP` reads `4` on both, the
+three pointers equal the committed predictions in the right slots, and `chain-doc`'s `inflated
+sha256` and `widget sha256` equal `sha256sum` of each chain's rebuilt bundle. The three submit and
+three `executeQueued` hashes per chain are in this section's 4c `record:` blocks below, and the
+verification figures in m04-t08's `HANDOFF.md` § Step 8's `record:`.
 
 **The route changed on 2026-11-15, before anything was signed**: one `batch` proposal per chain
 through the threshold route, proposed by the engineer and signed by the product owner (§ Step 4).
@@ -1027,6 +1035,143 @@ five per-call files are unchanged; `batch.hex` is added beside them and carries 
 4a). The single `batch.hex` was 109,962 hex characters and the coordination service caps a proposal
 at 65,536 (#188), so step 7 stopped there; calls 1 and 2 go as plain proposals and calls 3–5 as
 `batch345.hex`, executed in nonce order. `batch.hex` is deleted (§ The five calls).
+
+**4a `record:` — both chains are proposed** (2026-11-16; Base Sepolia at 16:57Z, Sepolia at 21:10Z
+after the stop below was lifted). Gates on both chains at **16:54Z**: `isOwner($ENGINEER)` `true`, `threshold()` `2`,
+`nonce()` `3`, `cast nonce $APP` `1`. `make dapp-nodev` and `tools/step4-calldata.mjs` regenerated
+every committed file byte-identical on both chains, `git status --porcelain` empty. The three Base
+Sepolia proposals carry one signature, the engineer's, and were generated at commit **`9fa393f`**:
+
+| proposal | file | target | nonce | digest |
+|--:|:--|:--|--:|:--|
+| 1 | `1-addChunk-0.hex` | `$APP` | 3 | `0xf9996757df4ac60bbf8fad2b779c39ef7c82215390a8a12dc7bf17284706d702` |
+| 2 | `2-addChunk-1.hex` | `$APP` | 4 | `0xa2f30eebdcdc15eaa2ee322bf050796e72a12707b72eb4a38232fb10fa70f9a1` |
+| 3 | `batch345.hex` | `$OWNER` | 5 | `0xc691bc7e6ca4098f7b37ec1207fc0a7389ccead111ad762296d8758ff320f521` |
+
+**Sepolia's nonces 3 and 4 were already occupied when step 7 ran**, by two live proposals from the
+product owner's account `0x357836ff…902b` of 2026-11-16 00:21Z and 00:26Z: at nonce 3 a call to
+`$APP` whose calldata is byte-identical to `2-addChunk-1.hex` (sha256
+`cdb5fe891727c7cb98e26d84e3e0f79acb91b95694fd90da94069da66ca06357`, 42,890 characters), and at
+nonce 4 a second `addOwner($ENGINEER)`, which nonce 2 already executed on both chains. The first is
+**chunk 1 at the nonce chunk 0 must occupy** — the one misorder 4c calls silent: it does not revert,
+and `App` would serve the document's two halves swapped. Proposing calls 1–3 at nonces 3–5 there
+would put two `addChunk` proposals at nonce 3 and leave which one executes to whoever signs, so step
+7 stopped on that chain and escalated rather than competing with it.
+
+**Amended 2026-11-16: that stop rested on a wrong premise, and Sepolia is proposable.** The two rows
+above carry **no signature at all**, and an unsigned proposal is hidden from every owner by design —
+the dapp drops any proposal with no valid owner signature that the chain does not hold queued, with
+only a `console.warn`; its user-facing notice fires only when the signatures could not be *read*,
+which is not this case, so the rows vanish silently. Measured with a paired control, using the query
+the dapp itself sends (`tx_summary` with `signatures(signer,sig_type)` embedded, as anon): Base
+Sepolia's three return one `ecdsa` row each, signer `0x5a158af8…bc50d`; Sepolia's two return `[]`.
+That is why the product owner sees three rows on Base Sepolia and **zero** on Sepolia. The
+`sig_count` column reads `0` on every `proposed` row on both chains and is not a usable signal; the
+embedded rows are. A duplicate-nonce rendering theory was tested and rejected — one mainnet vault
+carries four duplicate-nonce rows and renders.
+
+So the hidden pair never contested nonce 3 as the stop assumed: unsigned, not queued on chain
+(`queued()` returns `0` for both digests), and unsignable through the dapp because it does not
+display them.
+
+**The hazard that remains is bounded by the nonce, and the upload is what closes it.** A signature
+collected outside the dapp is only dangerous if the vault accepts it: `execute()` requires every
+signature slot — ECDSA-recovered or the `v == 0` approval form — to resolve to an address in the
+vault's own owner mapping, so a non-owner's signature is worthless at execution. And the digest is
+nonce-bound: `getTransactionHash` puts `nonce` inside the EIP-712 `Execute` struct hash, and
+`execute()` computes its hash from the live counter it increments, never from a caller-supplied
+nonce (`Multisig.sol` at `e767b88`, lines 85 and 136–137). **Say the window plainly: the hidden
+nonce-3 row is executable only while Sepolia's `nonce()` is exactly 3, and it stops being executable
+the moment that nonce is consumed** — proposal 1 executing at nonce 3 kills its digest permanently,
+and proposal 2 at nonce 4 does the same to the duplicate `addOwner`. It is a real hazard in that
+window; it is not an open door, and it argues for proposing sooner rather than for pruning first.
+
+**Follow-on, not a gate: prune the hidden pair.** It needs the proposer's own address, so it is the
+product owner's. It is **housekeeping, not safety** — once the nonces move it protects nothing. The
+reason it stays on the list is the one that survives the nonce moving: a phantom row an owner can
+neither see nor act on is a trust cost in the dapp every time a key is used on that chain. "Cosmetic"
+here does not mean it never mattered.
+
+**Sepolia's three, proposed 2026-11-16 21:10Z** on the product owner's go. Gates re-read immediately
+before: `isOwner($ENGINEER)` `true`, `threshold()` `2`, `nonce()` **`3`** — unmoved, so the digests
+TASK.md recorded at *N* = 3 still hold — `delay()` `3600`, `cast nonce $APP` `1`. `make dapp-nodev
+CHAIN_ID=11155111` and `node tools/step4-calldata.mjs --chain 11155111` regenerated every committed
+file byte-identical (`git status --porcelain` empty), and each digest was recomputed from the chain
+and compared against TASK.md's value before signing:
+
+| proposal | file | target | nonce | digest | proposal id |
+|--:|:--|:--|--:|:--|:--|
+| 1 | `1-addChunk-0.hex` | `$APP` | 3 | `0xe73c3f13c1b2f66f1d15e53a1cc2cefcd6da67b41599f1273d31e359caca326d` | `62b53064-2768-4da3-adf0-0df130d02b17` |
+| 2 | `2-addChunk-1.hex` | `$APP` | 4 | `0xc1e9b846b07a3c73ad80c4f168c7972b78e0d239342dc530ebe4668fa2d4bc47` | `3ad0d25f-a8d5-477f-9b7e-c01e5eae50b7` |
+| 3 | `batch345.hex` | `$OWNER` | 5 | `0x7d2d3128a3e3ee78c30a10c2e7e2834c9031d57c1c466c9900c91fa8e256c0f5` | `6760a9a5-df96-47b8-a659-5cbe2f45d664` |
+
+Read back through the dapp's own query, all three carry **exactly one** signature, `ecdsa`, signer
+`0x5a158af8…bc50d`, with `value 0`, `threshold 2`, calldata byte-equal to the committed file and the
+digest equal to TASK.md's. **The prediction above held:** the same read returns five rows for that
+vault and the two unsigned ones are still the only hidden pair, so the product owner sees exactly
+three signable rows on Sepolia.
+
+**4c, partial `record:` — Base Sepolia submitted and queued** (2026-11-16, by the product owner).
+Vault `nonce()` moved `3 → 6` and `queued()` is nonzero for all three digests; nothing has reached
+`App` yet. Read from the chain, not from the service:
+
+| proposal | nonce | submit tx | block | `gasUsed` | ETA |
+|--:|--:|:--|--:|--:|:--|
+| 1 | 3 | `0x2425762d26dafd86d303beea53e4bd4e64391f88ed5b96d84901702e30630e2f` | 59706961 | 1,984,890 | `1794866861` · 22:07:41Z |
+| 2 | 4 | `0x913236ed909b8ca76df1ff2d082f714c1a15f00aaddc96864826a418e2f64feb` | 59707098 | 1,773,830 | `1794866888` · 22:08:08Z |
+| 3 | 5 | `0x24b889609e17fc7ad11c8a09afee1d7036848ba9c1c19d5c7745bdc71b983b8a` | 59707756 | 748,940 | `1794867020` · 22:10:20Z |
+
+All three receipts are `status true`. **Two things a later reader will trip on.** First, the submits
+were *relayed*: each `from` is a different EOA (`0xB42F812A…EAD6`, `0xB01caEa8…9C2E`,
+`0xC066ac5D…8B8c`) and each `to` is `0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3`, not the vault and
+not the product owner's account — the signatures are what authorise the call, and with both slots
+ECDSA the vault does not care who sends it. Second, **the `cast receipt <hash> --field gasUsed`
+form this plan prescribes does not run** on the pinned `cast 1.7.1`: the field is positional,
+`cast receipt <hash> gasUsed`. The figures above come from the positional form.
+
+**4c `record:` — Sepolia submitted and queued too** (2026-11-16 22:18Z, by the product owner). Not
+recorded when sent; recovered from the vault's own `Queued(bytes32,uint256,uint256)` logs, topic0
+`0x51c73878…6fdcf39`, one `cast logs --address $OWNER <topic0> <digest>` per digest — the event is
+emitted by `execute()` on the vault, so it is better evidence than the service's rows:
+
+| proposal | nonce | submit tx | block | `gasUsed` | ETA |
+|--:|--:|:--|--:|--:|:--|
+| 1 | 3 | `0xfa83fb4c8bccf54aaaa640f7aa80afeb739369102cef85c4aa1c1a2f1d1df627` | 12149932 | 1,651,608 | `1794867504` · 22:18:24Z |
+| 2 | 4 | `0xec93f725db2d8d362ab0d61ad21597f7d3bd581fc71a2358cf2d40a7a1400924` | 12149934 | 1,483,672 | `1794867528` · 22:18:48Z |
+| 3 | 5 | `0x9005224aa5bcf9af5f0e6d2882d1268f7c6dcf100b6155a59b33d6912fffed8d` | 12149936 | 697,240 | `1794867552` · 22:19:12Z |
+
+All three `status true`. **Sepolia's submits were not relayed the way Base Sepolia's were:** each
+`from` is the product owner's own account `0x357836fFcB45307FA7ff2A574F505753c961902B`, through the
+same relay `to` of `0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3`. The relay contract is constant
+across both chains; the sending EOA is not. Which is why **`from` is never a signer attribution on
+either chain** — the signatures authorise the call and `execute()` does not read `msg.sender`.
+
+**4c `record:` — the six `executeQueued` calls, both chains, 2026-11-16** (by the engineer, on the
+product owner's explicit go of 21:35Z, after every ETA had passed). Pre-send gates re-read on both
+chains at 22:20Z: all six digests recomputed from the chain with `getTransactionHash` and equal to
+4a's table, `queued()` nonzero for all six, every ETA past, vault `nonce()` `6`, `cast nonce $APP`
+**`1`** — nothing had run.
+
+| chain | order | nonce | file | target | `executeQueued` tx | block | `gasUsed` | estimate |
+|:--|--:|--:|:--|:--|:--|--:|--:|--:|
+| Base Sepolia | 1 | 3 | `1-addChunk-0.hex` | `$APP` | `0x542f24c8bff7a15c91f3b9a067472bd5c8a60a5e0f37cf6c9f01d0417e0a0154` | 59729067 | 5,330,923 | 5,555,812 |
+| Base Sepolia | 2 | 4 | `2-addChunk-1.hex` | `$APP` | `0xaaaa14162deb7d56a8cdbc50a71a03366d4f4d62d22004e783fe1738ae7c12bf` | 59729117 | 4,739,420 | 4,961,962 |
+| Base Sepolia | 3 | 5 | `batch345.hex` | `$OWNER` | `0x6fba77ffcc25d2d7a37180b5e19ce40d99436afa4eff96f797ac69281caee533` | 59729165 | 1,939,537 | 2,085,800 |
+| Sepolia | 1 | 3 | `1-addChunk-0.hex` | `$APP` | `0x7d902b542d993503245d4156847f2dc3f27c0f55d23f33a3d03848f3992e44fb` | 12150245 | 37,591,595 | 38,202,423 |
+| Sepolia | 2 | 4 | `2-addChunk-1.hex` | `$APP` | `0xeff1ea245e51e77ce07f51953615412517dd47e9612caff43aa9d3e921555d20` | 12150247 | 33,404,902 | 34,214,503 |
+| Sepolia | 3 | 5 | `batch345.hex` | `$OWNER` | `0x08a15c2649adc1c4051d6e4ff4f9a27233c6227d69831941b6d86cc5ef78805a` | 12150251 | 13,197,961 | 14,043,126 |
+
+All six `status true`, every figure from `cast receipt <hash> gasUsed` positionally. **The order gate
+was read between every send:** `cast nonce $APP` returned `1`, `2`, `3` before orders 1, 2, 3 and `4`
+after the batch, per chain — the table above walked, so the silent misorder was never reachable.
+
+**The hand-set gas limits of § Gas were not needed on these RPCs, and the reason given for them did
+not hold.** `cast estimate --from` the signer returned a clean figure for all six against the same
+public RPCs — no `DeploymentFailed()` — within 2% of the gas actually used every time; what was sent
+was each estimate plus 30% headroom. The batch still cannot be estimated before its chunks land, as
+written; it was estimated after order 2 on each chain. **Keep the table as a fallback and prefer
+estimate-then-send**: the false `DeploymentFailed()` is a wallet-path observation, not an
+`eth_estimateGas` one.
 
 Step 6 has not run on
 either chain:
@@ -1094,9 +1239,10 @@ exit **0** with 0 results. `forge test` **102 passed**, `node --test` **90 passe
 | | 2 | `implementation()` | `IMPL`: `0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0` (9,271 bytes) |
 | 2 | 3 | `App` CREATE2 | tx: `0x6f8d868f381a5b0cda7fd6c397fc63d581ab08593e57d6eb1a318cd13275ad14` · gas: **11,506,694** · addr: `0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE` · block 12,091,543 |
 | | 3 | `owner()` · `version()` · `locked()` | `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790` · `v0.1` · false |
-| 3 | 4 | `addChunk` ×N · `setChunks` | **not run — blocked on M04-D4 (#178)** |
-| 4 | 4 | widget chunks | **not run — blocked on M04-D4 (#178)** |
-| | 4 | `inflated sha256` · `widget sha256` · byte counts | **not run — blocked on M04-D4 (#178)** |
+| 3 | 4 | `addChunk` ×2 · `setChunks` | **done** 2026-11-16 via the vault (m04-t08, § Step 4) · chunk 0 tx `0x7d902b54…f992e44fb` block 12,150,245 gas **37,591,595** · chunk 1 tx `0xeff1ea24…921555d20` block 12,150,247 gas **33,404,902** · `setChunks` inside `batch345` |
+| 4 | 4 | widget chunk · `setWidgetChunks` | **done** · both in `batch345` tx `0x08a15c26…5ef78805a` block 12,150,251 gas **13,197,961** |
+| | 4 | pointers · `cast nonce $APP` | `chunks(0)` `0x0f8132D4…5D0D` · `chunks(1)` `0xAf5f9504…30a0` · `widgetChunks(0)` `0xc39C7643…aC8e`, all equal to the predictions · nonce **4** |
+| | 4 | `inflated sha256` · `widget sha256` · byte counts | `cb2e8301…b99363` = `sha256sum app/dist/index.html` · `21dd3d13…eea24a` = `sha256sum app/dist/widget.js` · 142,949 and 8,144 both ways · `html()` 61,157 bytes, payload 45,358 |
 | 5 | 5 | explorer: factory / implementation / App | all three `Pass`, names `DistributionFactory` / `Distribution` / `App`; URLs below |
 | 6 | 6 | DNZN `create` | not run — Denizen's; `predict($DNZN_SALT)` = `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`, `cast code` `0x` |
 | | 6 | `owner()` on `DISTRO` | not run |
@@ -1120,9 +1266,10 @@ a collision and the successful send that followed it is not a resend.
 | | 2 | `implementation()` | `IMPL`: `0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0` (9,271 bytes) |
 | 2 | 3 | `App` CREATE2 | tx: `0xce1bdad0a3907098277ce40fe412aac1ac56b4bde62879349e4fc67886130e52` · gas: **1,655,660** · addr: `0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE` · block 56,161,508 |
 | | 3 | `owner()` · `version()` · `locked()` | `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790` · `v0.1` · false |
-| 3 | 4 | `addChunk` ×N · `setChunks` | **not run — blocked on M04-D4 (#178)** |
-| 4 | 4 | widget chunks | **not run — blocked on M04-D4 (#178)** |
-| | 4 | `inflated sha256` · `widget sha256` · byte counts | **not run — blocked on M04-D4 (#178)** |
+| 3 | 4 | `addChunk` ×2 · `setChunks` | **done** 2026-11-16 via the vault (m04-t08, § Step 4) · chunk 0 tx `0x542f24c8…17e0a0154` block 59,729,067 gas **5,330,923** · chunk 1 tx `0xaaaa1416…1738ae7c12bf` block 59,729,117 gas **4,739,420** · `setChunks` inside `batch345` |
+| 4 | 4 | widget chunk · `setWidgetChunks` | **done** · both in `batch345` tx `0x6fba77ff…281caee533` block 59,729,165 gas **1,939,537** |
+| | 4 | pointers · `cast nonce $APP` | identical to Sepolia's row — `0x0f8132D4…5D0D`, `0xAf5f9504…30a0`, `0xc39C7643…aC8e`, all equal to the predictions · nonce **4** |
+| | 4 | `inflated sha256` · `widget sha256` · byte counts | `8c235917…576ea3` = `sha256sum app/dist/index.html` · `21dd3d13…eea24a`, the same widget hash as Sepolia · 142,947 and 8,144 both ways · `html()` 61,157 bytes, payload 45,358 |
 | 5 | 5 | explorer: factory / implementation / App | all three `Pass - Verified` this run; URLs below |
 | 6 | 6 | DNZN `create` | not run — Denizen's; `predict($DNZN_SALT)` = `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`, `cast code` `0x` |
 | | 6 | `owner()` on `DISTRO` | not run |
