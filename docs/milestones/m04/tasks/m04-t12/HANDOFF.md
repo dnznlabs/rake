@@ -1,6 +1,6 @@
 # m04-t12 — handoff
 
-PR: not opened — reserved (§ Deviations 11) · Branch: `m04/t12-log-cache` · 2026-11-17
+PR: [#227](https://github.com/dnznlabs/rake/pull/227) · Branch: `m04/t12-log-cache` · 2026-11-17
 
 Decision 52's store was built in three parts: `splitFinal`, `evict` and `mergeHist` in `model.js`,
 driven under node; one IndexedDB database `rake.logs` in `index.html`, keyed `[chainId, address]`,
@@ -12,28 +12,31 @@ control. A second load of a distribution page now costs one `eth_getLogs` per ki
 pays one per window of the whole history (AC 1), and the three sections' rows do not move across the
 two (AC 2).
 
-Code head `a837fd2`, the last commit to touch `app/` or `test/`; `git diff a837fd2..HEAD -- app/ test/`
-is empty, so every figure below was read on that tree and none is quoted from the plan. Each figure is
-stated once, in its criterion's row; the sections after § Open questions are the artifacts the plan
-asks for by name, and they reference the rows rather than restate them. The planted reds are numbered
-in § The planted reds and cited from the row that needed each.
+Code head `6aae040`, the last commit to touch `app/` or `test/`; `git diff 6aae040..HEAD -- app/ test/`
+is empty, so every figure below was read on that tree and none is quoted from the plan. The #227 review
+found one bug in the `clear cache` path, fixed at that commit (red 7, AC 8 and AC 9); because the fix
+is in a path the check exercises, the whole browser check was re-run at that head against a freshly
+deployed stack, and every browser figure below is that one run's rather than the first run's. Each
+figure is stated once, in its criterion's row; the sections after § Open questions are the artifacts
+the plan asks for by name, and they reference the rows rather than restate them. The planted reds are
+numbered in § The planted reds and cited from the row that needed each.
 
 ## Acceptance criteria
 
 | AC | Result | Evidence |
 |:---|:-------|:---------|
-| 1 | pass | Step 7(a), store empty, `?win=100`: `self.__LOGREQ` grouped by `kind` = **11 / 11 / 11, total 33**, spans `[941,1040] [841,940] [741,840]` — 100 blocks wide, and 11 = ⌈1040 ÷ 100⌉. Step 7(b) reload: **1 / 1 / 1, total 3**, every span `[977,1040]`, the tail above `finalized` 976. `≤ 1 per kind: true · ≤ 3 total: true`. The plant this criterion names is red 6. |
+| 1 | pass | Step 7(a), store empty, `?win=100`: `self.__LOGREQ` grouped by `kind` = **11 / 11 / 11, total 33**, spans `[944,1043] [844,943] [744,843]` — 100 blocks wide, and 11 = ⌈1043 ÷ 100⌉. Step 7(b) reload: **1 / 1 / 1, total 3**, every span `[980,1043]`, the tail above `finalized` 979. `≤ 1 per kind: true · ≤ 3 total: true`. The plant this criterion names is red 6. |
 | 2 | pass | The DOM text of `funds`, `h-changes` and `h-funds` after 7(a) and after 7(b): `byte-equal funds: true · byte-equal changes: true · byte-equal activity: true` — compared as strings in the browser, not by eye. The three texts are carried once in § The browser check. |
-| 3 | pass | Step 7(c): the record's `through` 976 against head 1040. `evm_snapshot`; pay Ξ0.55 → block 1041, above `finalized`; load → the page shows `Ξ0.5500` and the record's `through` is **977**, so the log was shown and not kept. `evm_revert`; pay Ξ0.99 at the same height; reload → `shows 0.9900: true · shows 0.5500: false`. The plants are reds 5 and 5a. |
+| 3 | pass | Step 7(c): the record's `through` 979 against head 1043. `evm_snapshot`; pay Ξ0.55, which lands above `finalized`; load → the page shows `Ξ0.5500` and the record's `through` is **980**, so the log was shown and not kept. `evm_revert`; pay Ξ0.99 in its place; reload → `shows 0.9900: true · shows 0.5500: false`, the replacement painting at block 1044. The plants are reds 5 and 5a. |
 | 4 | pass | Step 7(d): 50 fresh records one minute apart plus one visited 31 days ago, written through `page.evaluate` against the open database → 51 records; a load → **count 50**, the 31-day record gone. Then a distribution not among the 50 (the escrow demo, salt 2) → **count 50**, the least recently visited seeded key `0xbeef…0049` gone and the new distribution in the store. `Model.evict` is pinned in `test/model.test.mjs` with four age-and-cap rows rather than the plan's three (§ Deviations 2); the predicted reds are 2, 2a, 3 and 3a. |
 | 5 | pass | Step 7(e), `indexedDB` redefined as `undefined` by `page.addInitScript` and confirmed tripping (`typeof self.indexedDB` → `undefined`): two consecutive loads of **11 / 11 / 11, total 33** each, both equal to 7(a), and the three section texts equal to 7(a) on both. The Cache section renders its storage-unavailable line (quoted in § For Denizen) and the control is `<button class="btn off sm" disabled="">clear cache</button>`. |
-| 6 | pass | `make dapp-nodev CHAIN_ID=11155111` at the head → `dapp: raw 149592 bytes · gzip 47629 bytes · chain 11155111` and `widget: raw 8132 bytes · budget 10240 · 2108 left`; `wc -c app/dist/widget.js` → **8132**, unchanged. The gzip delta is **+2,252** against the plan's baseline 45377 and **+2,094** against `origin/main` at `1a5a211`, re-measured today at 45535 (§ Deviations 1). |
-| 7 | deferred | The brief that dispatched this task reserves the PR — "Do NOT open a PR — report back and I will" — so nothing in this branch closes [#165](https://github.com/dnznlabs/rake/issues/165). The closing comment is drafted ready to post in § For the PR (§ Deviations 11). |
-| 8 | pass | Step 7(f), one distribution load then a fresh load of `#/docs` so nothing is open behind it: the press leaves `0 distributions cached · about 0 bytes` in the section and `count()` through `page.evaluate` → **0**. The next distribution load → **11 / 11 / 11, total 33**, equal to 7(a). With a distribution page open behind the docs route (reached by hash, so `DS` keeps it) the press issued **33** `eth_getLogs` — the re-read the step asks for — and repainted the same rows AC 2 compares. |
-| 9 | pass | Step 7(g), after exactly **two** loads of one distribution page (7a and 7b), so one record: the section printed `1 distribution cached · about 6618 bytes`; `count()` and the summed `JSON.stringify` length read through `page.evaluate` outside the page gave `{"count":1,"bytes":6618}`. `count matches: true · bytes match: true`. |
+| 6 | pass | `make dapp-nodev CHAIN_ID=11155111` at the head → `dapp: raw 149619 bytes · gzip 47636 bytes · chain 11155111` and `widget: raw 8132 bytes · budget 10240 · 2108 left`; `wc -c app/dist/widget.js` → **8132**, unchanged. The gzip delta is **+2,259** against the plan's baseline 45377 and **+2,101** against `origin/main` at `1a5a211`, re-measured today at 45535 (§ Deviations 1). |
+| 7 | pass | [#227](https://github.com/dnznlabs/rake/pull/227) carries the closing reference: `gh pr view 227 --json closingIssuesReferences` → `#165` and `#221`, so GitHub closes [#165](https://github.com/dnznlabs/rake/issues/165) on merge. The closing comment carrying criterion 1's counts is on #165 as [`issuecomment-6960250350`](https://github.com/dnznlabs/rake/issues/165#issuecomment-6960250350), posted 2026-11-17 20:35:11Z; its text is § For the PR's. The product owner opened the PR and posted the comment, not me (§ Deviations 11). |
+| 8 | pass | Step 7(f), one distribution load then a fresh load of `#/docs` so nothing is open behind it: the press leaves `0 distributions cached · about 0 bytes` in the section and `count()` through `page.evaluate` → **0**. The next distribution load → **11 / 11 / 11, total 33**, equal to 7(a). With a distribution page open behind the docs route (reached by hash, so `DS` keeps it) the press issued **33** `eth_getLogs` — the re-read the step asks for — and repainted the same rows AC 2 compares. That re-read writes the record back, which is the case red 7 caught; the section's figure once it lands is AC 9's. |
+| 9 | pass | Step 7(g), after exactly **two** loads of one distribution page (7a and 7b), so one record: the section printed `1 distribution cached · about 6621 bytes`; `count()` and the summed `JSON.stringify` length read through `page.evaluate` outside the page gave `{"count":1,"bytes":6621}`. `count matches: true · bytes match: true`. The same comparison after `clear cache` with a distribution page open behind the docs route, waited on the store rather than on a sleep (`count() > 0`, then the section read): store `{"count":1,"bytes":6621}` against a section printing `1 distribution cached · about 6621 bytes` — `count matches: true · bytes match: true · PASS: true`. Red 7 is that case before the fix at `6aae040`. |
 | 10 | pass | `devbox run -- node --test test/docs.test.mjs` → `ℹ tests 12 · ℹ pass 12 · ℹ fail 0`, with `:95` asserting `15`, the title at `:88` reworded to "fifteen sections" and one test added, `the Cache section says what is stored, the eviction rule and carries the clear control`. `grep -rniE '\btip\b\|govUrl\|about:\|ownerKind' app/src \| wc -l` → **4**, as the baseline is 4: the same four `ownerKind` reads, which at this head sit at `model.js:95`, `model.js:342`, `index.html:1752` and `index.html:1758` (`:291`, `:1601`, `:1607` before this task's lines pushed them down), and nothing new. The three reference-file tests (`the snapshot struct…`, `every Distribution signature…`, `the factory table…`) are untouched and pass in that run. |
 | 11 | pass | At the head: `grep -ic indexeddb app/src/index.html` → **5** (baseline 0); `grep -ic finalized` → **6** (baseline 0); `grep -c eth_getBlockByNumber` → **2** (baseline 1 — the clock's `latest` read and `fin()`'s); `grep -ic '43,200 a day'` → **0** (baseline 1); `grep -ic 'id="s-cache"'` → **1** (baseline 0). That last pattern must keep its quotes: unquoted it reads `0` on the same tree, so re-run it quoted. |
-| 12 | pass | `git diff --stat origin/main -- src/ test/*.t.sol .gas-snapshot RUNBOOK.md scripts/ calldata/` → empty, and `git status --porcelain` → empty after `make dapp-nodev CHAIN_ID=11155111`. `node --test test/*.test.mjs` → `ℹ tests 121 · ℹ pass 121 · ℹ fail 0`, above the 102 the plan quotes and above the 109 re-measured at the branch point; the 12 added tests are named in § The tests added. `forge test` → `107 tests passed, 0 failed` in 7 suites, unchanged from `main`. `make fmt` (`forge fmt --check`) exit 0; `forge lint` exit 0 with no finding; `forge snapshot --check` exit 0 after `forge build --force`. CI green at the code head — run [44166498439](https://github.com/dnznlabs/rake/actions/runs/44166498439), `completed success` in 3m54s — and every one of its steps was run locally through the pin first (secrets `scanned ~15720516 bytes`, `forge build --force` with 0 `warning[` and 0 `Warning (`, `make fmt`, `make test`, `forge snapshot --check` exit 0, `make slither` → `6 contracts with 75 detectors, 0 result(s) found`, working tree clean). |
+| 12 | pass | `git diff --stat origin/main -- src/ test/*.t.sol .gas-snapshot RUNBOOK.md scripts/ calldata/` → empty, and `git status --porcelain` → empty after `make dapp-nodev CHAIN_ID=11155111`. `node --test test/*.test.mjs` → `ℹ tests 121 · ℹ pass 121 · ℹ fail 0`, above the 102 the plan quotes and above the 109 re-measured at the branch point; the 12 added tests are named in § The tests added. `forge test` → `107 tests passed, 0 failed` in 7 suites, unchanged from `main`. `make fmt` (`forge fmt --check`) exit 0; `forge lint` exit 0 with no finding; `forge snapshot --check` exit 0, run after `forge build --force`, which compiled with 0 `warning[` and 0 `Warning (`. All of those were re-run locally through the pin at the code head. CI green there too: the `push` run [44178425532](https://github.com/dnznlabs/rake/actions/runs/44178425532) `completed success` in 4m10s with all twelve steps green, and the `pull_request` run [44178437816](https://github.com/dnznlabs/rake/actions/runs/44178437816) likewise. Its betterleaks and slither steps ran there rather than locally at this head; both are green in that run. |
 
 ## Deviations from the plan
 
@@ -84,18 +87,28 @@ in § The planted reds and cited from the row that needed each.
 10. **Step 6 says "Base Sepolia"; the comment now says "the Base chains".** Authorised by the architect
     on 2026-11-17 in the dispatching brief, and § The baselines is why: Base mainnet mints at the same
     rate as Base Sepolia, so the narrower wording would have been wrong about mainnet.
-11. **AC 7 is deferred because the PR is reserved.** The brief's instruction is quoted in AC 7's row.
-    The closing comment is written and ready in § For the PR rather than posted.
+11. **The PR was opened by the product owner, not by me.** The brief that dispatched this task reserved
+    it — "Do NOT open a PR — report back and I will" — so the branch was handed over at `de3180d`
+    instead, and #227 and its closing comment discharge AC 7 (its row). § For the PR keeps the comment's
+    text as it was handed over.
 12. **`ls .git/hooks | grep -v sample` cannot run in this worktree**, where `.git` is a file rather than
-    a directory, so the hook check § 0 prescribes reads nothing. Read at the common directory instead:
-    `ls /home/openclaw/src/rake/.git/hooks | grep -v sample` → `pre-commit`, `post-commit`, which is
-    § 0's answer.
+    a directory, so the hook check § 0 prescribes reads nothing here. Run against the repository's
+    common git directory instead, where it answers `pre-commit`, `post-commit` — § 0's answer. Both
+    hooks ran on every commit on this branch.
+13. **The `clear cache` path was fixed after the #227 review**, at `6aae040`: the section is painted a
+    second time when the re-read's write-back lands. The plan's § 4 asks for the control to clear the
+    store and re-read an open distribution's history, which it did; what it did not say, and what the
+    review caught, is that the figures the section prints are read before that write-back and so sat at
+    zero over a store holding a record. Red 7 is that state measured; AC 8 and AC 9 carry the case, and
+    the browser check gained it (§ The browser check).
 
 ## Decisions
 
 - **The check's chain and window**, which § Open questions leaves to the engineer: `?win=100` over a
-  chain of 1,040 blocks — three ETH payments of 0.11, 0.22 and 0.33 at blocks 13, 14 and 15, one
-  `setDescription` proposed at block 16, then `anvil_mine 0x400`. That puts the whole shaped history
+  chain of about 1,040 blocks — three ETH payments of 0.11, 0.22 and 0.33 and one `setDescription`
+  proposal, all inside the first twenty blocks, then `anvil_mine 0x400`. The exact heights move with
+  what `make deploy && make fixtures` leaves behind, so the head and boundary each run measured are in
+  AC 1 and AC 3 rather than here. That puts the whole shaped history
   far below `finalized` on the first load, so the tail is one window on the second; the counts and
   boundaries it produced are AC 1's and AC 3's. Default anvil, not `--slots-in-an-epoch 1`, because
   step 7(c) needs head − 64: a payment at the head is then above `finalized` by construction.
@@ -195,6 +208,21 @@ reverted Ξ0.55 payment at block 1052 stayed at the top of activity and in the r
 **11 / 11 / 11, total 33**, `≤ 1 per kind: false · ≤ 3 total: false`. The three section texts stayed
 byte-equal under this plant, so AC 2 alone cannot catch it; AC 1 is the row that does.
 
+**7 · the Cache section not repainted when the write-back lands** — the #227 review's finding, which
+is the code as it stood at `de3180d` rather than a plant, measured by running the new case against that
+build before fixing it (AC 8, AC 9):
+
+```
+store after the write-back: {"count":1,"bytes":6621}
+section after the write-back: 0 distributions cached · about 0 bytesclear cache
+count matches: false · bytes match: false
+PASS: false
+```
+
+The press's own repaint is right at the instant it runs; what was missing is the second one, after the
+re-read it starts puts the record back. The same case at `6aae040` is AC 9's figure. It is the only
+criterion whose check needed adding after the review, and the only code change at that commit.
+
 ## The browser check
 
 The three section texts AC 2 compares, read at step 7(a) and byte-equal after 7(b). The chain is
@@ -202,21 +230,24 @@ The three section texts AC 2 compares, read at step 7(a) and byte-equal after 7(
 `0x9b407e3c98fdb820203275919A90A056275e1e37` on anvil 31337.
 
 - `funds` — `ETHwaiting to distributeΞ1.6600distribute0x68B1…1aedwaiting to distribute · 40000000000000000000 raw held in escrow0 rawdistributeescrowed · 0x68B1…1aed0x7099…79C8 — the push failed, so this share waits here40000000000000000000 rawreleaseanyone can call distribute() — the contract splits by the table above; you pay the gas.Paying in from a contract with .transfer() or .send() can fail when the implementation is cold: the 2,300-gas stipend does not cover a clone's delegatecall to a cold implementation. Pay in with call and gas.`
-- `h-changes` — `queuedsetDescription · new name · DNZN fees - revised · nonce 2 · 6d 23hblock 16 · 0xbab4…3a70queuedsetBeneficiaries · new table · 40% / 60% · nonce 1 · 6d 23hblock 4 · 0xb0db…705d`
-- `h-funds` — `inΞ0.3300 from 0xf39F…2266block 15 · 0x38a1…b30einΞ0.2200 from 0xf39F…2266block 14 · 0xc85e…0214inΞ0.1100 from 0xf39F…2266block 13 · 0xdd82…da2bdistributed100000000000000000000 raw 0x68B1…1aed by the tableblock 12 · 0x4ccf…4014escrowed40000000000000000000 raw 0x68B1…1aed · 0x7099…79C8block 12 · 0x4ccf…4014inΞ1.0000 from 0xf39F…2266block 4 · 0xdf97…aa8c`
+- `h-changes` — `queuedsetDescription · new name · DNZN fees - revised · nonce 2 · 6d 23hblock 19 · 0xee47…cd45queuedsetBeneficiaries · new table · 40% / 60% · nonce 1 · 6d 23hblock 4 · 0xb0db…705d`
+- `h-funds` — `inΞ0.3300 from 0xf39F…2266block 18 · 0xbdc7…efaeinΞ0.2200 from 0xf39F…2266block 17 · 0xe029…21c4inΞ0.1100 from 0xf39F…2266block 16 · 0x2f56…2115distributed100000000000000000000 raw 0x68B1…1aed by the tableblock 15 · 0x4ccf…4014escrowed40000000000000000000 raw 0x68B1…1aed · 0x7099…79C8block 15 · 0x4ccf…4014inΞ1.0000 from 0xf39F…2266block 4 · 0xdf97…aa8c`
 
-`page errors: none` in every one of the seven runs, as t01's check recorded it. The whole check was run
-twice end to end against the same dev build with the same result on every row; the second run's record
-carries `through` 977 rather than AC 3's 976, the chain having advanced one block under the first run's
-`evm_revert`.
+`page errors: none` in all six browser contexts the check opens, as t01's check recorded it. The record
+behind these rows reads `chainId 31337 · first 1 · schema 1 · changes 2 · funds 6 · ins 0`, its boundary
+being AC 1's.
+The check was run twice at this head — once for the `clear cache` case alone, to plant and then clear
+red 7, and once end to end — with the same result on every row.
 
 **That the page read `?win=100` was confirmed against the build under test** rather than inferred:
 `WINDOW_START` read through `page.evaluate` is `100`, `MAX_WINDOWS` is `40` and `WINDOW_INFLIGHT` `4`,
 neither retuned (§ Out of scope), and every window span in `__LOGREQ` is 100 blocks wide (AC 1). The
 same read against the **ship** bundle answers `10000`, so the `/*DEV*/` fences hold and `?win=` reaches
-nothing that ships. That reading cost a cycle first: `app/dist` held the `dapp-nodev` build when it was
-taken, and the ship bundle ignores `?win=` and `?rpc=` by design, so the first answer was `10000` and
-meant only that the wrong artifact was under the browser.
+nothing that ships. That reading cost a cycle on both runs, the same way each time: AC 6's
+`make dapp-nodev` leaves the ship bundle in `app/dist`, and the ship bundle ignores `?win=` and `?rpc=`
+by design, so a proof taken after it answers `10000` and means only that the wrong artifact was under
+the browser. `make dapp` is rebuilt before the proof is read, and the `__LOGREQ` counter's presence in
+`app/dist/index.html` is what tells the two bundles apart.
 
 ## The baselines, re-measured
 
@@ -306,8 +337,9 @@ disabled (AC 5).
 
 ## For the PR
 
-#165's closing comment, ready to post. It carries AC 1's counts in full because it is published outside
-this handoff, where a reference to a row would mean nothing:
+#165's closing comment as it was handed over, and as it stands on the issue (AC 7). It carries AC 1's
+counts in full because it is published outside this handoff, where a reference to a row would mean
+nothing; the chain length it names is the first run's, the run it was written from:
 
 > Closed by decision 52's store (m04-t12). The window budget is 40 per log kind, so a load of a
 > distribution older than the budget paid up to 120 `eth_getLogs`. It now pays that once per device:
