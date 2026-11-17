@@ -14,8 +14,8 @@ globalThis.Eth = Eth;
 
 const { SNAPSHOT_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt } = Model;
 const { revertMessage, tableFrom, parseDelay, wei, namehash } = Model;
-const { windows, rangeCap, isPruned } = Model;
-const FUNCTIONS = ['countdown', 'dateText', 'deadline', 'decodePending', 'isPruned', 'namehash', 'ownerChange', 'ownerKind', 'parseDelay', 'pct', 'rangeCap', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei', 'windows'];
+const { windows, rangeCap, isPruned, isWrappedRefusal, nonceOf } = Model;
+const FUNCTIONS = ['countdown', 'dateText', 'deadline', 'decodePending', 'isPruned', 'isWrappedRefusal', 'namehash', 'nonceOf', 'ownerChange', 'ownerKind', 'parseDelay', 'pct', 'rangeCap', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei', 'windows'];
 const SET_BENEFICIARIES = 'setBeneficiaries((address,uint96,string,string)[])';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/abi');
@@ -467,4 +467,81 @@ test('isPruned tells a provider that dropped the blocks from one that refused th
   ];
 
   assert.deepEqual(got, [true, false, false, false]);
+});
+
+/* The four refusal objects this file asserts against are what the endpoints and the wallet actually
+   answered, not shapes invented for the test: the three provider objects were measured directly on
+   2026-11-07 (m04-t01 § The provider caps) and 2026-11-17, and WRAPPED is what MetaMask handed the
+   page on Base Sepolia on 2026-11-17 in place of PROVIDER_413's body (#215). The pairing is the
+   point — the same refusal, once with its text and once without. */
+const WRAPPED = { code: -32080, message: 'RPC endpoint returned HTTP client error.', data: { httpStatus: 413, cause: null } };
+const PROVIDER_50K = { code: -32701, message: 'exceed maximum block range: 50000' };
+const PROVIDER_413 = { code: -32614, message: 'eth_getLogs is limited to a 200 range' };
+const PROVIDER_PRUNED = { code: 4444, message: 'pruned history unavailable' };
+
+test('isWrappedRefusal catches the wallet-substituted refusal by its shape, since its text has none', () => {
+  const got = [
+    isWrappedRefusal(WRAPPED),
+    isWrappedRefusal({ code: -32080 }),
+    isWrappedRefusal({ code: -32603, data: { httpStatus: 413 } }),
+  ];
+
+  assert.deepEqual(got, [true, true, true]);
+});
+
+test('isWrappedRefusal is false for a provider that kept its text, and for what is not an error object', () => {
+  const got = [
+    isWrappedRefusal(PROVIDER_50K),
+    isWrappedRefusal(PROVIDER_413),
+    isWrappedRefusal(PROVIDER_PRUNED),
+    isWrappedRefusal({ data: { httpStatus: 500 } }),
+    isWrappedRefusal({ code: 4001 }),
+    isWrappedRefusal(null),
+    isWrappedRefusal('RPC endpoint returned HTTP client error.'),
+  ];
+
+  /* The last two matter most: the string is the *message* of the object that is true above, so a
+     predicate reading text rather than shape would pass it and this test would not discriminate. */
+  assert.deepEqual(got, [false, false, false, false, false, false, false]);
+});
+
+/* The two queued entries below were read off a local anvil with
+     cast logs --address <distribution> "Queued(bytes32,uint32,uint256,bytes)" --json
+   on 2026-11-17: topic 1 is the hash, the first data word the nonce. The seed's
+   `setBeneficiaries` is nonce 1 and a `setDescription` proposed after it is nonce 2. They are here
+   because `nonceOf` has to reproduce a hash the *contract* computed, so a hand-built fixture would
+   only prove the function agrees with itself. */
+const SEED_ENTRY = {
+  nonce: 1,
+  hash: '0xb0d3eaa3efaed98bd18f058376bb221b0aa6b8e3ac19aac3fe2dcf2bc092331d',
+  action: '0x8868f49000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000001400000000000000000000000003c44cdddb6a900fa2b585dd299e03d12fa4293bc0000000000000000000000000000000000000000000000000000000000000fa0000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000036f70730000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a6f7065726174696f6e730000000000000000000000000000000000000000000000000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c80000000000000000000000000000000000000000000000000000000000001770000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000000874726561737572790000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+};
+const RENAME_ENTRY = {
+  nonce: 2,
+  hash: '0x8dec66a02d2ab698c27257db26d68e84a7c8b3583c0a1bcc447cd23a51b89c94',
+  action: '0x90c3f38f00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000013444e5a4e2066656573202d2072656e616d656400000000000000000000000000',
+};
+
+test('nonceOf recovers the nonce a queued hash commits to, without reading a log', () => {
+  assert.equal(nonceOf(RENAME_ENTRY.hash, RENAME_ENTRY.action, 2), 2);
+  assert.equal(nonceOf(SEED_ENTRY.hash, SEED_ENTRY.action, 2), 1);
+
+  /* `upTo` is the snapshot's `nonce`, so a value below the entry's own cannot reach it. */
+  assert.equal(nonceOf(RENAME_ENTRY.hash, RENAME_ENTRY.action, 1), undefined);
+  assert.equal(nonceOf(RENAME_ENTRY.hash, RENAME_ENTRY.action, 0), undefined);
+
+  /* A hash arrives from a log or a snapshot, and case is not guaranteed either way. */
+  const upper = '0x' + RENAME_ENTRY.hash.slice(2).toUpperCase();
+  assert.equal(nonceOf(upper, RENAME_ENTRY.action, 2), 2);
+
+  /* The hash commits to the action as well as the nonce, so the wrong action finds nothing —
+     which is what stops a mismatched pair being applied with a guessed nonce. */
+  assert.equal(nonceOf(RENAME_ENTRY.hash, SEED_ENTRY.action, 2), undefined);
+});
+
+test('the wrapped shape leaves the text classifiers exactly as they were', () => {
+  assert.deepEqual([rangeCap(PROVIDER_50K.message), rangeCap(PROVIDER_413.message)], [50_000, 200]);
+  assert.equal(rangeCap(WRAPPED.message), null);
+  assert.equal(isPruned(PROVIDER_PRUNED.message), true);
+  assert.equal(isPruned(WRAPPED.message), false);
 });

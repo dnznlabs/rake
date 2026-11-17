@@ -231,6 +231,56 @@ const Model = (() => {
     return /pruned history/i.test(String(message == null ? '' : message));
   }
 
+  /* A third shape, and the only one with no range left in its text: the wallet's own object,
+     substituted for whatever the provider said. Measured through MetaMask on Base Sepolia on
+     2026-11-17 (#215), where `sepolia.base.org` refuses an over-range `eth_getLogs` at the
+     *transport* level — HTTP 413, with `-32614 eth_getLogs is limited to a 200 range` in the body —
+     and MetaMask discards that body and hands the page
+
+         { code: -32080, message: 'RPC endpoint returned HTTP client error.',
+           data: { httpStatus: 413, cause: null } }
+
+     The identical refusal from publicnode arrives at HTTP 200 with its body intact, which is the
+     whole reason `rangeCap` works on Sepolia and found nothing on Base Sepolia. So `CAPS` cannot be
+     widened to catch this: there is no number and no word of range left to match. The *shape* is the
+     only evidence the substitution leaves — hence an error-object predicate rather than another
+     regex, and hence this is not `rangeCap`'s to answer. */
+
+  /** Whether an error is a range refusal a wallet rewrote, leaving no range in its text: code
+     `-32080`, or any object carrying an HTTP 413. Shrinks the window like any other nameless
+     refusal — `rangeCap` is `null` for it by construction, so the caller halves. Takes the error
+     *object*: a string or `null` cannot carry the shape, and is not this. */
+  function isWrappedRefusal(e) {
+    if (e == null || typeof e !== 'object') return false;
+    if (e.code === -32080) return true;
+    const d = e.data;
+    return d != null && typeof d === 'object' && d.httpStatus === 413;
+  }
+
+  /* Recovering a queued entry's nonce without reading a log. `propose` commits to
+     `keccak256(abi.encode(action, nonce))` (`src/Distribution.sol:224`) and `applyQueued` recomputes
+     the same hash from the arguments it is handed (`:243`), so the nonce is not extra information the
+     chain only emits in an event — it is determined by the hash and the action together, and
+     `snapshot()` already returns both the `pending` entries and `nonce`, the count of everything ever
+     proposed. Searching down from that count finds it in at most `nonce` keccaks.
+
+     This exists because the apply control used to take the nonce from the `Queued` logs, so a failed
+     history read disabled a button whose transaction never needed the logs at all (#215). Cost,
+     measured on node v24.12.0 on this host: 10 candidates 6.6 ms, 100 → 22 ms, 1,000 → 187 ms. A
+     distribution's `nonce` is its lifetime proposal count, so this is single-digit milliseconds per
+     paint for anything real. */
+
+  /** The nonce `hash` commits to for `action`, searching `upTo` down to 1, or `undefined` when none
+     reproduces it. Downwards because the entries a page is about to apply are the recent ones. */
+  function nonceOf(hash, action, upTo) {
+    const want = String(hash == null ? '' : hash).toLowerCase();
+    for (let n = Number(upTo); n >= 1; n--) {
+      const h = '0x' + Eth.keccak(Eth.hexBytes(Eth.enc('x(bytes,uint32)', [action, n]).slice(10)));
+      if (h.toLowerCase() === want) return n;
+    }
+    return undefined;
+  }
+
   /** EIP-137 namehash, over eth.js's own keccak. */
   function namehash(name) {
     let node = '0'.repeat(64);
@@ -238,6 +288,6 @@ const Model = (() => {
     return '0x' + node;
   }
 
-  return { SNAPSHOT_T, BENEFICIARY_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash, windows, rangeCap, isPruned };
+  return { SNAPSHOT_T, BENEFICIARY_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash, windows, rangeCap, isPruned, isWrappedRefusal, nonceOf };
 })();
 export default Model;
