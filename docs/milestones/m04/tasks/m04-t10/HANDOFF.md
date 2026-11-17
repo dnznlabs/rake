@@ -24,7 +24,7 @@ this upload filled in as it ran.
 | regeneration reproducible under the pin — **(a)** pre-execution at App nonce 4 | pass | run before 4c, when it was still possible: `make dapp-nodev CHAIN_ID=$CHAIN_ID && node tools/step4-calldata.mjs --chain $CHAIN_ID --rpc "$RPC" --out calldata` inside `devbox run --`, both chains. The tool read `App` nonce **4** from each chain and `git status --porcelain` was **empty**. Recorded with the nonce it read, at ~15:30Z, in the engineer's daily note `~/.openclaw/workspace/memory/2026-11-17.md` § m04-t10 — the perishable half |
 | regeneration reproducible under the pin — **(b)** `--app-nonce 4` at the review head | pass | re-run at this PR's head, **after** 4c, both chains: the same command with `--app-nonce 4` in place of `--rpc` leaves `git status --porcelain` **empty**. `4` is the nonce RUNBOOK § Uploads names for rows 1 and 2 |
 | every `calldata/$CHAIN_ID/*.hex` under 65,536 characters; no `batch.hex` | pass | `wc -c` largest is `1-addChunk-0.hex` at **48,138** chars (17,398 spare); then 42,954 / 42,890, `batch345.hex` 18,314, `3-addWidgetChunk.hex` 16,458, `4-setChunks.hex` 330, `5-setWidgetChunks.hex` 202. `ls calldata/*/batch.hex` → `No such file or directory` |
-| the tool refuses a defaulted nonce | pass | `node tools/step4-calldata.mjs --chain 11155111 --out /tmp/x` with neither flag exits **2**, prints `refusing to guess \`App\`'s nonce` and names both `--rpc` and `--app-nonce`; `/tmp/x` is not created |
+| the tool refuses a defaulted nonce | pass | `node tools/step4-calldata.mjs --chain 11155111 --out /tmp/x` with neither flag exits **2**, prints `refusing to guess \`App\`'s nonce` and names both `--rpc` and `--app-nonce`; `/tmp/x` is not created. Measured twice: with `app/dist/` present, and with it **absent**, which is CI's condition and the one that found the ordering defect in § Discoveries |
 | the test reds when the default is restored | pass | planted the pre-change behaviour (default 1 when neither flag is given) and `node --test test/step4-calldata.test.mjs` failed at `test/step4-calldata.test.mjs:42` — `AssertionError: expected a deliberate exit 2, got 0: 0 !== 2`. Reverted; 3/3 pass |
 | six transactions recorded and reconciled | pass | the twelve hashes, `gasUsed`, `effectiveGasPrice` and the Base Sepolia `l1Fee`s are in § What it cost below and in RUNBOOK § Uploads. Balance delta equals the receipt sum **to the wei** on both chains: Sepolia **1,257,406,800**, Base Sepolia **66,991,833,699,460** |
 | the runbook has two entry points | pass, with one noted exception | `RUNBOOK.md:36` is `## Which run is this`, before `## 0 — variables` at `:58`, carrying the two-row Run A / Run B table; `## Uploads` at `:1021` with rows 1 and 2 filled; Step 4 lists its own five Run-B variables. **`grep -n "must be 1" RUNBOOK.md` prints one hit** — see § Deviations |
@@ -153,6 +153,16 @@ Sepolia is touched.
   is the *other* multisig's. Worth stating because the ETA arithmetic that locates a submit
   transaction from a queue entry — `submit ts = eta − delay()` — is how both chains' submit hashes
   were recovered here, and it is silently wrong with the wrong delay. Read `delay()` per vault.
+- **A refusal that runs after a file read is not a refusal, and a built worktree cannot see it.** The
+  first head of this PR validated `--rpc` / `--app-nonce` *after* `readFileSync('app/dist/index.html.gz')`,
+  so in a clean checkout the tool died `ENOENT` at exit **1** with a stack trace instead of exiting 2
+  with the instruction. Every local run passed, because an engineer running this tool has just built
+  the bundle — the artifact is always there. CI, which does not build before `make test`, failed both
+  refusal tests on the first push and is the only reason this was found. Argument validation now
+  precedes the first file or chain read (`tools/step4-calldata.mjs:73-95`), verified by moving
+  `app/dist/` aside and re-running: 3/3 pass. **The general shape is worth carrying: a guard whose
+  purpose is to replace a confusing failure with a clear one has to run before the confusing failure
+  can happen, and a test for it passes locally for the wrong reason.**
 - **Base Sepolia's public RPC caps `eth_getLogs` at a 200-block range**, and the chain produces ~5
   blocks per second, so a `Queued` log 3,600 s back is ~18,000 blocks and 90 windows away. Locate the
   block by interpolating timestamps first, then scan one window. The same scan on Sepolia needs no
