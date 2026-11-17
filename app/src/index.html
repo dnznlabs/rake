@@ -2143,11 +2143,17 @@ async function cacheBind() {
     await cacheBind();
     /* A distribution page open behind this route holds its history in `DS`, built from the record
        that has just gone. It is read again now, from the chain, so returning to that page does not
-       show rows the store no longer backs. */
+       show rows the store no longer backs. That read writes the record back through `histLogs`, about
+       a second after the press, so the section is painted a second time when it lands: the figures
+       above were read before the write-back and would otherwise sit at zero over a store holding a
+       record (#227). */
     const d = DS.d;
     if (d) {
       const t = TOKEN;
-      history(d.addr, FIRST.get(d.addr) || CFG.factoryBlock).then(h => absorb(t, d, h)).catch(() => {});
+      history(d.addr, FIRST.get(d.addr) || CFG.factoryBlock)
+        .then(h => absorb(t, d, h))
+        .then(() => cacheBind())
+        .catch(() => {});
     }
   };
 }
