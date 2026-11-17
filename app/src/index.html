@@ -70,13 +70,22 @@ const rpcProvider = url => ({
 /* A provider that refuses a wide `eth_getLogs` the way `sepolia.base.org` does, so #76's window
    shrink can be driven in a browser against anvil, which caps nothing: `?cap=200` answers the
    verbatim `-32614` refusal for any range wider than 200 blocks, and `?cap=…&prune=N` also refuses
-   anything below block N the way `ethereum-sepolia.publicnode.com` does. */
-const capped = (p, cap, prune) => ({
+   anything below block N the way `ethereum-sepolia.publicnode.com` does.
+   `&wrap=1` answers the *wallet's* substitution instead — the object MetaMask hands the page in
+   place of a provider body that arrived under an HTTP 413, measured on Base Sepolia 2026-11-17
+   (#215). It carries no range and no number, which is the whole difficulty: it is the only refusal
+   shape `rangeCap`, `isPruned` and `RANGEY` all miss, so it is the one worth being able to serve on
+   demand. */
+const capped = (p, cap, prune, wrap) => ({
   request: async ({ method, params }) => {
     if (method === 'eth_getLogs') {
       const a = parseInt(params[0].fromBlock, 16), b = parseInt(params[0].toBlock, 16);
       if (prune && a < prune) throw { code: 4444, message: 'pruned history unavailable' };
-      if (b - a + 1 > cap) throw { code: -32614, message: `eth_getLogs is limited to a ${cap} range` };
+      if (b - a + 1 > cap) {
+        throw wrap
+          ? { code: -32080, message: 'RPC endpoint returned HTTP client error.', data: { httpStatus: 413, cause: null } }
+          : { code: -32614, message: `eth_getLogs is limited to a ${cap} range` };
+      }
     }
     return p.request({ method, params });
   }
@@ -86,7 +95,7 @@ async function discover() {
   /*DEV*/
   if (Q.get('rpc')) {
     P = rpcProvider(Q.get('rpc'));
-    if (Q.get('cap')) P = capped(P, Number(Q.get('cap')), Number(Q.get('prune') || 0));
+    if (Q.get('cap')) P = capped(P, Number(Q.get('cap')), Number(Q.get('prune') || 0), !!Q.get('wrap'));
     ACC = Q.get('from') || null; WRPC = Q.get('rpc'); return;
   }
   /*DEV*/
@@ -244,14 +253,19 @@ async function logs(address, topics, fromBlock, toBlock) {
       .reverse().slice(0, Math.min(WINDOW_INFLIGHT, MAX_WINDOWS - spent));
     spent += batch.length;
     const res = await Promise.all(batch.map(([a, b]) =>
-      window1(address, topics, a, b).then(r => ({ ok: r }), e => ({ err: errText(e) }))));
+      window1(address, topics, a, b).then(r => ({ ok: r }), e => ({ err: errText(e), e }))));
     /* Kept only as far as the first refusal: the batch is contiguous from the top, so keeping a
        success from below a failure would leave a hole that no single boundary could describe. */
     const i = res.findIndex(r => r.err);
     for (const r of (i < 0 ? res : res.slice(0, i))) out.push(...r.ok);
     if (i < 0) { hi = batch[batch.length - 1][0] - 1; continue; }
     const top = batch[i][1], text = res[i].err, cap = Model.rangeCap(text);
-    if (!Model.isPruned(text) && cap == null && !RANGEY.test(text)) throw new Error(text);
+    /* The fourth clause reads the error *object*, not the text: a wallet can replace a provider's
+       range refusal with one of its own that says only `RPC endpoint returned HTTP client error.`,
+       and nothing above matches that sentence, so before this clause existed the first window of
+       the first kind threw and the history read ended there (#215). `cap` is `null` for that shape,
+       so it falls through and halves like any other nameless refusal. */
+    if (!Model.isPruned(text) && cap == null && !RANGEY.test(text) && !Model.isWrappedRefusal(res[i].e)) throw new Error(text);
     /* A pruned refusal names no window either, but a *smaller* one can still fit above the block the
        provider stopped keeping — the refused range straddled it — so it shrinks like any other
        nameless refusal and the shrinking bisects toward that boundary, which is exactly "the first
@@ -795,17 +809,27 @@ function pendingBlock(d, acts) {
    the entry can still be applied — the delay guards applying, not cancelling — and anyone's once the
    entry has expired, which is the only control on this page whose audience the clock decides
    (`src/Distribution.sol:266`). `applyQueued(bytes,uint32)` also needs the nonce, which the struct
-   does not carry and that entry's `Queued` log does. Until the log has arrived the apply button says
-   which reading it is waiting on and stays disabled: a guessed nonce is a different hash, and would
-   revert `NotReady(0)`. An expired entry reads past that wait: no nonce makes it applicable again. */
+   does not carry.
+   It used to be taken from that entry's `Queued` log, which made this button wait on the history
+   read — so a provider that refused a wide `eth_getLogs` disabled an action whose transaction never
+   needed a log at all, and on Base Sepolia that held a ripe rename unappliable for ten hours
+   (#215). The nonce is not information only the event carries: `propose` commits to
+   `keccak256(abi.encode(action, nonce))` (`src/Distribution.sol:224`) and `applyQueued` recomputes
+   it (`:243`), so the hash and the action determine it, and `snapshot()` returns both the entry and
+   `nonce`, the count of everything ever proposed. `Model.nonceOf` searches down from that count, so
+   the button is able at the first paint and the history only ever adds the `queued in <tx>` link.
+   `undefined` now means no nonce at or below the snapshot's count reproduces the hash, which a
+   correct contract never produces — so it stays disabled rather than guessing, because a wrong
+   nonce is a different hash and would revert `NotReady(0)`. An expired entry reads past all of it:
+   no nonce makes it applicable again. */
 function pendingActs(d, p, i, ph) {
-  const nonce = DS.nonces ? DS.nonces.get(p[0]) : undefined;
+  const nonce = Model.nonceOf(p[0], p[2], d.nonce);
   const apply = ph === 'expired'
     ? '<button class="btn off sm" disabled>apply</button>'
       + `<span class="status bad">this change expired on ${Model.dateText(Model.deadline(p[1], S.grace))} — it can no longer be applied</span>`
     : nonce === undefined
-      ? `<button class="btn off sm" disabled>apply</button><span class="status${DS.failed ? ' bad' : ''}">`
-        + `${DS.failed ? 'history unavailable — apply needs the queue log' : 'reading the queue log — apply needs the nonce it carries'}</span>`
+      ? '<button class="btn off sm" disabled>apply</button>'
+        + '<span class="status bad">no nonce reproduces this entry\'s hash — apply needs one</span>'
       : ph === 'ready'
         ? sctl(`apply:${i}`, 'apply', { to: d.addr, sig: 'applyQueued(bytes,uint32)', args: () => [p[2], nonce], label: 'applyQueued' })
           + `<span class="status">the delay has passed — anyone can land it${ACC ? '' : ' · connect a wallet to send it'}</span>`
@@ -1085,9 +1109,11 @@ function loadField() {
 }
 
 /* ---- one distribution ------------------------------------------------------------------------ */
-/* What one load of `#/distros/<addr>` knows. `nonces` arrives with the logs rather than the snapshot,
-   which is why the apply buttons are drawn twice: once disabled, once able. */
-let DS = { d: null, next: null, heir: null, nonces: null, qtx: null, failed: false, h: null, fundsReady: false, f: null };
+/* What one load of `#/distros/<addr>` knows. The apply buttons are able at the first paint, from
+   `snapshot()` alone — `Model.nonceOf` recovers each entry's nonce from its hash — so the logs add
+   the `queued in <tx>` link and nothing else. `qtx` is that link; there is no nonce map, because a
+   nonce that the snapshot already determines is not the log's to supply (#215). */
+let DS = { d: null, next: null, heir: null, qtx: null, failed: false, h: null, fundsReady: false, f: null };
 let PROPOSE = null, DRAWER = false, OWNOPEN = false;
 // The distribution `#/docs#widget` embeds: set only where the owner bar paints, cleared by every route but the docs.
 let EMBED = null;
@@ -1136,13 +1162,13 @@ async function detail(addr) {
   const next = Model.supersededBy(d.table);
   const [heir, view] = await Promise.all([next ? loadDistro(next) : null, ownerView(d)]);
   if (stale(t)) return;
-  DS = { d, next, heir, nonces: null, qtx: null, failed: false, h: null, fundsReady: false, f: null };
+  DS = { d, next, heir, qtx: null, failed: false, h: null, fundsReady: false, f: null };
   VIEW = view;
   WRITES.clear();
   paintDetail();
-  // Progressive, and after the paint above: a slow or failed logs call never holds back the table. The
-  // apply nonces, the token list and the escrow rows all come out of it, so all three say so until it
-  // lands rather than reading as absence.
+  // Progressive, and after the paint above: a slow or failed logs call never holds back the table.
+  // The token list, the escrow rows and the `queued in <tx>` links come out of it, so those say so
+  // until it lands rather than reading as absence. The apply buttons do not wait on it (#215).
   const from = FIRST.get(d.addr) || CFG.factoryBlock;
   history(addr, from).then(h => absorb(t, d, h)).catch(() => {
     if (stale(t)) return;
@@ -1156,7 +1182,6 @@ async function detail(addr) {
    again on every `load older`, which is why it is a function and not the body of that `.then`. */
 async function absorb(t, d, h) {
   if (stale(t)) return;
-  DS.nonces = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.nonce]));
   DS.qtx = new Map(h.changes.filter(e => e.kind === 'queued').map(e => [e.hash, e.tx]));
   /* The fallback's pending list, as `snapshot()` would have returned it: every `Queued` the history
      pass did not find an `Applied` or a `Cancelled` for, oldest first — `h.changes` is newest-first
