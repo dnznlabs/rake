@@ -207,7 +207,13 @@ from, so a vacuous pass has nowhere to hide.
   for that issue, counted from the code at `6394f16` and labelled an estimate: on Base Sepolia from a
   10,000 start, six nameless refusals at four windows each spend 24 of the 40 windows before a 156-block
   size is accepted, leaving about 16 × 156 ≈ 2,500 blocks per pass against 7,800 with the named cap.
-  Carry it to #165 in the handoff; do not fix it here.
+  In time, at Base Sepolia's measured block time of 0.200 s (`eth_getBlockByNumber` on
+  `base-sepolia-rpc.publicnode.com`, 2026-11-17: blocks 56,161,390 → 60,078,563, timestamps
+  1,794,154,146 → 1,794,937,581, 783,435 s over 3,917,173 blocks), 7,800 blocks is about 26 minutes
+  and 2,500 about 8 minutes; the 40 × 10,000 budget is 400,000 blocks, about 22 hours. #165's "4 h
+  20 m" and "nine days" assume 2 s per block and are ten times too generous on this chain; re-read
+  two timestamps before carrying any figure in hours. Carry it to #165 in the handoff; do not fix
+  it here.
 - A read RPC of the page's own — struck on #215, the Product Owner's to reverse.
 - The finalized-log cache (m04-t12) and any re-upload (the next Run B).
 - The fallback path when `snapshot()` itself fails (step 3, last bullet).
