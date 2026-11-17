@@ -78,9 +78,10 @@ that, and whether they find them is the measurement.
   and a token that calls its recipient hands that recipient 63/64 of it. The 1/64 left has to pay
   every row after it. **Re-measured on this head** (`test_hookRecipientStarvesLaterRows`): over a
   cap-length table whose first row burns what it is given, a `distribute` under a 30,000,000-gas
-  limit reverts, and the first round thousand at which it completes is **95,237,000**
-  (`test/Distribution.t.sol:66`) — more than three 30M blocks, so that `distribute(token)` cannot be
-  mined at all. That figure was 95,049,000 at `b0fb4e3`; t08's `claim` and expiry code moved it, and
+  limit reverts, and the first round thousand at which it completes is **95,226,000**
+  (`test/Distribution.t.sol`, `F8_SUCCEEDS_AT`) — more than three 30M blocks, so that `distribute(token)` cannot be
+  mined at all. That figure was 95,049,000 at `b0fb4e3`; t08's `claim` and expiry code moved it to
+  95,237,000, the solc 0.8.34 → 0.8.38 pin of 2026-11-16 moved it again with no `src/` change, and
   the shape is unchanged. The shape needs an ERC-777-style `transfer` callback *and* an owner-chosen
   hostile row; the owner's remedy is a re-table through the delay. Decision 36 / #123 holds the
   ruling on whether to cap the call, with *document* as the default; it is unruled as this head

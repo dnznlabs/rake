@@ -62,8 +62,10 @@ contract DistributionTest is Test {
     /// @dev Bytecode-dependent, so it is re-bisected whenever `Distribution` moves: m03-t08's
     /// `GRACE`/`claim` changes added 542 bytes of deployed code and moved it from **95,049,000** to
     /// **95,237,000** (+188,000) — the implementation the clone delegates into is bigger, so every
-    /// row of the table costs a little more to pay.
-    uint256 internal constant F8_SUCCEEDS_AT = 95_237_000;
+    /// row of the table costs a little more to pay. The compiler moves it too: the solc 0.8.34 →
+    /// 0.8.38 bump (2026-11-16) took it from 95,237,000 to **95,226,000** (−11,000) with no `src/`
+    /// change.
+    uint256 internal constant F8_SUCCEEDS_AT = 95_226_000;
 
     /// @dev Hands each starvation attempt its own disjoint range of row addresses.
     uint160 internal starveRanges;
@@ -448,8 +450,8 @@ contract DistributionTest is Test {
     }
 
     /// @notice The **warm** case only, and deliberately so: the clone is deployed inside the test, so
-    /// the implementation it delegates into is already warm when the ETH arrives and 1,662 gas of the
-    /// 2,300 stipend is enough. Cold it needs 4,162 and this same `transfer` reverts — #174, measured
+    /// the implementation it delegates into is already warm when the ETH arrives and 1,659 gas of the
+    /// 2,300 stipend is enough. Cold it needs 4,159 and this same `transfer` reverts — #174, measured
     /// and pinned from both sides in `test/ColdStipend.t.sol`, which creates its clone in `setUp` to
     /// get a genuinely cold first touch. Read the two together; neither says what the other does.
     function test_receiveUnderStipend() public {
@@ -1432,8 +1434,8 @@ contract DistributionTest is Test {
     /// block gas limit a chain actually has.
     /// @dev F8, measured rather than predicted, and the measurement is what D14 is ruled on. The
     /// first row is a `GasBurnerAny` reached through the token's `transfer`; the rest are plain rows.
-    /// Bisected by hand to the round thousand: **95,237,000** gas is the first at which `distribute`
-    /// completes, and 95,236,000 still reverts. A 30,000,000-gas block is barely a third of that, so
+    /// Bisected by hand to the round thousand: **95,226,000** gas is the first at which `distribute`
+    /// completes, and 95,225,000 still reverts. A 30,000,000-gas block is barely a third of that, so
     /// a `distribute(token)` for this token cannot be mined until the owner re-tables through the
     /// delay — which is the remedy `SECURITY.md`'s F8 row names.
     ///
@@ -1446,8 +1448,8 @@ contract DistributionTest is Test {
         assertFalse(_starvationSucceedsAt(30_000_000), "a 30,000,000-gas distribute is starved");
 
         // And the figure it does need, pinned from both sides at the round thousand.
-        assertTrue(_starvationSucceedsAt(F8_SUCCEEDS_AT), "it first completes at 95,237,000");
-        assertFalse(_starvationSucceedsAt(F8_SUCCEEDS_AT - 1_000), "and not at 95,236,000");
+        assertTrue(_starvationSucceedsAt(F8_SUCCEEDS_AT), "it first completes at 95,226,000");
+        assertFalse(_starvationSucceedsAt(F8_SUCCEEDS_AT - 1_000), "and not at 95,225,000");
 
         emit log_named_uint("F8 distribute completes at   ", F8_SUCCEEDS_AT);
         emit log_named_uint("blocks of 30M that would take", F8_SUCCEEDS_AT / 30_000_000 + 1);

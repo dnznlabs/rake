@@ -30,14 +30,15 @@ contract ColdStipendTest is Test {
     uint256 internal constant STIPEND = 2300;
 
     /// @dev The measured gas a clone's `receive()` frame needs when the implementation is cold:
-    /// **4,162**, bisected on this tree with devbox-pinned forge 1.7.1, one transaction per probe —
-    /// 1,861 forwarded on top of the stipend fails, 1,862 succeeds. It is the warm figure
-    /// `SECURITY.md` F7 settles at 1,662 plus the 2,500 a cold account access adds to the clone's
+    /// **4,159**, bisected on this tree with devbox-pinned forge 1.7.1, one transaction per probe —
+    /// 1,858 forwarded on top of the stipend fails, 1,859 succeeds. It is the warm figure
+    /// `SECURITY.md` F7 settles at 1,659 plus the 2,500 a cold account access adds to the clone's
     /// `DELEGATECALL` (2,600 cold against 100 warm), not plus the full 2,600: the "1,662 + 2,600 =
     /// 4,262" F7 quotes from the second review leg counts the warm access twice.
     /// @dev Bytecode-dependent, like `F8_SUCCEEDS_AT`: the delegated body is `Distribution`'s own, so
-    /// re-bisect this whenever `src/Distribution.sol` moves.
-    uint256 internal constant COLD_FRAME = 4162;
+    /// re-bisect this whenever `src/Distribution.sol` moves — or the compiler does: the solc
+    /// 0.8.34 → 0.8.38 bump (2026-11-16) moved it from 4,162 to 4,159 with no `src/` change.
+    uint256 internal constant COLD_FRAME = 4159;
 
     function setUp() public {
         factory = new DistributionFactory();
