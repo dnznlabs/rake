@@ -28,21 +28,23 @@ Every address below is **the same on both chains it is deployed to**, so a bookm
 
 | CONTRACT | ADDRESS | ROLE |
 |:---|:---|:---|
-| `DistributionFactory` | [`0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B`](https://sepolia.etherscan.io/address/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B) | Places each `Distribution`, one per distribution |
+| `DistributionFactory` | [`0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B`](https://sepolia.etherscan.io/address/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B) | Places each `Distribution`, one per distribution. **Permissionless and unowned** — anyone may call `create`, and the caller names the owner of what they create |
 | `App` | [`0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE`](https://sepolia.etherscan.io/address/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE) | Serves the dapp and the widget from the chain over [ERC-5219](https://eips.ethereum.org/EIPS/eip-5219) |
-| Owner of both | [`0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`](https://sepolia.etherscan.io/address/0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790) | DNZN Ops, a multisig behind a time lock. Only it can change what `App` serves |
+| `App`'s owner | [`0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`](https://sepolia.etherscan.io/address/0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790) | DNZN Ops, a multisig behind a time lock. Only it can change what `App` serves — and it owns nothing else here: `owner()` reverts on the factory, and each `Distribution` is owned by whoever created it |
 
 A `Distribution` is not listed here: there is one address per distribution, created on demand through the factory.
 
 ### Deployment Status
 
-| CHAIN | CHAIN ID | FACTORY | APP | DOCUMENT | SOURCE VERIFIED |
+| CHAIN | CHAIN ID | FACTORY | APP | DOCUMENT | SOURCE VERIFIED (EXPLORER · SOURCIFY) |
 |:---|:---|:---|:---|:---|:---|
-| Sepolia | `11155111` | live, pre-#201 bytes | live, pre-#201 bytes | uploaded 2026-11-16 | [factory](https://sepolia.etherscan.io/address/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B#code) · [app](https://sepolia.etherscan.io/address/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE#code) |
-| Base Sepolia | `84532` | live, pre-#201 bytes | live, pre-#201 bytes | uploaded 2026-11-16 | [factory](https://sepolia.basescan.org/address/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B#code) · [app](https://sepolia.basescan.org/address/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE#code) |
+| Sepolia | `11155111` | live, pre-#201 bytes | live, pre-#201 bytes | uploaded 2026-11-16 | explorer [factory](https://sepolia.etherscan.io/address/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B#code) · [app](https://sepolia.etherscan.io/address/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE#code) · Sourcify [factory](https://repo.sourcify.dev/11155111/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B) · [impl](https://repo.sourcify.dev/11155111/0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0) · [app](https://repo.sourcify.dev/11155111/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE) |
+| Base Sepolia | `84532` | live, pre-#201 bytes | live, pre-#201 bytes | uploaded 2026-11-16 | explorer [factory](https://sepolia.basescan.org/address/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B#code) · [app](https://sepolia.basescan.org/address/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE#code) · Sourcify [factory](https://repo.sourcify.dev/84532/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B) · [impl](https://repo.sourcify.dev/84532/0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0) · [app](https://repo.sourcify.dev/84532/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE) |
 | Ethereum, Base, Arbitrum, OP Mainnet | — | not deployed | not deployed | — | — |
 
-Read live rather than trusted: `make addresses CHAIN_ID=<id>` prints the addresses from the broadcast logs, and `cast codesize <address> --rpc-url <rpc>` is the check that one is really there — `1320` for the factory and `7155` for `App` on both testnets today. Sources of record are `broadcast/<Script>/<chain id>/run-latest.json` and [`RUNBOOK.md`](RUNBOOK.md) § Executed on testnets. All four deployments are source-verified on their explorers (solc `0.8.34`).
+Read live rather than trusted: `make addresses CHAIN_ID=<id>` prints the addresses from the broadcast logs, and `cast codesize <address> --rpc-url <rpc>` is the check that one is really there — `1320` for the factory and `7155` for `App` on both testnets today. Sources of record are `broadcast/<Script>/<chain id>/run-latest.json` and [`RUNBOOK.md`](RUNBOOK.md) § Executed on testnets.
+
+Source is published in both places a client might look, at solc `0.8.34`: the explorers, and **[Sourcify](https://sourcify.dev), which is where a wallet looks to decode a call** — factory, implementation and `App` are each `exact_match` on both chains, `creationMatch` and `runtimeMatch` alike. A `Distribution` is a clone and Sourcify does not report one as verified at all, so its function and event signatures are registered on OpenChain instead; a wallet that cannot find the source can still show the function name.
 
 ### Opening the App
 
