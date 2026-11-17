@@ -685,6 +685,18 @@ convention. Numbered 45 because 44 is taken by
     touches the upload). Supersedes the route line of decision 44 (one `batch` proposal per chain),
     not the decision: step 4 is still an Ops-vault action.
 
+48. **The alpha marker comes off the landing hero and the widget; it stays in the header.** Ruled by
+    Denizen on 2026-11-17 (Telegram, 00:15 CST): "alpha comes off the landing *hero* and widget - not
+    the header". Decision 45 put the tag line in the dapp header *and* on the landing, and the word
+    `alpha` in the widget; the testnet run ([#203](https://github.com/dnznlabs/rake/pull/203))
+    found the landing repeated it under the hero and proposed dropping both the repeat and the widget
+    word. The marker now lives in the header tag line on every view, the page version string
+    `0.1alpha`, the README table and the `#/docs` Disclaimer; the widget carries no marker. The
+    reasoning of 45 stands: the header is the surface every view shows, so the owner still sees it;
+    the widget is embedded on a host that is not ours and the marker is for owners. Removal at 90 days
+    (decision 45) is unchanged and now touches one place fewer. Amends decision 45's placement, not
+    its content or its removal clause.
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
