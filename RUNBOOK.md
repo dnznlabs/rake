@@ -33,6 +33,28 @@ requires `false`, and that check passes by this transaction never being sent:
 grep -c 'lock()' RUNBOOK.md        # every hit is in this section
 ```
 
+## Which run is this
+
+Two different jobs live in this file and they share almost nothing. Decide which one you are doing
+before reading further, because Run B is most of the traffic and reading Run A's steps for it is how
+an upload ends up re-deploying contracts that are already live.
+
+| Run | When | Sections |
+|:--|:--|:--|
+| **A — the contracts** | first deploy to a chain, or any change under `src/` (new bytes are new addresses, so decision 37's salt mining repeats; the old addresses stay live and are marked superseded in [README](README.md#contracts) § Contracts) | § 0, § 1, steps 1–7, § Record |
+| **B — the document** | `app/` changed and `src/` did not: the page, the widget, the featured salt | § 0's Run-B variables, Step 4, § Uploads |
+
+**Under Run A, which of steps 2 and 3 run is decided by which contracts' bytes changed.** The factory
+and `App` are placed by separate salted `CREATE2`s against their own init code, so their addresses
+move independently: a change under `src/App.sol` alone moves `App` and leaves the factory where it
+is, and step 2 is then skipped rather than repeated. Step 1f recomputes both addresses either way, and
+disagreeing with the live ones is the signal that a mining run is owed.
+
+**Run B needs nothing from this file but § 0's Run-B variables and Step 4.** It sends no transaction
+from the engineer's key at all: `App`'s chunk setters are `onlyOwner` and the owner is the Ops vault,
+so a document upload is three vault proposals the Product Owner co-signs (decisions 44 and 47). If
+you are here because the page changed, go to Step 4.
+
 ## 0 — variables
 
 Every command below is parameterised by these and nothing else, and nothing below hard-codes a value
@@ -52,6 +74,23 @@ export DNZN_SALT=${CREATOR}000000000000000000000001        # top 20 bytes CREATO
 # filled in by step 1, never by hand
 export PROXY=0x4e59b44847b379578588920cA78FbF26c0B4956C FACTORY= IMPL= APP= DISTRO=
 ```
+
+**Run B needs five of these and no salts.** A document upload touches no address that mining decides,
+so the mined salts, `PROXY`, `FACTORY_SALT`, `APP_SALT`, `CREATOR` and `DNZN_SALT` are all Run A's.
+Run B's list, complete:
+
+```sh
+export RPC=<full https URL>          # every command passes --rpc-url "$RPC"
+export CHAIN_ID=<from § 1's table>
+export OWNER=0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790    # the Ops vault: App's owner
+export ENGINEER=0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d # the proposing key, an Ops owner
+export APP=<from README § Contracts>  # read, not predicted — Run B never mines or computes it
+```
+
+**`APP` is read from [README](README.md#contracts) § Contracts rather than predicted.** Run A derives
+it from init code and salt; Run B is uploading to a contract that already exists, so deriving it again
+only creates a way to upload to the wrong one. `SIGNER` is not in the list because Run B sends nothing
+from the engineer's key: it proposes, and the Product Owner's signature is what moves anything.
 
 **`OWNER` is one value for every chain on purpose**, as `state-collection`'s `PAYEE` is: there is no
 second constant to pick the wrong one of. The Ops vault is at this address on all eight chains of
@@ -442,20 +481,43 @@ account nonce and would put every digest one off:
 cast call $OWNER "isOwner(address)(bool)" $ENGINEER --rpc-url "$RPC"  # must be true
 cast call $OWNER "threshold()(uint16)" --rpc-url "$RPC"                 # 2
 cast call $OWNER "nonce()(uint32)" --rpc-url "$RPC"                     # the proposal's nonce
-cast nonce $APP --rpc-url "$RPC"                                        # must be 1: the pointers assume it
+cast nonce $APP --rpc-url "$RPC"   # must equal the --app-nonce the calldata was generated with
 ```
+
+**On that last line.** `App`'s chunk pointers are its own `CREATE` addresses, so they are a function
+of its account nonce, and the calldata is only valid for the nonce it was generated at. It read `1`
+for the first upload onto a fresh `App` and has moved with every upload since — 4 before this one.
+So the check is equality with the generating nonce, which § Uploads names per upload, **not** a
+constant. `tools/step4-calldata.mjs` reads the nonce from the chain when given `--rpc` and refuses to
+run with neither `--rpc` nor `--app-nonce` rather than defaulting, because a wrong nonce yields
+calldata that is well-formed, byte-reproducible and points at the wrong three contracts.
 
 #### 4a — the engineer proposes
 
 ```sh
-make dapp-nodev CHAIN_ID=$CHAIN_ID
-node tools/step4-calldata.mjs --chain $CHAIN_ID    # rewrites calldata/$CHAIN_ID/; git diff must be empty
+devbox run -- make dapp-nodev CHAIN_ID=$CHAIN_ID
+devbox run -- node tools/step4-calldata.mjs --chain $CHAIN_ID --rpc "$RPC" --out calldata
 ```
 
 `dapp-nodev`, never `dapp`: a dev bundle on chain reads through its `?rpc=` override and never
-reaches a wallet (`mk/30-onchain.mk`). The calldata is committed under
-`docs/milestones/m04/tasks/m04-t08/calldata/$CHAIN_ID/`, so a non-empty `git diff` is a stale
-proposal and stops here.
+reaches a wallet (`mk/30-onchain.mk`). Routine uploads write **`calldata/$CHAIN_ID/`** at the
+repository root, overwritten per upload, and are committed — git history is the archive, and § Uploads
+names the generating commit and nonce per upload. (m04-t08's first upload kept its calldata under its
+own task directory; that stays as that task's record.)
+
+**Through `devbox run --`, and that is load-bearing rather than habit.** The gzip is produced by
+`node`'s zlib, and zlib differs between node versions: this VM's `node v24.21.0` deflates the same
+`index.html` to 45,624 bytes where the pinned `v24.12.0` gives 45,358
+([#199](https://github.com/dnznlabs/rake/issues/199)). Outside devbox the tool therefore rewrites two
+calldata files for a document that has not changed, which costs a full-gas re-upload of identical
+bytes. **The regeneration criterion is `chain-doc`'s `inflated sha256` against the build under the
+pin — not `sha256sum` of calldata on whatever `node` is on `PATH`.**
+
+A non-empty `git status --porcelain` here is a stale proposal and stops the run — with one
+expected exception: after an upload has executed, `App`'s nonce has moved, so re-running the command
+above with `--rpc` regenerates *different* pointers by design. To reproduce a past upload's committed
+calldata at any later head, pass the nonce § Uploads records for it instead:
+`--app-nonce <n>` in place of `--rpc`.
 
 The upload is **three proposals, in nonce order**, all value `0`. ~~The proposal is **one
 transaction**: target `$OWNER`, data `calldata/$CHAIN_ID/batch.hex`, nonce the live `nonce()`.~~
@@ -487,13 +549,39 @@ address `5-setWidgetChunks.hex` names, and that is where the nonce stands only a
 proposals 1 and 2, which is why the batch executes last and why 1 precedes 2 (4c). `batch` is
 `onlySelf`, so the vault is its target and it calls `App` as its owner.
 
-The engineer signs each digest and proposes through the dapp's API — handbook
-`docs/multisig-transactions.md` § Doing it as an agent, steps 1–3, three times: `getTransactionHash`
-as above, `cast wallet sign --no-hash`, `POST /proposals`. Each description names this step, the
-chain, the proposal's number of three and the commit the calldata was generated at; it is not signed
-and proves nothing, which is why 4b does not read it.
+The engineer signs each digest and proposes it, three times, with no other document open:
 
-`record:` the three nonces and digests, and the commit the files were generated at.
+```sh
+DIGEST=$(cast call $OWNER 'getTransactionHash(address,uint256,bytes,uint32)(bytes32)' \
+  <target> 0 "$(cat calldata/$CHAIN_ID/<file>)" <nonce> --rpc-url "$RPC")
+SIG=$(cast wallet sign --no-hash --account <keystore> "$DIGEST")
+cast wallet verify --address $ENGINEER --no-hash "$DIGEST" "$SIG"   # positional, not --signature
+```
+
+Then `POST https://multisig-proposals.onrender.com/proposals` with
+`p_wallet_id`, `p_chain_id`, `p_nonce`, `p_target`, `p_value` (a string), `p_call_data`, `p_tx_hash`
+(the digest), **`p_threshold`**, `p_proposed_by`, `p_description`, `p_signature` and
+`p_sig_type: "ecdsa"`.
+
+**`p_threshold` is required and is not optional-with-a-default**
+([#196](https://github.com/dnznlabs/rake/issues/196)): without it the service answers
+`400 Invalid proposal threshold` and stores nothing, so the retry is the same POST with the field
+added. It must be at least the vault's on-chain `threshold()` and at most `ownerCount()`.
+
+Each description names this step, the chain, the proposal's number of three and the commit the
+calldata was generated at; it is not signed and proves nothing, which is why 4b does not read it.
+
+**Verify by reading the proposals back, not by the POST's `200`.** Query
+`tx_summary` with the signatures embedded — `?wallet_id=eq.<id>&status=in.(proposed,executing,queued)
+&select=id,nonce,target,value,status,tx_hash,call_data,threshold,signatures(signer,sig_type)` on
+`https://multisig-postgrest.onrender.com` — and check each row carries exactly one `ecdsa` signature
+from `$ENGINEER`, `value` 0, the committed file's bytes and the digest just signed. The `sig_count`
+column reads `0` for signed and unsigned proposals alike and must not be used; and a proposal with no
+valid owner signature is **hidden** from every owner's dapp with no message, so an empty vault page is
+not evidence of an empty queue.
+
+`record:` the three nonces and digests, the commit the files were generated at, and the `--app-nonce`
+they were generated for.
 
 #### 4b — the product owner reviews and signs
 
@@ -563,26 +651,42 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
      swapped. Nothing stops it until 4d's `inflated sha256` differs. The repair is a further vault
      proposal — a corrective `setChunks` with the two pointers in the right order — not a redeploy.
      So the order 1 → 2 is load-bearing in itself, not only relative to the batch.
-   So each piece has a **gate, read from the chain before it is sent**. `App` starts at account nonce
-   1 (the precondition above), and every `add*Chunk` is one CREATE, so the nonce counts the chunks
-   that have landed and the predicted pointers (handoff § The pointers, identical on both chains) say
-   where:
+   So each piece has a **gate, read from the chain before it is sent**. Let ***N*** be the `App`
+   account nonce the calldata was generated for — the precondition above reads it, and § Uploads
+   records it per upload. Every `add*Chunk` is one CREATE, so the nonce counts the chunks that have
+   landed, and the three pointers are `App`'s CREATEs at *N*, *N* + 1 and *N* + 2. **Read them out of
+   the committed calldata rather than retyping them**, which is both shorter and the only form that
+   stays correct across uploads:
+
+   ```sh
+   # the two document pointers, in order, and the widget pointer
+   cast calldata-decode 'setChunks(address[],bool)'   "$(cat calldata/$CHAIN_ID/4-setChunks.hex)"
+   cast calldata-decode 'setWidgetChunks(address[])'  "$(cat calldata/$CHAIN_ID/5-setWidgetChunks.hex)"
+   # the same three, independently, from the nonce — the two must agree
+   for i in $N $((N+1)) $((N+2)); do cast compute-address $APP --nonce $i; done
+   ```
+
+   Those two routes agreeing is itself a check: the first reads what the setters will be told, the
+   second what the EVM will create, and a mismatch means the calldata was generated for a different
+   nonce than the one you are about to execute at.
 
    | before sending | `cast nonce $APP` | `cast code <ptr>` non-empty at |
    |:--|--:|:--|
-   | piece 1 | `1` | nothing yet — both document pointers print `0x` |
-   | piece 2 | `2` | doc 0: `0x0f8132D41Ea16c4536565cb2910EF801c2e35D0D` |
-   | the batch | `3` | doc 0 as above **and** doc 1: `0xAf5f9504714D4D441E836ef626633553ccF730a0` |
-   | (after the batch) | `4` | widget: `0xc39C7643cbfFE57114A1851Af499f1781c0daC8e` — step 4d's check |
+   | piece 1 | *N* | nothing yet — both document pointers print `0x` |
+   | piece 2 | *N* + 1 | doc 0 (the `CREATE` at *N*) |
+   | the batch | *N* + 2 | doc 0 **and** doc 1 (the `CREATE` at *N* + 1) |
+   | (after the batch) | *N* + 3 | widget (the `CREATE` at *N* + 2) — step 4d's check |
 
    Neither the nonce nor a non-empty `cast code` is the gate against the swap: after piece 2
-   executed first, the nonce reads `2` *and* the doc-0 pointer holds code — chunk 1's. Only the
+   executed first, the nonce reads *N* + 1 *and* the doc-0 pointer holds code — chunk 1's. Only the
    **contents** discriminate. Before piece 2, the code at the doc-0 pointer must equal `0x00`
    followed by chunk 0's bytes, which are the `bytes` argument of the committed call:
 
    ```sh
-   CHUNK0=$(cast calldata-decode "addChunk(bytes)" "$(cat calldata/$CHAIN_ID/1-addChunk-0.hex)")
-   [ "$(cast code 0x0f8132D41Ea16c4536565cb2910EF801c2e35D0D --rpc-url "$RPC")" = "0x00${CHUNK0#0x}" ] && echo chunk0-in-place
+   DOC0=$(cast calldata-decode 'setChunks(address[],bool)' \
+            "$(cat calldata/$CHAIN_ID/4-setChunks.hex)" | sed -n '1p' | tr -d '[] ' | cut -d, -f1)
+   CHUNK0=$(cast calldata-decode 'addChunk(bytes)' "$(cat calldata/$CHAIN_ID/1-addChunk-0.hex)")
+   [ "$(cast code $DOC0 --rpc-url "$RPC")" = "0x00${CHUNK0#0x}" ] && echo chunk0-in-place
    ```
 
    (`SSTORE2.write` stores a `0x00` STOP byte then the data, `lib/solady/src/utils/SSTORE2.sol:52`,
@@ -591,10 +695,22 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
    cheap pre-checks; the content equality is what proves the order held. Any other reading is a
    stop and a message to the architect, not a retry.
 
-   Each `executeQueued` is the transaction that runs its call and pays for it, so **set each gas limit
-   by hand** — three figures per chain, § Gas. A wallet's own estimate through a public RPC reports a
-   false `DeploymentFailed()`. Running out of gas reverts that one call and leaves it queued, so it
-   can be sent again with more; the ones already executed stay executed.
+   Each `executeQueued` is the transaction that runs its call and pays for it, so it needs a gas
+   limit. **Estimate, then send estimate + 30%**, and keep § Gas's hand table only as the fallback for
+   an RPC that refuses to estimate:
+
+   ```sh
+   cast estimate --from $ENGINEER <target> "$(cat calldata/$CHAIN_ID/<file>)" --rpc-url "$RPC"
+   ```
+
+   The batch cannot be estimated until its chunks have landed — `CodelessChunk` — so estimate it
+   *between* piece 2 and the batch rather than before piece 1. Measured across all six sends of the
+   2026-11-17 upload, every estimate came back clean from the public RPCs and sat between **2.62%**
+   (Sepolia doc 0) and **7.62%** (the Sepolia batch) above the gas actually used; § Uploads carries
+   the figures. The `DeploymentFailed()` that the hand table exists for is a **wallet-path**
+   observation and did not reproduce on `cast estimate` against either chain. Running out of gas
+   reverts that one call and leaves it queued, so it can be sent again with more; the ones already
+   executed stay executed.
 
 **The one silent misorder, and its repair.** The pointer predictions depend on execution *order*,
 not on the proposals: `App`'s CREATE address is a function of its nonce, and `addChunk` records
@@ -711,6 +827,38 @@ it executed, and `chain-doc` then read `inflated sha256` and `widget sha256` equ
 Anvil does not reproduce Sepolia's code-deposit pricing (11,896,347 gas there), so it proves the
 bytes and the order, not the gas. The three-proposal split changes the transaction boundaries and
 nothing about the bytes or their order, so that rehearsal still stands for both.
+
+**Run B's gas step, which is a fork and not the live node** ([#189](https://github.com/dnznlabs/rake/issues/189)).
+Calls 1 and 2 depend on nothing and are live-estimable; the batch is not, because `setChunks`
+validates pointers that calls 1–3 create, so asking the live node for it is red by construction and
+the revert is `CodelessChunk` naming your own predicted pointer. Estimate it on a fork, which also
+proves the whole sequence before anyone signs:
+
+```sh
+cast estimate --from $OWNER $APP "$(cat calldata/$CHAIN_ID/1-addChunk-0.hex)" --rpc-url "$RPC"
+cast estimate --from $OWNER $APP "$(cat calldata/$CHAIN_ID/2-addChunk-1.hex)" --rpc-url "$RPC"
+
+anvil --fork-url "$RPC" --port 8701 --silent &            # kill by PID, never by pattern
+cast rpc anvil_impersonateAccount $OWNER --rpc-url http://127.0.0.1:8701
+cast rpc anvil_setBalance $OWNER 0xDE0B6B3A7640000 --rpc-url http://127.0.0.1:8701
+for f in 1-addChunk-0 2-addChunk-1; do
+  cast send --from $OWNER --unlocked $APP "$(cat calldata/$CHAIN_ID/$f.hex)" --rpc-url http://127.0.0.1:8701
+done
+cast estimate --from $OWNER $OWNER "$(cat calldata/$CHAIN_ID/batch345.hex)" --rpc-url http://127.0.0.1:8701
+cast send --from $OWNER --unlocked $OWNER "$(cat calldata/$CHAIN_ID/batch345.hex)" --rpc-url http://127.0.0.1:8701
+node tools/chain-doc.mjs --app $APP --rpc http://127.0.0.1:8701 --chain $CHAIN_ID
+```
+
+`record:` the figures, and read the last command's `inflated sha256` against `sha256sum
+app/dist/index.html` — **equal there means the upload will serve the right bytes, proven before a
+signature exists.** Two cautions. The fork collapses signer and owner by impersonating the vault, so
+it establishes encoding, order and gas and says *nothing* about authority — the authority readings are
+the live `isOwner`/`threshold` above. And **anvil prices code deposit at ~223 gas/byte, which matches
+Base Sepolia live to within 2% and under-prices Sepolia by ~7×**: measured 2026-11-17, Sepolia's chunk
+0 estimates **37,760,737** live against **5,283,594** on the fork, while Base Sepolia's reads
+5,369,650 live against 5,283,450. So a fork figure is authoritative only for a call that creates no
+code; for the rest the live estimate is, and on Sepolia the batch's real cost exceeds its fork figure
+by roughly the code-deposit term for the widget chunk.
 
 **`MAX_CHUNK = 24_000` is sized against one constraint and bound by three**
 ([#188](https://github.com/dnznlabs/rake/issues/188)). The constant is a byte budget, chosen
@@ -897,6 +1045,63 @@ blank transaction hash is a step that did not run.
 | | 5 | OpenChain signatures | |
 | 6 | 6 | DNZN `create` | tx: · gas: · `DNZN_SALT`: · `DISTRO`: |
 | | 6 | `owner()` on `DISTRO` | |
+
+## Uploads
+
+Run B's record: one row per chain per upload, newest last. The **nonce** column is the `App` account
+nonce the calldata was generated for, which is what makes a past upload reproducible —
+`--app-nonce <that number>` regenerates its committed `calldata/<chain>/` byte-for-byte at any later
+head, where `--rpc` would read today's nonce and emit different pointers.
+
+| # | date | chain | commit | App nonce | pointers (doc 0 · doc 1 · widget) | vault nonces | `inflated sha256` · `widget sha256` | six tx hashes | gas across the three |
+|--:|:--|:--|:--|--:|:--|:--|:--|:--|--:|
+| 1 | 2026-11-17 | Sepolia | `9fdf0f1` | 4 | `0x831f740F…1268` · `0x02d5AcDA…A0C3` · `0x80bDDA62…FC38` | 6, 7, 8 | `2d27b603…3f9a9d4a` · `07e808ed…d51b8ca` | in full below | **83,827,120** |
+| 2 | 2026-11-17 | Base Sepolia | `9fdf0f1` | 4 | the same three — the pointers are a function of `App`'s address and nonce, and both are identical per chain | 6, 7, 8 | `1111b791…0920e17` · `07e808ed…d51b8ca` | in full below | **11,947,862** |
+
+The `inflated sha256` and `widget sha256` in rows 1 and 2 were the build's when the rows were written,
+read from a fork of each chain before the proposals were signed; **4d re-read both from the chain
+after execution and they are unchanged**, so the column now carries a live `chain-doc` reading rather
+than a prediction. The gas column is the sum of the three `executeQueued` receipts.
+
+**The six transactions per row, in full.** Three submits (the proposal, which queues it) and three
+`executeQueued` (which runs it), in nonce order. The submits are not the engineer's: `from` is the
+Product Owner's account on Sepolia and a relayer EOA on Base Sepolia, both through the same relay
+`to` of `0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3` — so **`from` is never a signer attribution on
+either chain**, since the signatures authorise the call and `execute()` does not read `msg.sender`.
+All twelve `status true`.
+
+Row 1 — Sepolia, `eth_estimateGas` and `gasUsed` per `executeQueued`:
+
+| vault nonce | call | submit tx | `executeQueued` tx | block | `gasUsed` | estimate |
+|--:|:--|:--|:--|--:|--:|--:|
+| 6 | `addChunk` doc 0 | `0x9629018a60bd73fd2d34b3eedf7222e9db5eeac1c7dbe2513c8a81dc5b1c88fa` | `0x9559ca95b77595cf54980b9668b08f5760adb2c4715565ac0abb88e11cda59a2` | 12155608 | 37,493,831 | 38,474,885 |
+| 7 | `addChunk` doc 1 | `0x7df581c038f35cdc29e85c976fe215e74f553dd358dd60caa956696aea22f083` | `0xf5d6dcf20fa0dcfa1e9bab8cdcb62f8e1a85478436b568bda4d8aa0d77a2965e` | 12155609 | 33,434,368 | 34,479,858 |
+| 8 | `batch345` | `0x9ec56529a28121218d87e2aa5dca9db0760c55e73377ce19f213029498d4395d` | `0xe1f955983bbef0aa908968abda15762cadbe1ae90f5747c0dc50abb259855005` | 12155610 | 12,898,921 | 13,881,217 |
+
+Row 2 — Base Sepolia:
+
+| vault nonce | call | submit tx | `executeQueued` tx | block | `gasUsed` | estimate |
+|--:|:--|:--|:--|--:|--:|--:|
+| 6 | `addChunk` doc 0 | `0xb9c0e46e3a8e7aa371c1de43d48b730d798440e539167aff66f98b2a42012bff` | `0x1109d70289ae81f0138a148eb9ca870b94a88d3256deb13546cd27c9586b81b1` | 60056890 | 5,313,847 | 5,538,669 |
+| 7 | `addChunk` doc 1 | `0x13d73ce6f37e3a3f2843c99b01731a35c01785332588e55aed6e4c7d3865d253` | `0x51ebc2842191f3804fbea1bf1cf8f54a57e48f39d3e3c904a6874a33fe640206` | 60056912 | 4,742,766 | 4,965,321 |
+| 8 | `batch345` | `0xc5b7abb9b36a9b4d082c56ec4a94c19db937591ad3280d57384509380ae72e41` | `0x3b3c01042a857123233c8396ae967201ca5011c78965b913b56bf1510bb15714` | 60056932 | 1,891,249 | 2,016,300 |
+
+**Estimate-then-send was used for all six, and the hand limits of § Gas were not needed** — the second
+upload reproducing t08's finding. `cast estimate --from $ENGINEER` returned a clean figure for every
+one, including `batch345` once its chunks had landed, and each estimate was within 7% above the gas
+actually used; what was sent was estimate + 30%. Keep § Gas's table as the fallback for an RPC that
+refuses to estimate.
+
+**The order gate was read between every send**, per chain: `cast nonce $APP` returned `4`, `5`, `6`
+before orders 1, 2, 3 and `7` after the batch — the gate walked rather than assumed, so the silent
+misorder § Step 4 describes was never reachable.
+
+**The first upload of all, m04-t08's on 2026-11-16, is deliberately not a row here.** It was not
+routine — it is the one whose calldata lives under its own task directory, it predates this table, and
+its figures survive only in that handoff. Reconstructing them into this table would make a record
+whose rule is *filled in as the steps execute* carry two rows that were not, which is the one thing a
+record cannot afford. Its widget was 8,144 bytes and carried the alpha marker that decision 48
+removed, which is the difference these two rows ship.
 
 ## Rehearsed on anvil
 
