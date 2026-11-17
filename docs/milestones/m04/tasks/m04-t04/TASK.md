@@ -228,9 +228,17 @@ measured 2026-11-17 between 18:58 and 19:01 UTC unless another time is given; re
    record: extending `audit.sh` with `AUDIT_KIND=frontend`; running one model only (two labs is the
    whole independence claim, `audits/README.md` § Known limits).
    - `audits/SCOPE.frontend`: `app/src/index.html`, `app/src/model.js`, `app/src/eth.js`,
-     `app/src/widget.js`, `app/src/layout.html`, `app/build.mjs`, with a comment block giving each
-     exclusion its reason (`app/src/host.html` dev foil, never uploaded; `app/src/theme.css` no
-     script; `test/` not shipped).
+     `app/src/widget.js`, `app/src/layout.html`, `app/build.mjs`, and the three modules `build.mjs`
+     imports (`app/build.mjs:18-20`): `app/inline-scripts.mjs`, `app/broadcast.mjs`,
+     `app/version.mjs` — nine files — with a comment block giving each exclusion its reason
+     (`app/src/host.html` dev foil, never uploaded; `app/src/theme.css` no script; `test/` not
+     shipped). *Amended 2026-11-17 at the engineer's question before step 6 ran: the list as scoped
+     named six files and stopped at `build.mjs`; two of the values `build.mjs` substitutes into the
+     document are computed in `version.mjs` and `broadcast.mjs`, and `inline-scripts.mjs` is the
+     guard that keeps the DOMParser swap executing our scripts at all, so auditing the injection
+     point without its inputs reviews the pipe and not the water. `audits/SCOPE` excludes `build.mjs`
+     as build tooling; this task's list reverses that for the front end deliberately, and the three
+     helpers go with it.*
    - `audits/prompts/frontend-leg.md`: the same frame as `leg.md` (two legs, a third reconciles,
      do not soften), the `<!-- SCOPE -->` marker, no skill, and the surfaces named: the document is
      served by a third party's gateway that injects its own script before ours
