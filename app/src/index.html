@@ -27,9 +27,9 @@
    and replacing those two files reskins the app without touching this one.
    Addresses and the chain are substituted by app/build.mjs; a deployed contract's token is its name,
    uppercased, between double underscores. DEV-fenced blocks are stripped unless the build is --dev. */
-/* `featuredSalt` is the dev chain's seeded distribution, as a salt and never as an address: the
-   address is `factory.predict(salt)`, which the page reads at boot rather than carrying a token per
-   chain. `factoryBlock` is the block the factory was created in, so a `Created` scan never starts at
+/* `featuredSalt` is the featured distribution, as a salt and never as an address, picked per chain by
+   mk/15-seed.mk: the address is `factory.predict(salt)`, which the page reads at boot rather than
+   carrying a token per chain. `factoryBlock` is the block the factory was created in, so a `Created` scan never starts at
    genesis on a real chain. */
 const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTRIBUTIONFACTORY__', factoryBlock: '__DISTRIBUTIONFACTORY_BLOCK__', featuredSalt: '__FEATURED_SALT__', app: '__APP__' };
 const CONTRACTS = [['DistributionFactory', CFG.factory]];

@@ -38,7 +38,8 @@
 - `scripts/forge/Seed.s.sol` creates the *featured* distribution every dev chain carries: a two-row
   table, a 1 ETH deposit and one queued change. It is not a `Deploy*.s.sol` — that loop runs with no
   environment, and the seed needs `FACTORY`. `mk/15-seed.mk` runs it between the deploy and the dapp
-  build and owns `FEATURED_SALT`, whose top 20 bytes are `SENDER` as decision 10 requires. The salt is
+  build and owns `FEATURED_SALT`, whose top 20 bytes are its creator as decision 10 requires: the
+  seed's salt on chain 31337, the DNZN fee distribution's on every other chain (#193). The salt is
   the only build token; the address is `predict(salt)`, which the page reads at boot, so the same salt
   gives the same address on every chain while the table differs by `block.chainid`. A salt that already
   has code is left alone rather than re-created (#22).
