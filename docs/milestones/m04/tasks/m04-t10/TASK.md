@@ -136,7 +136,7 @@ Every figure is read at the review head, not quoted from here.
   Base Sepolia `l1Fee`s, and the engineer's balance delta equal to the sum on each chain.
 - **The runbook has two entry points:** `RUNBOOK.md` has a § Which run is this section before § 0 with
   the two-row table; Step 4 names its own variables and its `cast nonce $APP` precondition no longer
-  says "must be 1" (`grep -n "must be 1" RUNBOOK.md` prints nothing); § Uploads exists with two rows.
+  says "must be 1" (`grep -n "must be 1:" RUNBOOK.md` prints nothing; the pattern carries the colon because `must be 141 chars`, the proxy-size comment, also matches the bare form: 1 hit on `main` at `6394f16`, measured 2026-11-17); § Uploads exists with two rows.
   **The reviewer's test:** following Run B from the runbook alone, with `HANDOFF.md` and this file
   closed, every command in Step 4 is runnable with the variables Step 4 itself lists — the architect
   does this walk at review and names any command that needed another document.
