@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 /* Emit step 4's five calldatas, in execution order, for the Ops vault, and the batch that carries them.
 
-   node tools/step4-calldata.mjs --chain 11155111 [--app 0x…] [--vault 0x…] [--out docs/…/calldata]
+   node tools/step4-calldata.mjs --chain 11155111 --rpc "$RPC" --out calldata
+   node tools/step4-calldata.mjs --chain 31337 --app-nonce 1 --out /tmp/rehearsal   # offline
+
+   One of `--rpc` or `--app-nonce` is required: the pointers are `App`'s CREATE addresses, so a
+   wrong nonce yields calldata that is reproducible and points at the wrong contracts.
 
    Step 4 is an Ops-vault action (decision 44, #178): `App`'s chunk setters are `onlyOwner` and the
    owner is the vault, so the engineer proposes the bytes and the product owner signs them. These files
@@ -57,7 +61,7 @@ const arg = (name, fallback) => {
 
 const chain = arg('chain');
 if (!chain) {
-  console.error('usage: node tools/step4-calldata.mjs --chain <id> [--app 0x…] [--vault 0x…] [--out <dir>]');
+  console.error('usage: node tools/step4-calldata.mjs --chain <id> (--rpc <url> | --app-nonce <n>) [--app 0x…] [--vault 0x…] [--out <dir>]');
   process.exit(2);
 }
 /* `App` is the same address on every chain of RUNBOOK § 1 (decision 35), so this is a default and
@@ -103,10 +107,49 @@ calls.push({
 });
 
 /* SSTORE2 pointers are `App`'s own CREATE addresses, so they are the account-nonce sequence from
-   `cast nonce $APP` — 1 here, read in step 0 — in the order the `add*Chunk` calls above execute.
-   `cast nonce` is the right instrument for `App` and the wrong one for the vault, whose digests use
-   its internal `nonce()`. */
-const appNonce = Number(arg('app-nonce', '1'));
+   `cast nonce $APP`, in the order the `add*Chunk` calls above execute. `cast nonce` is the right
+   instrument for `App` and the wrong one for the vault, whose digests use its internal `nonce()`.
+
+   This used to default to 1, which was right for the first upload on a fresh `App` and silently
+   wrong for every upload after it: the pointers would be computed for CREATEs that had already
+   happened, `setChunks` would be handed addresses that already hold code, and the calldata would
+   look reproducible while pointing at the wrong three contracts. So there is no default. Pass
+   `--rpc` and the nonce is read from the chain, or pass `--app-nonce` for an offline run such as
+   the anvil rehearsal; with neither, this exits non-zero rather than guessing. */
+const rpc = arg('rpc');
+const nonceFlag = arg('app-nonce');
+if (nonceFlag === undefined && rpc === undefined) {
+  console.error(
+    'step4-calldata: refusing to guess `App`\'s nonce — the pointers are its CREATE addresses.\n' +
+    '  pass --rpc <url> to read `cast nonce <app>` from the chain, or\n' +
+    '  pass --app-nonce <n> for an offline run (the anvil rehearsal).',
+  );
+  process.exit(2);
+}
+/* `Number('')` is 0, not NaN, so a blank `--app-nonce` would pass an `isInteger && >= 0` check and
+   silently become nonce 0 — the same silently-wrong-nonce failure this whole change exists to stop,
+   one layer in. Match the digits before converting. */
+const digits = (s) => /^[0-9]+$/.test(String(s).trim());
+if (nonceFlag !== undefined && !digits(nonceFlag)) {
+  console.error(`step4-calldata: --app-nonce must be a non-negative integer, got ${JSON.stringify(nonceFlag)}`);
+  process.exit(2);
+}
+const appNonce = nonceFlag !== undefined
+  ? Number(String(nonceFlag).trim())
+  : Number(String(cast('nonce', app, '--rpc-url', rpc)).trim());
+if (!Number.isInteger(appNonce) || appNonce < 0) {
+  console.error(`step4-calldata: App nonce is not a non-negative integer: ${JSON.stringify(appNonce)}`);
+  process.exit(2);
+}
+if (nonceFlag !== undefined && rpc !== undefined) {
+  /* Both given and disagreeing is the stale-calldata bug this change exists to stop, so it is a
+     stop rather than a precedence rule. */
+  const live = Number(cast('nonce', app, '--rpc-url', rpc));
+  if (live !== appNonce) {
+    console.error(`step4-calldata: --app-nonce ${appNonce} disagrees with the chain's ${live} for ${app}`);
+    process.exit(2);
+  }
+}
 const pointers = [];
 for (let i = 0; i < calls.length; ++i) {
   pointers.push(cast('compute-address', app, '--nonce', String(appNonce + i)).split(/\s+/).pop());
