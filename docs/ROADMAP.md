@@ -17,7 +17,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 | [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain, and Denizen has ironed out the experience against it | done 2026-10-26 — t01 (#33), t02 (#40), t03 (#52), t04 (#60), t05 (#65), t06 done; Phase 5 signed off by Denizen in [#73](https://github.com/dnznlabs/rake/pull/73) |
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | **done 2026-11-07** — ten tasks (t01–t10), three two-leg reviews (`audits/2026-10-30`, `10-31`, `11-06`), 14 `SECURITY.md` rows, decisions 20–40; `src/` final at `3ad48ec` ([#153](https://github.com/dnznlabs/rake/pull/153)), `FACTORY_SALT`/`APP_SALT` mined against it (decision 37: `0x00D18B5b…`, `0x00A90943…`), `RUNBOOK.md` rehearsed on two anvils with the real Creator key; DNZN's predicted address `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`; criteria 1–8 re-run in [CLOSEOUT.md](milestones/m03/CLOSEOUT.md) |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | in progress — scoped 2026-11-07: seven tasks in four phases (Phase 1 done the same day: the dapp's carried items #164 and the `web3://` gateway in the dev stack #163, the ERC-5219 surface's first real consumer; then Slither as a third audit leg gating the deploy, invariant tests beside it, the runbook for real, then the gateway and a host page, then a scripted wallet session with a signoff line); two decisions open ([#156](https://github.com/dnznlabs/rake/issues/156) the test host, [#157](https://github.com/dnznlabs/rake/issues/157) DNZN's testnet table); needs testnet ETH on two keys and an Etherscan API key |
-| [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; DNZN's own 60/40 distribution live under the Ops multisig with a 7-day delay; dapp mirrored and widget embedded in one DNZN app | not started |
+| [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; the DNZN fee distribution live at its Sepolia address with the Sepolia table, the Ops vault as owner and a 7-day delay (decision 50); dapp mirrored and widget embedded in one DNZN app | not started |
 | [M06 — Owner integrations](milestones/m06/MILESTONE.md) | Optional, after mainnet. When the connected wallet is a member of the owner rather than the owner, route `propose`/`cancel` into the multisig vault's or Majeur DAO's own submit flow instead of copy-calldata. UI only; no contract change | not started |
 
 ## Order
@@ -709,6 +709,29 @@ convention. Numbered 45 because 44 is taken by
     ruling and #193's re-upload are unchanged. Consequence for M05: Step 6 (`create` from the Creator
     key at that salt) is a precondition of the page reading correctly on each mainnet, not an
     optional last step.
+
+50. **The mainnet DNZN distribution is the Sepolia one, `0x71a4221974Fc2E95081AE513248918dF27CF7a4A`,
+    with a 7-day delay and the Ops vault as owner.** Ruled by Denizen on 2026-11-17 (Telegram,
+    00:19 CST: "this is the distro i want to create on all chains - refer to sepolia
+    name/beneficiaries/etc … except on mainnets 7d instead of 1h"; 00:27 CST: "yes, on mainnets the
+    ops vault should be owner"). Read from chain on 2026-11-17 (`cast call` via publicnode Sepolia and
+    `sepolia.base.org`, identical on both): description `DNZN // FEE DISTRIBUTION`; table, ascending
+    by account, `0x00b6E7D12EdE9Ca4A74fE69be758aAB1ee02cFb9` 2,000 bps `treasury` "long-term growth,
+    future projects" · `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790` 4,000 bps `ops` "infrastructure,
+    services, tokens" · `0x357836fFcB45307FA7ff2A574F505753c961902B` 4,000 bps `creator` "founding
+    engineer, product vision"; salt `0x357836ff…902b` + `…0001`; owner on the testnets the Creator EOA,
+    delay 3,600 s. On every mainnet: the same description, table and salt, so `predict()` gives the same
+    address wherever the factory is at its one address; `DNZN_DELAY` 604,800; `OWNER` the Ops vault
+    `0x00c0e887…3790`, passed as `create`'s `owner_` directly — `create(owner_, …)` sets the owner, so
+    no `transferOwnership`/`acceptOwnership` round follows. Ops is 2-of-3 with a 3,600 s timelock on all
+    six mainnets rake targets (handbook `docs/multisig-transactions.md`, read 2026-10-30), so an owner
+    action on the distribution is two signatures, Ops's hour, then the distribution's seven days. The
+    `create` itself still comes from the Creator key: the salt's top 20 bytes must be `msg.sender`
+    (decision 10). Corrects the M05 row and RUNBOOK § Step 6, which said "60/40": the table is
+    20/40/40 and has been since the Sepolia `create`; the ROADMAP row was written before it existed.
+    Rejected: the Creator EOA as owner, as on Sepolia (a 7-day delay guards a mistaken action, not a
+    compromised single key, and this contract routes DNZN's fees); `create` then transfer to Ops (two
+    extra transactions for a value `create` already takes).
 
 ## Findings carried forward
 
