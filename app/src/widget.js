@@ -194,7 +194,7 @@ function render(el){
   /* ROADMAP decision 45: the word, and no anchor to carry it — decision 12's one outbound link is
      `data-link`'s, and this file promises no link unless the host asks. On `foot` because both
      variants paint `foot`, so the compact bar cannot be the one that omits it. */
-  var foot='alpha · '+(snap.delay?'delay '+fmtDelay(snap.delay):'no delay')+' · owner '+short(snap.owner)+' · '+short(addr)+' · '+esc(cname(cid))
+  var foot=(snap.delay?'delay '+fmtDelay(snap.delay):'no delay')+' · owner '+short(snap.owner)+' · '+short(addr)+' · '+esc(cname(cid))
   +(link===null?'':' · <a href="'+esc((link||(SRC?new URL('./',SRC).href:location.href)).split('#')[0]+'#/distros/'+addr)+'"'+(SRC?' target="_blank" rel="noopener"':'')+'>view ↗</a>');
   if(compact){
    el.innerHTML=bar(snap.table,'rk-b',1)
