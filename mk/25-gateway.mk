@@ -8,5 +8,6 @@ export GATEWAY_PORT
 gateway: ## Run the web3url-gateway by hand (make serve runs it as a process)
 	bash tools/gateway.sh
 
+# Against a hosted gateway instead of the dev stack: APP=… RPC=… GATEWAY_BASE=… make gateway-check
 gateway-check: ## Prove the ERC-5219 surface works through a real gateway
 	@bash tools/gateway-check.sh
