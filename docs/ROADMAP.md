@@ -747,6 +747,40 @@ convention. Numbered 45 because 44 is taken by
     distribution" is left as written. Rejected: `DNZN // DISTRIBUTION` (claims nothing, and says
     nothing).
 
+52. **The dapp caches finalized event logs in IndexedDB, per chain and distribution, evicted by last
+    visit.** Ruled by Denizen on 2026-11-17 (Telegram DM, 11:09 CST). Option 1 of three: one object
+    store keyed `[chainId, address]` holding the three raw `eth_getLogs` results a distribution's
+    history is built from, complete up to the chain's `finalized` block as of the last visit; each load
+    reads `finalized` once (`eth_getBlockByNumber`), serves the record, scans only the tail above it
+    live, and persists only what is at or below `finalized`; a provider that refuses the tag gets
+    `head − 1000`, said in a comment. Records are never trimmed internally; across distributions, one
+    not opened in 30 days is dropped whole, and the store holds at most 50, least recently visited
+    first. The schema version is in the key, so a decoder change starts clean. With storage
+    unavailable the page behaves as it does today. `app/` only; `logs()` and `histLogs()` are wrapped
+    and nothing above them changes. Amended the same day (11:10 CST): the `#/docs` page gains a
+    Cache section — what is stored, count and bytes, the eviction rule, a `clear cache` control — with
+    its wording a draft under decision 17. **Why:** the history budget is 40 windows per log kind
+    (m04-t01, #76), 120 `eth_getLogs` per page load once the span from the factory block exceeds the
+    budget on an uncapped provider — 400,000 blocks at the 10,000-block start — and the scan is paid
+    on every load, so it only gets heavier as the chain ages. Measured 2026-11-17: Base and Base
+    Sepolia mint a block every **0.2 s** (10,000 blocks in 2,000 s on both `mainnet.base.org` and
+    `sepolia.base.org`), so that span is under a day of factory age and the Base Sepolia factory,
+    9.0 days old, is already 3.9 million blocks back; on a 12 s chain it is about 56 days. A cached
+    load reads the tail above `finalized` — 4,387 blocks on Base and 6,500 on Base Sepolia at one
+    read the same day, 81 on Sepolia — one window per kind uncapped, so the 120 becomes 3 after the
+    first load and stays 3 as the chain grows. Closes
+    [#165](https://github.com/dnznlabs/rake/issues/165) against the per-load figure m04-t12 measures,
+    rather than by a block-target budget; m04-t12 must merge before M05 uploads the mainnet document,
+    or every mainnet chain pays a chunk re-upload for it. **Rejected:** (2) leave the scan as is and
+    close #165 with a block-target budget — still the full scan on every load, and the only option
+    that gets dearer with time; (3) a `createdBlock` on the clone so the scan starts at the right
+    block — still rescans the whole lifetime every load, and touches clone storage, which is frozen
+    (decision 5, `src/` final since M03). Also rejected: a service worker caching JSON-RPC responses
+    (keyed by request body, and every window boundary differs, so the hit rate is near zero), and
+    per-record age expiry (the `Applied`-to-`Queued` matching, the recognised-token list and the
+    escrow rows are derived from the whole lifetime of logs, and a trimmed record breaks them with
+    nothing on the page to say so). Task: [m04-t12](milestones/m04/tasks/m04-t12/TASK.md).
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
