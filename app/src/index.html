@@ -349,6 +349,15 @@ async function readClock() {
   CLOCK = { t: parseInt(b.timestamp, 16), at: Date.now() };
 }
 const isAddr = v => /^0x[0-9a-fA-F]{40}$/.test(v);
+const isWord = v => /^0x[0-9a-fA-F]{64}$/.test(v);
+/* The shape of a value `ext` is about to write, checked at the sink that writes it. Every `v` that
+   reaches `ext` came from a provider — a hash from `eth_sendTransaction`, a topic or an address from
+   `eth_getLogs`, an account from `eth_accounts` — and nothing between that call and here checks it:
+   `Eth.checksum` (`app/src/eth.js:183-186`) lowercases and re-cases its input but passes every other
+   character through, so it is not a filter. 20 bytes for an address, 32 for a hash, and a kind this
+   does not name fails closed, so a call site added with a fourth kind is inert and not raw
+   (`test/ext.test.mjs` pins both halves). */
+const shaped = (kind, v) => kind === 'address' ? isAddr(v) : (kind === 'tx' || kind === 'hash') && isWord(v);
 // EIP-55: one case throughout carries no checksum and passes; mixed case has to be the checksum itself.
 const checksumOk = v => { const h = v.slice(2); return h === h.toLowerCase() || h === h.toUpperCase() || Eth.checksum(v) === v; };
 const BAD_SUM = 'checksum does not match — a character is likely wrong';
@@ -361,12 +370,18 @@ const COPY = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke
 // `inLink` drops the ↗ for a value printed inside an <a>: a nested <a> makes the parser close the
 // outer one early, and the row's later cells fall out of its grid (only on a chain with an explorer).
 const ext = (kind, v, text, inLink) => {
+  /* A value that is not the shape its kind promises is printed escaped and alone. There is nothing
+     to copy and nothing an explorer could open, so the copy icon and the ↗ go with the shape, and
+     the answer reads as the malformed answer it is rather than as a short address. */
+  if (!shaped(kind, v)) return `<span title="malformed ${esc(kind)} from the provider">${esc(v)}</span>`;
   const known = kind === 'address' ? NAMED.get(String(v).toLowerCase()) : null;
   const body = known ? esc(known) : text, mark = kind === 'address' ? ` data-addr="${v}"` : '';
   return `<span title="${v}"${mark}>${body}</span><span class="cp" role="button" tabindex="0" title="copy" aria-label="copy ${v}" data-copy="${v}">${COPY}</span>`
     + (EXPLORER[CFG.chainId] && kind !== 'hash' && !inLink ? ` ${xlink(kind, v, '↗')}` : '');
 };
-const xlink = (kind, v, text) => EXPLORER[CFG.chainId]
+// The same check again rather than once in `ext`: `xlink` builds an `href` of its own and is one
+// call away from being used on its own, so the guard belongs where the attribute is written.
+const xlink = (kind, v, text) => EXPLORER[CFG.chainId] && shaped(kind, v)
   ? `<a class="xl" href="${EXPLORER[CFG.chainId]}/${kind}/${v}" target="_blank" rel="noopener" title="open in explorer">${text}</a>` : '';
 // `navigator.clipboard` needs a secure context; a gateway or file:// page may not be one, so the old
 // selection copy is the fallback. `on` is the copied state for a moment, like every state, a class.
