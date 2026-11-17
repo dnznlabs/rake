@@ -5,6 +5,15 @@
 #   devbox run -- make gateway-check
 #   APP=0x... devbox run -- tools/gateway-check.sh
 #
+# Or against a hosted gateway, by giving GATEWAY_BASE a full origin with no trailing slash and RPC
+# the chain that origin serves:
+#
+#   APP=0x... RPC=https://... GATEWAY_BASE=https://<app>.<chainId>.w3link.io \
+#     devbox run -- make gateway-check
+#
+# The hosted case is a mode, not a fork: the same assertions over the same strip-and-compare, since
+# the equality below is the thing that must not drift between the two.
+#
 # What it asserts, each with the value it measured:
 #   GET /          200, text/html, the three Web3-* headers that prove the 5219 path was taken
 #                  (not `html()`), and — after removing the block the gateway injects — a body that
@@ -27,6 +36,16 @@ cd "$root"
 GATEWAY_PORT=${GATEWAY_PORT:-8787}
 ANVIL_PORT=${ANVIL_PORT:-8545}
 RPC=${RPC:-http://127.0.0.1:$ANVIL_PORT}
+GATEWAY_BASE=${GATEWAY_BASE:-}
+
+# A hosted gateway serves one chain, and `html()` read from anvil and compared to a testnet gateway
+# is exactly the silent wrong-chain comparison this check exists to catch. So RPC must be named
+# explicitly, and this refuses before it reaches the network — not after a green run on nothing.
+if [ -n "$GATEWAY_BASE" ] && [ "$RPC" = "http://127.0.0.1:$ANVIL_PORT" ]; then
+  echo "gateway-check: GATEWAY_BASE=$GATEWAY_BASE needs RPC set to the chain that base serves;" >&2
+  echo "               RPC is unset or still the loopback default ($RPC)." >&2
+  exit 1
+fi
 
 fails=0
 ok()   { printf '  ok      %s: %s\n' "$1" "$2"; }
@@ -53,13 +72,33 @@ trap 'rm -rf "$tmp"' EXIT
 
 # One place that knows how to reach the gateway, so a stopped gateway fails here and nowhere else.
 fetch() { # fetch <host> <path> <headers-out> <body-out>
-  curl -s -D "$3" -o "$4" --resolve "$1:$GATEWAY_PORT:127.0.0.1" "http://$1:$GATEWAY_PORT$2" \
-    || { echo "gateway-check: no gateway at http://127.0.0.1:$GATEWAY_PORT ('make serve' starts one)"; exit 1; }
+  if [ -n "$GATEWAY_BASE" ]; then
+    curl -s -D "$3" -o "$4" "$GATEWAY_BASE$2" \
+      || { echo "gateway-check: no gateway at $GATEWAY_BASE (asked for $GATEWAY_BASE$2)"; exit 1; }
+  else
+    curl -s -D "$3" -o "$4" --resolve "$1:$GATEWAY_PORT:127.0.0.1" "http://$1:$GATEWAY_PORT$2" \
+      || { echo "gateway-check: no gateway at http://127.0.0.1:$GATEWAY_PORT ('make serve' starts one)"; exit 1; }
+  fi
 }
 status() { sed -n '1s/\r$//p' "$1" | awk '{print $2}'; }
 header() { grep -i "^$2:" "$1" | sed 's/\r$//' | head -1 | cut -d' ' -f2-; }
 
-echo "gateway-check: App $APP via http://$H:$GATEWAY_PORT/"
+# The hosted service's caching, measured and never asserted: a `hit` carrying the old document after
+# an upload is a finding for the session that uploaded, not a failing gate. The dev gateway sends
+# neither header, so this stays quiet unless a hosted base asked for it.
+cache_note() { # cache_note <path> <headers-out>
+  [ -n "$GATEWAY_BASE" ] || return 0
+  local cs age
+  cs=$(header "$2" Web3UrlGateway-Cache-Status || true)
+  age=$(header "$2" Age || true)
+  note "cache headers $1" "web3urlgateway-cache-status: ${cs:-(absent)}, age: ${age:-(absent)}"
+}
+
+if [ -n "$GATEWAY_BASE" ]; then
+  echo "gateway-check: App $APP via $GATEWAY_BASE/ (hosted; html() from $RPC)"
+else
+  echo "gateway-check: App $APP via http://$H:$GATEWAY_PORT/"
+fi
 
 echo "GET / — the document"
 fetch "$H" "/" "$tmp/h" "$tmp/root.html"
@@ -68,6 +107,7 @@ starts "content-type"                    "$(header "$tmp/h" Content-Type)" "text
 is     "web3-resolve-mode"               "$(header "$tmp/h" Web3-Resolve-Mode)" resourceRequest
 is     "web3-mode-auto-method"           "$(header "$tmp/h" Web3-Mode-Auto-Method)" request
 is     "web3-contract-return-processing"  "$(header "$tmp/h" Web3-Contract-Return-Processing)" decodeErc5219Request
+cache_note "/" "$tmp/h"
 
 # `html()` byte-exactly: the raw ABI return, not a `cast` string decode, whose escaping would make a
 # byte comparison meaningless. Offset word, then length word, then the bytes.
@@ -79,9 +119,13 @@ printf '%s' "${hex:128:$((len * 2))}" | xxd -r -p >"$tmp/html.bin"
 # The block starts at `<script>` right after `<body>`'s `>` and ends with `</script>` plus the one
 # newline that closes html.patch. Minification puts `<body><script>` on one line, so this is a byte
 # span, not a line range. No JS can contain a literal `</script>`, so the first one is the closer.
+# `tail` writes to a file rather than into `grep -m1`: past the 64 KiB pipe buffer — which a 69 KB
+# document is — the early-exiting grep leaves tail with a SIGPIPE, and `pipefail` makes that the
+# status of the assignment, so the strip died with 141 on a body it had read correctly.
 body_off=$(grep -abo -m1 '<body>' "$tmp/root.html" | head -1 | cut -d: -f1)
 start=$((body_off + 6))
-rel=$(tail -c +$((start + 1)) "$tmp/root.html" | grep -abo -m1 '</script>' | head -1 | cut -d: -f1)
+tail -c +$((start + 1)) "$tmp/root.html" >"$tmp/after-body"
+rel=$(grep -abo -m1 '</script>' "$tmp/after-body" | head -1 | cut -d: -f1)
 removed=$((rel + 10))
 { head -c "$start" "$tmp/root.html"; tail -c +$((start + removed + 1)) "$tmp/root.html"; } >"$tmp/stripped.html"
 
@@ -99,6 +143,7 @@ echo "GET /widget.js — the resource"
 fetch "$H" "/widget.js" "$tmp/hw" "$tmp/widget.js"
 is     "status"       "$(status "$tmp/hw")" 200
 starts "content-type" "$(header "$tmp/hw" Content-Type)" "application/javascript"
+cache_note "/widget.js" "$tmp/hw"
 note   "served bytes" "$(wc -c <"$tmp/widget.js")"
 note   "app/dist/widget.js bytes" "$(wc -c <app/dist/widget.js)"
 if cmp -s "$tmp/widget.js" app/dist/widget.js; then
@@ -113,9 +158,16 @@ is "status" "$(status "$tmp/hn")" 404
 
 # Documented because it is surprising, not because it is the form to use: the gateway reads the last
 # two labels as its own host and the one before as the address, then falls back to defaultChain.
-echo "GET /widget.js on the three-label host $H3"
-fetch "$H3" "/widget.js" "$tmp/h3" "$tmp/w3.js"
-is "status" "$(status "$tmp/h3")" 200
+# On a hosted service that fallback is its default chain, not ours, so there is nothing here to
+# assert about a base the caller handed us whole.
+if [ -n "$GATEWAY_BASE" ]; then
+  echo "GET /widget.js on the three-label host"
+  printf "  skipped: three-label form is the dev gateway's\n"
+else
+  echo "GET /widget.js on the three-label host $H3"
+  fetch "$H3" "/widget.js" "$tmp/h3" "$tmp/w3.js"
+  is "status" "$(status "$tmp/h3")" 200
+fi
 
 if [ "$fails" -eq 0 ]; then
   echo "gateway-check: all assertions passed"
