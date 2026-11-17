@@ -1,6 +1,6 @@
 # M04 — Testnets
 
-Status: in progress · scoped 2026-11-07 · updated 2026-11-17 (t12 added, t11 from #215 scoped separately; t08 2026-11-08, t09 2026-11-12, t10 2026-11-17)
+Status: in progress · scoped 2026-11-07 · updated 2026-11-17 (t11 from #215 and t12 added; t08 2026-11-08, t09 2026-11-12, t10 2026-11-17)
 
 `RUNBOOK.md` executed for real, twice — Sepolia (11155111) and Base Sepolia (84532) — so that the
 factory, the implementation, `App` and DNZN's own distribution sit at the addresses M03 predicted
