@@ -865,7 +865,7 @@ function editorPaint(rows) {
   const el = document.getElementById('ed-bar');
   if (el) el.innerHTML = bar(preview, {}) + ticks(preview, {});
   const sum = document.getElementById('ed-sum');
-  if (sum) { sum.className = st.ok ? 'ok' : 'bad'; sum.innerHTML = `${rows.length} of ${S.maxRows} beneficiar${S.maxRows === 1 ? 'y' : 'ies'} · total <b>${+st.total.toFixed(2)}%</b>`; }
+  if (sum) { sum.className = st.ok ? 'ok' : 'bad'; sum.innerHTML = `${rows.length} beneficiar${rows.length === 1 ? 'y' : 'ies'} · total <b>${+st.total.toFixed(2)}%</b>`; }
   return st;
 }
 function editorBind(rows, redraw, after) {
