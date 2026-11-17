@@ -116,7 +116,9 @@ input.narrow{max-width:160px}
 /* The table editor, in create step 2 and in the drawer: four fields and a remove, on the frame's
    measure, so the live bar above lines up with the columns under it. */
 .erows{border-top:1px solid var(--ink)}
-.erow{display:grid;grid-template-columns:1fr 1.4fr 1.6fr 76px 24px;gap:10px;align-items:start;padding:10px 0;border-bottom:1px solid var(--rule)}
+.erow{display:grid;grid-template-columns:1fr 1.4fr auto 76px 24px;gap:10px;align-items:start;padding:10px 0;border-bottom:1px solid var(--rule)}
+/* A whole address at the input's own mono `ch`: 42 characters, plus its padding and border. */
+.erow .addr-in{width:calc(42ch + 28px)}
 .erow .bps{text-align:right;font-weight:700;font-size:15px}
 .erow .rm{color:var(--dim);font-size:15px;justify-self:end;padding:8px 0}
 .erow .rm:hover{color:var(--err)}
@@ -247,7 +249,7 @@ footer{display:flex;justify-content:space-between;border-top:1px solid var(--rul
 .rail{position:static;display:flex;flex-wrap:wrap;gap:2px 14px;line-height:1.8;border-bottom:1px solid var(--rule);padding-bottom:10px}
 .erow{grid-template-columns:1fr 72px 24px;row-gap:8px}
 .erow>:nth-child(1){grid-area:1/1}.erow>:nth-child(4){grid-area:1/2}.erow>:nth-child(5){grid-area:1/3}
-.erow>:nth-child(2){grid-area:2/1/auto/-1}.erow>:nth-child(3){grid-area:3/1/auto/-1}
+.erow>:nth-child(2){grid-area:2/1/auto/-1}.erow>:nth-child(3){grid-area:3/1/auto/-1}.erow .addr-in{width:100%;font-size:11px}
 .qrow{grid-template-columns:70px 1fr;row-gap:8px}.qrow>:nth-child(3){grid-column:2}}
 /* Narrower still. The sub-label goes, not the links: the Brand Sheet draws the nav lockup both ways
    (mark + RAKE, and mark + RAKE + DNZN LABS), so the short one is the sanctioned reduction and the two

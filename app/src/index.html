@@ -853,7 +853,7 @@ function editorHTML(rows) {
     + rows.map((r, i) => `<div class="erow">`
       + `<input aria-label="name" data-ed="name" data-i="${i}" value="${esc(r.name)}" placeholder="name">`
       + `<input aria-label="note" class="note-in" data-ed="note" data-i="${i}" value="${esc(r.note)}" placeholder="note (prose)">`
-      + `<div><input aria-label="address or name" data-ed="addr" data-i="${i}" value="${esc(r.addr)}" placeholder="0x… or .eth / .wei / .gwei"><div class="res" data-edres="${i}"></div></div>`
+      + `<div><input aria-label="address or name" class="addr-in" data-ed="addr" data-i="${i}" value="${esc(r.addr)}" placeholder="0x… or .eth / .wei / .gwei"><div class="res" data-edres="${i}"></div></div>`
       + `<input aria-label="percent" class="bps" data-ed="pct" data-i="${i}" value="${esc(r.pct)}" inputmode="decimal">`
       + `<button class="rm" data-edrm="${i}" title="remove" aria-label="remove this row">×</button></div>`).join('')
     + `</div><div class="sum"><button class="link" data-edadd="1">+ add a beneficiary</button><span id="ed-sum"></span></div>`;
