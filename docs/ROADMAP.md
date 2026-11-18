@@ -721,7 +721,9 @@ convention. Numbered 45 because 44 is taken by
     services, tokens" · `0x357836fFcB45307FA7ff2A574F505753c961902B` 4,000 bps `creator` "founding
     engineer, product vision"; salt `0x357836ff…902b` + `…0001`; owner on the testnets the Creator EOA,
     delay 3,600 s. On every mainnet: the same description, table and salt, so `predict()` gives the same
-    address wherever the factory is at its one address; `DNZN_DELAY` 604,800; `OWNER` the Ops vault
+    address wherever the factory is at its one address (**superseded by decision 54 on the address and
+    the salt**: the Sepolia salt begins with Denizen's EOA, so its address cannot be reached by the
+    Creator key; description, table, delay and owner stand); `DNZN_DELAY` 604,800; `OWNER` the Ops vault
     `0x00c0e887…3790`, passed as `create`'s `owner_` directly — `create(owner_, …)` sets the owner, so
     no `transferOwnership`/`acceptOwnership` round follows. Ops is 2-of-3 with a 3,600 s timelock on all
     six mainnets rake targets (handbook `docs/multisig-transactions.md`, read 2026-10-30), so an owner
@@ -814,6 +816,24 @@ convention. Numbered 45 because 44 is taken by
     cannot open a `web3://` URL today, so the dapp would have no browser-reachable address until they
     install a client or run a gateway, and the boundary would be no different for those who did
     neither.
+
+54. **DNZN's `create` is signed by the Creator key on every chain, testnets included, never by
+    Denizen's EOA.** Ruled by Denizen on 2026-11-18 (Telegram, 15:03 CST): "Oh yeah so it has the
+    same address salt. Yes creator key every where not my eoa". Closes M05-D2. Step 6 of `RUNBOOK.md`
+    runs as written: `SIGNER` re-exported to the DNZN Creator key `0x68e0741D8d693e14BF56914567eADdC130b186eE`
+    (decision 32, handbook `docs/multisig-transactions.md` § The DNZN Creator key), salt `DNZN_SALT`
+    = `CREATOR` ‖ `…0001` (§ 0 line 73), on all six mainnets and, in m05-t01, on Sepolia and Base
+    Sepolia again, so the DNZN distribution is one address everywhere the factory is. That address
+    is fixed when m05-t01's re-mined factory address is (decision 5, M05-D1) and is recorded there,
+    not here. `mk/15-seed.mk:10`'s `FEATURED_SALT_DNZN`, today Denizen's EOA salt, becomes the
+    Creator salt in t01's bundle (decision 49). Supersedes decision 50's address `0x71a4…7a4A` and
+    its "the `create` itself still comes from the Creator key" as a description of Sepolia: read on
+    2026-11-18, that distribution's salt and `owner()` are Denizen's EOA `0x3578…902B`, so it was his
+    EOA's create and the sentence never held; decision 50's description, table, delay and owner are
+    unchanged. Rejected: Denizen's EOA as the address-bearing key, as Sepolia stands (a beneficiary
+    row and a wallet in daily use would be part of the address on every chain forever, which decision
+    32 ruled out: "never an owner or a signer for anything else"); costs nothing now only because
+    M05-D1's redeploy is already forced.
 
 ## Findings carried forward
 
