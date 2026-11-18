@@ -7,10 +7,12 @@
    cannot resolve and the one-creation log it can. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assertPairable, creations, isCreate, pairable } from '../app/broadcast.mjs';
+import { spawnSync } from 'node:child_process';
+import { assertPairable, create2, creations, isCreate, pairable, PROXY } from '../app/broadcast.mjs';
+import { check } from '../app/values.mjs';
 import { marked, MARKER } from '../app/version.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -140,7 +142,9 @@ test('build.mjs refuses a withheld block by name rather than substituting one', 
      `substitute` turns a demand for it into the rake#140 refusal instead of "nothing to substitute". */
   assert.match(src, /else withheld\.set\(`\$\{name\}_BLOCK`/);
   assert.match(src, /for \(const k of missing\) if \(withheld\.has\(k\)\) assertPairable\(/);
-  assert.ok(src.indexOf('creations(log)') > 0, 'app/build.mjs does not pair through creations()');
+  /* `creations` takes the log and the name of the file it came from, which is what its own refusals
+     cite — a build that passed only the log would name no file in them. */
+  assert.ok(src.indexOf('creations(log, rel)') > 0, 'app/build.mjs does not pair through creations()');
   // The AC's grep: one reference to the issue, in the file whose refusal it explains.
   assert.equal((src.match(/rake#140/g) || []).length, 1);
 });
@@ -266,4 +270,301 @@ test('every broadcast log in this working tree passes the assertion', () => {
 
   assert.ok(wanted.size > 0, 'no source asks for a creation block — this test has stopped measuring anything');
   for (const k of wanted) assert.ok(offered.has(k), `__${k}__ is wanted by the bundle and no pairable log offers it`);
+});
+
+/* ---- every value has a declared shape, whatever the source (A1, A2, A6) --------------------- */
+
+/* The six tokens the Sepolia build resolves, read from `broadcast/` and `mk/15-seed.mk` and pinned
+   here as the one row that must pass: a table every real build fails is not a check, it is a stop. */
+const SEPOLIA = {
+  CHAIN_ID: '11155111',
+  VERSION: '0.1alpha',
+  DISTRIBUTIONFACTORY: '0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B',
+  DISTRIBUTIONFACTORY_BLOCK: '0xb88091',
+  FEATURED_SALT: '0x357836ffcb45307fa7ff2a574f505753c961902b000000000000000000000001',
+  APP: '0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE',
+};
+
+test('the values a real build resolves pass every declared shape', () => {
+  assert.deepEqual(check({ ...SEPOLIA }), SEPOLIA);
+  // Returned unchanged: this is a gate, not a normaliser, so nothing downstream reads a rewritten value.
+  assert.equal(check({ CHAIN_ID: '31337' }).CHAIN_ID, '31337');
+});
+
+/* One row per token with a value that must not reach a sink, each refused by name. The widths are
+   the argument of `app/values.mjs`: every one of these is admitted by a shape one character wider. */
+test('a value outside its declared shape is refused by name', () => {
+  const bad = [
+    // Hex where `CFG.chainId` is compared as a decimal string and parsed with `Number`.
+    ['CHAIN_ID', '0x1'],
+    // Leg 1's two reproductions: the quote that breaks out of the `CFG` literal, and the markup.
+    ['VERSION', "0.1alpha'"],
+    ['VERSION', '<img src=x onerror=alert(1)>'],
+    // `isAddr` passes and the checksum fails: a typo, and a different gzip size for the same address.
+    ['DISTRIBUTIONFACTORY', '0x00d18b5b72c4d8e7761776d1275b69d4dbcde71b'],
+    ['DISTRIBUTIONFACTORY', '0x' + 'g'.repeat(40)],
+    // The form `build.mjs:48` writes has no leading zero, and is hex rather than decimal.
+    ['DISTRIBUTIONFACTORY_BLOCK', '0x0b88091'],
+    ['DISTRIBUTIONFACTORY_BLOCK', '12'],
+    // 63 hex digits is not 32 bytes.
+    ['FEATURED_SALT', '0x' + 'a'.repeat(63)],
+  ];
+
+  for (const [token, value] of bad) {
+    assert.throws(() => check({ ...SEPOLIA, [token]: value }),
+      new RegExp(`__${token}__`), `${token}=${value} was not refused`);
+  }
+});
+
+test('the source of a failing value is named with it', () => {
+  /* The message is read by whoever has to fix the value, and where it came from is half of that:
+     the command line, a log in `broadcast/`, or this build's one default. */
+  assert.throws(() => check({ CHAIN_ID: 'nope' }, { CHAIN_ID: '--set' }), /from --set/);
+  assert.throws(() => check({ CHAIN_ID: 'nope' }, { CHAIN_ID: 'broadcast/Deploy.s.sol/1/run-latest.json' }),
+    /from broadcast\/Deploy\.s\.sol\/1\/run-latest\.json/);
+  assert.throws(() => check({ CHAIN_ID: 'nope' }), /from the default/);
+});
+
+test('a token with no declared shape fails closed rather than passing unchecked', () => {
+  /* The point of the table is that there is no such thing as an unchecked value: a new `__NAME__`
+     in the sources stops the build until someone states what it may be. */
+  assert.throws(() => check({ FOO: 'x' }), /no shape declared for __FOO__/);
+  assert.throws(() => check({ ...SEPOLIA, FOO: 'x' }), /add one to app\/values\.mjs/);
+});
+
+/* `--set` and `deployed()` are `build.mjs`'s own surface, so these run it. The refusal path leaves
+   `app/dist` as it was (`build.mjs:129-130`), which is why a *failing* build may be run here on the
+   tracked Sepolia logs; a green one would write `app/dist` and is deliberately not written. */
+const buildRun = (...set) => {
+  const dist = join(root, 'app/dist/index.html');
+  const before = existsSync(dist) ? statSync(dist).mtimeMs : null;
+  const r = spawnSync(process.execPath,
+    ['app/build.mjs', '--chain', '11155111', ...set.flatMap(s => ['--set', s])],
+    { cwd: root, encoding: 'utf8' });
+  const after = existsSync(dist) ? statSync(dist).mtimeMs : null;
+  return { ...r, before, after };
+};
+const DNZN = 'FEATURED_SALT=0x357836ffcb45307fa7ff2a574f505753c961902b000000000000000000000001';
+
+test('a --set value outside its shape stops the build and leaves app/dist alone', () => {
+  /* Leg 1's reproduction: `--set VERSION=…` discarded `version.mjs`'s validation entirely, because
+     nothing checked the merged values and `marked()` is never asked about an override. */
+  const r = buildRun(DNZN, "VERSION=0.1alpha'");
+
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /VERSION/);
+  assert.equal(r.after, r.before, 'a refused build wrote app/dist');
+});
+
+test('a --set key the substitution could never match is refused as the argument given', () => {
+  /* `substitute` matches `__[A-Z][A-Z0-9_]*__`, so `--set lowercase=1` set a key nothing would ever
+     read and the document kept its literal token — a flag that silently did nothing. */
+  const r = buildRun(DNZN, 'lowercase=1');
+
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /lowercase/);
+  assert.equal(r.after, r.before, 'a refused build wrote app/dist');
+});
+
+test('a --set over a value the log already gave says so on stderr and still builds', () => {
+  /* The override is the flag's documented purpose (`build.mjs:10`, `:72`); what R4 named is that it
+     was silent, so a bundle could be re-pointed at another factory leaving no trace of it. This
+     passes the log's own value, so the build is the one it would have made anyway. */
+  const r = buildRun(DNZN, `DISTRIBUTIONFACTORY=${SEPOLIA.DISTRIBUTIONFACTORY}`);
+
+  assert.equal(r.status, 0);
+  assert.match(r.stderr, /--set DISTRIBUTIONFACTORY overrides the log's 0x00D18B5b/);
+});
+
+test('build.mjs refuses a name two broadcast logs both create', () => {
+  const src = readFileSync(join(root, 'app/build.mjs'), 'utf8');
+
+  /* Pinned the way `:136-146` pins the withheld wiring: the surface is `deployed()`'s loop over
+     `broadcast/`, which no unit test can reach without a second tracked log creating the same name.
+     What used to happen is that the later directory won, with no notice. */
+  assert.match(src, /is created by/);
+  assert.ok(src.indexOf('if (name in out)') > 0, 'app/build.mjs does not refuse a repeated name');
+});
+
+/* ---- the log's addresses recomputed rather than believed (A3, A4) --------------------------- */
+
+const DEPLOYED = {
+  factory: '0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B',
+  impl: '0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0',
+};
+
+/* The two chains whose `Deploy.s.sol` log is tracked, and so the only two whose addresses are a fact
+   about this repository rather than about whoever last ran `make deploy`. A dev chain's log is read
+   for the property and not for the figures: `:245-251` records why a suite the acceptance criteria
+   gate on cannot depend on local deploy history. */
+const TRACKED = { 11155111: DEPLOYED, 84532: DEPLOYED };
+
+test('every Deploy log in this tree recomputes to the addresses it logs', () => {
+  /* The chains are read from the tree rather than listed here: a third deploy is covered the day its
+     log lands. The test skips if absent, as `:235-251` does. */
+  const dir = join(root, 'broadcast/Deploy.s.sol');
+  if (!existsSync(dir)) return;
+  const seen = [];
+  for (const chain of readdirSync(dir).sort()) {
+    const file = join(dir, chain, 'run-latest.json');
+    if (!existsSync(file)) continue;
+    const log = JSON.parse(readFileSync(file, 'utf8'));
+    const t = log.transactions.find(x => x.contractName === 'DistributionFactory');
+
+    // The address is a function of the salt and the init code the log itself carries.
+    assert.equal(t.transaction.to.toLowerCase(), PROXY);
+    const computed = create2(PROXY, t.transaction.input.slice(2, 66), '0x' + t.transaction.input.slice(66));
+    assert.equal(computed.toLowerCase(), t.contractAddress.toLowerCase(), `chain ${chain} factory`);
+
+    const got = creations(log, file);
+    assert.deepEqual(got.map(c => c.name), ['DistributionFactory', 'Distribution'], `chain ${chain} names`);
+    // The implementation is created inside the factory's constructor, so it carries no block of its own.
+    assert.deepEqual(got.map(c => c.block), [log.receipts[0].blockNumber, null], `chain ${chain} blocks`);
+    /* The two tracked testnets place at the addresses ROADMAP decision 50 and `RUNBOOK.md:69` state;
+       a dev chain's factory is a different address and only the recomputation above is asserted. */
+    if (TRACKED[chain]) {
+      assert.deepEqual(got.map(c => c.address.toLowerCase()),
+        [TRACKED[chain].factory.toLowerCase(), TRACKED[chain].impl.toLowerCase()], `chain ${chain} addresses`);
+    }
+    seen.push([chain, computed, got[1].address]);
+  }
+
+  // Both tracked chains were actually read: an empty loop asserts nothing.
+  for (const chain of Object.keys(TRACKED)) {
+    assert.ok(seen.some(([c]) => c === chain), `no Deploy log read for tracked chain ${chain}`);
+  }
+  console.log('recomputed:', JSON.stringify(seen));
+});
+
+test('an address the salt and init code do not produce is refused with both', () => {
+  /* The sentence of R4 this answers: a *valid* replacement address silently re-pointed the bundle at
+     another factory. One hex digit is the whole defect — the value passes every shape check there is. */
+  const real = JSON.parse(readFileSync(join(root, 'broadcast/Deploy.s.sol/11155111/run-latest.json'), 'utf8'));
+  const input = real.transactions[0].transaction.input;
+  const bent = DEPLOYED.factory.slice(0, -1) + (DEPLOYED.factory.slice(-1) === 'B' ? 'c' : 'B');
+  const log = {
+    transactions: [{ ...tx('0xaa', 'DistributionFactory', bent), transaction: { to: PROXY, input } }],
+    receipts: [receipt('0xaa', '0x7b')],
+  };
+
+  assert.throws(() => creations(log, 'broadcast/Deploy.s.sol/11155111/run-latest.json'), err => {
+    assert.match(err.message, /computed/);
+    assert.match(err.message, new RegExp(bent));
+    assert.match(err.message, new RegExp(DEPLOYED.factory));
+    assert.match(err.message, /run-latest\.json/);
+    return true;
+  });
+});
+
+test('a contractAddress that is not 20 hex bytes is refused before it is checksummed', () => {
+  /* `Eth.checksum` lowercases and re-cases and passes everything else through, so a `g` survives it
+     into the `CFG` literal. The filter has to be here. */
+  const log = { transactions: [tx('0xaa', 'DistributionFactory', '0x' + 'g'.repeat(40))], receipts: [receipt('0xaa', '0x7b')] };
+
+  assert.throws(() => creations(log, 'x.json'), err => {
+    assert.match(err.message, /not an address/);
+    assert.match(err.message, /x\.json/);
+    return true;
+  });
+});
+
+test('a creation that is not through the proxy keeps its logged address', () => {
+  /* A plain `CREATE` — which is what `Fixtures.s.sol`'s four mocks are — places at an address that
+     follows the sender's nonce, and the log does not carry it. Nothing to recompute from, so
+     nothing is asserted, and `make fixtures` stays non-fatal to the next build. */
+  const log = {
+    transactions: [tx('0xaa', 'MockERC20', '0x' + '4'.repeat(40), 'CREATE')],
+    receipts: [receipt('0xaa', '0x7b')],
+  };
+
+  assert.deepEqual(creations(log, 'x.json').map(c => c.address), ['0x' + '4'.repeat(40)]);
+});
+
+test('a name two transactions in one log both create is yielded twice, not collapsed', () => {
+  /* `creations` reports what the log says; which of two addresses a token takes is `deployed()`'s
+     refusal, pinned above. Collapsing here would hide the question from it. */
+  const log = {
+    transactions: [tx('0xaa', 'App', '0x' + '1'.repeat(40)), tx('0xbb', 'App', '0x' + '2'.repeat(40))],
+    receipts: [receipt('0xaa', '0x7b'), receipt('0xbb', '0x7c')],
+  };
+
+  assert.deepEqual(creations(log, 'x.json').map(c => c.address), ['0x' + '1'.repeat(40), '0x' + '2'.repeat(40)]);
+});
+
+/* ---- the hash join the pairing exists to protect (B1-B3) ------------------------------------ */
+
+/* One creation and one call, so every row below is a log `pairable` used to accept. */
+const joined = (txs, receipts) => ({ transactions: txs, receipts });
+
+test('two transactions under one hash are refused, naming the hash', () => {
+  /* Leg 1's reproduction: today `pairable` is `true` — one creation, two receipts for two
+     transactions — and the creation takes whichever block the Map kept last. */
+  const log = joined(
+    [tx('0xaa', 'DistributionFactory', '0x' + '1'.repeat(40)), tx('0xaa', null, null, 'CALL')],
+    [receipt('0xaa', '0x7b'), receipt('0xbb', '0x7c')],
+  );
+
+  assert.equal(pairable(log), false);
+  assert.throws(() => assertPairable('x.json', log), /share hash 0xaa/);
+});
+
+test('the shared hash with matching receipts is refused, which only uniqueness catches', () => {
+  /* Leg 1's reproduction in the shape every other check passes: one creation, two receipts for two
+     transactions, and *every* hash on one list present on the other — the set equality holds because
+     the two sets are both `{0xaa}`. The Map keeps the last receipt, so the creation takes `0x7c`,
+     which is the call's block and not its own. Uniqueness is the only test that sees it, which is
+     why this row is here beside the one above and not instead of it. */
+  const log = joined(
+    [tx('0xaa', 'DistributionFactory', '0x' + '1'.repeat(40)), tx('0xaa', null, null, 'CALL')],
+    [receipt('0xaa', '0x7b'), receipt('0xaa', '0x7c')],
+  );
+
+  assert.equal(pairable(log), false);
+  assert.throws(() => assertPairable('x.json', log), /share hash 0xaa/);
+  // And with the block withheld, nothing substitutes the figure that would have been wrong.
+  assert.equal(creations(log, 'x.json')[0].block, null);
+});
+
+test('a transaction with no receipt of its own is refused, naming the transaction', () => {
+  const log = joined(
+    [tx('0xaa', 'DistributionFactory', '0x' + '1'.repeat(40)), tx('0xbb', null, null, 'CALL')],
+    [receipt('0xaa', '0x7b'), receipt('0xaa', '0x7c')],
+  );
+
+  assert.equal(pairable(log), false);
+  assert.throws(() => assertPairable('x.json', log), /0xbb has no receipt/);
+});
+
+test('a receipt naming another contract than its transaction is refused with both', () => {
+  /* A plain `CREATE` carries the address in the receipt too, so where there are two answers they
+     have to agree — a receipt filed under the wrong transaction is exactly what m03-t06 found. */
+  const log = joined(
+    [tx('0xaa', 'MockERC20', '0x' + '1'.repeat(40), 'CREATE')],
+    [{ ...receipt('0xaa', '0x7b'), contractAddress: '0x' + '3'.repeat(40) }],
+  );
+
+  assert.equal(pairable(log), false);
+  assert.throws(() => assertPairable('x.json', log), err => {
+    assert.match(err.message, /names/);
+    assert.match(err.message, /0x3{40}/);
+    assert.match(err.message, /0x1{40}/);
+    return true;
+  });
+});
+
+test('a creation whose receipt reverted gives up no block', () => {
+  /* A failed transaction still has a receipt and a block; the contract it names was never created. */
+  const log = joined(
+    [tx('0xaa', 'DistributionFactory', '0x' + '1'.repeat(40))],
+    [{ ...receipt('0xaa', '0x7b'), status: '0x0' }],
+  );
+
+  assert.equal(pairable(log), false);
+  assert.throws(() => assertPairable('x.json', log), /status 0x0/);
+});
+
+test('the one-creation log every deploy script writes still pairs and gives up its block', () => {
+  // The control for the four rows above: the checks refuse the broken shapes and not the real one.
+  assert.equal(pairable(ONE), true);
+  assert.equal(creations(ONE)[0].block, '0x7b');
 });

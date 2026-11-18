@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import Eth from './src/eth.js';
 import { assertInlineScripts } from './inline-scripts.mjs';
 import { assertPairable, creations } from './broadcast.mjs';
+import { check } from './values.mjs';
 import { marked } from './version.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -35,35 +36,51 @@ const chain = flag('chain', '31337');
    join) and no block at all. `withheld` remembers which, so a bundle that turns out to need one of
    them is refused with the reason rather than with "nothing to substitute" — see rake#140. */
 function deployed() {
-  const out = {}, withheld = new Map(), dir = join(root, 'broadcast');
-  if (!existsSync(dir)) return { out, withheld };
+  const out = {}, withheld = new Map(), from = {}, dir = join(root, 'broadcast');
+  if (!existsSync(dir)) return { out, withheld, from };
   for (const script of readdirSync(dir).sort()) {
     const file = join(dir, script, chain, 'run-latest.json');
     if (!existsSync(file)) continue;
+    /* Repo-relative in every message this log appears in: an absolute path under whoever ran the
+       build is not the string a reader greps the tree for. */
+    const rel = ['broadcast', script, chain, 'run-latest.json'].join('/');
     const log = JSON.parse(readFileSync(file, 'utf8'));
-    for (const c of creations(log)) {
+    for (const c of creations(log, rel)) {
       const name = c.name.toUpperCase();
+      /* This loop is directory-ordered, so a contract of the same name in a later script directory
+         used to replace the earlier address with no notice and point the bundle at whichever
+         `broadcast/` sorted last. Which of two is meant is not a build's choice to make. */
+      if (name in out) {
+        throw new Error(
+          `build: ${c.name} is created by ${from[name]} and ${rel}, so which address __${name}__\n`
+          + `       takes is not this build's to pick. Deploy it in one script, or pass\n`
+          + `       --set ${name}=0x… for the one this bundle means.`,
+        );
+      }
       /* Checksummed: the log is lowercase, and the same address two ways gzips to two sizes. */
       out[name] = Eth.checksum(c.address);
-      if (c.block != null) out[`${name}_BLOCK`] = '0x' + BigInt(c.block).toString(16);
-      else withheld.set(`${name}_BLOCK`, { file, log });
+      from[name] = rel;
+      if (c.block != null) {
+        out[`${name}_BLOCK`] = '0x' + BigInt(c.block).toString(16);
+        from[`${name}_BLOCK`] = rel;
+      } else withheld.set(`${name}_BLOCK`, { file, log });
       /* `__VERSION__` is `App`'s own second constructor argument plus the marker, read from the log
          that deployed it rather than hardcoded beside it: one source, and the marker comes off in a
          chunk re-upload instead of a redeploy (ROADMAP decision 45). */
       if (name === 'APP' && c.args && c.args.length > 1) {
         const version = marked(c.args[1]);
-        if (version != null) out.VERSION = version;
+        if (version != null) { out.VERSION = version; from.VERSION = rel; }
       }
     }
   }
-  return { out, withheld };
+  return { out, withheld, from };
 }
 
 /* A log whose `App` carries a version nobody recognises is a refusal with a reason, not a stack
    trace: the same shape every other stop in this file takes. */
-let onchain, withheld;
+let onchain, withheld, from;
 try {
-  ({ out: onchain, withheld } = deployed());
+  ({ out: onchain, withheld, from } = deployed());
 } catch (e) {
   console.error(e.message);
   process.exit(1);
@@ -71,11 +88,37 @@ try {
 /* No `VERSION` default: it is `onchain`'s, derived from the `App` creation above, and a chain whose
    log offers none leaves `__VERSION__` to the refusal below unless `--set VERSION=` supplies it. */
 const values = { ...onchain, CHAIN_ID: chain };
+/* Where each value came from, for the one message `check` throws: a value with a bad shape is a
+   question about the command line, or about a log, or about this file's one default. */
+const sources = { ...from, CHAIN_ID: 'the default' };
+/* The token grammar `substitute` matches below: a `--set` key outside it can never be substituted,
+   so the flag would silently do nothing and the document would keep its literal `__NAME__`. */
+const SET_KEY = /^[A-Z][A-Z0-9_]*$/;
 argv.forEach((a, i) => {
   if (a !== '--set') return;
-  const [k, ...v] = (argv[i + 1] || '').split('=');
-  values[k] = v.join('=');
+  const arg = argv[i + 1] || '';
+  const [k, ...v] = arg.split('=');
+  const value = v.join('=');
+  if (!SET_KEY.test(k) || value === '') {
+    console.error(`build: --set ${arg} is not NAME=value with NAME matching ${SET_KEY} and a non-empty value`);
+    process.exit(1);
+  }
+  /* Overriding a log's value is this flag's documented purpose (`:10`, `:72`); what R4 named is that
+     it was silent, so a bundle could be re-pointed at another factory leaving no trace of it. */
+  if (k in onchain) console.error(`build: --set ${k} overrides the log's ${onchain[k]} with ${value}`);
+  values[k] = value;
+  sources[k] = '--set';
 });
+
+/* One table for every source, checked once before anything is substituted: the log's addresses,
+   `marked()`'s output and the chain default alike. Checking at each source instead is what let
+   `--set VERSION=<img…>` past the validation `version.mjs` applies to the same token. */
+try {
+  check(values, sources);
+} catch (e) {
+  console.error(e.message);
+  process.exit(1);
+}
 
 /* Refuse rather than emit: a bundle holding a literal __NAME__ looks fine and fails at its first read. */
 function substitute(text, label) {
