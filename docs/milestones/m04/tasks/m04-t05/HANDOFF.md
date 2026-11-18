@@ -99,10 +99,24 @@ on the instrument: the method sees a gateway that updated.
 `web3urlgateway-cache-status: miss` with no `Age` — so m04-t04 § After the next Run B's expected
 residual, a `hit` serving the pre-Run-B document, is *not* what this is. Recorded, not explained.
 
-**The escalation point.** The upload executed 2026-11-18 **17:46:48Z–17:49:36Z** (§ Uploads, the six
-`executeQueued` calls), so TASK.md step 0's "within a day of the upload" expires **2026-11-19 ≈17:49Z**.
-At the time of writing it has not expired. If the check has still not passed by then, the question for
-Denizen is in § For Denizen: run Sepolia through a second gateway, or wait.
+**The escalation point, as TASK.md step 0 now reads.** The upload executed 2026-11-18
+**17:46:48Z–17:49:36Z** (§ Uploads, the six `executeQueued` calls), so step 0's "within a day of the
+upload" expires **2026-11-19 ≈17:49Z**. That deadline now belongs to **step 3 alone**: rake#248
+(merged `bc17d0e`) amended step 0 so that **the engineer's run (step 2) may use the project's own
+gateway** — m04-t02's `tools/gateway.sh` build at its pin, pointed at a public RPC for the chain
+under test, the authenticated path decision 53 names — when the primary's check is still failing at
+the time step 2 is ready. Step 3 keeps the primary, and if its check has not passed by that deadline
+the question in § For Denizen is whether to run Sepolia through the project's gateway or to wait.
+
+**`web3gateway.dev` is not a second path, and that was measured rather than assumed.** At 19:36Z it
+served Sepolia the same stale document as w3link — inflated sha256 `2d27b603…3f9a9d4a`, 142,989
+bytes, `web3urlgateway-cache-status: miss` — while its Base Sepolia copy was current, so that host
+discriminates by chain and is simply behind on Sepolia in the same way. The two share backing state:
+one instrument twice, not a second reading. The project's own build is independent precisely because
+it holds the software constant at the same pin and varies only the node.
+
+**Which gateway served step 2, and the primary's state at that time**, are recorded in step 2's
+section below, as the amended step 0 requires.
 
 ### The four URLs
 
@@ -320,16 +334,20 @@ in § The hosted gateway.
 ## Open questions
 
 **None.** The two things this task waits on are not decisions: the Sepolia gateway's check passing,
-which § For Denizen turns into a question only if it is still failing at 2026-11-19 ≈17:49Z, and
-m04-t04 AC (e)'s URL, which decision 41 already assigns to the Product Owner.
+which § For Denizen turns into a question only if it is still failing at 2026-11-19 ≈17:49Z **for
+step 3** — step 2 no longer waits on it, per the rake#248 amendment — and m04-t04 AC (e)'s URL, which
+decision 41 already assigns to the Product Owner.
 
 ## For Denizen
 
-1. **Sepolia's run cannot start yet.** Its hosted `gateway-check` fails because the gateway serves
-   the 2026-11-17 document. Base Sepolia is clear. If the check has not passed by **2026-11-19
-   ≈17:49Z** — a day after the upload executed — TASK.md step 0 asks you whether to run Sepolia
-   through a second gateway or to wait. Nothing about the chain's own document is in question: both
-   chains' `inflated sha256` match their builds exactly.
+1. **Your run on Sepolia is the one that waits; the engineer's is not, as of rake#248.** Sepolia's
+   hosted `gateway-check` fails because the gateway serves the 2026-11-17 document, unchanged across
+   about 22 hours and two uploads. Base Sepolia is clear. The amendment lets **step 2** run through
+   the project's own gateway build on a public RPC, so it proceeds; **step 3 keeps w3link**, and if
+   its check has not passed by **2026-11-19 ≈17:49Z** — a day after the upload executed — step 0 asks
+   you whether to run Sepolia through the project's gateway or to wait. Nothing about the chain's own
+   document is in question: both chains' `inflated sha256` match their builds exactly, and the
+   gateway's own ERC-5219 calldata replayed against a neutral node returns the current document.
 2. **m04-t04 AC (e)'s host-page URL**, if you have published it — row (k) is `pending on t04 (e)`
    until it arrives, and criterion 5's live half with it.
 3. **The signoff line** goes under `docs/milestones/m04/MILESTONE.md` § Phases 4, in your own words,
