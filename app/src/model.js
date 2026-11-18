@@ -281,6 +281,22 @@ const Model = (() => {
     return undefined;
   }
 
+  /** Whether a reverse name is plain enough to print in place of an address.
+
+     R10 (`audits/2026-11-17/frontend/AUDIT.md:290-303`). A forward-confirmed name proves that its
+     holder set it, not that a reader can tell it from another name: a Cyrillic `і` or a zero-width
+     character makes a name that reads as someone else's, and the address it replaces then survives
+     only in a `title` and the copy icon. True only for lowercase ASCII letters, digits and hyphens
+     in at least two dot-separated labels, at most 64 characters, and nothing else — no
+     normalisation is attempted. ENSIP-15 belongs here in principle and is refused in practice: its
+     table is tens of kilobytes against a bundle this milestone is about to upload, and plain names
+     are the ones this page's visitors read. Case is the resolver's to normalise, not this gate's to
+     accept, so a name with a capital is refused rather than lowered. */
+  function plainName(name) {
+    const s = String(name);
+    return s.length <= 64 && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(s);
+  }
+
   /** EIP-137 namehash, over eth.js's own keccak. */
   function namehash(name) {
     let node = '0'.repeat(64);
@@ -288,6 +304,6 @@ const Model = (() => {
     return '0x' + node;
   }
 
-  return { SNAPSHOT_T, BENEFICIARY_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash, windows, rangeCap, isPruned, isWrappedRefusal, nonceOf };
+  return { SNAPSHOT_T, BENEFICIARY_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash, plainName, windows, rangeCap, isPruned, isWrappedRefusal, nonceOf };
 })();
 export default Model;

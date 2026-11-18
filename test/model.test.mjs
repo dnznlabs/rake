@@ -13,9 +13,9 @@ import Model from '../app/src/model.js';
 globalThis.Eth = Eth;
 
 const { SNAPSHOT_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt } = Model;
-const { revertMessage, tableFrom, parseDelay, wei, namehash } = Model;
+const { revertMessage, tableFrom, parseDelay, wei, namehash, plainName } = Model;
 const { windows, rangeCap, isPruned, isWrappedRefusal, nonceOf } = Model;
-const FUNCTIONS = ['countdown', 'dateText', 'deadline', 'decodePending', 'isPruned', 'isWrappedRefusal', 'namehash', 'nonceOf', 'ownerChange', 'ownerKind', 'parseDelay', 'pct', 'rangeCap', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei', 'windows'];
+const FUNCTIONS = ['countdown', 'dateText', 'deadline', 'decodePending', 'isPruned', 'isWrappedRefusal', 'namehash', 'nonceOf', 'ownerChange', 'ownerKind', 'parseDelay', 'pct', 'plainName', 'rangeCap', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei', 'windows'];
 const SET_BENEFICIARIES = 'setBeneficiaries((address,uint96,string,string)[])';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/abi');
@@ -544,4 +544,30 @@ test('the wrapped shape leaves the text classifiers exactly as they were', () =>
   assert.equal(rangeCap(WRAPPED.message), null);
   assert.equal(isPruned(PROVIDER_PRUNED.message), true);
   assert.equal(isPruned(WRAPPED.message), false);
+});
+
+test('plainName accepts a plain name and refuses one a reader cannot tell apart', () => {
+  /* R10 (`audits/2026-11-17/frontend/AUDIT.md:290-303`). A forward-confirmed name proves only that
+     its holder set it; these are printed in place of an address, so the gate is on legibility. */
+  assert.equal(plainName('vitalik.eth'), true);
+  assert.equal(plainName('a.b.c.eth'), true);
+
+  /* U+0456, Cyrillic small letter byelorussian-ukrainian i — a name that reads as `vitalik.eth`. */
+  assert.equal(plainName('v\u0456talik.eth'), false, 'a mixed-script name passed the gate');
+  /* U+200B, zero-width space: invisible, and two such names are indistinguishable on screen. */
+  assert.equal(plainName('vitalik\u200B.eth'), false, 'a zero-width character passed the gate');
+  /* Case is the resolver's to normalise, not this gate's to accept. */
+  assert.equal(plainName('Vitalik.eth'), false);
+  /* One label is not a name this page would print in place of an address. */
+  assert.equal(plainName('eth'), false);
+});
+
+test('plainName caps a name at 64 characters', () => {
+  /* The boundary either way: the cap is what stops a name that pushes the address off a row. */
+  const label = n => 'a'.repeat(n - 4) + '.eth';
+
+  assert.equal(label(64).length, 64);
+  assert.equal(plainName(label(64)), true, 'a 64-character name was refused');
+  assert.equal(label(65).length, 65);
+  assert.equal(plainName(label(65)), false, 'a 65-character name passed the cap');
 });

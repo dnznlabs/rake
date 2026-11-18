@@ -483,11 +483,23 @@ async function resolveName(acc) {
 }
 /* Reverse display, in place. Every address the page printed went through `ext`, which marked it, so
    one pass after the paint replaces the ones that have a name without re-rendering anything and
-   without any view having to know that names exist. On anvil `resolveName` returns before it asks. */
+   without any view having to know that names exist. On anvil `resolveName` returns before it asks.
+
+   The model's name gate is applied here rather than at each of the three resolvers: one check on
+   what this map stores covers the owner cell, "transfer pending to …" and every beneficiary row at
+   once, and a fourth resolver added later is gated by having arrived (R10). What it refuses is a
+   name a reader cannot tell from another — mixed scripts, zero-width
+   and bidi characters, a capital, no dot, over 64 characters. A forward-confirmed name proves that
+   its holder set it, not that it is distinguishable; an address that keeps its digits is the
+   smaller harm. */
 async function nameSweep() {
   const marked = [...document.querySelectorAll('[data-addr]')];
   const fresh = [...new Set(marked.map(n => n.dataset.addr.toLowerCase()))].filter(a => !NAMED.has(a));
-  await Promise.all(fresh.map(async a => { NAMED.set(a, null); NAMED.set(a, await resolveName(a)); }));
+  /* The gate is on what is stored, not on what a reader writes: `ext` prints this map's value too
+     (`:399`), so a name refused only at the write below would still reach the next repaint through
+     it. A refused name caches as `null`, which is what "no record" already is, so the address
+     stands and nothing asks again. */
+  await Promise.all(fresh.map(async a => { NAMED.set(a, null); const n = await resolveName(a); NAMED.set(a, Model.plainName(n) ? n : null); }));
   for (const n of marked) { const name = NAMED.get(n.dataset.addr.toLowerCase()); if (name) n.textContent = name; }
 }
 /* Forward (name → address), for every field that takes one, under the same gate. The suffix picks the
