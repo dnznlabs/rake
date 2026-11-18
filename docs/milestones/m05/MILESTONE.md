@@ -174,7 +174,7 @@ form; the numbers here are the milestone's and the record is `ROADMAP.md` § Dec
   redeploy half (the mining and the runbook amendments proceed under any option). *Record:*
   `ROADMAP.md` § Decisions, amending decision 37's "mined once" and the address literals in
   decisions 32, 37 and 50.
-- **M05-D2, the key that signs step 6 and the salt it uses.** *Question:* which key sends DNZN's
+- **M05-D2, the key that signs step 6 and the salt it uses.** **Ruled 2026-11-18: option (1), decision 54.** *Question:* which key sends DNZN's
   `create` on the mainnets, given that decision 32 names the DNZN Creator key
   (`0x68e0741D…`, `RUNBOOK.md` § 0's `CREATOR` and `DNZN_SALT`) and decision 50 names the Sepolia
   distribution, whose salt begins with Denizen's own EOA `0x357836fF…902B`? Read from Sepolia on
