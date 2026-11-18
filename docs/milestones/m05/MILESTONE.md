@@ -125,9 +125,10 @@ Re-run rather than quote.
 
 - **Any byte under `src/`, `test/*.t.sol`, `.gas-snapshot`, or `foundry.toml`'s compiler pin.** A
   finding that needs one reopens M03 — a new review, a new mining run, a new address set with the
-  old one live and superseded — and is a decision for Denizen. The paid review's `fix` finding, if
-  there is one, is the one way this milestone is expected to stop; Phase 2's ordering is built so
-  that stop costs Base's gas and not Ethereum's.
+  old one live and superseded — and is a decision for Denizen. No review gates this milestone
+  (M05-D3, decision 55): a `fix`-grade finding from the self-review, a reader or a later bounty is
+  the one way it is expected to stop, and Phase 2's ordering is built so that stop costs Base's gas
+  and not Ethereum's.
 - **`App.lock()`.** M04 § Out of scope said "`lock()` is M05's, after mainnet has been watched". It is
   not sent here either: the door is one-way, its precondition is a watch period under real use that
   no criterion inside this milestone can measure, and decision 45's 90-day alpha clock starts at
@@ -193,7 +194,10 @@ form; the numbers here are the milestone's and the record is `ROADMAP.md` § Dec
   deadline:* (1); blocks step 6 of m05-t01 and the `DNZN_SALT` line of § 0. *Record:* `ROADMAP.md`
   § Decisions, amending decision 50's address and sender and leaving its description, table, delay
   and owner as ruled.
-- **M05-D3, the go/no-go: does Ethereum wait for the paid review?** Decision 20: "The paid review,
+- **M05-D3, the go/no-go: does Ethereum wait for the paid review?** **Ruled 2026-11-18: option (3),
+  decision 55 — no paid review; the self-review is the review of record and no mainnet transaction
+  waits on a review result. The recommendation below was not taken, and the "until a paid review
+  happens" wording it leans on is removed by the same transcription. Kept as asked.** Decision 20: "The paid review,
   the only kind that is *independent* in the overview § 10 sense, is an M05 go/no-go input, not a
   gate on M03 or M04 … It is a spend Denizen approves on a quote; nothing here commits it."
   [#167](https://github.com/dnznlabs/rake/issues/167) asked for quotes at M04's scoping and has no
@@ -257,7 +261,8 @@ form; the numbers here are the milestone's and the record is `ROADMAP.md` § Dec
   arbiscan.io and optimistic.etherscan.io in forge's chain table; **the stretch chains' explorers and
   whether forge resolves them are unverified**, m05-t05's first step), handed to the engineer's
   session and never committed.
-- **Quotes for the paid review, now** (#167's default), and the spend decision when one arrives.
+- ~~**Quotes for the paid review, now** (#167's default), and the spend decision when one arrives.~~
+  Withdrawn by M05-D3 (decision 55): no paid review, no quote request.
 - **The mirror published and the widget embedded** under M05-D4, on Denizen's side, with the URLs in
   m05-t04's handoff; and the Base signoff line under Phase 2 after the first real `distribute`.
 - **A branch protection rule on `main`**: `ROADMAP.md` § Not on the roadmap says "revisit at M05's
@@ -267,14 +272,15 @@ form; the numbers here are the milestone's and the record is `ROADMAP.md` § Dec
 
 In order. Phase 1 must merge before Phase 2 proposes anything, because Phase 2 spends on an address
 Phase 1 fixes. Phase 2 before Phase 3 because the first mainnet is where a runbook surprise is
-cheapest, and Phase 3 additionally waits on M05-D3. Phase 4 needs a mainnet document to mirror, so
+cheapest; Phase 3 follows Phase 2 on Base's handoff alone, no review result in between (M05-D3,
+decision 55). Phase 4 needs a mainnet document to mirror, so
 it follows Phase 2 and can run beside Phase 3. The stretch row is Phase 3's second task and gates
 nothing.
 
 **One chain first, then three; not four in one task.** Recommended: Base is the first mainnet
 (Phase 2) — the cheapest of the four at today's fees, an OP Stack chain whose sibling Base Sepolia
 is the testnet the runbook was rehearsed on twice, 200 ms blocks so the vault's hour is the only wait,
-and the chain a `fix` from the paid review would make us redeploy at the least cost. Then OP Mainnet,
+and the chain a `fix`-grade finding after deploy would make us redeploy at the least cost. Then OP Mainnet,
 Arbitrum One and Ethereum in one task (Phase 3), Ethereum last because it is the dearest place to
 meet a deviation and by then there are three handoffs of the same bytes behind it. Rejected: all four
 in one task — a deviation found on chain one is then found after three chains have spent, and the
@@ -297,19 +303,20 @@ three are measured against.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m05-t02 | **Base.** Run A steps 1–5 in the runbook's order with every `record:` line read from the chain — the offline prediction before any transaction, the proxy check, step 1e's pricing read, the collision check, the native-balance assertion of § 1 re-run and recorded ([#127](https://github.com/dnznlabs/rake/issues/127)), the factory, `App`, explorer and Sourcify verification with the asserting loop; Run B through the Ops vault, three proposals at the vault's live nonce, co-signed, executed after the hour, 4d's byte comparison; `make gateway-check` against `https://<App>.8453.w3link.io/`; step 6 handed to the step-6 key's holder with the exact command and the `cast code` that must print `0x` first; § Executed on mainnets opened, README row, § Uploads row. Stops at any deviation that touches `src/` or the chunk size | not started — starts on M04's close-out merge, m05-t01's merge and M05-D3's written go |
+| m05-t02 | **Base.** Run A steps 1–5 in the runbook's order with every `record:` line read from the chain — the offline prediction before any transaction, the proxy check, step 1e's pricing read, the collision check, the native-balance assertion of § 1 re-run and recorded ([#127](https://github.com/dnznlabs/rake/issues/127)), the factory, `App`, explorer and Sourcify verification with the asserting loop; Run B through the Ops vault, three proposals at the vault's live nonce, co-signed, executed after the hour, 4d's byte comparison; `make gateway-check` against `https://<App>.8453.w3link.io/`; step 6 handed to the step-6 key's holder with the exact command and the `cast code` that must print `0x` first; § Executed on mainnets opened, README row, § Uploads row. Stops at any deviation that touches `src/` or the chunk size | not started — starts on M04's close-out merge and m05-t01's merge; M05-D3 ruled 2026-11-18 (decision 55) |
 
 **Signoff:** _not yet — a dated line by Denizen after reading DNZN's distribution on Base through the
 gateway from a wallet, and after the first deposit and `distribute` have run, goes here._
 
 ### Phase 3 — The other three, and the stretch
 
-OP Mainnet, Arbitrum One, Ethereum in one task after Base's handoff is reviewed and M05-D3 is ruled;
+OP Mainnet, Arbitrum One, Ethereum in one task after Base's handoff is reviewed; M05-D3 is ruled
+(decision 55), so no review result is waited on;
 MegaETH and Robinhood Chain as a second task that passes or is recorded.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m05-t03 | **OP Mainnet (10), Arbitrum One (42161), Ethereum (1)**, in that order, each the same list as m05-t02 with Base's handoff as the comparison: the OP `LegacyERC20ETH` `transfer` assertion re-run before chain 10's deploy (`RUNBOOK.md:167-223`), Ethereum's step 1e read against Sepolia's 7× before step 2 and its base fee against the stop rule before every send, Arbitrum's `gasUsed` recorded with its L1 component named. Three README rows, three § Uploads rows, three `create`s by hand. Closes #127 with the per-chain table of all six mainnets' readings | not started — gated on m05-t02's review and M05-D3 |
+| m05-t03 | **OP Mainnet (10), Arbitrum One (42161), Ethereum (1)**, in that order, each the same list as m05-t02 with Base's handoff as the comparison: the OP `LegacyERC20ETH` `transfer` assertion re-run before chain 10's deploy (`RUNBOOK.md:167-223`), Ethereum's step 1e read against Sepolia's 7× before step 2 and its base fee against the stop rule before every send, Arbitrum's `gasUsed` recorded with its L1 component named. Three README rows, three § Uploads rows, three `create`s by hand. Closes #127 with the per-chain table of all six mainnets' readings | not started — gated on m05-t02's review; M05-D3 ruled 2026-11-18 (decision 55) |
 | m05-t05 | **MegaETH (4326) and Robinhood Chain (4663), the stretch row** (decision 4). First measurements, no key: a gateway that resolves either chain (w3link.io answered nothing for both on 2026-11-18), an explorer `forge verify-contract` can reach, step 1e's pricing. If both pass, the m05-t02 list on each; if either fails, the finding is recorded in this file beside criterion 3 and the row closes as not reached. The milestone closes either way | not started — after m05-t03; optional by decision 4 |
 
 ### Phase 4 — Mirrored and embedded
@@ -327,11 +334,11 @@ issues at close-out, comments on state-collection#74 with the live chains and th
 `lock()` decision issue with a proposed watch period, notes the date decision 45's 90-day clock
 starts, and hands M06 nothing it needs. No task.
 
-**Estimate, labelled as one:** five tasks, one optional; six to ten weeks of calendar time, of
+**Estimate, labelled as one:** five tasks, one optional; three to five weeks of calendar time, of
 which m05-t01 is about one week (two testnet signing rounds and two `create`s by hand), Phase 2 a
-few days after the go, and the rest is the paid review's lead time, which is unmeasured until #167
-has a quote, plus Denizen's signing sessions — twelve co-signatures and four `create`s on the four
-chains. Re-estimate when the quotes arrive and when m05-t02 reports.
+few days after the go, and the rest is Denizen's signing sessions — twelve co-signatures and four
+`create`s on the four chains. The earlier six-to-ten-week figure carried a paid review's lead time,
+which M05-D3 (decision 55) removed. Re-estimate when m05-t02 reports.
 
 ## Carried issues at close-out
 
@@ -343,7 +350,7 @@ issues whose body names this milestone:
 | [#207](https://github.com/dnznlabs/rake/issues/207) Step 5 read-back gate | t01; criterion 2. |
 | [#188](https://github.com/dnznlabs/rake/issues/188) chunk gas term | t01; the per-chain table and `MAX_CHUNK` per chain, before any mainnet upload. |
 | [#127](https://github.com/dnznlabs/rake/issues/127) native-balance alias (F12) | t02 and t03 re-run the `transfer` assertion per chain before each deploy; t03 closes it with the six-row table. |
-| [#167](https://github.com/dnznlabs/rake/issues/167) paid review quotes | M05-D3; the quote request fires with this file, the spend is its own decision. |
+| [#167](https://github.com/dnznlabs/rake/issues/167) paid review quotes | Ruled 2026-11-18, option 3, decision 55: no paid review, no quote request. Closes on the transcription's merge. |
 | [#75](https://github.com/dnznlabs/rake/issues/75) token list | Not M05's: every contract-side option is a new version (decision 5). Relabelled at close-out with that reason. |
 | [#235](https://github.com/dnznlabs/rake/issues/235) build hardening (m04-t14), [#227](https://github.com/dnznlabs/rake/pull/227) the log cache (m04-t12), [#243](https://github.com/dnznlabs/rake/issues/243), [#241](https://github.com/dnznlabs/rake/issues/241), [#165](https://github.com/dnznlabs/rake/issues/165) | M04's, every one gated on "before M05 builds the mainnet document": they close in M04 or are re-scoped there before t01 builds the bundle it uploads. Listed so the gate is visible from this side. |
 | state-collection#74 | t01 updates the predicted address; close-out names the live chains. |
@@ -386,9 +393,11 @@ Things that would cost a redeploy, a re-upload or real ETH to learn late. Each s
    the engineer became an Ops owner. Settled by t01 asking, per chain, before anything is proposed;
    a chain the service cannot sign for is a runbook change (on-chain `approve`), not an improvisation
    on deploy day.
-3. **The paid review finds a `fix`.** Then `src/` reopens, the salts are mined again, and whatever is
-   deployed is superseded. Settled by M05-D3's ordering: Base alone before the result, the dear
-   chains after it.
+3. **A `fix`-grade finding after deploy** — from the self-review's next run, a reader, or a later
+   bounty (decision 55). Then `src/` reopens, the salts are mined again, and whatever is deployed is
+   superseded. Bounded, not settled: no review precedes mainnet now, so the ordering is the only
+   hedge — Base alone first, the dear chains after Base's handoff is read — and the alpha posture of
+   decision 45 is published where a visitor sees it.
 4. **The hosted gateway's chain list.** Measured 2026-11-18 for 1, 10, 8453 and 42161 (resolved) and
    4326 and 4663 (no answer). Settled for the four; the stretch row's first step for the other two,
    with decision 53's `web3://` direct and the self-run gateway as the fallback the docs already name.

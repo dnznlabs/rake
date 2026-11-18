@@ -254,7 +254,10 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     cheap place to find what a review missed, and a paid review of code that then changes is a second
     paid review. It is a spend Denizen approves on a quote; nothing here commits it. Rejected: the
     agent review alone (no independent party ever reads it); the paid review alone or first (weeks of
-    lead time on code M04 may still change).
+    lead time on code M04 may still change). *Superseded on one point by decision 55 (2026-11-18):
+    "a paid external review later" and "an M05 go/no-go input" no longer hold; no paid review is
+    planned, and M05's go/no-go does not wait on one. The method, the scope, the rollup and the
+    "two-model agent review" wording stand.*
 21. **`transferOwnership` becomes two-step, without a struct change.** D2, ruled on
     [#79](https://github.com/dnznlabs/rake/issues/79) ("Select Option 2"), closing
     [#74](https://github.com/dnznlabs/rake/issues/74) when it lands. `pendingOwner()` is its own
@@ -834,6 +837,24 @@ convention. Numbered 45 because 44 is taken by
     row and a wallet in daily use would be part of the address on every chain forever, which decision
     32 ruled out: "never an owner or a signer for anything else"); costs nothing now only because
     M05-D1's redeploy is already forced.
+55. **No paid independent review for M05; the self-review is the review of record, and mainnet does
+    not wait on one.** M05-D3, ruled by Denizen on 2026-11-18 (Telegram, 16:36 CST) on
+    [#167](https://github.com/dnznlabs/rake/issues/167), option 3, after an estimate of $2k–8k for a
+    solo review: "fuck that - there are zero funds for that. maybe in the future ... maybe for trade
+    or bounty (future token). not spending that much money on it. we will need to rely on our own
+    self-review and due diligence with tools like Pashov. Maybe we should research what else we could
+    add to our own audit - which can be verified by the reader since everything is open source /
+    public / on-chain." The review of record is the self-review: the two-model `forge-audit` method
+    of decision 20 (`audits/<date>/AUDIT.md`), Slither, and the invariant suite. No mainnet
+    transaction waits on a review result: Phase 3 of M05 follows Phase 2 on Base's handoff alone,
+    and `SECURITY.md` and the README's `AUDIT` cell say what the review is without a "until a paid
+    review happens" clause. A paid review or a bug bounty may come later, possibly paid in trade or
+    in a future token; that is its own decision when there is a quote and a budget, and nothing here
+    commits it. A research task Lakos scopes lists what can be added to the self-audit that a reader
+    can verify from the public repo and the chain. Supersedes decision 20 on the paid review and on
+    the go/no-go input only; its method, scope and rollup stand. Rejected: options (1) and (2) of
+    M05-D3 (every chain, or the three dear chains, waiting on a review) — both spend money there is
+    none of; the quote request #167 stands for is withdrawn, not deferred.
 
 ## Findings carried forward
 
