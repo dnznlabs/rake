@@ -440,7 +440,17 @@ const logOpen = () => (LOGDBP ??= new Promise(done => {
       if (db.objectStoreNames.contains(LOGSTORE)) db.deleteObjectStore(LOGSTORE);
       db.createObjectStore(LOGSTORE, { keyPath: ['chainId', 'address'] });
     };
-    rq.onsuccess = () => done(rq.result);
+    rq.onsuccess = () => {
+      const db = rq.result;
+      /* This connection gets out of the way of the next `LOGSCHEMA`, which is the only way a bumped
+         schema ever reaches a device that has the old one open: without it, a tab left open on the
+         old version blocks the upgrade, and the tab that asks for the new one is answered by
+         `onblocked` below and runs with no cache for the whole of its life. Closing here costs this
+         tab its cache from that moment — every call resolves `null`, which is the contract — and the
+         next load opens clean. */
+      db.onversionchange = () => db.close();
+      done(db);
+    };
     // A refused open, and an open blocked by another tab still holding an older version: both are no cache.
     rq.onerror = () => done(null);
     rq.onblocked = () => done(null);
