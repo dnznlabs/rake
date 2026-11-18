@@ -149,10 +149,23 @@ async function tx(to, sig, args, opts) {
   // A null `from` is not refused everywhere: anvil fills in its first account and sends.
   if (!ACC) { txSay(label, 'connect a wallet to send', 'bad'); return { ok: false, stage: 'preflight', text: 'no account' }; }
   // An empty `sig` is a plain ETH payment: no calldata, so `receive()` takes it.
-  const params = { from: ACC, to, data: sig ? Eth.enc(sig, args) : '0x', ...(o.value ? { value: '0x' + BigInt(o.value).toString(16) } : {}) };
+  /* `chainId` is what a wallet that validates the field refuses on its own side, so the write says
+     which chain it is for rather than relying on the wallet's current one. Its effect in MetaMask
+     is not measured here — the re-read below is the check this page makes. */
+  const params = { from: ACC, to, data: sig ? Eth.enc(sig, args) : '0x', chainId: '0x' + Number(CFG.chainId).toString(16), ...(o.value ? { value: '0x' + BigInt(o.value).toString(16) } : {}) };
   txSay(label, 'checking the call against the chain…');
   try { await P.request({ method: 'eth_call', params: [params, 'latest'] }); }
   catch (e) { const text = txError(e); txSay(label, text, 'bad'); return { ok: false, stage: 'preflight', text }; }
+  /* The chain, re-read immediately before the send (R17, `AUDIT.md:377-385`). `wrongChain()` at
+     boot still stands, but it only runs at boot: a provider with no event emitter never fires
+     `chainChanged`, so a mid-session switch sent the write to the same address on the other chain,
+     where it is another contract or none. This is that same test, at the moment it matters. */
+  const on = parseInt(await P.request({ method: 'eth_chainId' }), 16);
+  if (String(on) !== String(CFG.chainId)) {
+    const text = `your wallet is on ${cname(on)} — this app lives on ${cname(CFG.chainId)}`;
+    txSay(label, text, 'bad');
+    return { ok: false, stage: 'chain', text };
+  }
   let hash;
   try { hash = await P.request({ method: 'eth_sendTransaction', params: [params] }); }
   catch (e) { const text = txError(e); txSay(label, text, 'bad'); return { ok: false, stage: 'send', text }; }
