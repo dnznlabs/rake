@@ -168,8 +168,7 @@ deviation, not a pass**), and the browser step where the behaviour is visible.
    digit changed → `false`; the implementation's own code (any longer string) → `false`; `0x` → `false`;
    upper-cased input → `true`. **Predicted red:** `isClone` written with `===` against a mixed-case
    `impl` reds the upper-cased row. The visible behaviour is step 9 (a) and (b). Greps:
-   `grep -ic 5f5f365f5f37365f73 app/src/index.html` → `1`; `grep -ic -F 'd.pending.length'` → `0`
-   (baseline 1) and `grep -ic -F 'd.pending && d.pending.length'` → `1`.
+   `grep -ic 5f5f365f5f37365f73 app/src/index.html` → `1`; `grep -c -F 'd.pending.length' app/src/index.html` → `1` and `grep -c -F 'd.pending && d.pending.length' app/src/index.html` → `1`, the same line — the guarded read is the only site (baseline: 1 and 0). *Amended 2026-11-18 at the #236 review: as scoped this read `'d.pending.length'` → `0`, which the prescribed guard's own text cannot satisfy; declared as § Deviations 2 of the handoff and corrected here.*
 
 5. **The widget's inputs and decoder (R6, R12, R14), `app/src/widget.js`, with `eth.js` for R12.**
    - `render` (`:177-184`): `addr` is checked with `/^0x[0-9a-fA-F]{40}$/` before anything is
@@ -332,7 +331,7 @@ branch point and recorded in the handoff with the commit.
 7. **R10, R11, R15, R16, R21 by test and grep.** `Model.plainName` rows (step 6) pass;
    `test/inline-scripts.test.mjs` with its two new rows passes and `grep -ic -F "indexOf('<script'"
    app/inline-scripts.mjs` → `0`; `grep -ic 'u202E'` → `1` in `app/src/index.html` and `1` in
-   `app/src/widget.js`; `grep -ic -F 'd.pending.length' app/src/index.html` → `0` and step 9 (b)
+   `app/src/widget.js`; `grep -c -F 'd.pending.length' app/src/index.html` → `1`, equal to `grep -c -F 'd.pending && d.pending.length'`, so every read is the guarded one (amended 2026-11-18, see step 4), and step 9 (b)
    paints; `grep -ic noreferrer` → `7` in `index.html`, `1` in `widget.js`, with `grep -ic noopener`
    unchanged at `7` and `1`.
 8. **Bytes.** `make dapp-nodev CHAIN_ID=11155111` → `widget: raw N bytes · budget 10240 · M left`
