@@ -6,6 +6,17 @@
 #   devbox run -- tools/gateway.sh
 #   GATEWAY_PORT=9000 devbox run -- tools/gateway.sh
 #
+# The chain it serves is a parameter, defaulting to the dev chain, so the same build at the same pin
+# can be pointed at a public node for one chain — the authenticated path decision 53 names, used when
+# a hosted gateway is serving a stale document:
+#
+#   GATEWAY_CHAIN_ID=11155111 GATEWAY_RPC=https://ethereum-sepolia-rpc.publicnode.com \
+#     GATEWAY_PORT=8799 devbox run -- tools/gateway.sh
+#
+# Named `GATEWAY_*` like every other parameter here, and deliberately not `CHAIN_ID`/`RPC`: those are
+# `mk/10-forge.mk`'s and `RUNBOOK.md` § 0 exports them, so a shell set up for a testnet deploy would
+# silently aim the dev stack's gateway at that testnet.
+#
 # Idempotent and incremental: the clone happens once, the checkout is a fixed pin, and the build is
 # skipped while the binary is newer than the pinned tree. Everything it writes lands in `cache/`,
 # which `.gitignore` already covers, so a run leaves `git status --porcelain` empty.
@@ -28,6 +39,17 @@ GATEWAY_REPO=${GATEWAY_REPO:-https://github.com/ethstorage/web3url-gateway}
 
 GATEWAY_PORT=${GATEWAY_PORT:-8787}
 ANVIL_PORT=${ANVIL_PORT:-8545}
+
+# The chain under test. Both default to anvil's, so `make serve` renders the same config it always
+# did; `ANVIL_PORT` stays in the default rather than being baked, so overriding it still moves the RPC.
+GATEWAY_CHAIN_ID=${GATEWAY_CHAIN_ID:-31337}
+GATEWAY_RPC=${GATEWAY_RPC:-http://127.0.0.1:$ANVIL_PORT}
+
+# The template's `[name2chain]` alias takes the chain id too, and has to: the pin validates the table
+# at startup and an alias naming a chain `[chainConfigs]` does not carry is fatal, not inert —
+#   level=fatal msg="Chain short name anvil is defined, but its chain is not"
+# — measured here on 11155111 before this line existed. So `anvil` reads as "the chain this local
+# gateway serves", which is the only chain it ever has, rather than becoming a third parameter.
 
 # `devbox run --` ignores the working directory and runs from the project root (m03-t07's lesson),
 # and process-compose has its own notion of one. Neither is trusted: the root is derived from where
@@ -54,11 +76,18 @@ if [ ! -x "$bin" ] || [ -n "$(find "$src" -name '*.go' -newer "$bin" -print -qui
   (cd "$src" && go build -o "../gateway-server" ./cmd/server)
 fi
 
-# No envsubst in devbox, so sed. Only the two ports vary; everything else about the config is a
-# property of the dev chain and lives in the tracked template.
+# No envsubst in devbox, so sed. The port, the chain and its RPC vary; everything else about the
+# config is a property of the gateway's own behaviour and lives in the tracked template. `$ANVIL_PORT`
+# is no longer substituted here because it is no longer in the template: it reaches the config inside
+# `GATEWAY_RPC`'s default, already expanded.
+#
+# sed reads `&` in a replacement as the whole match and `|` as the delimiter, and an RPC URL can
+# carry either in an API key. Escaped, so the config holds the URL that was passed.
+esc_rpc=$(printf '%s' "$GATEWAY_RPC" | sed -e 's/[\\&|]/\\&/g')
 sed -e "s|\$GATEWAY_PORT|$GATEWAY_PORT|g" \
-    -e "s|\$ANVIL_PORT|$ANVIL_PORT|g" \
+    -e "s|\$GATEWAY_CHAIN_ID|$GATEWAY_CHAIN_ID|g" \
+    -e "s|\$GATEWAY_RPC|$esc_rpc|g" \
     procs/gateway.toml.tmpl >"$conf"
 
-echo "gateway: serving chain 31337 at http://127.0.0.1:$GATEWAY_PORT (RPC http://127.0.0.1:$ANVIL_PORT)"
+echo "gateway: serving chain $GATEWAY_CHAIN_ID at http://127.0.0.1:$GATEWAY_PORT (RPC $GATEWAY_RPC)"
 exec "$bin" -config "$conf"
