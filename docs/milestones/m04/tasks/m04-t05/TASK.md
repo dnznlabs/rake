@@ -80,9 +80,24 @@ nothing. Two instruments, one per run:
      11155111 and 84532, output recorded. A mismatch is a documented third-party condition, not a
      failed upload — the chain is the reference — and no run in steps 2–3 drives a gateway whose check
      fails: record the time and the two hashes, re-run the check until it passes, and only then start
-     that chain's run. If it has not passed within a day of the upload, say so in the handoff and
-     ask Denizen whether to run that chain through a second gateway or wait; this task does not
-     change the gateway.
+     that chain's run. **The engineer's run (step 2) may use the project's own gateway** when the
+     primary's check is still failing at the time step 2 is ready (amended 2026-11-18: the primary
+     served Sepolia the pre-Run-B document 1 h 43 m after the upload, #242's condition, and
+     `web3gateway.dev` served the same stale bytes at 19:36Z — the two share backing state and are
+     one instrument twice, not a second path). The gateway is m04-t02's `tools/gateway.sh` build of
+     `ethstorage/web3url-gateway` at its pin, pointed at a public RPC for the chain under test: the
+     authenticated path decision 53 names. That needs tracked changes, allowed here and only these:
+     `tools/gateway.sh` and `procs/gateway.toml.tmpl` take the chain id and the RPC as parameters
+     that default to anvil's (`31337`, `http://127.0.0.1:$ANVIL_PORT`), and `tools/gateway-check.sh`
+     whatever it needs to address the local base for a chain other than 31337 — with `make serve`
+     and the local `gateway-check` unchanged at the defaults, shown by running both on anvil
+     before and after. Run the hosted check against that base with `RPC` the same public endpoint,
+     drive only a passing gateway, and record in the handoff which gateway served step 2 and the
+     primary's state at that time. Step 2 exists to prove the script executable and to count
+     requests through the injected provider, neither of which depends on which gateway served the
+     bytes. Denizen's run (step 3) keeps the primary: if it has not passed within a day of the
+     upload, say so in the handoff and ask Denizen whether to run that chain through the project's
+     gateway or wait; this task does not change a hosted gateway.
    - The gateway URLs' HTTP status: `curl -sS -o /dev/null -w '%{http_code}\n'
      https://0x00a90943f58b6ab7fde05aae01c13a80e6995bae.<chainId>.w3link.io/` and the same for
      `/widget.js` (README § Opening the App, `README.md:56`) → `200` ×4, with the
@@ -308,7 +323,8 @@ branch point and recorded with the commit.
 
 ## Out of scope
 
-- **Any `app/` change.** A finding is an issue, scoped per item; the fix lands in its own task and, if
+- **Any `app/` change.** (`tools/gateway.sh`, `procs/gateway.toml.tmpl` and `tools/gateway-check.sh` are
+  not `app/`; step 0 names the one change they may take.) A finding is an issue, scoped per item; the fix lands in its own task and, if
   it changes what criterion 3 hashes, is re-uploaded once through m04-t08's vault procedure (RUNBOOK
   § Step 4) — said here once.
 - **The mainnet document** and anything M05.
