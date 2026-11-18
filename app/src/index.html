@@ -879,17 +879,38 @@ const rowsFrom = table => table.map(b => ({ name: b[2], note: b[3], addr: b[0], 
    the share and the name only, and a half-typed address must not stop the preview from painting. */
 const barRows = rows => rows.filter(r => (parseFloat(r.pct) || 0) > 0).map(r => [ZERO, Math.round((parseFloat(r.pct) || 0) * 100), r.name, r.note]);
 const pctTotal = rows => rows.reduce((s, r) => s + (parseFloat(r.pct) || 0), 0);
-/* Valid means the contract will take it. The first two refusals are the prototype's; the third and
-   the fourth are here because `propose` does not validate the action it queues — a table with a
-   duplicate account or a zero share, or one longer than `MAX_BENEFICIARIES`, queues happily and then
-   reverts `BadTable` on apply, where it stays stuck for the whole delay with only a cancel to clear
-   it. The cap is `S.maxRows`, read at boot: this is the one validator both write paths use, so the
-   refusal covers create and propose together. The sort is stated rather than performed on screen:
-   silently reordering a table someone is typing is worse than saying which order it goes in. */
+/* Valid means the contract will take it, so every refusal below is one of `_set`'s own
+   (`src/Distribution.sol:330-346`) read at the moment a table is typed rather than at the moment it
+   is applied: `propose` does not validate the action it queues, so a table with a wrong sum, a
+   duplicate account, a zero share, the zero address, or one longer than `MAX_BENEFICIARIES` queues
+   happily and then reverts `BadTable` on apply, where it stays stuck for the whole delay with only a
+   cancel to clear it. The cap is `S.maxRows`, read at boot: this is the one validator both write
+   paths use, so the refusal covers create and propose together. The sort is stated rather than
+   performed on screen: silently reordering a table someone is typing is worse than saying which
+   order it goes in. */
 function editorState(rows) {
-  const total = pctTotal(rows), off = Math.round((100 - total) * 100) / 100;
-  if (Math.abs(off) >= 0.005) return { ok: false, total, why: `total must equal 100% — ${Math.abs(off)}% ${off > 0 ? 'unassigned' : 'over'}` };
+  const total = pctTotal(rows);
+  /* The sum is read in basis points, not in decimals (R7,
+     `audits/2026-11-17/frontend/AUDIT.md:233-250`). `Model.tableFrom` rounds each row to integer bps
+     on its own, and that is what the chain receives, so a decimal tolerance checked a number the
+     contract never sees: three rows at 33.334% total 100.002%, which the old 0.005 tolerance
+     accepted, and encode as 3333 × 3 = 9999 bps — 0.01% short of `BPS_TOTAL`, which `propose`
+     queues happily and `applyQueued` then refuses after the whole delay. `Math.round` here is
+     `tableFrom`'s own, so the two cannot disagree again. */
+  const bps = rows.map(r => Math.round((parseFloat(r.pct) || 0) * 100));
+  const off = 10000 - bps.reduce((s, b) => s + b, 0);
+  if (off !== 0) return { ok: false, total, why: `total must equal 100% — ${Math.abs(off) / 100}% ${off > 0 ? 'unassigned' : 'over'}` };
+  // A negative share rounds into the sum and can hide inside a correct total, so it is named after it.
+  if (rows.some(r => (parseFloat(r.pct) || 0) < 0)) return { ok: false, total, why: 'a share cannot be negative' };
   if (!rows.every(r => r.name.trim() && isAddr(r.addr))) return { ok: false, total, why: 'every row needs a name and address' };
+  /* R5 (`AUDIT.md:193-212`): the owner field and the claim field refuse an address whose mixed-case
+     checksum is wrong, and this editor showed the same warning at `addrField` below while leaving
+     Deploy and Queue enabled — so it encoded the 20 bytes of a mistyped address, and `distribute`
+     is permissionless. The same sentence the owner field uses, so the editor says one thing. */
+  if (!rows.every(r => checksumOk(r.addr))) return { ok: false, total, why: BAD_SUM };
+  /* `isAddr` passes the zero address; `_set` refuses it at `src/Distribution.sol:339`, where
+     `b.account <= prev` with `prev` starting at zero keeps the first row above `address(0)`. */
+  if (rows.some(r => r.addr.toLowerCase() === ZERO)) return { ok: false, total, why: 'the zero address cannot be a beneficiary — the contract refuses that table' };
   const seen = new Set(rows.map(r => r.addr.toLowerCase()));
   if (seen.size !== rows.length) return { ok: false, total, why: 'two rows cannot share an address — the contract refuses that table' };
   if (rows.some(r => Math.round((parseFloat(r.pct) || 0) * 100) === 0)) return { ok: false, total, why: 'every row needs a share above zero — the contract refuses that table' };
