@@ -143,6 +143,11 @@ const Eth = (() => {
     const [el, n] = arr(t);
     if (n) {
       const len = n < 0 ? Number(wordAt(d, at)) : n;
+      /* A dynamic length comes from the response, and `new Array(len)` allocated it unchecked (R12,
+         `audits/2026-11-17/frontend/AUDIT.md:322-334`): a length word larger than the data has words
+         cannot describe a real array, and 2^32 of them freezes the tab before anything is painted.
+         A throw, not a clamp — a truncated list read as complete is the worse answer. */
+      if (len > d.length / 64) throw new Error('array length ' + len + ' exceeds the data');
       return decList(new Array(len).fill(el), d, n < 0 ? at + 32 : at);
     }
     const m = members(t);
