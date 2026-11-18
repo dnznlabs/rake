@@ -75,6 +75,14 @@ nothing. Two instruments, one per run:
      $CHAIN_ID` → `inflated sha256` and `widget sha256`, beside `sha256sum app/dist/index.html
      app/dist/widget.js` of `make dapp-nodev CHAIN_ID=$CHAIN_ID` at the commit § Uploads names for that
      chain; the pair must be equal, as RUNBOOK § Uploads requires of a row.
+   - **The hosted gateway serves the chain's document, per chain** ([#242](https://github.com/dnznlabs/rake/issues/242),
+     found 2026-11-18): `tools/gateway-check.sh` in its hosted mode (`APP`, `RPC`, `GATEWAY_BASE`) for
+     11155111 and 84532, output recorded. A mismatch is a documented third-party condition, not a
+     failed upload — the chain is the reference — and no run in steps 2–3 drives a gateway whose check
+     fails: record the time and the two hashes, re-run the check until it passes, and only then start
+     that chain's run. If it has not passed within a day of the upload, say so in the handoff and
+     ask Denizen whether to run that chain through a second gateway or wait; this task does not
+     change the gateway.
    - The gateway URLs' HTTP status: `curl -sS -o /dev/null -w '%{http_code}\n'
      https://0x00a90943f58b6ab7fde05aae01c13a80e6995bae.<chainId>.w3link.io/` and the same for
      `/widget.js` (README § Opening the App, `README.md:56`) → `200` ×4, with the
@@ -270,7 +278,8 @@ branch point and recorded with the commit.
 
 1. **The gate held.** The handoff's step 0 shows, per chain, `cast nonce $APP` past 7, the § Uploads
    row at `06fbaab` or its descendant, and `chain-doc`'s `inflated sha256` equal to the build's at
-   that commit; the gateway URLs answer 200 ×4 with the cache header recorded.
+   that commit; the gateway URLs answer 200 ×4 with the cache header recorded; and the hosted
+   `gateway-check` passed per chain, its output and time in the handoff, before that chain's run.
 2. **The script exists and is executable.** `UAT.md` has two lists of equal row count, every row with
    action, expected state, screenshot name and hash cell; `count.js` passes `node --check`; the
    engineer's Sepolia run reached every row's expected state, with one hash per transaction row in the
