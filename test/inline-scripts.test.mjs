@@ -30,6 +30,11 @@ for (const [name, tag] of [
   ['type=module', '<script type="module">var a=1;</script>'],
   ['defer', '<script defer>var a=1;</script>'],
   ['async', '<script async>var a=1;</script>'],
+  /* R11 (`audits/2026-11-17/frontend/AUDIT.md:305-320`): the scan matched the opening tag
+     case-sensitively, so these two — a real external script and a real deferred one — passed the
+     build and shipped a bundle that renders and never runs. One row per case the legs named. */
+  ['SRC, upper-cased tag', '<SCRIPT src="app.js"></SCRIPT>'],
+  ['defer, mixed case', '<Script defer>var a=1;</Script>'],
 ]) {
   test(`a bundle with a ${name} script fails the build`, () => {
     const html = CLEAN + tag;

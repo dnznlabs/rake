@@ -75,7 +75,11 @@ var CSS = '.rk{font:inherit;color:inherit;--rk-ac:oklch(.47 .09 230);--rk-am:#B8
 + '.rk a{color:inherit;text-decoration:none;border-bottom:1px solid currentColor}'
 + '.rk-f{margin-top:10px;padding-top:8px;border-top:' + RULE + ';font-size:10.5px;opacity:.5}';
 
-function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+/* The bidi controls are dropped before the four characters are escaped, and dropped rather than
+   isolated: U+202A–U+202E and U+2066–U+2069 reorder what follows them, so one row's name can
+   visually reverse the rest of the compact line (R15). A `<bdi>` cannot reach the `title` this
+   function also feeds at `bar()`, and the dapp's `esc` does the same thing for the same reason. */
+function esc(s){return String(s).replace(/[\u202A-\u202E\u2066-\u2069]/g,'').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function short(a){return a.slice(0,6)+'…'+a.slice(-4)}
 function pct(bps){return bps/100}
 /* An unlisted chain reads as its id rather than as ethereum: the mismatch sentence below names two
@@ -126,14 +130,22 @@ function reader(hex){
  function txt(p){var n=u(p)*2,s='',i=0;for(;i<n;i+=2)s+='%'+H.substr(p*2+64+i,2);if(!n)return '';
   try{return decodeURIComponent(s)}catch(e){return s.replace(/%(..)/g,function(_,c){return String.fromCharCode(parseInt(c,16))})}}
  function hx(p){return '0x'+H.substr(p*2+64,u(p)*2)}
- function arr(p,f){var n=u(p),o=p+32,r=[],i=0;for(;i<n;i++)r.push(f(o+u(o+i*32)));return r}
+ /* A length word larger than the body has words cannot be a real array (R12): `arr` looped `u(p)`
+    times against no bound, so a hostile `data-rpc` could answer with 2^32 and freeze the host tab.
+    The throw lands in `decode`'s own `catch` below, which returns `null` and paints the error
+    state — the same place every other unreadable answer lands. */
+ function arr(p,f){var n=u(p),o=p+32,r=[],i=0;if(n>H.length/64)throw 0;for(;i<n;i++)r.push(f(o+u(o+i*32)));return r}
  function ben(p){return{account:adr(p),bps:u(p+32),name:txt(p+u(p+64)),note:txt(p+u(p+96))}}
  return{u:u,adr:adr,txt:txt,hx:hx,arr:arr,ben:ben}}
 
 /* `null` rather than a throw, because every caller treats an unreadable answer the same way: the
    smallest `snapshot()` return is ten words, so `0x` from a codeless address never reaches a read. */
+/* The hex check comes before the length check, so `reader` never slices a body that is not hex
+   (R14): `reader` lower-cases and `substr`s whatever it is given, and a non-hex answer of 642 or
+   more characters put four-plus-four of its own characters into `foot` as an owner. A non-hex answer
+   now lands in the error state instead. */
 function decode(hex){
- if(!hex||hex.length<642)return null;
+ if(!hex||!/^0x[0-9a-fA-F]+$/.test(hex)||hex.length<642)return null;
  try{
   var r=reader(hex),b=r.u(0);
   return{
@@ -174,6 +186,13 @@ function bar(table,wrap,tint,adj){
   var w=pct(b.bps);
   return '<div'+(tint?' class="rk-s rk-s'+(i%3)+'"':'')+' data-w="'+(adj?'calc('+w+'% - '+adj+'px)':w+'%')
   +'" title="'+esc(b.name||'')+' '+w+'%"></div>'}).join('')+'</div>'}
+/* The error state, as a function because two callers paint it: a `data-rake` that is not an address,
+   and an answer that would not decode. `text` is written escaped, and the bad-address caller passes
+   a sentence with none of the attribute in it. */
+function fail(el,text){
+ el.innerHTML='<div class="rk-b rk-x"></div><div class="rk-err">'+esc(text)
+ +' · <button class="rk-rt" data-retry>retry</button></div>';
+ var r=el.querySelector('[data-retry]');if(r)r.addEventListener('click',function(){render(el)})}
 function render(el){
  inject();
  var addr=el.getAttribute('data-rake')||'',cid=el.getAttribute('data-chain')||'1';
@@ -181,21 +200,35 @@ function render(el){
  var themeAttr=el.getAttribute('data-theme'),dark=themeAttr?themeAttr==='dark':isDark(el);
  /* `classList`, not `className`: the mount is the host's element and may carry the host's classes. */
  el.classList.add('rk');el.classList.toggle('rk-c',compact);el.classList.toggle('rk-dk',dark);
+ /* `data-rake` is checked for shape before anything is written (R6). `mountAll` mounts every
+    `[data-rake]` in the host page, and a host that renders sanitised user HTML keeps `data-*`, so
+    the attribute is not always the host's own text. The sentence carries no `short(addr)`: that
+    concatenation at the footer and the `addr` in the link's `href` are the two sinks this closes,
+    and naming the payload back to the reader would reopen the first of them. */
+ if(!/^0x[0-9a-fA-F]{40}$/.test(addr)){fail(el,'data-rake is not an address');return}
  el.innerHTML='<div class="rk-b rk-w"></div><div class="rk-msg">reading distribution…</div>';
  fetchSnapshot(addr,cid,rpc,function(hex,why){
   var snap=decode(hex);
   if(!snap){
-   el.innerHTML='<div class="rk-b rk-x"></div><div class="rk-err">'
-   +esc(why||'could not read distribution '+short(addr)+' on '+cname(cid))
-   +' · <button class="rk-rt" data-retry>retry</button></div>';
-   var r=el.querySelector('[data-retry]');if(r)r.addEventListener('click',function(){render(el)});
+   fail(el,why||'could not read distribution '+short(addr)+' on '+cname(cid));
    return}
   var link=el.getAttribute('data-link');
   /* No alpha marker (ROADMAP decision 48): it is for the owner, in the dapp, not for a viewer of the
      host page. Decision 12's one outbound link is `data-link`'s, and this file promises no link
-     unless the host asks. */
+     unless the host asks. That promise covers analytics too, and a `Referer` carrying the host
+     page's URL to the gateway is analytics, so the link's `rel` suppresses that as well (R21). */
+  /* The scheme is an allow-list, not a denylist (R6): `data-link` went into `href` with HTML
+     escaping only, so a script-scheme value became a link that runs script in the host's origin
+     when clicked. `new URL` resolves a relative value against the page and throws on one it
+     refuses; only `http:` and `https:` emit the `<a>` at all, so a script or data scheme — and any
+     other named later — produces no link rather than a refused one. The two allowed schemes are
+     named here and the refused ones are not, so step 0's grep for the refused scheme stays at zero
+     and would notice a denylist if one ever appeared. */
+  var href=null;
+  if(link!==null){try{var u2=new URL(link||(SRC?new URL('./',SRC).href:location.href),location.href);
+   if(u2.protocol==='http:'||u2.protocol==='https:')href=u2.href.split('#')[0]+'#/distros/'+addr}catch(e){}}
   var foot=(snap.delay?'delay '+fmtDelay(snap.delay):'no delay')+' · owner '+short(snap.owner)+' · '+short(addr)+' · '+esc(cname(cid))
-  +(link===null?'':' · <a href="'+esc((link||(SRC?new URL('./',SRC).href:location.href)).split('#')[0]+'#/distros/'+addr)+'"'+(SRC?' target="_blank" rel="noopener"':'')+'>view ↗</a>');
+  +(href===null?'':' · <a href="'+esc(href)+'"'+(SRC?' target="_blank" rel="noopener noreferrer"':'')+'>view ↗</a>');
   if(compact){
    el.innerHTML=bar(snap.table,'rk-b',1)
    +'<div class="rk-1">'+snap.table.map(function(b){return '<b>'+esc(b.name)+'</b> '+pct(b.bps)+'%'}).join(' · ')

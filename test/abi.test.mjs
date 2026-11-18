@@ -112,3 +112,24 @@ test('every fixture the script writes is covered by a case above', () => {
     'snapshot.return.hex',
   ]);
 });
+
+test('a dynamic array length larger than the data is refused, not allocated', () => {
+  /* R12's `eth.js` half (`audits/2026-11-17/frontend/AUDIT.md:322-334`): `decOne` called
+     `new Array(len)` with a length read straight from the response. A head word pointing at the
+     length, a length of 100,000 and no body at all — the shape a hostile endpoint sends. */
+  const head = '0x' + (32n).toString(16).padStart(64, '0') + (100000n).toString(16).padStart(64, '0');
+
+  const run = () => Eth.dec(['uint256[]'], head);
+
+  assert.throws(run, /exceeds/);
+});
+
+test('a dynamic array whose length matches its body still decodes', () => {
+  /* The paired control: the refusal above must not be refusing every array. */
+  const body = ['11', '22'].map(h => '0x'.repeat(0) + BigInt('0x' + h).toString(16).padStart(64, '0')).join('');
+  const hex = '0x' + (32n).toString(16).padStart(64, '0') + (2n).toString(16).padStart(64, '0') + body;
+
+  const [out] = Eth.dec(['uint256[]'], hex);
+
+  assert.deepEqual(out, [0x11n, 0x22n]);
+});

@@ -48,7 +48,7 @@ function widget() {
     addEventListener() {},
   };
   const win = {};
-  const api = new Function('window', 'document', `${body}\nreturn { decode, SNAP, SETBEN, etaText, GRACE, SKEW };`)(win, doc);
+  const api = new Function('window', 'document', `${body}\nreturn { decode, SNAP, SETBEN, etaText, GRACE, SKEW, esc };`)(win, doc);
   assert.deepEqual(Object.keys(win.RakeWidget), ['mount', 'refresh'], 'the widget\'s public surface changed');
   return api;
 }
@@ -235,4 +235,74 @@ test('the widget is one classic script with no module surface', () => {
   assert.ok(SRC.includes("'use strict';"), 'the IIFE is not strict');
   assert.equal(SRC.match(/^\s*export\b/m), null, 'App serves this as a classic script, not a module');
   assert.equal(SRC.match(/@inline/g), null, 'the widget is a second bundle, not an inlined file');
+});
+
+/* R15, the widget's half (`audits/2026-11-17/frontend/AUDIT.md:358-365`). The controls are written
+   as escapes here for the same reason the dapp's rows are: a literal control is invisible to the
+   next reader and to every grep. */
+const BIDI = ['\u202A', '\u202B', '\u202C', '\u202D', '\u202E', '\u2066', '\u2067', '\u2068', '\u2069'];
+
+test('the widget\'s esc drops a bidi override rather than escaping it', () => {
+  assert.equal(widget().esc('a\u202Eb'), 'ab');
+});
+
+test('the widget\'s esc drops each of the nine bidi control characters', () => {
+  const { esc } = widget();
+
+  assert.equal(BIDI.length, 9, 'the range is U+202A-U+202E and U+2066-U+2069 — nine code points');
+  for (const c of BIDI) {
+    const out = esc(`a${c}b`);
+
+    assert.equal(out, 'ab', `esc kept U+${c.codePointAt(0).toString(16).toUpperCase()}: ${JSON.stringify(out)}`);
+  }
+  assert.equal(esc(`${BIDI.join('')}<b>`), '&lt;b&gt;');
+});
+
+/* R12 and R14 (`audits/2026-11-17/frontend/AUDIT.md:322-334` and `:345-356`), the decoder's two
+   inputs from a host-chosen endpoint. `arr` looped the length word's many times against no bound,
+   and `reader` sliced whatever it was handed without asking whether it was hex. */
+
+/* The table's length word, found the way `decode` finds it: the head word holds the struct's
+   offset, and the fifth member's offset is at `b + 128`. Returned as a byte offset into the body so
+   the rewrite below lands on the same word the decoder will read. */
+function tableLenAt(hex) {
+  const H = hex.slice(2);
+  const u = p => parseInt(H.substr(p * 2, 64), 16);
+  const b = u(0);
+  return b + u(b + 128);
+}
+function rewriteWord(hex, at, value) {
+  const H = hex.slice(2);
+  const word = BigInt(value).toString(16).padStart(64, '0');
+  const out = '0x' + H.slice(0, at * 2) + word + H.slice(at * 2 + 64);
+  assert.equal(out.length, hex.length, 'the rewrite changed the body length');
+  assert.notEqual(out, hex, 'the rewrite changed nothing');
+  return out;
+}
+
+test('a table length larger than the body has words decodes to null', () => {
+  /* 100,000 and not 2^32: without the bound this returns a 100,000-row table in a few hundred
+     milliseconds rather than hanging, so the assertion below is what fails, not the test run. */
+  const hostile = rewriteWord(fixture('snapshot.return'), tableLenAt(fixture('snapshot.return')), 100000);
+
+  assert.equal(widget().decode(hostile), null);
+});
+
+test('a non-hex answer decodes to null before reader slices it', () => {
+  const hex = fixture('snapshot.return');
+  const bad = '0xzz' + hex.slice(4);
+
+  assert.equal(bad.length, hex.length, 'the fixture changed length');
+  assert.equal(widget().decode(bad), null);
+});
+
+test('the real fixture still decodes through both new checks', () => {
+  /* (a) above already reads this fixture; this row is here so the run proves the two refusals let
+     the real shape through rather than only that they refuse. */
+  const snap = widget().decode(fixture('snapshot.return'));
+
+  assert.ok(snap, 'the fixture decoded to null');
+  assert.equal(snap.owner, OWNER);
+  assert.equal(snap.table.length, 2);
+  assert.equal(snap.pending.length, 1);
 });

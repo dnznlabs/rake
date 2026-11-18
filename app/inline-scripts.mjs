@@ -8,9 +8,15 @@
 /** Every <script> open tag, with its attribute text. Quote-aware: an attribute value may hold `>`. */
 export function scriptTags(html) {
   const tags = [];
-  for (let i = html.indexOf('<script'); i !== -1; i = html.indexOf('<script', i + 1)) {
-    /* `<scriptable>` is not a script tag; the name has to end at the tag. */
-    if (/[^\s/>]/.test(html[i + 7] ?? '')) continue;
+  /* Case-insensitive: `<SCRIPT src="app.js">` and `<Script defer>` are a real external script and a
+     real deferred one, and the case-sensitive `indexOf` scan this replaces saw neither, so the build shipped
+     a bundle that renders and never runs — the one thing this module exists to refuse (R11,
+     `audits/2026-11-17/frontend/AUDIT.md:305-320`). The lookahead is the name check that used to be
+     a separate test on the next character: `<scriptable>` is not a script tag, because the name has
+     to end at the tag. */
+  const open = /<script(?=[\s/>])/gi;
+  for (let m = open.exec(html); m !== null; m = open.exec(html)) {
+    const i = m.index;
     let quote = null;
     let j = i + 7;
     for (; j < html.length; j++) {
