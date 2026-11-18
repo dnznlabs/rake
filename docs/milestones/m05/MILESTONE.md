@@ -233,8 +233,15 @@ form; the numbers here are the milestone's and the record is `ROADMAP.md` § Dec
   which is why the stop rule of criterion 6 exists and why the figures here are a margin, not a
   forecast. The L2s' L1-data component is also unmeasured and the upload is about 56 KB of
   calldata per chain (111,710 hex characters across the three committed files of § Uploads row 3). Keys: the **engineer's wallet** `0x5A158aF8…` signs steps 2, 3 and the
-  `executeQueued` calls — holds 0.0051 ETH on Ethereum and 0 on Base today; ask **0.2 ETH on
-  Ethereum and 0.02 ETH on each L2**, funded per chain as its task starts, not all at once. The
+  `executeQueued` calls — holds 0.0051 ETH on Ethereum and 0 on Base today; ask **0.03 ETH on
+  Ethereum and 0.02 ETH on each L2**, funded per chain as its task starts, not all at once, with
+  the stop rule criterion 6 restores set at **1 gwei** base fee on Ethereum: 0.03 ETH covers Run A,
+  Run B and step 6 up to about that price on Sepolia's pricing, and a fee held above it for days is
+  a top-up and a raised rule by Denizen's word, not a buffer pre-funded in a hot key. (Amended
+  2026-11-18 from "0.2 ETH on Ethereum", which was a margin against 5 gwei; Denizen, Telegram,
+  15:38 CST: "I can live with .02ish" — the expected spend at today's fee, labelled an estimate,
+  since whether Ethereum prices code deposit like Sepolia or like Base Sepolia is what m05-t01's
+  keyless estimate measures first.) The
   **step-6 key** M05-D2 picks needs about 0.005 ETH per chain (the Creator key holds 0 on Ethereum
   today). **Denizen's signing account** pays the three proposal submits per chain, as it did on the
   testnets. The handoff records what was spent, per key per chain.
