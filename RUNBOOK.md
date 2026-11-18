@@ -1057,18 +1057,59 @@ head, where `--rpc` would read today's nonce and emit different pointers.
 |--:|:--|:--|:--|--:|:--|:--|:--|:--|--:|
 | 1 | 2026-11-17 | Sepolia | `9fdf0f1` | 4 | `0x831f740F…1268` · `0x02d5AcDA…A0C3` · `0x80bDDA62…FC38` | 6, 7, 8 | `2d27b603…3f9a9d4a` · `07e808ed…d51b8ca` | in full below | **83,827,120** |
 | 2 | 2026-11-17 | Base Sepolia | `9fdf0f1` | 4 | the same three — the pointers are a function of `App`'s address and nonce, and both are identical per chain | 6, 7, 8 | `1111b791…0920e17` · `07e808ed…d51b8ca` | in full below | **11,947,862** |
+| 3 | 2026-11-18 | Sepolia | `3751211` | 7 | `0x3C4C7D4E…5C06` · `0xcEaA7F17…7396` · `0x1Affb52C…F45D` | 9, 10, 11 | `b1fc3b96…e5ef1e86` · `8b6bbc88…108bc368` | 4a only — proposed, not submitted | 4c pending |
+| 4 | 2026-11-18 | Base Sepolia | `3751211` | 7 | the same three | 9, 10, 11 | `6f0225bb…ff45336f` · `8b6bbc88…108bc368` | 4a only — proposed, not submitted | 4c pending |
+
+**Rows 3 and 4 are 4a only.** The three proposals per chain carry the engineer's one signature and
+nothing has been submitted or executed, so the last two columns stay open until 4b–4d run; the hash
+columns are the fork reading, as rows 1 and 2's were before their execution. This upload carries
+m04-t11, m04-t04 and m04-t13; #227 (m04-t12) is held out by ruling and #235's R18 waits for a later
+upload. The generating commit is `3751211` and the bundle under `app/` and `src/` is byte-identical to
+the `06fbaab` the plan scoped — `git diff --stat 06fbaab 3751211 -- app/ src/` is empty, the one
+change between them being a `TASK.md`. The calldata is committed in `calldata/<chain>/`.
+
+The three digests per chain, each `getTransactionHash(<that proposal's own target>, 0, <file>, <nonce>)`
+on the vault — `$APP` for proposals 1 and 2, `$OWNER` for the batch, and the chain is bound by
+`getTransactionHash`, so no signature crosses chains:
+
+| vault nonce | proposal | target | Sepolia digest | Base Sepolia digest |
+|--:|:--|:--|:--|:--|
+| 9 | 1 — `1-addChunk-0.hex` | `$APP` | `0x3cb3f8f9dd76fa1dfdea85b5f8ab5d0980e89630124f8801612631bd7bec864e` | `0xff8f5ba1d9c46b5e8a5df8121a274e9c51ed83c7fab5f1552e3f4cd09a72756d` |
+| 10 | 2 — `2-addChunk-1.hex` | `$APP` | `0x8baf5cf5f206e0e8c74bab5ad741ade54e4a145ca27cf29fd95cb81aaf5f542e` | `0xb0e751cfe5996d45e995a9dffffa7412c8ab9f9d616bdc9ed843653905b5eecc` |
+| 11 | 3 — `batch345.hex` | `$OWNER` | `0x6162d2ef558c5d436807e2834d9ccaf7fc0d1e6c423e9b2ccb356a52485654d5` | `0x2b16c2d0be0c38a1dd15dc8efb31b4364ea317cb80dd1dcc6641e7ec371ec5de` |
+
+Sizes and gas for rows 3 and 4. The proposal sizes are `wc -c` of the committed files, `0x` included,
+and differ per chain only in content — this upload's two chunks pad to the same encoded length on both.
+Calls 1 and 2 are live `cast estimate --from $OWNER`; `batch345` reverts `CodelessChunk` live by
+construction (§ Gas) and its figure is the fork's, with a derivation for Sepolia where anvil
+under-prices code deposit:
+
+| proposal | hex chars (cap 65,536) | Sepolia gas | Base Sepolia gas |
+|:--|--:|--:|--:|
+| 1 — `1-addChunk-0.hex` | 48,138 | 37,760,229 live | 5,369,382 live |
+| 2 — `2-addChunk-1.hex` | 44,554 | 34,937,102 live | 4,970,346 live |
+| 3 — `batch345.hex` | 19,018 | 2,021,612 fork · **≈13,524,000 derived** | 2,021,612 fork · ≈2,035,800 derived |
+
+The Sepolia derivation is the fork figure plus the chain's code-deposit premium over anvil for the
+widget chunk's 8,510 deposited bytes. That premium was measured on this chain at two chunk sizes —
+1,351.19 and 1,352.16 gas per byte from calls 1 and 2's live-minus-fork — and the same method applied
+to row 1's widget reproduces its executed `gasUsed` of 12,898,921 to **0.26%**, which is the check that
+the two figures are not one instrument twice. Row 1's live estimate ran 7.62% above its own `gasUsed`,
+so expect a live `batch345` estimate near 14.6M once proposals 1 and 2 have executed and § Gas's
+re-estimate becomes possible. Every proposal clears its block limit with room: the largest is 18.88%
+of Sepolia's 200,000,000 and 4.47% of Base Sepolia's 120,000,000.
 
 The `inflated sha256` and `widget sha256` in rows 1 and 2 were the build's when the rows were written,
 read from a fork of each chain before the proposals were signed; **4d re-read both from the chain
 after execution and they are unchanged**, so the column now carries a live `chain-doc` reading rather
 than a prediction. The gas column is the sum of the three `executeQueued` receipts.
 
-**The six transactions per row, in full.** Three submits (the proposal, which queues it) and three
+**The six transactions of rows 1 and 2, in full.** Three submits (the proposal, which queues it) and three
 `executeQueued` (which runs it), in nonce order. The submits are not the engineer's: `from` is the
 Product Owner's account on Sepolia and a relayer EOA on Base Sepolia, both through the same relay
 `to` of `0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3` — so **`from` is never a signer attribution on
 either chain**, since the signatures authorise the call and `execute()` does not read `msg.sender`.
-All twelve `status true`.
+All twelve of those `status true`; rows 3 and 4 have no transactions yet.
 
 Row 1 — Sepolia, `eth_estimateGas` and `gasUsed` per `executeQueued`:
 
