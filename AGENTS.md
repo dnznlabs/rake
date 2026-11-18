@@ -177,6 +177,21 @@
   by a `MockVault` that answers `isOwner` for anvil account 3. It is a hand-run step after
   `make deploy` and never part of it, and it is idempotent: both salts are read with `eth_getCode`
   first, so a second run broadcasts nothing.
+- A distribution's event history is cached between visits in **`rake.logs`**, one IndexedDB database
+  keyed `[chainId, address]` (decision 52): the record holds the three raw log arrays `histLogs`
+  answers, cut at the chain's `finalized` block, so a second visit live-scans only the tail above it
+  and the 40-window budget is paid once per device. **The database's version number *is* the schema
+  version** — `LOGSCHEMA` in `index.html`, and the record carries the same number as its own `schema`
+  field: a decoder change is one edit, because `onupgradeneeded` deletes and recreates the store, so
+  there is no migration to write and no old shape to read. Every call resolves `null` rather than
+  throwing, as `store.get` does for `localStorage`, so a browser with no storage is the page as it was
+  before the cache existed. Eviction is `LOGKEEP` — not opened in 30 days, or beyond 50 records, least
+  recently opened first — and the `#/docs` Cache section prints both numbers in words, which
+  `test/docs.test.mjs` pins against the constant. **On a dev chain nothing is final for 64 blocks:**
+  anvil answers `finalized` as head − 64, and genesis while the chain is shorter than that
+  (`cast block finalized --field number`, read against `cast block-number`), so a fresh `make serve`
+  chain caches nothing a browser check can measure until it is mined past 64 — `cast rpc anvil_mine
+  0x64`, or start anvil with `--slots-in-an-epoch 1`.
 - `#/docs` is the long page, and it matches by prefix so it paints before the wallet checks; the rail's
   links are `#/docs#<section>` and `docScroll` reaches `id="s-<section>"` once `docs()` has painted.
   It is written for the owner of a distribution (ROADMAP decision 17), not for a developer: the
