@@ -1,0 +1,41 @@
+# The files the front-end review pass covers: one repo-relative path per line, `#` and blank lines
+# ignored. Same format as `SCOPE`, read by the same substitution (`scripts/audit.sh:226-227`), but a
+# separate list because this pass is not the Solidity one: no skill, a web-security prompt
+# (`prompts/frontend-leg.md`), and a surface that is loaded by strangers rather than called by a
+# chain.
+#
+# Why this list exists at all. `app/` is excluded from `SCOPE` with a reason that was true when it
+# was written — "the dapp was signed off in M02 Phase 5, and a UI change after this review is a
+# second review (decision 14)" — and M04 made the document a thing a third party's gateway serves to
+# anyone. m04-t04 is that second review.
+#
+# Named file by file, never a directory glob: a review whose scope is `app/` would silently grow
+# every time a file lands there, and the provenance block has to be able to say what was read.
+#
+# `app/build.mjs` is here, where `SCOPE` excludes it as "build tooling, no authority on chain". That
+# reversal is deliberate: its substitutions put values into the document before it is uploaded, so
+# the build is an injection point into the surface strangers load. The three modules it imports
+# (`app/build.mjs:18-20`) are here for the same reason and no other — `version.mjs` and
+# `broadcast.mjs` compute two of those substituted values, and `inline-scripts.mjs` enforces the
+# inline, attribute-free script guard that makes the DOMParser swap run the app at all. The injected
+# value is what an attacker reaches; reviewing the injection point without its inputs would leave
+# that unread.
+#
+# Excluded, each with the reason the method asks for (`README.md` § Scope), so the next reader does
+# not re-derive it:
+#
+#   app/src/host.html    the dev foil: a local page for driving the widget by hand, loads
+#                        `widget.js` relatively and reads `?rpc=`, never uploaded and never served
+#                        by the gateway (m04-t04 `TASK.md` step 4)
+#   app/src/theme.css    no script, no interpolation; a stylesheet the build inlines verbatim
+#   test/                not shipped
+
+app/src/index.html
+app/src/model.js
+app/src/eth.js
+app/src/widget.js
+app/src/layout.html
+app/build.mjs
+app/inline-scripts.mjs
+app/broadcast.mjs
+app/version.mjs

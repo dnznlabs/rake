@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rake widget — test page</title>
+<style>
+  body { margin: 0; background: #f4f3ef; color: #181818;
+         font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, Helvetica, Arial, sans-serif; }
+  main { max-width: 44rem; margin: 0 auto; padding: 4rem 1.25rem; }
+  h1 { font-size: 1.35rem; letter-spacing: -0.01em; margin: 0 0 1rem; }
+  p { color: #4a4a4a; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>A test page for the rake widget</h1>
+
+<p>This page is not part of the app and runs on a host the app's authors do not control. It carries
+the embed snippet the app's own documentation prints for Sepolia, twice and nothing else: the first
+mount names a public endpoint, so it reads the distribution without a wallet; the second names none,
+so it reads through the visitor's wallet and shows its failure state when there is no wallet on
+Sepolia.</p>
+
+<script src="https://0x00a90943f58b6ab7fde05aae01c13a80e6995bae.11155111.w3link.io/widget.js"></script>
+<div
+  data-rake="0x71a4221974Fc2E95081AE513248918dF27CF7a4A"
+  data-chain="11155111"
+  data-link
+  data-rpc="https://ethereum-sepolia-rpc.publicnode.com"
+></div>
+<div
+  data-rake="0x71a4221974Fc2E95081AE513248918dF27CF7a4A"
+  data-chain="11155111"
+  data-link
+></div>
+
+</main>
+</body>
+</html>
