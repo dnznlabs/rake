@@ -744,9 +744,14 @@ async function histLogs(addr, from, to) {
     through: at, changes: cut(changes), funds: cut(funds), ins: cut(ins),
   };
   /* Merged with the record only where the two cover different blocks: the tail above it, or the older
-     slice below it. The rescan above covers the record's own range, so there it replaces it. */
+     slice below it. Elsewhere the live read replaces the record — but only where it reaches at least
+     as deep, which `Model.keepsDepth` is the test of: a rescan that ran out of budget stops at a
+     floor of its own, and that floor can sit above the record's `first`, so the put would hand the
+     device a shallower record than it had and lose history it has already read. Where it would, the
+     record stands and only its `visited` moves, since the load is still a visit for the eviction rule. */
   const into = base || (rec && to != null && Number(to) < rec.first ? rec : null);
-  await logCache.put({ ...Model.mergeHist(into, live), schema: LOGSCHEMA, chainId: String(CFG.chainId), address: addr, visited: Date.now() });
+  const next = { ...Model.mergeHist(into, live), schema: LOGSCHEMA, chainId: String(CFG.chainId), address: addr, visited: Date.now() };
+  await logCache.put(Model.keepsDepth(rec, next) ? next : { ...rec, visited: next.visited });
   // The one moment the record count can rise, and so the one that can put the store over the cap.
   await logSweepRun();
   if (!base) return { changes, funds, ins };

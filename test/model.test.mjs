@@ -15,8 +15,8 @@ globalThis.Eth = Eth;
 const { SNAPSHOT_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt } = Model;
 const { revertMessage, tableFrom, parseDelay, wei, namehash } = Model;
 const { windows, rangeCap, isPruned, isWrappedRefusal, nonceOf } = Model;
-const { splitFinal, evict, mergeHist } = Model;
-const FUNCTIONS = ['countdown', 'dateText', 'deadline', 'decodePending', 'evict', 'isPruned', 'isWrappedRefusal', 'mergeHist', 'namehash', 'nonceOf', 'ownerChange', 'ownerKind', 'parseDelay', 'pct', 'rangeCap', 'revertMessage', 'salt', 'splitFinal', 'supersededBy', 'tableFrom', 'wei', 'windows'];
+const { splitFinal, evict, mergeHist, keepsDepth } = Model;
+const FUNCTIONS = ['countdown', 'dateText', 'deadline', 'decodePending', 'evict', 'isPruned', 'isWrappedRefusal', 'keepsDepth', 'mergeHist', 'namehash', 'nonceOf', 'ownerChange', 'ownerKind', 'parseDelay', 'pct', 'rangeCap', 'revertMessage', 'salt', 'splitFinal', 'supersededBy', 'tableFrom', 'wei', 'windows'];
 const SET_BENEFICIARIES = 'setBeneficiaries((address,uint96,string,string)[])';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/abi');
@@ -624,6 +624,27 @@ test('mergeHist keeps the other-token list only where both halves carry it', () 
   assert.equal(mergeHist(cached, { first: 51, through: 90, changes: [], funds: [], ins: null }).ins, null);
   assert.equal(mergeHist({ ...cached, ins: null }, { first: 51, through: 90, changes: [], funds: [], ins: [at(60, 'j')] }).ins, null);
   assert.equal(mergeHist(null, { first: 51, through: 90, changes: [], funds: [], ins: null }).ins, null);
+});
+
+test('keepsDepth admits a record that reaches at least as deep, and the first one a device holds', () => {
+  const cached = { first: 100, through: 500 };
+
+  assert.equal(keepsDepth(cached, { first: 40, through: 900 }), true);
+  assert.equal(keepsDepth(cached, { first: 100, through: 900 }), true);
+  assert.equal(keepsDepth(null, { first: 4000, through: 9000 }), true);
+});
+
+test('keepsDepth refuses a shallower record over a deeper one, which is a scan out of budget', () => {
+  /* The record reaches block 100; a rescan that ran out of budget answers a boundary of its own at
+     300, so what it holds starts above what the device has already read. Writing it would lose
+     blocks 100–299 the device need never read again. */
+  assert.equal(keepsDepth({ first: 100, through: 500 }, { first: 300, through: 900 }), false);
+});
+
+test('keepsDepth judges depth and not the boundary above, so a shrinking through is admitted', () => {
+  /* A `through` below the record's is a chain that has replaced blocks it promised to keep; the
+     shorter claim is the honest one and the put goes through. */
+  assert.equal(keepsDepth({ first: 100, through: 900 }, { first: 100, through: 500 }), true);
 });
 
 /* The two queued entries below were read off a local anvil with

@@ -308,6 +308,18 @@ const Model = (() => {
     };
   }
 
+  /** Whether the record a load has built may be written over the one the store already holds: true
+     where it reaches at least as far down, and true for a device that holds none yet. A load whose
+     scan ran out of budget answers a boundary of its own, and that boundary can sit *above* the
+     stored record's `first`; the stored record then describes history this read never saw, and
+     writing the shallower one over it would lose history the device had. Depth alone is judged —
+     where `through` moves down instead, the chain has replaced blocks it had promised to keep and
+     the shorter claim is the honest one. */
+  function keepsDepth(cached, next) {
+    if (!cached) return true;
+    return Number(next.first) <= Number(cached.first);
+  }
+
   /* Recovering a queued entry's nonce without reading a log. `propose` commits to
      `keccak256(abi.encode(action, nonce))` (`src/Distribution.sol:224`) and `applyQueued` recomputes
      the same hash from the arguments it is handed (`:243`), so the nonce is not extra information the
@@ -339,6 +351,6 @@ const Model = (() => {
     return '0x' + node;
   }
 
-  return { SNAPSHOT_T, BENEFICIARY_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash, windows, rangeCap, isPruned, isWrappedRefusal, splitFinal, evict, mergeHist, nonceOf };
+  return { SNAPSHOT_T, BENEFICIARY_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash, windows, rangeCap, isPruned, isWrappedRefusal, splitFinal, evict, mergeHist, keepsDepth, nonceOf };
 })();
 export default Model;
