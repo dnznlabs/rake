@@ -12,7 +12,7 @@ A distribution is one address with a published table of beneficiaries. Anything 
 
 | STATUS | VERSION | AUDIT |
 |:---|:---|:---|
-| `pre-mvp` | `0.1alpha` | two-model agent review, 2026-11-06 ([SECURITY.md](SECURITY.md)) |
+| `pre-mvp` | `0.1alpha` | two-model agent review and Slither, 2026-11-06; the review of record, no paid review planned ([SECURITY.md](SECURITY.md)) |
 
 This is pre-release software. The contracts are unaudited and are deployed to **Sepolia and Base Sepolia only** — see [Contracts](#contracts) for addresses and per-chain status. No mainnet deployment exists. Milestones and their status are in the [roadmap](docs/ROADMAP.md).
 

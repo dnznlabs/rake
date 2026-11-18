@@ -113,8 +113,10 @@ leg 1 found 1 of 5, leg 2 found 3 of 5, both missed two, and neither raised anyt
 **Full report:** [`audits/2026-10-30/AUDIT.md`](audits/2026-10-30/AUDIT.md)
 
 **This is not an independent audit** and does not claim to be one. It is two language models from
-two labs reading the same code; a commissioned human review is a separate, paid exercise. Per
-decision 20, that paid review is an input to M05's go/no-go, not a gate on this milestone.
+two labs reading the same code, plus Slither and the invariant suite, and it is the review of
+record: no paid review is planned, and mainnet does not wait on one ([decision 55](docs/ROADMAP.md#decisions),
+2026-11-18, superseding decision 20 on that point). A commissioned human review or a bug bounty
+may come later as its own decision. Everything the review reads is public, so a reader can re-run it.
 
 ---
 
