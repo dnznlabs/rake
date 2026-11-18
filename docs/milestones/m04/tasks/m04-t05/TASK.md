@@ -15,9 +15,9 @@ scoped per item, and `app/` fixes land in their own task.
 ## Gate
 
 **The next Run B has executed on both chains** — `RUNBOOK.md` § Which run is this, Step 4 alone —
-serving the bundle built from `main` at `06fbaab` (the merge of m04-t13, carrying m04-t11, m04-t04 and
+serving the bundle built from `main` at `3751211` (whose `app/` and `src/` are byte-identical to `06fbaab`, the merge of m04-t13, carrying m04-t11, m04-t04 and
 m04-t13). Read it per chain: `cast nonce $APP --rpc-url "$RPC"` has moved past the `7` that RUNBOOK
-§ Uploads rows 1 and 2 record, § Uploads carries a row for that chain whose commit is `06fbaab` or a
+§ Uploads rows 1 and 2 record, § Uploads carries a row for that chain whose commit is `3751211` or a
 docs-only descendant of it, and `node tools/chain-doc.mjs --app $APP --rpc "$RPC" --chain $CHAIN_ID`
 reports an `inflated sha256` equal to `sha256sum app/dist/index.html` after `make dapp-nodev
 CHAIN_ID=$CHAIN_ID` at that commit. **The engineer's headless run (step 2) starts when Sepolia's upload
