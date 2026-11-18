@@ -130,7 +130,9 @@ deviation, not a pass**), and the exact command the red was taken with.
    `:136-146` pins the withheld wiring: `assert.match(src, /is created by/)`. **Predicted red:** with
    the `check(values)` call removed from `build.mjs`, the `VERSION=0.1alpha'` spawn exits `0`
    (quote the stdout `dapp:` line it prints) — then restore and confirm `app/dist` carries no quote:
-   `grep -c "0.1alpha'" app/dist/index.html` → `0`.
+   `grep -c "0.1alpha''" app/dist/index.html` → `0`. (Amended 2026-11-18: the original pattern
+   `"0.1alpha'"` matches the closing quote of the legitimate `version: '0.1alpha',` and reads `1` on
+   any correct build; the injected value would print `0.1alpha''`. Declared as deviation 1 in #255.)
 
 3. **The log's addresses recomputed (A3, A4, A5), `app/broadcast.mjs`.** Add beside `isCreate`
    (`:16`): `export const PROXY = '0x4e59b44847b379578588920ca78fbf26c0b4956c'` with a comment naming
@@ -274,8 +276,9 @@ branch point and recorded in the handoff with the commit.
    step 3 ×2, step 4 ×3, step 5 ×1 and the browser red of step 5 (b) — eleven. A plant that did not
    red is declared as a deviation with what did.
 3. **Shapes (A1, A2).** `test/build.test.mjs`'s `check` rows pass; the two `spawnSync` refusals exit
-   `1` with the named token on stderr and `app/dist` unchanged; `grep -c "0.1alpha'"
-   app/dist/index.html` → `0` after `make dapp-nodev CHAIN_ID=11155111`; `app/values.mjs` declares
+   `1` with the named token on stderr and `app/dist` unchanged; `grep -c "0.1alpha''"
+   app/dist/index.html` → `0` after `make dapp-nodev CHAIN_ID=11155111` (amended 2026-11-18, see
+   step 2's predicted red: the single-quote pattern reads `1` on every correct build); `app/values.mjs` declares
    exactly the seven tokens step 0's count reaches after step 5, and
    `grep -oh '__[A-Z][A-Z0-9_]*__' app/src/index.html app/src/widget.js app/src/host.html | sort -u`
    lists no token `SHAPES` lacks (both lists in the handoff, side by side).
