@@ -38,12 +38,12 @@ function lift() {
   const to = PAGE.indexOf('\n', PAGE.indexOf(CLOSE, from));
   assert.ok(to > from, 'the xlink declaration no longer ends on the explorer title');
 
-  const body = `${one('const esc = s =>')}\n${one('const short = a =>')}\n${PAGE.slice(from, to)}\nreturn { ext, xlink, esc };`;
+  const body = `${one('const esc = s =>')}\n${one('const short = a =>')}\n${PAGE.slice(from, to)}\nreturn { ext, xlink, esc, isClone, CLONE };`;
 
   return new Function('NAMED', 'EXPLORER', 'CFG', body)(
     new Map(), { 11155111: 'https://sepolia.etherscan.io' }, { chainId: 11155111 });
 }
-const { ext, xlink, esc } = lift();
+const { ext, xlink, esc, isClone, CLONE } = lift();
 
 const ADDR = '0x71a4221974Fc2E95081AE513248918dF27CF7a4A';
 const HASH = '0x' + 'ab'.repeat(32);
@@ -158,4 +158,45 @@ test('Eth.checksum is still not a filter, which is why the check is at the sink'
 
   /* Case-insensitively: re-casing is all `checksum` does, so the payload comes back shouting. */
   assert.match(checksum(BAITED), /<img src=x onerror=alert\(1\)>/i, 'checksum() now filters, and this test is stale');
+});
+
+/* R3 (`audits/2026-11-17/frontend/AUDIT.md:117-144`), the check half. `loadDistro` asked only that
+   the code was not `0x`, so any contract answering `snapshot()` was painted with the page's whole
+   trust surface and saved to `rake.recent`. `isClone` is the refusal; step 9 (a) of the task is the
+   same refusal in a browser. The 45 bytes are `create`'s own
+   (`src/Distribution.sol:473-476`), measured on the dev chain with `cast code` — see HANDOFF.md. */
+const IMPL = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
+
+test('isClone accepts exactly the 45-byte PUSH0 clone of the implementation', () => {
+  const code = CLONE(IMPL);
+
+  assert.equal((code.length - 2) / 2, 45, `the clone's runtime code is ${(code.length - 2) / 2} bytes, not 45`);
+  assert.equal(isClone(code, IMPL), true);
+});
+
+test('isClone refuses a clone with one hex digit changed', () => {
+  const code = CLONE(IMPL);
+  /* The last byte of the trailing `5af4…5ff3` run, so the forgery differs outside the address. */
+  const bent = code.slice(0, -1) + (code.slice(-1) === '3' ? '4' : '3');
+  assert.notEqual(bent, code, 'the fixture did not change a digit');
+
+  assert.equal(isClone(bent, IMPL), false);
+});
+
+test('isClone refuses the implementation\'s own code, which answers snapshot()', () => {
+  /* Leg 2's fake is any contract with the right ABI, and the implementation behind the factory is
+     one: it answers `snapshot()` and is not a clone. Any longer string stands for it here. */
+  assert.equal(isClone('0x60806040523480156100' + 'ab'.repeat(200), IMPL), false);
+});
+
+test('isClone refuses an address with no code at all', () => {
+  assert.equal(isClone('0x', IMPL), false);
+});
+
+test('isClone reads an upper-cased answer as the same code', () => {
+  /* `eth_getCode` answers in whatever case the node likes, and `implementation()` arrives
+     checksummed, so both sides are lower-cased before they are compared. */
+  const shouted = '0X' + CLONE(IMPL).slice(2).toUpperCase();
+
+  assert.equal(isClone(shouted, IMPL), true);
 });

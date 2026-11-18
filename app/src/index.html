@@ -357,6 +357,21 @@ async function readClock() {
 }
 const isAddr = v => /^0x[0-9a-fA-F]{40}$/.test(v);
 const isWord = v => /^0x[0-9a-fA-F]{64}$/.test(v);
+/* The runtime code of a PUSH0 clone of `impl`, which is the only code this page will read as a
+   distribution (R3, `audits/2026-11-17/frontend/AUDIT.md:117-144`). `loadDistro` checked only that
+   the code was not `0x`, so any contract answering `snapshot()`, `reserved` and `pendingOwner` was
+   painted with the page's whole trust surface — the table, the delay, the timelock phases, "anyone
+   can apply", the `distribute` buttons — and saved to the visitor's `rake.recent`. A fake claiming a
+   seven-day delay while forwarding on `receive()` is a phishing page carrying this dapp's own
+   signals, and a fake reporting a large `nonce` also sends `Model.nonceOf` up to 2^32 keccaks.
+
+   The 45 bytes are the `0x2d` `create` copies out after its 9-byte init prefix
+   (`src/Distribution.sol:473-476`; `predict` at `:489-495` hashes the same 54 bytes), measured on
+   this task's own dev chain with `cast code <clone>` — see HANDOFF.md. Lower-cased on both sides:
+   `eth_getCode` answers in whatever case the node likes, and `implementation()` arrives
+   checksummed. */
+const CLONE = impl => '0x5f5f365f5f37365f73' + impl.slice(2).toLowerCase() + '5af43d5f5f3e6029573d5ffd5b3d5ff3';
+const isClone = (code, impl) => String(code).toLowerCase() === CLONE(impl);
 /* The shape of a value `ext` is about to write, checked at the sink that writes it. Every `v` that
    reaches `ext` came from a provider — a hash from `eth_sendTransaction`, a topic or an address from
    `eth_getLogs`, an account from `eth_accounts` — and nothing between that call and here checks it:
@@ -527,7 +542,7 @@ function who() {
 }
 
 /* ---- reading the chain ---------------------------------------------------------------------- */
-const S = { featured: null, maxRows: null, grace: null, loaded: false, error: null, tab: 'recent' };
+const S = { featured: null, impl: null, maxRows: null, grace: null, loaded: false, error: null, tab: 'recent' };
 async function load() {
   CHAIN = parseInt(await P.request({ method: 'eth_chainId' }), 16);
   // The same address on another network is another contract, or none: do not read it.
@@ -548,7 +563,9 @@ async function load() {
     call(impl, 'MAX_BENEFICIARIES()', [], ['uint256']),
     call(impl, 'GRACE()', [], ['uint256']),
   ]);
-  S.featured = a; S.maxRows = Number(max); S.grace = grace; S.loaded = true;
+  /* `S.impl` is kept, not only used: `isClone` needs it on every `loadDistro`, and this read is the
+     one the page already makes at boot — so the clone check costs no extra request. */
+  S.featured = a; S.impl = impl; S.maxRows = Number(max); S.grace = grace; S.loaded = true;
 }
 
 /* One distribution, in four reads: code first, so an address with nothing on it is "could not read"
@@ -561,6 +578,10 @@ async function load() {
 async function loadDistro(addr) {
   const code = await P.request({ method: 'eth_getCode', params: [addr, 'latest'] });
   if (!code || code === '0x') return { addr, missing: true };
+  /* The code is compared with the clone of the implementation this page read at boot, so a contract
+     that is not one of this factory's distributions never reaches a paint (R3). `foreign` is handled
+     wherever `missing` is, and like `missing` it is not added to `rake.recent`. */
+  if (!isClone(code, S.impl)) return { addr, foreign: true };
   let snap = null;
   try {
     /*DEV*/
@@ -780,6 +801,9 @@ const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow$
 const eyebrow = (text, cls) => `<div class="eyebrow${cls ? ' ' + cls : ''}">${text}</div>`;
 const notice = (text, cls) => `<div class="notice${cls ? ' ' + cls : ''}">${text}</div>`;
 const unreadable = addr => notice(`could not read a distribution at ${ext('address', addr, short(addr))} on ${cname(CFG.chainId)} — nothing is deployed there.`, 'err');
+/* The other half of "could not read": there is code at the address, but it is not a clone of this
+   factory's implementation, so nothing below this line would be this app's state (R3). */
+const notFactory = addr => notice(`${ext('address', addr, short(addr))} on ${cname(CFG.chainId)} has code, but it is not a distribution of this app's factory — this page will not read it.`, 'err');
 
 /* Owner, delay and the balance behind `distribute`. The owner cell takes a second line while a
    transfer is waiting for its nominee to accept (decision 21): the current owner above it still holds
@@ -1064,7 +1088,7 @@ async function landing() {
   const t = TOKEN;
   const d = await loadDistro(S.featured);
   // The widget reads `window.ethereum` alone, so with no RPC and no such global it could only fail.
-  if (stale(t) || d.missing || !(WRPC || window.ethereum)) return;
+  if (stale(t) || d.missing || d.foreign || !(WRPC || window.ethereum)) return;
   fill('featured', `<div id="wdg" data-rake="${d.addr}" data-chain="${CFG.chainId}" data-link${WRPC ? ` data-rpc="${esc(WRPC)}"` : ''}></div>`);
   window.RakeWidget.mount(document.getElementById('wdg'));
 }
@@ -1200,6 +1224,10 @@ async function detail(addr) {
   const [d] = await Promise.all([loadDistro(addr), readClock()]);
   if (stale(t)) return;
   if (d.missing) { V.innerHTML = unreadable(addr); return; }
+  /* Before `addRecent`, deliberately: the old order saved the address first and painted second, so
+     one visit to a hostile link put a fake into `rake.recent` for good (R3, and R16 is what the
+     fake's fallback shape then did to `#/distros`). A foreign contract is named, not drawn. */
+  if (d.foreign) { V.innerHTML = notFactory(addr); return; }
   addRecent(d.addr);
   // Decision 6: a one-row table at 100% is a forward to a successor, so that successor is named first.
   const next = Model.supersededBy(d.table);
@@ -1298,7 +1326,7 @@ function paintDetail() {
   const d = DS.d, next = DS.next, heir = DS.heir;
   V.innerHTML = '<div class="distro">' + eyebrow(`${ext('address', d.addr, short(d.addr))} · ${cname(CFG.chainId)}`)
     + `<h1>${esc(d.description)}</h1>`
-    + (next ? `<div class="status warn">superseded by ${heir.missing ? ext('address', next, short(next)) : `<a href="#/distros/${next}">${esc(heir.description)}</a>`} — this table forwards everything it receives.</div>` : '')
+    + (next ? `<div class="status warn">superseded by ${heir.missing || heir.foreign ? ext('address', next, short(next)) : `<a href="#/distros/${next}">${esc(heir.description)}</a>`} — this table forwards everything it receives.</div>` : '')
     + bar(d.table, { small: true }) + ticks(d.table, {}) + ledger(d.table)
     + `<div id="pending">${pendingBlock(d, true)}</div>`
     + meta(d)
@@ -1806,7 +1834,7 @@ async function mine() {
   const addrs = found.logs.map(l => { const a = Eth.dec(['address'], l.topics[1])[0]; FIRST.set(a, l.blockNumber); return a; });
   const rows = await Promise.all(addrs.map(async a => {
     const d = await loadDistro(a);
-    return !d.missing && d.owner.toLowerCase() === ACC.toLowerCase() ? d : null;
+    return !d.missing && !d.foreign && d.owner.toLowerCase() === ACC.toLowerCase() ? d : null;
   }));
   /* A truncated scan says so rather than showing fewer: this list is the only place the dapp claims
      to know everything an account owns, and a short answer here reads as "you own three" (#76). */
@@ -1824,7 +1852,7 @@ async function list() {
   let items = [], failed = false, scanned = null;
   try {
     if (S.tab === 'mine') { const m = await mine(); items = m.rows; scanned = m.partial; }
-    else items = (await Promise.all(recents().map(loadDistro))).filter(d => !d.missing);
+    else items = (await Promise.all(recents().map(loadDistro))).filter(d => !d.missing && !d.foreign);
   } catch (e) { failed = true; }
   if (stale(t)) return;
   if (failed) { slot.innerHTML = notice('could not read the list from this chain.', 'err'); return; }
@@ -1843,7 +1871,11 @@ async function list() {
     return;
   }
   fill('rows', items.map(d => `<a class="list-row" href="#/distros/${d.addr}"><span><b>${esc(d.description)}</b><span class="sub">${cname(CFG.chainId)} · ${ext('address', d.addr, short(d.addr), true)}</span></span>`
-    + `${d.pending.length ? '<span class="dot" title="change queued"></span>' : '<span></span>'}${mini(d.table)}</a>`).join('') + short_);
+    /* `pending` is `null`, not `[]`, when `loadDistro` fell back to the five single reads, and the
+       `TypeError` an unguarded length read threw here was outside the `try` above, so one such row
+       left `#/distros` on "reading…" for good (R16, `AUDIT.md:367-375`). No dot: the fallback did
+       not read the queue, and an absent dot is what "not read" looks like in this column. */
+    + `${d.pending && d.pending.length ? '<span class="dot" title="change queued"></span>' : '<span></span>'}${mini(d.table)}</a>`).join('') + short_);
 }
 
 /* ---- docs ------------------------------------------------------------------------------------ */
