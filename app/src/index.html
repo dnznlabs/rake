@@ -479,7 +479,9 @@ const logCache = {
    age rule bites because nothing but the passage of time moves it; and after a record is written,
    because that is the only moment the count can rise, and decision 52's "at most 50" is a claim about
    the store rather than about one instant of one load. A page whose route changes by hash never opens
-   again, so without the second point a device could sit at 51 indefinitely. */
+   again, so without the second point a device could sit at 51 indefinitely. The second point is taken
+   only where the count says it has to be — the write path reads `count()` first — so the common load,
+   which neither ages a record nor crosses the cap, pays one `count` and not a read of every record. */
 const logSweepRun = async () => {
   const recs = await logCache.all();
   if (!recs || !recs.length) return;
@@ -752,8 +754,11 @@ async function histLogs(addr, from, to) {
   const into = base || (rec && to != null && Number(to) < rec.first ? rec : null);
   const next = { ...Model.mergeHist(into, live), schema: LOGSCHEMA, chainId: String(CFG.chainId), address: addr, visited: Date.now() };
   await logCache.put(Model.keepsDepth(rec, next) ? next : { ...rec, visited: next.visited });
-  // The one moment the record count can rise, and so the one that can put the store over the cap.
-  await logSweepRun();
+  /* The one moment the record count can rise, and so the one that can put the store over the cap. Only
+     the count moves here — the age rule is judged once per load, on open, where nothing but the passage
+     of time can have moved it — so the sweep's `getAll` of every record, up to 50 of raw logs read for
+     one timestamp each, is paid only where the count is actually over the cap. */
+  if (((await logCache.count()) ?? 0) > LOGKEEP.cap) await logSweepRun();
   if (!base) return { changes, funds, ins };
   /* Served: the record's logs below `through` and the live tail above it, as one range. Its boundary
      is the record's own `first` where that record was itself built by a partial scan — the history
