@@ -224,9 +224,13 @@ nothing. Two instruments, one per run:
      `cancel` on it (`cancel(bytes32)`, `index.html:912`); `changes` gains `cancelled`. Three hashes;
      screenshots of the pending row, the applied row and the cancelled row.
    - **(j) Create, vault-owned, and the calldata view (decision 7).** `#/create` again with the owner
-     field set to the Ops vault `0x00c0e887…3790` (README § Contracts): the owner-guard of #172 says
-     the owner is not the connected wallet and asks for an acknowledgement before step 2 — screenshot
+     field set to the Ops vault `0x00c0e887…3790` (README § Contracts): the owner note reads `a
+     contract — it will have to propose and cancel through its own calls` (`probeOwner`,
+     `index.html:1482`) and the form proceeds without an acknowledgement — #172's checkbox is drawn
+     only for a never-used address (`paintOwner`, `index.html:1742`), by decision 43 — screenshot
      that sentence — then a two-row table (the UAT wallet, the engineer's wallet), delay `3600`.
+     (Amended 2026-11-18 from "asks for an acknowledgement before step 2": the plan's wording, not
+     the page, was wrong; found by the engineer's run.)
      Expected after `create`: the new page's owner bar reads `you are a signer on <vault>, which owns
      this distribution — every change below is calldata to submit through it` (`index.html:1383`,
      reached through the `isOwner(address)` probe at `:1218-1225`), and the drawer's writes render as
