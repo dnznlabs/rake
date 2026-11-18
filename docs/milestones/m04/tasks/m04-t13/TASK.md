@@ -4,11 +4,10 @@ Milestone: [M04](../../MILESTONE.md) · Phase: 1 — The dapp that ships
 
 When this is done, every finding of the 2026-11-17 front-end audit whose remedy is a byte in the
 shipped bundle has either been closed at its sink or input, with a test that is red without the
-change, or has been accepted for this release with its reason in `SECURITY.md` § Front end; and the
-Cache section cannot sit at zero over a populated store on the path `#227` left open. `app/`,
+change, or has been accepted for this release with its reason in `SECURITY.md` § Front end. `app/`,
 `test/*.mjs` only; nothing under `src/`, no `.gas-snapshot` change, and the testnets' document is not
 re-uploaded by this task — this is the last `app/` change the next Run B carries, so that one upload
-carries m04-t11, m04-t12, m04-t04 and this.
+carries m04-t11, m04-t04 and this.
 
 ## Plan
 
@@ -17,17 +16,17 @@ Every command runs from the repo root through `devbox run --` (node `v24.12.0` f
 [#230](https://github.com/dnznlabs/rake/pull/230) (m04-t04)**: R2's `shaped()` check at `ext`/`xlink`
 is the pattern steps 3 and 5 follow and `test/ext.test.mjs` is the test they extend, so a branch cut
 before that merge rebases onto it before the PR opens. [#227](https://github.com/dnznlabs/rake/pull/227)
-(m04-t12) is expected to have merged first; if it has not, the task waits, because step 9 edits the
-`cacheBind` chain it adds. Check hooks with `ls .git/hooks | grep -v sample` → `pre-commit`,
+(m04-t12) is held out of this upload by Denizen's ruling of 2026-11-18, and this task does not depend
+on it. Check hooks with `ls .git/hooks | grep -v sample` → `pre-commit`,
 `post-commit`. **Line numbers below are PR #230's head `3789dbc`** for `app/src/widget.js`,
-`app/src/eth.js`, `app/src/model.js` and `app/inline-scripts.mjs`, which no open PR moves, and for
-`app/src/index.html`, which #227 moves by about +136 lines below `:425` — trust names over numbers.
+`app/src/eth.js`, `app/src/model.js`, `app/inline-scripts.mjs` and `app/src/index.html`, which no PR
+ahead of this one moves — trust names over numbers.
 Never `devbox run -- bash -c` with a pipe; write a script. Scratch files go under a directory outside
-the repo. The browser check runs as m04-t12's did ([HANDOFF.md](../m04-t12/HANDOFF.md) § The browser
+the repo. The browser check runs as m04-t01's did ([HANDOFF.md](../m04-t01/HANDOFF.md) § The browser
 check): `playwright-core` outside the repo driving the cached chromium `AGENTS.md` § The dapp names,
 against the dev build (`make dapp`) on a dev stack on spare ports. **Serve `app/dist` with
 `python3 -m http.server <port>`, not `npx serve`: `serve` drops the query string on its extension
-redirect (m04-t12 handoff § Deviations 9), so any check that passes `?rpc=…` through `serve` measures
+redirect (m04-t12's branch, #227, § Deviations 9), so any check that passes `?rpc=…` through `serve` measures
 a page that never received it. Every browser step below that passes a parameter proves the page saw it
 (read `location.search` back through `page.evaluate` and record it) before reading a result.**
 
@@ -54,7 +53,6 @@ test, in the shape R2's row already has.
 | R16 (Low) | **fix** (step 4) | The recent list reads `d.pending` as possibly `null`, the shape the fallback returns. |
 | R17 (Low) | **fix** (step 8) | `tx` re-reads `eth_chainId` immediately before `eth_sendTransaction` and refuses a chain other than `CFG.chainId`; the transaction also carries `chainId`. |
 | R21 (Info) | **fix** (step 2) | `noreferrer` joins `noopener` at the eight `target="_blank"` sites; the widget promises no analytics and a `Referer` to the gateway is one. |
-| #227 residual | **fix** (step 9) | The Cache section is repainted whether the re-read after `clear cache` settles or rejects. |
 | R4, R8 (Medium) | accept | `app/build.mjs` and `app/broadcast.mjs` input validation changes no byte of the bundle and needs no upload, and exploiting either needs write access to a tracked input — the authority to edit `index.html` itself. Carried to a build-hardening task before M05 builds the mainnet document; not here, because this task gates the Run B. |
 | R9 (Medium) | accept | The remedy is what the ledger calls a token that has been distributed once, which is the docs page's and the ledger's wording — Denizen's under decision 17 — and whether the set should be the owner's rather than anyone's is a product decision. Raised with this task's handoff, not changed here. |
 | R18 (Low) | accept | Computing the featured address needs the clone init-code hash and the implementation address as build constants; today both are provider reads, and the provider that can lie about `predict()` lies about `implementation()` too. The build change shares R4's and R8's task and is carried there. |
@@ -69,9 +67,9 @@ the test that is red without it (**planted once, the red quoted; a predicted red
 deviation, not a pass**), and the browser step where the behaviour is visible.
 
 0. **Baselines**, re-run at the branch point and recorded in the handoff with the commit and the date,
-   never carried from here: #230 and #227 both move the test count and the gzip figure, and m04-t11
+   never carried from here: #230 moves the test count and the gzip figure, and m04-t11
    and m04-t12 each caught this plan's predecessors quoting a stale one. On `main` at `3d4f4cf`,
-   2026-11-17, before either merge, the figures were: `node --test test/*.test.mjs` → `ℹ tests 109 ·
+   2026-11-17, before that merge, the figures were: `node --test test/*.test.mjs` → `ℹ tests 109 ·
    ℹ pass 109 · ℹ fail 0`; `make dapp-nodev CHAIN_ID=11155111` → `dapp: raw 143339 bytes · gzip
    45535 bytes · chain 11155111`, `widget: raw 8132 bytes · budget 10240 · 2108 left`; `wc -c
    app/dist/widget.js` → `8132`. Re-run those three, then these greps (every grep in this plan is
@@ -88,16 +86,15 @@ deviation, not a pass**), and the browser step where the behaviour is visible.
      one it refuses, so this stays `0` after; it is here so a denylist is noticed if one appears).
    - `grep -ic -F "indexOf('<script'" app/inline-scripts.mjs` → `1`.
    - `grep -ic plainName app/src/model.js app/src/index.html test/model.test.mjs` → `0` each.
-   - `grep -ic finally app/src/index.html` → `0`.
    - `grep -rniE '\btip\b|govUrl|about:|ownerKind' app/src | wc -l` → `4` (M02 criterion 9's
-     baseline, the four `ownerKind` reads; m04-t12 holds it at four).
+     baseline, the four `ownerKind` reads; `main` at `3d4f4cf` holds it at four).
    - The clone's runtime code, **rehearsed by the architect on anvil `1.7.1` on a spare port,
      2026-11-17**, against a clone the dev deploy created: `cast code <clone>` is exactly 45 bytes,
      `0x5f5f365f5f37365f73` + the 20 bytes of `implementation()` lower-cased + `5af43d5f5f3e6029573d5ffd5b3d5ff3`,
      which is the `0x2d` bytes `create` copies out after its 9-byte init prefix
      (`src/Distribution.sol:473-476`; `predict` at `:489-495` hashes the same 54 bytes). The
      implementation itself (9,277 bytes of code) answers `snapshot()` and is not a clone, so it is
-     the foreign contract step 10 opens; the factory (1,319 bytes) reverts `snapshot()` and is the
+     the foreign contract step 9 opens; the factory (1,319 bytes) reverts `snapshot()` and is the
      fallback-path foreign contract. Re-run the `cast code` comparison on the task's own dev chain
      and record it.
 
@@ -170,7 +167,7 @@ deviation, not a pass**), and the browser step where the behaviour is visible.
    or add a second lift): the 45-byte clone of a given implementation → `true`; the same with one hex
    digit changed → `false`; the implementation's own code (any longer string) → `false`; `0x` → `false`;
    upper-cased input → `true`. **Predicted red:** `isClone` written with `===` against a mixed-case
-   `impl` reds the upper-cased row. The visible behaviour is step 10 (a) and (b). Greps:
+   `impl` reds the upper-cased row. The visible behaviour is step 9 (a) and (b). Greps:
    `grep -ic 5f5f365f5f37365f73 app/src/index.html` → `1`; `grep -ic -F 'd.pending.length'` → `0`
    (baseline 1) and `grep -ic -F 'd.pending && d.pending.length'` → `1`.
 
@@ -201,7 +198,7 @@ deviation, not a pass**), and the browser step where the behaviour is visible.
    `0xzz…` (quote it). `test/abi.test.mjs` — `Eth.dec(['uint256[]'], <head word 0x20, length word
    100000, no body>)` throws `/exceeds/`; **predicted red:** without the bound it returns an array of
    100,000 `0n`s and the `assert.throws` fails. For `data-rake` and `data-link`, the IIFE's `render`
-   is not reachable from node without a DOM; those two are proved in the browser, step 10 (e) and
+   is not reachable from node without a DOM; those two are proved in the browser, step 9 (e) and
    (f), with the red planted on the reviewed build. `grep -ic eth_chainId app/src/widget.js` → `2`,
    unchanged — the RPC path gains no request.
 
@@ -244,16 +241,9 @@ deviation, not a pass**), and the browser step where the behaviour is visible.
    that too; the re-read is the measured check. `wrongChain()` at boot (`:527`) stays; this is the
    same test at the moment it matters.
 
-   Check: step 10 (d). `grep -ic eth_chainId app/src/index.html` → `2` (baseline 1).
+   Check: step 9 (d). `grep -ic eth_chainId app/src/index.html` → `2` (baseline 1).
 
-9. **The Cache section after a rejected re-read (#227 residual), `index.html` `cacheBind`.** The
-   chain after `clear cache` — `history(…).then(h => absorb(t, d, h)).then(() => cacheBind()).catch(() => {})`
-   as #227 wrote it — becomes `.then(h => absorb(t, d, h)).catch(() => {}).finally(() => cacheBind())`,
-   with the comment above it (#227's, about the write-back) extended by one sentence: `readFunds`
-   reads balances over RPC and can reject, and the section must be read again either way. Check:
-   step 10 (g); `grep -ic finally app/src/index.html` → `1` (baseline 0).
-
-10. **The browser check**, against a dev stack on spare ports as m04-t12 ran it (`ANVIL_PORT=<a>
+9. **The browser check**, against a dev stack on spare ports as m04-t12's branch ran it (`ANVIL_PORT=<a>
     APP_PORT=<b> make deploy && make fixtures`, `make dapp`, `python3 -m http.server <b>` over
     `app/dist`), the page opened with `?rpc=http://127.0.0.1:<a>&from=<anvil account 0>` and
     `location.search` read back and recorded first. `page errors: none` in every run, as t01 and t12
@@ -294,16 +284,10 @@ deviation, not a pass**), and the browser step where the behaviour is visible.
       100,000. Both mounts show the `could not read distribution` error state; neither shows a `foot`
       line. Before the fix the first shows a footer with `0xzz…` in it and the second a table — the
       red, recorded by `innerHTML` length and the presence of `rk-f`.
-    - (g) **#227 residual.** A distribution page open behind `#/docs`, as t12's criterion 9 case:
-      press `clear cache` with the route failing every `eth_getBalance` (→ `absorb` rejects at
-      `readFunds`). Wait on `count() > 0` through `page.evaluate`, then read the Cache section: it
-      prints `1 distribution cached · about N bytes` with `N` equal to the sum computed outside the
-      page. Before the fix the section reads `0 distributions cached · about 0 bytes` over a store at
-      count 1 — the red, recorded as t12's red 7 was.
-    - (h) **The whole page once more** with no route and no stub: a distribution page, `#/distros`,
-      `#/docs` with the Cache section, `#/create` step 2; `page errors: none`.
+    - (g) **The whole page once more** with no route and no stub: a distribution page, `#/distros`,
+      `#/docs`, `#/create` step 2; `page errors: none`.
 
-11. **`SECURITY.md` § Front end.** Every row this table fixes becomes `fix`, naming the hunk (file,
+10. **`SECURITY.md` § Front end.** Every row this table fixes becomes `fix`, naming the hunk (file,
     function, commit) and the test, in the shape R2's row has; every row it accepts keeps `accepted`
     and gains the table's reason as its last sentence, replacing "a follow-on task the architect
     scopes from this rollup" with this task's name and, for R4, R8, R18, R9, R19, R24, the words
@@ -312,7 +296,7 @@ deviation, not a pass**), and the browser step where the behaviour is visible.
     stated, as that section already does. **Nothing is removed from the rollup**: `AUDIT.md` is the
     legs' record and stays as committed.
 
-12. **`HANDOFF.md`** beside this file: the AC table with the figures beside step 0's re-run baselines;
+11. **`HANDOFF.md`** beside this file: the AC table with the figures beside step 0's re-run baselines;
     one fix row per finding with its four parts and the planted red quoted; the widget and gzip
     deltas; § For Denizen naming R9 and R19 as the two wording questions this task leaves him, with
     the ledger sentence (`:1582`) and the docs claim (`:1921`) quoted so he can rule on the words;
@@ -329,46 +313,43 @@ branch point and recorded in the handoff with the commit.
    table's reason, the section's count sentence matches its 24 rows, and `git diff --stat
    origin/main -- app/ test/` touches nothing a row does not name (the handoff lists each file beside
    the rows that touch it).
-2. **Planted reds.** Each predicted red in steps 2–9 was planted once and the red quoted in the
+2. **Planted reds.** Each predicted red in steps 2–8 was planted once and the red quoted in the
    handoff — the node rows: `esc` ×2 (step 2), `editorState` ×4 (step 3), `isClone` ×1
    (step 4), `decode`/`arr` ×2 and `Eth.dec` ×1 (step 5), `plainName` ×2 (step 6),
-   `scriptTags` ×1 (step 7) — thirteen — plus the browser reds of step 10 (a)–(g) recorded on the reviewed
+   `scriptTags` ×1 (step 7) — thirteen — plus the browser reds of step 9 (a)–(f) recorded on the reviewed
    build. A plant that did not red is declared as a deviation with what did.
-3. **R3 in the browser.** Step 10 (a): the implementation address and the factory address both paint
+3. **R3 in the browser.** Step 9 (a): the implementation address and the factory address both paint
    the foreign notice, no table, and `rake.recent` does not gain either; `isClone` is pinned in
    `test/ext.test.mjs` with the five rows of step 4.
-4. **R5 and R7.** Step 10 (c) as recorded, and `test/editor.test.mjs` with the six rows of step 3
+4. **R5 and R7.** Step 9 (c) as recorded, and `test/editor.test.mjs` with the six rows of step 3
    passing; `grep -ic checksumOk app/src/index.html` → `9` (baseline 8).
-5. **R6, R12, R14 in the widget.** Step 10 (e) and (f): zero `img` elements and zero
+5. **R6, R12, R14 in the widget.** Step 9 (e) and (f): zero `img` elements and zero
    `a[href^="javascript:"]` across the mounts, the bare and `https:` links as recorded, both stub
    mounts in the error state; `test/widget.test.mjs` with the step 5 rows; `test/abi.test.mjs` with
    the `exceeds` row.
-6. **R17.** Step 10 (d): zero `eth_sendTransaction` under the flipped `eth_chainId`, one with it
+6. **R17.** Step 9 (d): zero `eth_sendTransaction` under the flipped `eth_chainId`, one with it
    restored; `grep -ic eth_chainId app/src/index.html` → `2`.
 7. **R10, R11, R15, R16, R21 by test and grep.** `Model.plainName` rows (step 6) pass;
    `test/inline-scripts.test.mjs` with its two new rows passes and `grep -ic -F "indexOf('<script'"
    app/inline-scripts.mjs` → `0`; `grep -ic 'u202E'` → `1` in `app/src/index.html` and `1` in
-   `app/src/widget.js`; `grep -ic -F 'd.pending.length' app/src/index.html` → `0` and step 10 (b)
+   `app/src/widget.js`; `grep -ic -F 'd.pending.length' app/src/index.html` → `0` and step 9 (b)
    paints; `grep -ic noreferrer` → `7` in `index.html`, `1` in `widget.js`, with `grep -ic noopener`
    unchanged at `7` and `1`.
-8. **The Cache section after a rejected re-read.** Step 10 (g): the section's count equals `count()`
-   and its bytes equal the outside sum after `clear cache` with `eth_getBalance` failing;
-   `grep -ic finally app/src/index.html` → `1`.
-9. **Bytes.** `make dapp-nodev CHAIN_ID=11155111` → `widget: raw N bytes · budget 10240 · M left`
+8. **Bytes.** `make dapp-nodev CHAIN_ID=11155111` → `widget: raw N bytes · budget 10240 · M left`
    with `N ≤ 10240`, and `wc -c app/dist/widget.js` → the same `N`, **recorded as a signed delta
    against step 0's re-run `8132`** — the widget is expected to grow by a few hundred bytes for the
    first time since M02; the `dapp:` line's `gzip` figure recorded as a signed delta against step 0's
    re-run figure. Both hashes for both chains in the handoff § For the Run B.
-10. **The docs page's checks still pass.** `node --test test/docs.test.mjs` passes with the section
-    count as #227 left it (`15`) and no section added or removed; `grep -rniE
+9. **The docs page's checks still pass.** `node --test test/docs.test.mjs` passes with the section
+    count as `main` pins it (`14`, `test/docs.test.mjs:95` at `3d4f4cf`) and no section added or removed; `grep -rniE
     '\btip\b|govUrl|about:|ownerKind' app/src | wc -l` → `4`, the same four `ownerKind` lines
     (M02 criterion 9, baseline stated).
-11. **Nothing else moved.** `git diff --stat origin/main -- src/ test/*.t.sol .gas-snapshot
+10. **Nothing else moved.** `git diff --stat origin/main -- src/ test/*.t.sol .gas-snapshot
     RUNBOOK.md scripts/ calldata/ audits/` empty; `node --test test/*.test.mjs` passes with more
     tests than step 0's re-run count and the handoff names the added ones per file; `forge test` count
     unchanged from `main` and stated; `make fmt`, `forge lint` and CI pass at the head; `git status
     --porcelain` empty after `make dapp-nodev CHAIN_ID=11155111`.
-12. **The Run B gate.** The PR merges before the next Run B's step 4 is prepared, and the handoff's
+11. **The Run B gate.** The PR merges before the next Run B's step 4 is prepared, and the handoff's
     § For the Run B says so with the hashes; if the Run B has already been prepared when this is
     ready, the handoff says that instead and the architect re-sequences — this task does not start an
     upload.
@@ -400,8 +381,7 @@ two wording items (R9, R19) go to Denizen through the handoff, not through this 
   findings (R1 accepted with a decision issue, R2 fixed in t04, the rest to this task), and
   [#230](https://github.com/dnznlabs/rake/pull/230), whose `shaped()` at `ext`/`xlink` and
   `test/ext.test.mjs` are the pattern.
-- [m04-t12 HANDOFF.md](../m04-t12/HANDOFF.md) § Discoveries (the `absorb` residual, `npx serve`),
-  § The browser check (the harness); [m04-t11 TASK.md](../m04-t11/TASK.md) and
+- [m04-t01 HANDOFF.md](../m04-t01/HANDOFF.md) § The browser check (the harness); [m04-t11 TASK.md](../m04-t11/TASK.md) and
   [m04-t12 TASK.md](../m04-t12/TASK.md), the shape this plan follows.
 - `src/Distribution.sol:459-497` (`create`, `predict`, the clone bytes) and `:325-345` (the table
   validator this task's editor mirrors); `ROADMAP.md` decisions 12 (the widget's cost model), 13
