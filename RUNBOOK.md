@@ -1080,7 +1080,8 @@ head, where `--rpc` would read today's nonce and emit different pointers.
 
 **Rows 3 and 4 are complete — 4a through 4d all ran.** The product owner co-signed and submitted all
 six proposals on 2026-11-18 at 16:42–16:44 UTC; the engineer ran the six `executeQueued` calls once
-the hour delay matured, 17:46–17:52 UTC, and every receipt is `status 1`. The two hash columns were
+the hour delay matured, 17:46:48Z–17:49:36Z by the executing blocks' own timestamps, and every
+receipt is `status 1`. The two hash columns were
 written from a fork at 4a, before the proposals were signed, and **4d re-read both from the chain
 after execution and they are unchanged** — so, as in rows 1 and 2, the column now carries a live
 `chain-doc` reading rather than a prediction. The pointers landed at the three predicted addresses and
