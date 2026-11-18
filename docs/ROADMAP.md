@@ -790,6 +790,31 @@ convention. Numbered 45 because 44 is taken by
     M05 builds the mainnet document, which was always the gate that mattered: ship it as amended,
     or close #165 by option 2 with the figure recorded. #165 reopens against t05 until then.
 
+53. **The gateway the visitor chose is the trust boundary for the hosted dapp; `web3://` direct is
+    preferred and gateways are a convenience.** Ruled by Denizen on 2026-11-18 (GitHub,
+    [#232](https://github.com/dnznlabs/rake/issues/232), 14:26 UTC): "Option 1 - document it. web3://
+    direct is preferred, gateways are for convenience. Anyone can run a gateway that serves a contract
+    html(), it is a trust boundary out of scope for our project." The project accepts that a `web3://`
+    gateway operator can alter what a visitor runs, and says so: the authenticated paths are a native
+    `web3://` client or a gateway the visitor runs themselves (the one m04-t02 put in the dev stack); a
+    hosted gateway such as `w3link.io` is a convenience whose operator the visitor is trusting.
+    Supersedes nothing; it records the ruling that `SECURITY.md` § Front end row R1 (front-end audit
+    `audits/2026-11-17/frontend/AUDIT.md`, m04-t04, [#230](https://github.com/dnznlabs/rake/pull/230))
+    was dispositioned `accepted` on, and R23 leans on the same boundary. **Why:** a gateway that can
+    inject script into our document can equally serve a different document, so the on-chain bytes
+    authenticate the document only to a client that reads the chain itself, and no change in `app/`
+    moves that boundary — which is why R1 is `accepted` rather than a `fix` or `design`, and why the
+    property is out of scope for the project rather than a defect in it. Cost: a paragraph of page
+    text, nothing in `app/` beyond it. The `#/docs` wording is Denizen's under decision 17 and is not
+    changed by this transcription: it rides the post-UAT `app/` task alongside
+    [#243](https://github.com/dnznlabs/rake/issues/243) and
+    [#241](https://github.com/dnznlabs/rake/issues/241), before M05 builds the mainnet document.
+    **Rejected:** (2) stop recommending hosted gateway URLs — publish only `web3://<App>/` and the
+    self-run gateway, and drop `w3link.io` from the docs page and the widget snippet. Most visitors
+    cannot open a `web3://` URL today, so the dapp would have no browser-reachable address until they
+    install a client or run a gateway, and the boundary would be no different for those who did
+    neither.
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
