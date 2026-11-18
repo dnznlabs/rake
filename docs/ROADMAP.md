@@ -780,6 +780,15 @@ convention. Numbered 45 because 44 is taken by
     per-record age expiry (the `Applied`-to-`Queued` matching, the recognised-token list and the
     escrow rows are derived from the whole lifetime of logs, and a trimmed record breaks them with
     nothing on the page to say so). Task: [m04-t12](milestones/m04/tasks/m04-t12/TASK.md).
+    **Addendum 2026-11-18 (held, [#227](https://github.com/dnznlabs/rake/pull/227)):** Denizen
+    halted the task's PR on 2026-11-18 (Telegram DM, 00:05 CST) while testing it locally before
+    mainnet; the ruled shape stands and the ship decision moves. m04-t12 is out of the next Run B,
+    which carries t11, t04 and t13 only; the branch stays unmerged at `ad556ff`, do-not-merge. The
+    remedy was sized from the public fallback RPC and the page reads through the wallet's, which
+    m04-t05 is the task to measure, and it adds persistent client state right before that UAT.
+    Decide after t05 records the per-load count and wall time through MetaMask's RPC, and before
+    M05 builds the mainnet document, which was always the gate that mattered: ship it as amended,
+    or close #165 by option 2 with the figure recorded. #165 reopens against t05 until then.
 
 ## Findings carried forward
 
