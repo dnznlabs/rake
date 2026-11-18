@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { assertPairable, create2, creations, isCreate, pairable, PROXY } from '../app/broadcast.mjs';
-import { check } from '../app/values.mjs';
+import { check, SHAPES } from '../app/values.mjs';
 import { marked, MARKER } from '../app/version.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -330,6 +330,17 @@ test('a token with no declared shape fails closed rather than passing unchecked'
      in the sources stops the build until someone states what it may be. */
   assert.throws(() => check({ FOO: 'x' }), /no shape declared for __FOO__/);
   assert.throws(() => check({ ...SEPOLIA, FOO: 'x' }), /add one to app\/values\.mjs/);
+});
+
+test('every token the three sources use has a shape, and the table is only those', () => {
+  /* Both halves, because each is blind to the other defect: a token with no row would be refused at
+     every build, and a row for a token nothing substitutes is a rule nothing applies. */
+  const used = new Set();
+  for (const f of ['app/src/index.html', 'app/src/widget.js', 'app/src/host.html']) {
+    for (const m of readFileSync(join(root, f), 'utf8').matchAll(/__([A-Z][A-Z0-9_]*)__/g)) used.add(m[1]);
+  }
+
+  assert.deepEqual([...used].sort(), Object.keys(SHAPES).sort());
 });
 
 /* `--set` and `deployed()` are `build.mjs`'s own surface, so these run it. The refusal path leaves

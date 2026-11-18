@@ -31,7 +31,7 @@
    mk/15-seed.mk: the address is `factory.predict(salt)`, which the page reads at boot rather than
    carrying a token per chain. `factoryBlock` is the block the factory was created in, so a `Created` scan never starts at
    genesis on a real chain. */
-const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTRIBUTIONFACTORY__', factoryBlock: '__DISTRIBUTIONFACTORY_BLOCK__', featuredSalt: '__FEATURED_SALT__', app: '__APP__' };
+const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTRIBUTIONFACTORY__', factoryBlock: '__DISTRIBUTIONFACTORY_BLOCK__', featuredSalt: '__FEATURED_SALT__', app: '__APP__', impl: '__DISTRIBUTION__' };
 const CONTRACTS = [['DistributionFactory', CFG.factory]];
 const CHAINS = { 1: 'mainnet', 10: 'op mainnet', 8453: 'base', 42161: 'arbitrum', 11155111: 'sepolia', 84532: 'base sepolia', 31337: 'anvil', 31338: 'anvil-b' };
 /* A dev chain has no explorer, so `ext()` prints plain text with the full value in the title. */
@@ -385,6 +385,18 @@ const isWord = v => /^0x[0-9a-fA-F]{64}$/.test(v);
    checksummed. */
 const CLONE = impl => '0x5f5f365f5f37365f73' + impl.slice(2).toLowerCase() + '5af43d5f5f3e6029573d5ffd5b3d5ff3';
 const isClone = (code, impl) => String(code).toLowerCase() === CLONE(impl);
+/* The address `create` will place a clone at, computed here instead of asked of the provider: the
+   factory, the implementation and the salt are all three in this build, so the CREATE2 address is a
+   function of values nothing on the wire supplies. The 54 bytes hashed are the ones `predict` hashes
+   (`src/Distribution.sol:489-499`): the 9-byte init prefix in front of the 45 runtime bytes `CLONE`
+   already carries (`:473-475`, hashed at `:493-496`), which is the one literal below that `CLONE`
+   does not have. With the factory, the implementation and `FEATURED_SALT_DNZN` they give
+   `0x71a4221974Fc2E95081AE513248918dF27CF7a4A` on both testnets, which is the address ROADMAP
+   decision 50 states (m04-t14 TASK.md step 0's rehearsal, re-run 2026-11-18).
+
+   `CFG.impl` and never `S.impl`: a provider that lies about `predict()` lies about
+   `implementation()` too, which is why this could not share R3's inputs (`SECURITY.md` row R18). */
+const predictLocal = salt => Eth.checksum('0x' + Eth.keccak(Eth.hexBytes('ff' + CFG.factory.slice(2) + salt.slice(2) + Eth.keccak(Eth.hexBytes('602d5f8160095f39f35f5f365f5f37365f73' + CFG.impl.slice(2) + '5af43d5f5f3e6029573d5ffd5b3d5ff3')))).slice(24));
 /* The shape of a value `ext` is about to write, checked at the sink that writes it. Every `v` that
    reaches `ext` came from a provider — a hash from `eth_sendTransaction`, a topic or an address from
    `eth_getLogs`, an account from `eth_accounts` — and nothing between that call and here checks it:
@@ -567,7 +579,7 @@ function who() {
 }
 
 /* ---- reading the chain ---------------------------------------------------------------------- */
-const S = { featured: null, impl: null, maxRows: null, grace: null, loaded: false, error: null, tab: 'recent' };
+const S = { featured: null, featuredLie: null, impl: null, maxRows: null, grace: null, loaded: false, error: null, tab: 'recent' };
 async function load() {
   CHAIN = parseInt(await P.request({ method: 'eth_chainId' }), 16);
   // The same address on another network is another contract, or none: do not read it.
@@ -590,7 +602,15 @@ async function load() {
   ]);
   /* `S.impl` is kept, not only used: `isClone` needs it on every `loadDistro`, and this read is the
      one the page already makes at boot — so the clone check costs no extra request. */
-  S.featured = a; S.impl = impl; S.maxRows = Number(max); S.grace = grace; S.loaded = true;
+  /* Both provider reads stay — `implementation()` is what `isClone` compares against (R3) and the
+     two numbers below are read off it — but the featured address is computed from the build and the
+     provider's answer is only taken where it agrees with it. Where it does not, there is no featured
+     distribution on this page and the docs' support form says why rather than naming the address
+     a provider chose (R18). */
+  const mine = predictLocal(CFG.featuredSalt);
+  if (String(a).toLowerCase() === mine.toLowerCase()) S.featured = a;
+  else { S.featured = null; S.featuredLie = { said: a, computed: mine }; }
+  S.impl = impl; S.maxRows = Number(max); S.grace = grace; S.loaded = true;
 }
 
 /* One distribution, in four reads: code first, so an address with nothing on it is "could not read"
@@ -1111,6 +1131,10 @@ async function landing() {
   // The live example is the widget itself, inlined below, mounted once the featured distribution is
   // known to exist: a chain without the seed leaves its slot empty rather than a widget in its error state.
   const t = TOKEN;
+  /* No featured address — none seeded on this chain, or one the provider named that this page did
+     not compute (R18) — is an empty slot, not a widget in its error state: `loadDistro(null)` would
+     send `eth_getCode` with a null address. */
+  if (!S.featured) return;
   const d = await loadDistro(S.featured);
   // The widget reads `window.ethereum` alone, so with no RPC and no such global it could only fail.
   if (stale(t) || d.missing || d.foreign || !(WRPC || window.ethereum)) return;
@@ -1989,6 +2013,7 @@ function docs() {
 
   <h2 id="s-economics">Economics</h2>
   <p>Rake is free software. The source is published under the MIT licence, the contracts take no fee on anything they receive or pay out, and neither this app nor the widget charges for its use. The only cost of a distribution is the network's gas.</p>
+  ${S.featuredLie ? notice(`this page computes the featured distribution at ${ext('address', S.featuredLie.computed, esc(short(S.featuredLie.computed)))}; your wallet's provider answered ${esc(short(S.featuredLie.said))} instead — the support form is not shown.`, 'err') : ''}
   ${S.featured ? `<p>If this work is useful to you, please consider supporting its authors. A payment goes to the distribution this app features, ${ext('address', S.featured, esc(short(S.featured)))}, and is divided by its published table like any other.</p>
   <div class="give">${ethIn('id="give-amt" placeholder="amount" aria-label="amount in ETH"')}<button class="btn sec sm" id="give-go"${ACC ? '' : ' disabled title="connect a wallet to send"'}>send</button><a href="#/distros/${S.featured}">view the distribution →</a></div>
   <div id="txs">${ACC ? '' : '<div class="help">Connect a wallet to send.</div>'}</div>` : ''}
