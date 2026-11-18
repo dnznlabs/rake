@@ -11,13 +11,15 @@
 
    Like `amt.test.mjs` and `widget.test.mjs`, this reads the page rather than building anything: the
    declarations are lifted out of `app/src/index.html` and evaluated, so what runs here is the page's
-   own text. `NAMED`, `EXPLORER` and `CFG` are the only globals the lifted region touches, and they
-   are passed in. */
+   own text. `NAMED`, `EXPLORER`, `CFG` and `Eth` are the only globals the lifted region touches, and
+   they are passed in — `Eth` because `predictLocal` hashes with it, and `CFG` because it is where
+   `predictLocal` reads the factory and the implementation rather than asking the provider (R18). */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import Eth from '../app/src/eth.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PAGE = readFileSync(join(root, 'app/src/index.html'), 'utf8');
@@ -27,7 +29,16 @@ const PAGE = readFileSync(join(root, 'app/src/index.html'), 'utf8');
    passes against a check the page no longer applies. */
 const OPEN = 'const isAddr = v =>';
 const CLOSE = 'title="open in explorer"';
-function lift() {
+/* The deployed factory and the implementation it clones, read from both tracked `Deploy.s.sol` logs
+   and recomputed from their own init code (m04-t14 TASK.md step 0, re-run 2026-11-18). These are the
+   two values the build substitutes into `CFG`, which is what makes the featured address computable
+   on the page at all. */
+const DEPLOYED = {
+  chainId: 11155111,
+  factory: '0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B',
+  impl: '0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0',
+};
+function lift(cfg = DEPLOYED) {
   const one = anchor => {
     const at = PAGE.indexOf(anchor);
     assert.ok(at >= 0, `app/src/index.html no longer declares \`${anchor}\` — this test lifts it`);
@@ -38,12 +49,12 @@ function lift() {
   const to = PAGE.indexOf('\n', PAGE.indexOf(CLOSE, from));
   assert.ok(to > from, 'the xlink declaration no longer ends on the explorer title');
 
-  const body = `${one('const esc = s =>')}\n${one('const short = a =>')}\n${PAGE.slice(from, to)}\nreturn { ext, xlink, esc, isClone, CLONE };`;
+  const body = `${one('const esc = s =>')}\n${one('const short = a =>')}\n${PAGE.slice(from, to)}\nreturn { ext, xlink, esc, isClone, CLONE, predictLocal };`;
 
-  return new Function('NAMED', 'EXPLORER', 'CFG', body)(
-    new Map(), { 11155111: 'https://sepolia.etherscan.io' }, { chainId: 11155111 });
+  return new Function('NAMED', 'EXPLORER', 'CFG', 'Eth', body)(
+    new Map(), { 11155111: 'https://sepolia.etherscan.io' }, cfg, Eth);
 }
-const { ext, xlink, esc, isClone, CLONE } = lift();
+const { ext, xlink, esc, isClone, CLONE, predictLocal } = lift();
 
 const ADDR = '0x71a4221974Fc2E95081AE513248918dF27CF7a4A';
 const HASH = '0x' + 'ab'.repeat(32);
@@ -199,4 +210,36 @@ test('isClone reads an upper-cased answer as the same code', () => {
   const shouted = '0X' + CLONE(IMPL).slice(2).toUpperCase();
 
   assert.equal(isClone(shouted, IMPL), true);
+});
+
+/* ---- the featured address computed rather than asked for (R18) ------------------------------ */
+
+/* The DNZN salt `mk/15-seed.mk:10` passes on every chain that is not the dev one: the creator's
+   address in the top 20 bytes and the index in the bottom 12 (decision 10). */
+const DNZN_SALT = '0x357836ffcb45307fa7ff2a574f505753c961902b000000000000000000000001';
+
+test('predictLocal computes decision 50\'s address from the build alone', () => {
+  /* The address ROADMAP decision 50 states, read from both testnets 2026-11-17 and reproduced from
+     the two tracked `Deploy.s.sol` logs by m04-t14 step 0's rehearsal. Nothing on the wire takes
+     part: the factory and the implementation are `CFG`'s, and the salt is the build's. */
+  assert.equal(predictLocal(DNZN_SALT), '0x71a4221974Fc2E95081AE513248918dF27CF7a4A');
+});
+
+test('a different salt gives a different address of the same shape', () => {
+  /* The second index the same creator can place, which the page's create screen predicts: a salt is
+     not a label, so one byte of it is a different contract. */
+  const second = DNZN_SALT.slice(0, -2) + '02';
+  const got = predictLocal(second);
+
+  assert.match(got, /^0x[0-9a-fA-F]{40}$/);
+  assert.notEqual(got.toLowerCase(), '0x71a4221974fc2e95081ae513248918df27cf7a4a');
+});
+
+test('the implementation\'s case does not move the address', () => {
+  /* The hash takes bytes, not characters: `__DISTRIBUTION__` arrives checksummed from the build and
+     the same address lower-cased has to give the same answer, or the computation would depend on how
+     a value was printed. */
+  const lower = lift({ ...DEPLOYED, impl: DEPLOYED.impl.toLowerCase() });
+
+  assert.equal(lower.predictLocal(DNZN_SALT), '0x71a4221974Fc2E95081AE513248918dF27CF7a4A');
 });
