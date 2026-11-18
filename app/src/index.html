@@ -486,8 +486,6 @@ const logSweepRun = async () => {
   const gone = Model.evict(recs.map(r => ({ key: logKey(r.chainId, r.address), visited: r.visited })), Date.now(), LOGKEEP);
   if (gone.length) await logCache.drop(gone);
 };
-let LOGSWEEP = null;
-const logSweep = () => (LOGSWEEP ??= logSweepRun());
 
 /* ---- names ---------------------------------------------------------------------------------- */
 /* Ported from state-collection `app/src/index.html:224-279`, which took it from its own
@@ -2138,23 +2136,12 @@ async function cacheBind() {
   go.onclick = async () => {
     go.disabled = true; go.textContent = 'clearing…';
     await logCache.clear();
-    // The sweep's one run per load has nothing left to judge, and a fresh store is swept again.
-    LOGSWEEP = null;
+    /* Nothing is re-read here, and the store is left as empty as the button's label says. A
+       distribution page open behind this route is painted again by `detail()`, which every return to
+       that route goes through: it resets `DS.h` and re-runs the history read, so no page can paint
+       from a record this press has deleted. A re-read from here would spend a full first-load scan to
+       write back the record the user has just asked to be rid of (#227). */
     await cacheBind();
-    /* A distribution page open behind this route holds its history in `DS`, built from the record
-       that has just gone. It is read again now, from the chain, so returning to that page does not
-       show rows the store no longer backs. That read writes the record back through `histLogs`, about
-       a second after the press, so the section is painted a second time when it lands: the figures
-       above were read before the write-back and would otherwise sit at zero over a store holding a
-       record (#227). */
-    const d = DS.d;
-    if (d) {
-      const t = TOKEN;
-      history(d.addr, FIRST.get(d.addr) || CFG.factoryBlock)
-        .then(h => absorb(t, d, h))
-        .then(() => cacheBind())
-        .catch(() => {});
-    }
   };
 }
 /* The support form under Economics: a plain payment to the featured distribution, any amount, nothing
@@ -2246,7 +2233,7 @@ document.addEventListener('click', () => toggle(null)); document.addEventListene
   /* Before the first history read, which is `detail()`'s, and before the docs page prints a count:
      the records this device has stopped keeping go now, so neither the scan nor the Cache section
      ever reads a store the eviction rule has already judged (decision 52). */
-  await logSweep();
+  await logSweepRun();
   who(); route();
 })();
 </script>
