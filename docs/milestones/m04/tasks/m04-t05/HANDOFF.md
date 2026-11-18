@@ -514,11 +514,28 @@ Step 5's four lines. **Each is pending its figure; none is written from a readin
 
 ## Findings
 
-**None, and that is a reading rather than an omission.** Step 2 ran all fourteen Sepolia rows and
-**every one reached its expected state**, so there is no row to open an issue for. The one mismatch
-was row (j)'s *expectation* of an acknowledgement, and the page turned out to implement #172 exactly
-as #172 specifies — opening an issue against it would have been a false finding. § Deviations 6
-carries the proof. Step 3's rows are Denizen's and may yet produce findings.
+**One, and it is not a row.** [#251](https://github.com/dnznlabs/rake/issues/251) — `RUNBOOK.md:66`
+defines `SIGNER` as `--account <keystore> --sender <address>`, which `forge script` takes and which
+**`cast send` and `forge create` refuse outright** on the pinned forge 1.7.1-dev with
+`error: unexpected argument '--sender' found`. Any step that follows § 0 literally with either
+command fails before it reaches the network; the working form drops `--sender` and lets the keystore
+name the sender. It cost a full debugging pass here because the failure reads as a signing problem
+rather than an argument-parsing one. Labelled `carried`: the runbook amendment is m05-t01's.
+
+**No row is a finding, and that is a reading rather than an omission.** Step 2 ran all fourteen
+Sepolia rows and **every one reached its expected state**, so there is no row to open an issue for.
+The one mismatch was row (j)'s *expectation* of an acknowledgement, and the page turned out to
+implement #172 exactly as #172 specifies — opening an issue against it would have been a false
+finding. The plan agreed: `TASK.md` row (j) was rewritten to expect the contract-owner note
+([#250](https://github.com/dnznlabs/rake/pull/250), merged `74f680f`), so the expected state now
+matches and AC 7 is satisfied without an issue. § Deviations 6 carries the proof. Step 3's rows are
+Denizen's and may yet produce findings.
+
+**Row (e) is not a finding either, and it nearly was reported as one.** A reading taken seconds after
+the press caught the load mid-flight — `loading older…`, boundary unmoved — which would have recorded
+a press that did nothing. Awaited to a quiet request stream, each press costs **84** `eth_getLogs` and
+the boundary does move: the two presses measured moved it **39** and **6,445** blocks. § Deviations 9
+carries the figures. The lesson is in § Decisions: an in-flight reading is not a result.
 
 The Sepolia gateway condition is **not** a finding of this task either: it is
 [#242](https://github.com/dnznlabs/rake/issues/242), a third-party condition already filed, recorded
