@@ -573,12 +573,28 @@ calldata was generated at; it is not signed and proves nothing, which is why 4b 
 
 **Verify by reading the proposals back, not by the POST's `200`.** Query
 `tx_summary` with the signatures embedded — `?wallet_id=eq.<id>&status=in.(proposed,executing,queued)
-&select=id,nonce,target,value,status,tx_hash,call_data,threshold,signatures(signer,sig_type)` on
-`https://multisig-postgrest.onrender.com` — and check each row carries exactly one `ecdsa` signature
-from `$ENGINEER`, `value` 0, the committed file's bytes and the digest just signed. The `sig_count`
-column reads `0` for signed and unsigned proposals alike and must not be used; and a proposal with no
-valid owner signature is **hidden** from every owner's dapp with no message, so an empty vault page is
-not evidence of an empty queue.
+&select=id,nonce,proposed_at,target,value,status,tx_hash,call_data,threshold,signatures(signer,sig_type)`
+on `https://multisig-postgrest.onrender.com` — and check each row carries exactly one `ecdsa`
+signature from `$ENGINEER`, `value` 0, the committed file's bytes and the digest just signed. The
+`sig_count` column reads `0` for signed and unsigned proposals alike and must not be used; and a
+proposal with no valid owner signature is **hidden** from every owner's dapp with no message, so an
+empty vault page is not evidence of an empty queue.
+
+**Identify the rows by nonce, and expect more of them than this upload proposed.** Earlier uploads'
+rows linger in the service as `queued` or `stale` after the chain has consumed them — nothing deletes
+them when `executeQueued` runs — so this filter returned **six rows per chain** today for three new
+proposals. Match each row by its `nonce` against the three 4a just wrote; `proposed_at` is what lets a
+reader tell a lingering row from the live one at the same glance. There is no `created_at` column —
+asking for one answers `42703 column tx_summary.created_at does not exist` and the whole query fails.
+
+**`<id>` is the `wallets` row's id, and three things about that table bite.** Look it up on the same
+host with `wallets?address=eq.<vault>&chain_id=eq.$CHAIN_ID&select=id,address,chain_id,nonce,owner_count`.
+The rows are **per chain**, so one vault deployed at the same address on two chains has two rows and
+two different ids — the wrong one silently queries the wrong chain's proposals. The `address` column
+is stored **lowercase**, so a checksummed `address=eq.0x00c0…` returns `[]`, which reads exactly like
+an unregistered vault; lowercase the address before querying. And the `nonce` and `owner_count` those
+rows carry **lag the chain** — they are the service's last-seen values, not live reads, so every nonce
+and threshold precondition comes from `cast call` on the vault and never from here.
 
 `record:` the three nonces and digests, the commit the files were generated at, and the `--app-nonce`
 they were generated for.
@@ -782,8 +798,10 @@ rehearsal caught this — a dev chain cannot tell the two roles apart.
 
 #### The five calls, and their order
 
-`tools/step4-calldata.mjs` writes them to `docs/milestones/m04/tasks/m04-t08/calldata/$CHAIN_ID/`,
-splitting `app/dist/index.html.gz` at `MAX_CHUNK = 24_000` bytes exactly as `Chunks.s.sol:_upload`
+`tools/step4-calldata.mjs` writes them to **`calldata/$CHAIN_ID/`** at the repository root — § 4a's
+`--out calldata`, which is the live path for every routine upload; only m04-t08's first upload kept
+its calldata under its own task directory, which is where the tool's own default would still put it.
+It splits `app/dist/index.html.gz` at `MAX_CHUNK = 24_000` bytes exactly as `Chunks.s.sol:_upload`
 does, and wraps calls 3–5 into `batch345.hex`. They are committed, so what the product owner signs is
 reviewable before it is signed and re-derivable after:
 
@@ -1086,18 +1104,73 @@ head, where `--rpc` would read today's nonce and emit different pointers.
 |--:|:--|:--|:--|--:|:--|:--|:--|:--|--:|
 | 1 | 2026-11-17 | Sepolia | `9fdf0f1` | 4 | `0x831f740F…1268` · `0x02d5AcDA…A0C3` · `0x80bDDA62…FC38` | 6, 7, 8 | `2d27b603…3f9a9d4a` · `07e808ed…d51b8ca` | in full below | **83,827,120** |
 | 2 | 2026-11-17 | Base Sepolia | `9fdf0f1` | 4 | the same three — the pointers are a function of `App`'s address and nonce, and both are identical per chain | 6, 7, 8 | `1111b791…0920e17` · `07e808ed…d51b8ca` | in full below | **11,947,862** |
+| 3 | 2026-11-18 | Sepolia | `3751211` | 7 | `0x3C4C7D4E…5C06` · `0xcEaA7F17…7396` · `0x1Affb52C…F45D` | 9, 10, 11 | `b1fc3b96…e5ef1e86` · `8b6bbc88…108bc368` | in full below | **85,666,566** |
+| 4 | 2026-11-18 | Base Sepolia | `3751211` | 7 | the same three | 9, 10, 11 | `6f0225bb…ff45336f` · `8b6bbc88…108bc368` | in full below | **12,206,026** |
+
+**Rows 3 and 4 are complete — 4a through 4d all ran.** The product owner co-signed and submitted all
+six proposals on 2026-11-18 at 16:42–16:44 UTC; the engineer ran the six `executeQueued` calls once
+the hour delay matured, 17:46:48Z–17:49:36Z by the executing blocks' own timestamps, and every
+receipt is `status 1`. The two hash columns were
+written from a fork at 4a, before the proposals were signed, and **4d re-read both from the chain
+after execution and they are unchanged** — so, as in rows 1 and 2, the column now carries a live
+`chain-doc` reading rather than a prediction. The pointers landed at the three predicted addresses and
+`cast nonce $APP` reads `10` on both chains. This upload carries
+m04-t11, m04-t04 and m04-t13; #227 (m04-t12) is held out by ruling and #235's R18 waits for a later
+upload. The generating commit is `3751211` and the bundle under `app/` and `src/` is byte-identical to
+the `06fbaab` the plan scoped — `git diff --stat 06fbaab 3751211 -- app/ src/` is empty, the one
+change between them being a `TASK.md`. The calldata is committed in `calldata/<chain>/`.
+
+The three digests per chain, each `getTransactionHash(<that proposal's own target>, 0, <file>, <nonce>)`
+on the vault — `$APP` for proposals 1 and 2, `$OWNER` for the batch, and the chain is bound by
+`getTransactionHash`, so no signature crosses chains:
+
+| vault nonce | proposal | target | Sepolia digest | Base Sepolia digest |
+|--:|:--|:--|:--|:--|
+| 9 | 1 — `1-addChunk-0.hex` | `$APP` | `0x3cb3f8f9dd76fa1dfdea85b5f8ab5d0980e89630124f8801612631bd7bec864e` | `0xff8f5ba1d9c46b5e8a5df8121a274e9c51ed83c7fab5f1552e3f4cd09a72756d` |
+| 10 | 2 — `2-addChunk-1.hex` | `$APP` | `0x8baf5cf5f206e0e8c74bab5ad741ade54e4a145ca27cf29fd95cb81aaf5f542e` | `0xb0e751cfe5996d45e995a9dffffa7412c8ab9f9d616bdc9ed843653905b5eecc` |
+| 11 | 3 — `batch345.hex` | `$OWNER` | `0x6162d2ef558c5d436807e2834d9ccaf7fc0d1e6c423e9b2ccb356a52485654d5` | `0x2b16c2d0be0c38a1dd15dc8efb31b4364ea317cb80dd1dcc6641e7ec371ec5de` |
+
+Sizes and gas for rows 3 and 4. The proposal sizes are `wc -c` of the committed files, `0x` included,
+and differ per chain only in content — this upload's two chunks pad to the same encoded length on both.
+Calls 1 and 2 are live `cast estimate --from $OWNER`; `batch345` reverts `CodelessChunk` live by
+construction (§ Gas) and its figure is the fork's, with a derivation for Sepolia where anvil
+under-prices code deposit:
+
+| proposal | hex chars (cap 65,536) | Sepolia gas | Base Sepolia gas |
+|:--|--:|--:|--:|
+| 1 — `1-addChunk-0.hex` | 48,138 | 37,760,229 live | 5,369,382 live |
+| 2 — `2-addChunk-1.hex` | 44,554 | 34,937,102 live | 4,970,346 live |
+| 3 — `batch345.hex` | 19,018 | 2,021,612 fork · **≈13,524,000 derived** | 2,021,612 fork · ≈2,035,800 derived |
+
+The Sepolia derivation is the fork figure plus the chain's code-deposit premium over anvil for the
+widget chunk's 8,510 deposited bytes. That premium was measured on this chain at two chunk sizes —
+1,351.19 and 1,352.16 gas per byte from calls 1 and 2's live-minus-fork — and the same method applied
+to row 1's widget reproduces its executed `gasUsed` of 12,898,921 to **0.26%**, which is the check that
+the two figures are not one instrument twice. Row 1's live estimate ran 7.62% above its own `gasUsed`,
+so expect a live `batch345` estimate near 14.6M once proposals 1 and 2 have executed and § Gas's
+re-estimate becomes possible. Every proposal clears its block limit with room: the largest is 18.88%
+of Sepolia's 200,000,000 and 4.47% of Base Sepolia's 120,000,000.
+
+**Both of those predictions held, which is the derivation's own check.** Once the chunks had landed
+the live Sepolia `batch345` estimate was **14,603,875** against the 14.6M expected, and its executed
+`gasUsed` of **13,482,308** is **0.31%** off the ≈13,524,000 derived above — a figure derived from two
+chunk-size measurements and validated against a different upload's receipt, then confirmed against
+its own. The fork figure alone (2,021,612) would have under-funded the call by a factor of six, so on
+a chain where anvil under-prices code deposit the derivation is the number to carry, not the fork's.
 
 The `inflated sha256` and `widget sha256` in rows 1 and 2 were the build's when the rows were written,
 read from a fork of each chain before the proposals were signed; **4d re-read both from the chain
 after execution and they are unchanged**, so the column now carries a live `chain-doc` reading rather
 than a prediction. The gas column is the sum of the three `executeQueued` receipts.
 
-**The six transactions per row, in full.** Three submits (the proposal, which queues it) and three
+**The six transactions of each row, in full.** Three submits (the proposal, which queues it) and three
 `executeQueued` (which runs it), in nonce order. The submits are not the engineer's: `from` is the
 Product Owner's account on Sepolia and a relayer EOA on Base Sepolia, both through the same relay
 `to` of `0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3` — so **`from` is never a signer attribution on
 either chain**, since the signatures authorise the call and `execute()` does not read `msg.sender`.
-All twelve `status true`.
+All twelve of rows 1 and 2's read `status true`, and so do all twelve of rows 3 and 4's. Rows 3 and 4
+follow the same shape with one difference: their submits are the Product Owner's own account on both
+chains, no relayer in between — which changes nothing about attribution, for the same reason.
 
 Row 1 — Sepolia, `eth_estimateGas` and `gasUsed` per `executeQueued`:
 
@@ -1115,15 +1188,48 @@ Row 2 — Base Sepolia:
 | 7 | `addChunk` doc 1 | `0x13d73ce6f37e3a3f2843c99b01731a35c01785332588e55aed6e4c7d3865d253` | `0x51ebc2842191f3804fbea1bf1cf8f54a57e48f39d3e3c904a6874a33fe640206` | 60056912 | 4,742,766 | 4,965,321 |
 | 8 | `batch345` | `0xc5b7abb9b36a9b4d082c56ec4a94c19db937591ad3280d57384509380ae72e41` | `0x3b3c01042a857123233c8396ae967201ca5011c78965b913b56bf1510bb15714` | 60056932 | 1,891,249 | 2,016,300 |
 
-**Estimate-then-send was used for all six, and the hand limits of § Gas were not needed** — the second
-upload reproducing t08's finding. `cast estimate --from $ENGINEER` returned a clean figure for every
-one, including `batch345` once its chunks had landed, and each estimate was within 7% above the gas
-actually used; what was sent was estimate + 30%. Keep § Gas's table as the fallback for an RPC that
-refuses to estimate.
+Row 3 — Sepolia, this upload. Submits at vault nonces 9–11 in blocks 12162699, 12162701 and 12162703;
+the `executeQueued` calls after the delay matured:
 
-**The order gate was read between every send**, per chain: `cast nonce $APP` returned `4`, `5`, `6`
-before orders 1, 2, 3 and `7` after the batch — the gate walked rather than assumed, so the silent
-misorder § Step 4 describes was never reachable.
+| vault nonce | call | submit tx | `executeQueued` tx | block | `gasUsed` | estimate |
+|--:|:--|:--|:--|--:|--:|--:|
+| 9 | `addChunk` doc 0 | `0xf7e62f1bc70e55fb761393b862b53048f2479081625874993eb37e7469b8c370` | `0x6cc405e453233fcd9c674fb1e23ca1920aad235e387b6fbbf17b63b080c28be5` | 12163010 | 37,493,327 | 38,474,389 |
+| 10 | `addChunk` doc 1 | `0x2e981710463c39ae1072189b93a7dee815bb9c4f3725ebb97edbbcea73ae4f78` | `0x21022288de684c6c844415fd0fc2a71dd2ba1d292829c119c40f86c0eaeab973` | 12163016 | 34,690,931 | 35,531,152 |
+| 11 | `batch345` | `0xf85536643fbeef28dd6f6f6ea31b901b4380fb7a833dbb6efbfa68f8b29d1e05` | `0xaba41d0cb3f11f668e808fd12d3587bb09b183a53b8b6b9371d1c43ac34637ac` | 12163019 | 13,482,308 | 14,603,875 |
+
+Row 4 — Base Sepolia. Submits in blocks 60491332, 60491399 and 60491459; **the chain now produces
+200 ms blocks**, so the submits sit ~20,000 blocks below their executions rather than the ~2,000 a
+2 s block time would put them, and `eth_getLogs` here is capped at a **200-block range**, which is
+what makes a wide `cast logs` sweep for them come back empty rather than erroring usefully:
+
+| vault nonce | call | submit tx | `executeQueued` tx | block | `gasUsed` | estimate |
+|--:|:--|:--|:--|--:|--:|--:|
+| 9 | `addChunk` doc 0 | `0x710daccbb751f6f9664a1d893ef78087635e0798714bd538efdb4febf8b64ab7` | `0x337e52476f8dddf2e22046efd22160fd52474cd2bb69634048d0c5ad70be1e81` | 60511403 | 5,313,583 | 5,538,404 |
+| 10 | `addChunk` doc 1 | `0xeca03fa11a6c9ccd2e424e913a0763b80ce6d7d3933c0a641df2a433c226ec1e` | `0x029904f076f31194a1e35d730039da0af81255989145318dd56a43edf2a811b7` | 60511451 | 4,919,283 | 5,142,539 |
+| 11 | `batch345` | `0xd5c2770bae41eec22cf0e3fbcf6789c32f49dd9522bdbb2a1822c1a234083d93` | `0x44258f6970f469e7d03aab236f1d37ed1190b98f143ec9946ceeadfabedcd133` | 60511536 | 1,973,160 | 2,101,838 |
+
+**Recovering a send-time estimate that was not written down.** The gas limit in a sent transaction is
+`estimate * 13 / 10` in integer arithmetic, so `cast tx <hash> gas` inverts to a unique estimate — the
+only integer `g` with `g * 13 / 10` equal to the limit. That is how row 3's order-1 estimate above was
+read back after its console output was lost, and running it on the other five reproduced their logged
+figures to the digit, which is what makes it a measurement rather than a reconstruction.
+
+**Estimate-then-send was used for all twelve, and the hand limits of § Gas were not needed** — two
+uploads reproducing t08's finding. `cast estimate --from $ENGINEER` returned a clean figure for every
+one, including `batch345` once its chunks had landed, and what was sent was estimate + 30% every
+time. Across the twelve the estimate ran **2.42% to 8.32%** above the gas actually used, and it is the
+four `batch345` calls that sit at the top of that range (**6.52% to 8.32%**) while the eight
+`addChunk` calls stay under 4.7% — so **the +30% margin is the one to keep, and 7% is not a ceiling to
+plan against**. Keep § Gas's table as the fallback for an RPC that refuses to estimate.
+
+**The order gate was read between every send**, per chain. Rows 1 and 2 walked `cast nonce $APP` —
+`4`, `5`, `6` before orders 1, 2, 3 and `7` after the batch. **Rows 3 and 4 proved the order by
+contents instead**, which is the stronger gate and the one § Step 4 asks for: after piece 2, `cast
+code` at each predicted pointer was compared byte-for-byte against `cast calldata-decode
+'addChunk(bytes)'` of the committed file, with the `0x00` `STOP` prefix prepended — equal on both
+chains (48,004 and 44,382 hex chars on Sepolia, 48,004 and 44,376 on Base Sepolia). The nonce walk
+cannot distinguish the swapped case, in which both pointers carry code and the nonce reads the same;
+only the byte comparison can, so a nonce reading is a precondition and not the proof.
 
 **The first upload of all, m04-t08's on 2026-11-16, is deliberately not a row here.** It was not
 routine — it is the one whose calldata lives under its own task directory, it predates this table, and
