@@ -51,7 +51,7 @@ const ICON = {
   github: '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>',
   robot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2h8l2 4H6L8 2z"/><rect x="4" y="6" width="16" height="10" rx="2"/><circle cx="9" cy="11" r="2" fill="currentColor"/><circle cx="15" cy="11" r="2" fill="currentColor"/><path d="M6 16l-2 6h4l1-3h6l1 3h4l-2-6"/></svg>',
 };
-const iconLink = (href, icon, label, text) => `<a class="ico" href="${href}" target="_blank" rel="noopener" aria-label="${label}">${ICON[icon]}${text ? `<span>${text}</span>` : ''}</a>`;
+const iconLink = (href, icon, label, text) => `<a class="ico" href="${href}" target="_blank" rel="noopener noreferrer" aria-label="${label}">${ICON[icon]}${text ? `<span>${text}</span>` : ''}</a>`;
 document.getElementById('ver').textContent = `dnzn labs · ${CFG.version}`;
 document.getElementById('flinks').innerHTML = iconLink(REPO, 'github', 'source on GitHub') + iconLink(SITE, 'robot', 'dnzn.dev');
 
@@ -284,7 +284,14 @@ async function logs(address, topics, fromBlock, toBlock) {
 
 /* ---- text ---------------------------------------------------------------------------------- */
 // Descriptions, names and notes are whatever the chain was given, so every one of them is escaped.
-const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+/* The bidi controls are dropped first, and dropped rather than isolated (R15,
+   `audits/2026-11-17/frontend/AUDIT.md:358-365`): U+202A–U+202E and U+2066–U+2069 reorder every
+   character after them, so one row's name can visually reverse the rest of a line. No `<bdi>` and no
+   `unicode-bidi` rule — neither can reach the `title` attributes this same function feeds, and
+   isolation would cost a wrapper per sink, where one `replace` here covers every site that already
+   calls `esc`. A plain RTL name renders correctly without explicit controls, so what is lost is a
+   character no reader would miss. */
+const esc = s => String(s == null ? '' : s).replace(/[\u202A-\u202E\u2066-\u2069]/g, '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const short = a => a ? a.slice(0, 6) + '…' + a.slice(-4) : '';
 const cname = id => CHAINS[id] || 'chain ' + id;
 const wrongChain = () => !!CHAIN && String(CHAIN) !== String(CFG.chainId);
@@ -382,7 +389,7 @@ const ext = (kind, v, text, inLink) => {
 // The same check again rather than once in `ext`: `xlink` builds an `href` of its own and is one
 // call away from being used on its own, so the guard belongs where the attribute is written.
 const xlink = (kind, v, text) => EXPLORER[CFG.chainId] && shaped(kind, v)
-  ? `<a class="xl" href="${EXPLORER[CFG.chainId]}/${kind}/${v}" target="_blank" rel="noopener" title="open in explorer">${text}</a>` : '';
+  ? `<a class="xl" href="${EXPLORER[CFG.chainId]}/${kind}/${v}" target="_blank" rel="noopener noreferrer" title="open in explorer">${text}</a>` : '';
 // `navigator.clipboard` needs a secure context; a gateway or file:// page may not be one, so the old
 // selection copy is the fallback. `on` is the copied state for a moment, like every state, a class.
 async function copyClick(e) {
@@ -1893,7 +1900,7 @@ function docs() {
   <article class="doc">${eyebrow(`docs · ${CFG.version}`)}<h1>Rake Distributions</h1>
 
   <h2 id="s-disclaimer">Disclaimer</h2>
-  <p>Alpha software. The contracts behind this page are reviewed, not audited: they have been read by the shared two-model agent method and by Slither, and both reviews are recorded in <a href="${REPO}/blob/main/SECURITY.md" target="_blank" rel="noopener">SECURITY.md</a>. No third party has audited them, and they are offered with no warranty of any kind.</p>
+  <p>Alpha software. The contracts behind this page are reviewed, not audited: they have been read by the shared two-model agent method and by Slither, and both reviews are recorded in <a href="${REPO}/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">SECURITY.md</a>. No third party has audited them, and they are offered with no warranty of any kind.</p>
   <p>The contracts are immutable, and that cuts both ways. Nobody can alter a distribution's rules behind your back; nobody can repair one either. A bug that is found is not patched — the remedy is new code at a new address, and a distribution that already exists keeps the code it was created with. Weigh that before you point a protocol fee or a payroll at a distribution, and before you ask a beneficiary to rely on one.</p>
   <p>The alpha marks come off in one release — a re-upload of this page and an edit to the README, with no redeploy — on the day all three of these readings hold: the mainnet milestone's closeout is merged and ninety days have passed since that merge commit's date; <code class="brk">gh issue list -R dnznlabs/rake --label bug --state all --search "created:&gt;=&lt;that date&gt;"</code> prints nothing; and SECURITY.md records no finding dated after that merge whose disposition is <code>fix</code> or <code>accepted</code>. The release that removes the marks cites the three readings with the date they were taken.</p>
 
@@ -1909,8 +1916,8 @@ function docs() {
   <div id="txs">${ACC ? '' : '<div class="help">Connect a wallet to send.</div>'}</div>` : ''}
 
   <h2 id="s-credits">Credits</h2>
-  <p>The design of these contracts derives from <a href="https://multisig.software" target="_blank" rel="noopener">multisig.software</a> by Src Co / z0r0z: the timelock, the self-call setters, the PUSH0 clones and the sender-bound salt. The low-level patterns follow <a href="https://github.com/Vectorized/solady" target="_blank" rel="noopener">Solady</a>.</p>
-  <p>Rake is a fully on-chain contract-hosted dapp, also after z0r0z's work: this page is served by the <code>html()</code> view of a contract, as <a href="https://github.com/ethereum/ERCs/pull/1712" target="_blank" rel="noopener">ERC-8244</a> proposes, and gateways reach the same contract through ERC-5219. There is no server behind it; the widget is served the same way.</p>
+  <p>The design of these contracts derives from <a href="https://multisig.software" target="_blank" rel="noopener noreferrer">multisig.software</a> by Src Co / z0r0z: the timelock, the self-call setters, the PUSH0 clones and the sender-bound salt. The low-level patterns follow <a href="https://github.com/Vectorized/solady" target="_blank" rel="noopener noreferrer">Solady</a>.</p>
+  <p>Rake is a fully on-chain contract-hosted dapp, also after z0r0z's work: this page is served by the <code>html()</code> view of a contract, as <a href="https://github.com/ethereum/ERCs/pull/1712" target="_blank" rel="noopener noreferrer">ERC-8244</a> proposes, and gateways reach the same contract through ERC-5219. There is no server behind it; the widget is served the same way.</p>
 
   <h2 id="s-why">Purpose</h2>
   <p>Where a fee or a revenue share goes is ordinarily stated off chain, and that statement can be revised without notice. A distribution places it on record. The allocation is public, the owner is public, and a change to either is visible for the full length of the delay before it can be applied. A payer can verify where funds will go; a beneficiary can rely on the share it has been allocated.</p>
@@ -1967,10 +1974,10 @@ function docs() {
   <p>Every address, share, name and note is public, and remains in the chain's history after it is changed. An allocation that must stay private, such as individual salaries, is not suited to a distribution.</p>
   <p>A contract that pays in with <code>transfer</code> or <code>send</code> fails while the implementation is cold, because the 2,300-gas stipend does not cover receipt: a cold receipt needs 4,162 gas. Pay in with <code>call</code> and forward the gas instead. The payment simply reverts, so nothing is lost.</p>
   <p>The contracts cannot be upgraded. A defect is remedied by deploying a new distribution.</p>
-  <p>The contracts have not yet been audited. Security issues should be reported through the repository's <a href="${REPO}/security/advisories/new" target="_blank" rel="noopener">advisory form</a>.</p>
+  <p>The contracts have not yet been audited. Security issues should be reported through the repository's <a href="${REPO}/security/advisories/new" target="_blank" rel="noopener noreferrer">advisory form</a>.</p>
 
   <h2 id="s-developers">For developers</h2>
-  <p>The source is published at <a href="${REPO}" target="_blank" rel="noopener">github.com/dnznlabs/rake</a> under the MIT licence. Both contracts reside in one file with no imports. Every function, event and error, and the <code>Snapshot</code> struct the widget reads, are documented in <a href="${REPO}/blob/main/docs/REFERENCE.md" target="_blank" rel="noopener">docs/REFERENCE.md</a>. This page is itself served by the <code>html()</code> view of a contract; see <a href="#/docs#credits">credits</a>.</p>
+  <p>The source is published at <a href="${REPO}" target="_blank" rel="noopener noreferrer">github.com/dnznlabs/rake</a> under the MIT licence. Both contracts reside in one file with no imports. Every function, event and error, and the <code>Snapshot</code> struct the widget reads, are documented in <a href="${REPO}/blob/main/docs/REFERENCE.md" target="_blank" rel="noopener noreferrer">docs/REFERENCE.md</a>. This page is itself served by the <code>html()</code> view of a contract; see <a href="#/docs#credits">credits</a>.</p>
   <div class="scroll"><table class="dtab"><tr><th>chain</th><th>factory</th><th>status</th></tr>${chainRows()}</table></div>
   </article></div>`;
   widgetDemo();

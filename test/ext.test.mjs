@@ -38,12 +38,12 @@ function lift() {
   const to = PAGE.indexOf('\n', PAGE.indexOf(CLOSE, from));
   assert.ok(to > from, 'the xlink declaration no longer ends on the explorer title');
 
-  const body = `${one('const esc = s =>')}\n${one('const short = a =>')}\n${PAGE.slice(from, to)}\nreturn { ext, xlink };`;
+  const body = `${one('const esc = s =>')}\n${one('const short = a =>')}\n${PAGE.slice(from, to)}\nreturn { ext, xlink, esc };`;
 
   return new Function('NAMED', 'EXPLORER', 'CFG', body)(
     new Map(), { 11155111: 'https://sepolia.etherscan.io' }, { chainId: 11155111 });
 }
-const { ext, xlink } = lift();
+const { ext, xlink, esc } = lift();
 
 const ADDR = '0x71a4221974Fc2E95081AE513248918dF27CF7a4A';
 const HASH = '0x' + 'ab'.repeat(32);
@@ -122,6 +122,28 @@ test('an address in a list row keeps its inLink suppression', () => {
 
   assert.ok(!out.includes('<a '), `a nested <a> closes the row's own anchor early:\n${out}`);
   assert.ok(out.includes(`data-addr="${ADDR}"`), out);
+});
+
+/* R15 (`audits/2026-11-17/frontend/AUDIT.md:358-365`): `esc` kept U+202E and U+2066–2069, and with
+   no `<bdi>` and no `unicode-bidi` rule one row's name could visually reverse the rest of a line.
+   The controls are written here as escapes, not as the characters themselves: a literal control in
+   a test file is invisible to the next reader and to every grep. */
+const BIDI = ['\u202A', '\u202B', '\u202C', '\u202D', '\u202E', '\u2066', '\u2067', '\u2068', '\u2069'];
+
+test('esc drops a bidi override rather than escaping it', () => {
+  assert.equal(esc('a\u202Eb'), 'ab');
+});
+
+test('esc drops each of the nine bidi control characters', () => {
+  assert.equal(BIDI.length, 9, 'the range is U+202A-U+202E and U+2066-U+2069 — nine code points');
+  for (const c of BIDI) {
+    const out = esc(`a${c}b`);
+
+    assert.equal(out, 'ab', `esc kept U+${c.codePointAt(0).toString(16).toUpperCase()}: ${JSON.stringify(out)}`);
+  }
+  /* All nine at once, and the four escapes still happen: dropping is a step in front of escaping,
+     not a replacement for it. */
+  assert.equal(esc(`${BIDI.join('')}<b>`), '&lt;b&gt;');
 });
 
 test('Eth.checksum is still not a filter, which is why the check is at the sink', () => {

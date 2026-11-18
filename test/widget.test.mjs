@@ -48,7 +48,7 @@ function widget() {
     addEventListener() {},
   };
   const win = {};
-  const api = new Function('window', 'document', `${body}\nreturn { decode, SNAP, SETBEN, etaText, GRACE, SKEW };`)(win, doc);
+  const api = new Function('window', 'document', `${body}\nreturn { decode, SNAP, SETBEN, etaText, GRACE, SKEW, esc };`)(win, doc);
   assert.deepEqual(Object.keys(win.RakeWidget), ['mount', 'refresh'], 'the widget\'s public surface changed');
   return api;
 }
@@ -235,4 +235,25 @@ test('the widget is one classic script with no module surface', () => {
   assert.ok(SRC.includes("'use strict';"), 'the IIFE is not strict');
   assert.equal(SRC.match(/^\s*export\b/m), null, 'App serves this as a classic script, not a module');
   assert.equal(SRC.match(/@inline/g), null, 'the widget is a second bundle, not an inlined file');
+});
+
+/* R15, the widget's half (`audits/2026-11-17/frontend/AUDIT.md:358-365`). The controls are written
+   as escapes here for the same reason the dapp's rows are: a literal control is invisible to the
+   next reader and to every grep. */
+const BIDI = ['\u202A', '\u202B', '\u202C', '\u202D', '\u202E', '\u2066', '\u2067', '\u2068', '\u2069'];
+
+test('the widget\'s esc drops a bidi override rather than escaping it', () => {
+  assert.equal(widget().esc('a\u202Eb'), 'ab');
+});
+
+test('the widget\'s esc drops each of the nine bidi control characters', () => {
+  const { esc } = widget();
+
+  assert.equal(BIDI.length, 9, 'the range is U+202A-U+202E and U+2066-U+2069 — nine code points');
+  for (const c of BIDI) {
+    const out = esc(`a${c}b`);
+
+    assert.equal(out, 'ab', `esc kept U+${c.codePointAt(0).toString(16).toUpperCase()}: ${JSON.stringify(out)}`);
+  }
+  assert.equal(esc(`${BIDI.join('')}<b>`), '&lt;b&gt;');
 });

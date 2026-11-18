@@ -75,7 +75,11 @@ var CSS = '.rk{font:inherit;color:inherit;--rk-ac:oklch(.47 .09 230);--rk-am:#B8
 + '.rk a{color:inherit;text-decoration:none;border-bottom:1px solid currentColor}'
 + '.rk-f{margin-top:10px;padding-top:8px;border-top:' + RULE + ';font-size:10.5px;opacity:.5}';
 
-function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+/* The bidi controls are dropped before the four characters are escaped, and dropped rather than
+   isolated: U+202A–U+202E and U+2066–U+2069 reorder what follows them, so one row's name can
+   visually reverse the rest of the compact line (R15). A `<bdi>` cannot reach the `title` this
+   function also feeds at `bar()`, and the dapp's `esc` does the same thing for the same reason. */
+function esc(s){return String(s).replace(/[\u202A-\u202E\u2066-\u2069]/g,'').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function short(a){return a.slice(0,6)+'…'+a.slice(-4)}
 function pct(bps){return bps/100}
 /* An unlisted chain reads as its id rather than as ethereum: the mismatch sentence below names two
@@ -193,9 +197,10 @@ function render(el){
   var link=el.getAttribute('data-link');
   /* No alpha marker (ROADMAP decision 48): it is for the owner, in the dapp, not for a viewer of the
      host page. Decision 12's one outbound link is `data-link`'s, and this file promises no link
-     unless the host asks. */
+     unless the host asks. That promise covers analytics too, and a `Referer` carrying the host
+     page's URL to the gateway is analytics, so the link's `rel` suppresses that as well (R21). */
   var foot=(snap.delay?'delay '+fmtDelay(snap.delay):'no delay')+' · owner '+short(snap.owner)+' · '+short(addr)+' · '+esc(cname(cid))
-  +(link===null?'':' · <a href="'+esc((link||(SRC?new URL('./',SRC).href:location.href)).split('#')[0]+'#/distros/'+addr)+'"'+(SRC?' target="_blank" rel="noopener"':'')+'>view ↗</a>');
+  +(link===null?'':' · <a href="'+esc((link||(SRC?new URL('./',SRC).href:location.href)).split('#')[0]+'#/distros/'+addr)+'"'+(SRC?' target="_blank" rel="noopener noreferrer"':'')+'>view ↗</a>');
   if(compact){
    el.innerHTML=bar(snap.table,'rk-b',1)
    +'<div class="rk-1">'+snap.table.map(function(b){return '<b>'+esc(b.name)+'</b> '+pct(b.bps)+'%'}).join(' · ')
