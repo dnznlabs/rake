@@ -732,7 +732,12 @@ async function histLogs(addr, from, to) {
      highest block the two queries carrying the history stopped at, and the block asked for where
      neither stopped short. */
   const floors = [changes.partial, funds.partial].filter(n => n != null);
-  const at = await fin();
+  /* Clamped to the head the scan above measured its windows against, which is the highest block this
+     load can have read: `fin()` is awaited here, after the scan, so a chain whose `finalized` keeps
+     up with its `latest` could otherwise answer a block above that head and the record would claim
+     blocks nobody read. Unreachable on every chain measured on 2026-11-17 — anvil finalizes 64 blocks
+     behind its head and the Base chains thousands — and one `Math.min` to rule out. */
+  const at = Math.min(await fin(), await head());
   const cut = r => (r ? Model.splitFinal(r.logs, at).final : null);
   const live = {
     first: floors.length ? Math.max(...floors) : (base ? base.through + 1 : lo),
