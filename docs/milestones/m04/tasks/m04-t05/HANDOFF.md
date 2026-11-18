@@ -80,7 +80,9 @@ Both chains' pairs reproduce § Uploads rows 3 and 4 exactly.
 `html()` **62,261**; `/widget.js` 200, **8,509 B** identical to `app/dist/widget.js`; `/nope` 404.
 `gateway-check: all assertions passed`, exit 0. **This chain is clear to run.**
 
-**Sepolia · 11155111 — FAILED, 2026-11-18 19:35:24Z**, 2 of the assertions, exit 2. The 5219 path
+**Sepolia · 11155111 — FAILED, 2026-11-18 19:35:24Z**, 2 of the assertions, exit **1**
+(`tools/gateway-check.sh:206`; the `2` is the fail count, and a `2` seen at the shell is `make`'s and
+the `devbox run` wrapper's, not the script's). The 5219 path
 itself is fine (200, the three `Web3-*` headers, `/nope` 404); what differs is the document:
 
 | assertion | measured | expected |
@@ -690,11 +692,11 @@ m04-t04 AC (e)'s URL, which decision 41 already assigns to the Product Owner.
    does not appear: #172 requires it only for a never-used address, and the Ops vault is a contract.
    You will see the note — `not the connected wallet — a contract — it will have to propose and cancel
    through its own calls` — and the flow will continue. § Deviations 6.
-2. **m04-t04 AC (e)'s host-page URL**, if you have published it — row (k) is `pending on t04 (e)`
+4. **m04-t04 AC (e)'s host-page URL**, if you have published it — row (k) is `pending on t04 (e)`
    until it arrives, and criterion 5's live half with it.
-3. **The signoff line** goes under `docs/milestones/m04/MILESTONE.md` § Phases 4, in your own words,
+5. **The signoff line** goes under `docs/milestones/m04/MILESTONE.md` § Phases 4, in your own words,
    dated, once step 3 has run with nothing open. The PR carries it.
-4. **One wording question, and it is yours under decision 17.** Row (j) expects the owner bar to read
+6. **One wording question, and it is yours under decision 17.** Row (j) expects the owner bar to read
    `you are a signer on <vault>, which owns this distribution — every change below is calldata to
    submit through it`, and the drawer's writes to read `copy calldata for your vault`. Both strings
    are in the shipped document. If either reads wrong to you when you see it in place, that is a
