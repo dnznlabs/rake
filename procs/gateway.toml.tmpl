@@ -3,14 +3,14 @@ RunAsHttp = true
 IsBehindHttpsProxy = false
 HomePage = "/"
 CORS = "*"
-defaultChain = 31337
+defaultChain = $GATEWAY_CHAIN_ID
 requestLimit = 50
 [pageCache]
 enabled = false
 [nsDefaultChains]
 [name2chain]
-"anvil" = 31337
+"anvil" = $GATEWAY_CHAIN_ID
 [chainConfigs]
-    [chainConfigs.31337]
-    "ChainID" = 31337
-    "RPC" = "http://127.0.0.1:$ANVIL_PORT"
+    [chainConfigs.$GATEWAY_CHAIN_ID]
+    "ChainID" = $GATEWAY_CHAIN_ID
+    "RPC" = "$GATEWAY_RPC"

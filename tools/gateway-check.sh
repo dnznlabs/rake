@@ -14,6 +14,16 @@
 # The hosted case is a mode, not a fork: the same assertions over the same strip-and-compare, since
 # the equality below is the thing that must not drift between the two.
 #
+# A base on loopback is the project's own gateway build serving a chain other than the dev one
+# (`tools/gateway.sh`'s GATEWAY_CHAIN_ID/GATEWAY_RPC). It goes through the hosted mode, because the
+# base is handed over whole:
+#
+#   APP=0x... RPC=https://ethereum-sepolia-rpc.publicnode.com \
+#     GATEWAY_BASE=http://<app>.11155111.w3.localhost:8799 devbox run -- make gateway-check
+#
+# CHAIN_ID names the chain in the dev mode's host labels and defaults to the dev chain, so the
+# command above and `make gateway-check` against `make serve` both work unchanged.
+#
 # What it asserts, each with the value it measured:
 #   GET /          200, text/html, the three Web3-* headers that prove the 5219 path was taken
 #                  (not `html()`), and — after removing the block the gateway injects — a body that
@@ -37,6 +47,7 @@ GATEWAY_PORT=${GATEWAY_PORT:-8787}
 ANVIL_PORT=${ANVIL_PORT:-8545}
 RPC=${RPC:-http://127.0.0.1:$ANVIL_PORT}
 GATEWAY_BASE=${GATEWAY_BASE:-}
+CHAIN_ID=${CHAIN_ID:-31337}
 
 # A hosted gateway serves one chain, and `html()` read from anvil and compared to a testnet gateway
 # is exactly the silent wrong-chain comparison this check exists to catch. So RPC must be named
@@ -62,10 +73,28 @@ if [ -z "${APP:-}" ]; then
 fi
 [ -n "${APP:-}" ] || { echo "gateway-check: no App address — 'make deploy' first, or pass APP="; exit 1; }
 
-# The host form the hosted gateway's URL has: <address>.<chainId>.w3.<gateway host>.
+# The host form the hosted gateway's URL has: <address>.<chainId>.w3.<gateway host>. The chain label
+# is CHAIN_ID so a local gateway serving another chain is addressable; at the default these are the
+# `31337` hosts they have always been.
 app=$(printf '%s' "$APP" | tr 'A-Z' 'a-z')
-H=$app.31337.w3.localhost
-H3=$app.31337.localhost
+H=$app.$CHAIN_ID.w3.localhost
+H3=$app.$CHAIN_ID.localhost
+
+# curl resolves neither `localhost` subdomains nor the four-label form — Chrome does, curl does not —
+# so the dev mode has always passed `--resolve`. A GATEWAY_BASE on loopback needs the same, or the
+# request dies in resolution and reads exactly like a gateway that is not running. Derived from the
+# base rather than taken as another parameter: the base already carries the host and the port.
+resolve=()
+if [ -n "$GATEWAY_BASE" ]; then
+  hostport=${GATEWAY_BASE#*://}; hostport=${hostport%%/*}
+  bhost=${hostport%%:*}; bport=${hostport##*:}
+  if [ "$bport" = "$bhost" ]; then
+    case $GATEWAY_BASE in https://*) bport=443;; *) bport=80;; esac
+  fi
+  case $bhost in
+    localhost|*.localhost|127.0.0.1) resolve=(--resolve "$bhost:$bport:127.0.0.1");;
+  esac
+fi
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -73,7 +102,7 @@ trap 'rm -rf "$tmp"' EXIT
 # One place that knows how to reach the gateway, so a stopped gateway fails here and nowhere else.
 fetch() { # fetch <host> <path> <headers-out> <body-out>
   if [ -n "$GATEWAY_BASE" ]; then
-    curl -s -D "$3" -o "$4" "$GATEWAY_BASE$2" \
+    curl -s -D "$3" -o "$4" ${resolve[@]+"${resolve[@]}"} "$GATEWAY_BASE$2" \
       || { echo "gateway-check: no gateway at $GATEWAY_BASE (asked for $GATEWAY_BASE$2)"; exit 1; }
   else
     curl -s -D "$3" -o "$4" --resolve "$1:$GATEWAY_PORT:127.0.0.1" "http://$1:$GATEWAY_PORT$2" \
@@ -96,6 +125,7 @@ cache_note() { # cache_note <path> <headers-out>
 
 if [ -n "$GATEWAY_BASE" ]; then
   echo "gateway-check: App $APP via $GATEWAY_BASE/ (hosted; html() from $RPC)"
+  [ ${#resolve[@]} -eq 0 ] || echo "               ${resolve[*]} (loopback base)"
 else
   echo "gateway-check: App $APP via http://$H:$GATEWAY_PORT/"
 fi
