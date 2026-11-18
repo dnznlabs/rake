@@ -743,6 +743,35 @@ The equality to check is the one `docs/milestones/m03/tasks/m03-t03/HANDOFF.md` 
 `record:` the chunk pointers, `inflated sha256`, `widget sha256`, both byte counts, and the three
 submit and three `executeQueued` transaction hashes.
 
+**Then prove it through the gateway, because nothing above does.** `chain-doc` reads the ERC-5219
+path with our own reader, so it establishes what the chain holds and nothing at all about what a
+visitor receives — a gateway can serve a document two uploads old while every reading above is
+correct and stays correct ([#242](https://github.com/dnznlabs/rake/issues/242)). The comparison
+already exists: `tools/gateway-check.sh` removes the block the gateway injects after `<body>` and
+compares the remainder byte-for-byte with `html()` on chain, and it takes a hosted origin rather
+than only the dev stack's.
+
+```sh
+APP=$APP RPC="$RPC" \
+  GATEWAY_BASE="https://$(printf %s "$APP" | tr 'A-Z' 'a-z').$CHAIN_ID.w3link.io" \
+  devbox run -- make gateway-check
+```
+
+Run it **once per chain**, after that chain's `chain-doc` reading, and `record:` its outcome beside
+that reading — `body minus block` against `html()` bytes, and `/widget.js` against
+`app/dist/widget.js`. The origin is four labels, the address lowercased, no trailing slash. The
+script refuses outright when `GATEWAY_BASE` is set while `RPC` is still the loopback default, which
+is the silent wrong-chain comparison it exists to catch, so a green run on nothing is not available.
+
+**A mismatch here is a documented third-party condition, not a failed upload — and the chain is the
+reference.** If `chain-doc` matches the build and the gateway disagrees, the upload is sound: no
+operator action changes what a third-party gateway is serving, so the figures and the date are
+recorded and carried, and a re-upload is never the response — it would spend the gas and move
+nothing, since the bytes on chain are already the ones intended. What a mismatch does gate is any
+step that reads the hosted URL as a proxy for the chain: a UAT pass driving that origin is
+exercising whatever the gateway last served unless this check passed for that chain first
+([#238](https://github.com/dnznlabs/rake/pull/238)).
+
 **`make deploy` is not used on a public chain.** Its later recipes run `Seed.s.sol`,
 `Fixtures.s.sol` and a dev build, all of which are dev-chain only (decision 29).
 
