@@ -1,6 +1,6 @@
 # M04 — Testnets
 
-Status: in progress · scoped 2026-11-07 · updated 2026-11-17 (t04 scoped; t11 from #215 and t12 added; t08 2026-11-08, t09 2026-11-12, t10 2026-11-17; t10 done, t11 approved, t12 issue opened, #209 closed, all 2026-11-17; t12 held out of Run B, 2026-11-18; t13 scoped from t04's front-end rollup, 2026-11-17)
+Status: in progress · scoped 2026-11-07 · updated 2026-11-17 (t04 scoped; t11 from #215 and t12 added; t08 2026-11-08, t09 2026-11-12, t10 2026-11-17; t10 done, t11 approved, t12 issue opened, #209 closed, all 2026-11-17; t12 held out of Run B, 2026-11-18; t13 scoped from t04's front-end rollup, 2026-11-17; t05 scoped 2026-11-18)
 
 `RUNBOOK.md` executed for real, twice — Sepolia (11155111) and Base Sepolia (84532) — so that the
 factory, the implementation, `App` and DNZN's own distribution sit at the addresses M03 predicted
@@ -214,7 +214,7 @@ Denizen's session, scripted so the evidence is a list of hashes and not a feelin
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m04-t05 | The UAT script for criterion 6 — one ordered list per chain with the expected state after each step, the gateway URL to open, the wallet to use and what to screenshot; run first by the engineer in headless chromium with an injected provider against Sepolia so the script is known to be executable; then Denizen's run, its hashes and screenshots filed in the handoff by whoever holds them, and the signoff line below. Anything he finds is an issue, scoped per item: `app/` fixes land as m04-t09 if they change what criterion 3 hashes, and are re-uploaded once through m04-t08's vault procedure | not started — scoped when t04 merges |
+| m04-t05 | The UAT script for criterion 6 — one ordered list per chain with the expected state after each step, the gateway URL to open, the wallet to use and what to screenshot; run first by the engineer in headless chromium with an injected provider against Sepolia so the script is known to be executable; then Denizen's run, its hashes and screenshots filed in the handoff by whoever holds them, and the signoff line below. Anything he finds is an issue, scoped per item: `app/` fixes land as m04-t09 if they change what criterion 3 hashes, and are re-uploaded once through m04-t08's vault procedure | scoped 2026-11-18 ([TASK.md](tasks/m04-t05/TASK.md)); gated on the next Run B executing on both chains; task issue opens when this merges |
 
 **Signoff:** _not yet — a dated line by Denizen goes here._
 
