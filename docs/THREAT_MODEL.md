@@ -107,7 +107,7 @@ owner-set table through a timelock. Disposition is one of `held by test <name>`,
 | SOL-CR-4 | Can the admin change a critical property immediately? | held by test `test_delayZeroAppliesInline` — only when `delay` is 0, which the mainnet deploy sets to 604,800 s (decision 50) |
 | SOL-CR-5 | Is any privileged setter missing events? | held by test `test_renounceEmitsOwnershipTransferred` — #111 was exactly this |
 | SOL-CR-6 | How is ownership transferred? | held by test `test_acceptOwnershipByPendingOwner` |
-| SOL-CR-7 | Is there proper validation in privileged setter functions? | open — `propose` (`src/Distribution.sol:220`) validates nothing about the action it queues; a malformed action is caught only at `applyQueued`. [#54](https://github.com/dnznlabs/rake/issues/54) |
+| SOL-CR-7 | Is there proper validation in privileged setter functions? | design — decision 25. `propose` (`src/Distribution.sol:220`) validates nothing about the action it queues and a malformed action is caught only at `applyQueued`, a full `delay` later. That is the ruled behaviour and not a gap: [#54](https://github.com/dnznlabs/rake/issues/54) is **closed** (2026-10-31), decision 25 documents the shape rather than validating in `propose` or letting anyone cancel, and `SECURITY.md:446` records it as documented and not changed |
 | SOL-AM-DOSA-1 | Is the withdrawal pattern followed to prevent DoS? | held by test `test_escrowRevertingEthRecipientOthersPaid` — a failed push escrows and the rest are paid |
 | SOL-AM-DOSA-2 | Is a minimum transaction amount enforced? | not applicable — a zero-value `distribute` is a no-op, not a failure |
 | SOL-AM-DOSA-3 | How are tokens with blacklisting handled? | design — decision 23's neighbour: a blocked row's ERC-20 `transfer` reverts the whole `distribute` for that token. Unlike ETH there is no escrow fallback for ERC-20 |
@@ -147,30 +147,41 @@ owner-set table through a timelock. Disposition is one of `held by test <name>`,
 | SOL-Basics-Payment-5 | How is withdrawal handled? | held by test `test_claimEthToOtherAddress` |
 | SOL-Basics-Payment-6 | Is `transfer()` or `send()` used for sending ETH? | held by test `test_receiveMinimaAreUnderPushGas` — neither: a `call` under an explicit `PUSH_GAS` cap |
 | SOL-Basics-Payment-7 | Can native ETH be locked in the contract? | held by test `test_selfRowRecycles` — the distribution as its own row recycles rather than stranding |
-| SOL-AM-ReentrancyAttack-1 | Can a view function return a stale value during interaction? | open — `snapshot()` and `beneficiaries()` are readable mid-`distribute` by a hook token's callback, and no test asserts what they return in that frame |
+| SOL-AM-ReentrancyAttack-1 | Can a view function return a stale value during interaction? | open — `snapshot()` and `beneficiaries()` are readable mid-`distribute` by a hook token's callback, and no test asserts what they return in that frame. [#293](https://github.com/dnznlabs/rake/issues/293) |
 | SOL-AM-ReentrancyAttack-2 | Is there a state change after an external interaction? | held by test `test_reentrantRecipientIsEscrowed` |
 | SOL-Timelock-1 | Are timelocks implemented for important changes? | held by test `testFuzz_applyWindow` |
 | MoleculeVesting [M-01] | `revoke` incompatible with block-list tokens | see SOL-AM-DOSA-3 — rake has no `revoke`, and the block-list consequence is the same |
-| MoleculeVesting [M-02] | Insufficient input validation in `createVestingSchedule` | open — for `propose`, the same shape as SOL-CR-7, [#54](https://github.com/dnznlabs/rake/issues/54). Held by test `test_tableValidation` for `create`, which is the validated half |
+| MoleculeVesting [M-02] | Insufficient input validation in `createVestingSchedule` | design — decision 25, for `propose`: the same shape as SOL-CR-7, and [#54](https://github.com/dnznlabs/rake/issues/54) is closed by that ruling. Held by test `test_tableValidation` for `create`, which is the validated half |
 | MoleculeVesting [M-03] | Contract can receive ETH but has no withdraw function | held by test `test_claimEthToSelfUncapped` — ETH arriving outside a table share is distributable, not stuck |
 | MoleculeVesting [M-04] | Users cannot claim while the contract is paused | not applicable — no pause exists (SOL-CR-2) |
 | MoleculeVesting [L-01] | Limit the max size of the schedule array | held by test `test_tableCapBoundary` |
 | MoleculeVesting [L-02] | Modifier does not revert for a non-existent id | held by test `test_cancelThenApplyReverts` |
-| TokenDistributor [L-01] | Insufficient input validation | open — the same finding as SOL-CR-7 and MoleculeVesting [M-02], reached from the corpus report nearest rake's shape. [#54](https://github.com/dnznlabs/rake/issues/54) |
+| TokenDistributor [L-01] | Insufficient input validation | design — decision 25. The same finding as SOL-CR-7 and MoleculeVesting [M-02], reached from the corpus report nearest rake's shape; [#54](https://github.com/dnznlabs/rake/issues/54) is closed by that ruling |
 
 ## Open list
 
-Everything above that is assumed and not asserted. **Five rows** of § Checklist diff are
-dispositioned open, and they name **three distinct findings**: the `propose` validation gap is
-reached three times over, once from the Solodit checklist (SOL-CR-7) and once from each Pashov
-report ([M-02] and [L-01]). **Two further rows** are dispositioned with no test, one in § Token
-classes and one in § Chains; neither is a § Actors row, so every actor above carries a test.
-Nothing here is a `src/` change, per decision 56.
+Everything above that is assumed and not asserted. **Two rows** of § Checklist diff are
+dispositioned open and they name **two distinct findings**, each with an issue carried against it.
+**Two further rows** are dispositioned with no test, one in § Token classes and one in § Chains;
+neither is a § Actors row, so every actor above carries a test. Nothing here is a `src/` change,
+per decision 56.
 
-| What | Where | Why it is open |
+**What left this list at review.** The `propose` validation gap — reached three times over, once
+from the Solodit checklist (SOL-CR-7) and once from each Pashov report ([M-02], [L-01]) — was
+dispositioned `open` against [#54](https://github.com/dnznlabs/rake/issues/54). That issue is
+**closed** (2026-10-31) by **decision 25**, which ruled the shape documented rather than validated
+in `propose` or cancellable (`docs/ROADMAP.md:316-320`, and `SECURITY.md:446` records it as
+documented and not changed). Behaviour a ruling put outside the code is `design`, not `open`, so all
+three rows now read `design — decision 25` and the finding is not carried.
+
+| What | Where | Why it is open | Carried |
+|:--|:--|:--|:--|
+| A token whose `balanceOf` is the native balance | SOL-Token-FE-5 | Checked per chain against a live node by `RUNBOOK.md` § 1, which no local test can stand in for | [#127](https://github.com/dnznlabs/rake/issues/127) |
+| Views readable mid-`distribute` | SOL-AM-ReentrancyAttack-1 | The transient lock stops re-entry into the state-changing functions, but `snapshot()` and `beneficiaries()` are `view` and unguarded; no test pins what a hook sees | [#293](https://github.com/dnznlabs/rake/issues/293) |
+
+The two rows that carry no test are reasons rather than gaps, and neither needs an issue:
+
+| What | Where | Disposition |
 |:--|:--|:--|
-| `propose` validates nothing about the action it queues | SOL-CR-7, MoleculeVesting [M-02], TokenDistributor [L-01] | A malformed action is caught at `applyQueued`, a full `delay` later. [#54](https://github.com/dnznlabs/rake/issues/54) — carried, not fixed here |
-| A token whose `balanceOf` is the native balance | SOL-Token-FE-5 | Checked per chain against a live node by `RUNBOOK.md` § 1, which no local test can stand in for. [#127](https://github.com/dnznlabs/rake/issues/127) |
-| Views readable mid-`distribute` | SOL-AM-ReentrancyAttack-1 | The transient lock stops re-entry into the state-changing functions, but `snapshot()` and `beneficiaries()` are `view` and unguarded; no test pins what a hook sees |
-| ERC-1363 | § Token classes | Decision 28 put the class outside the review, so the suite holds no property over it |
-| No native-balance alias on a new chain | § Chains | A `RUNBOOK.md` per-chain procedure against a live node, not a local property |
+| ERC-1363 | § Token classes | `none — decision 28` put the class outside the review, so the suite holds no property over it. The reason is the ruling |
+| No native-balance alias on a new chain | § Chains | `none —` a `RUNBOOK.md` per-chain procedure against a live node, not a local property. Same finding as SOL-Token-FE-5 above, so it is carried by [#127](https://github.com/dnznlabs/rake/issues/127) |

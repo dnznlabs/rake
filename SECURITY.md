@@ -127,10 +127,13 @@ names every actor, token class and chain the self-review had in mind, and beside
 test that holds it — 63 distinct names, every one a name `forge test --list` returns, which is the
 file's own stated check. It closes with a diff against two inputs pinned by commit, the Solodit
 checklist (370 items under 62 labels) and the two `pashov/audits` reports nearest rake's shape, and
-with an **open list**: five rows of that diff are dispositioned `open`, naming three distinct
-findings — the `propose` validation gap of [#54](https://github.com/dnznlabs/rake/issues/54), the
-native-balance alias token of [#127](https://github.com/dnznlabs/rake/issues/127), and views that
-stay readable mid-`distribute` and that no test pins. Two further rows carry no test at all. That
+with an **open list**: two rows of that diff are dispositioned `open`, naming two distinct findings
+— the native-balance alias token of [#127](https://github.com/dnznlabs/rake/issues/127), and views
+that stay readable mid-`distribute` and that no test pins,
+[#293](https://github.com/dnznlabs/rake/issues/293). The `propose` validation gap reads `design —
+decision 25` on all three of its rows, because [#54](https://github.com/dnznlabs/rake/issues/54) is
+closed by that ruling and `:446` below records it as documented and not changed. Two further rows
+carry no test at all, each with a reason rather than an issue. That
 list, not the table above, is what the review still owes a reader. First of decision 56's three
 additions; § Coverage and § Mutation are the other two.
 
