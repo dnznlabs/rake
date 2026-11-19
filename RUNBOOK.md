@@ -72,9 +72,21 @@ export APP_SALT=0x87cdf85b31cb82e688a11bbb8cf4c0249648f7dc2e5bec932424960920ead3
 export CREATOR=0x68e0741D8d693e14BF56914567eADdC130b186eE  # DNZN Creator, decision 32
 export ENGINEER=0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d # Elanik's key, an Ops owner since 2026-11-16 (§ Step 4)
 export DNZN_SALT=${CREATOR}000000000000000000000001        # top 20 bytes CREATOR (decision 10), low 12 bytes 1
+# step 6's values — read from the chain and the decisions, never typed from memory
+export DNZN_DESCRIPTION="DNZN // FUND DISTRIBUTION"
+export DNZN_TABLE='[(0x00b6E7D12EdE9Ca4A74fE69be758aAB1ee02cFb9,2000,"treasury","long-term growth, future projects"),(0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790,4000,"ops","infrastructure, services, tokens"),(0x357836fFcB45307FA7ff2A574F505753c961902B,4000,"creator","founding engineer, product vision")]'
+export DNZN_DELAY=604800        # mainnets, decision 50; 86400 on the two testnets, decision 42
 # filled in by step 1, never by hand
 export PROXY=0x4e59b44847b379578588920cA78FbF26c0B4956C FACTORY= IMPL= APP= DISTRO=
 ```
+
+**Step 6's three values are read, not remembered.** The description and the table are the live
+Sepolia distribution's, read on 2026-11-19 with
+`cast call 0x71a4221974Fc2E95081AE513248918dF27CF7a4A 'snapshot()(…)'` and `description()` against
+that chain, and they match decision 50's record of the three names and notes and decision 51's
+string. The table is already sorted strictly ascending by account and its `bps` sum to 10,000, which
+is what `BadTable()` checks. `OWNER` above is the owner step 6 passes (decision 50) and the sender is
+the Creator key on every chain, testnets included (**decision 54**), with `$SENDER`.
 
 **Two signer variables because the two commands spell it differently, and one rejects the other's
 spelling outright** ([#251](https://github.com/dnznlabs/rake/issues/251)). On the pinned toolchain
@@ -1066,15 +1078,13 @@ DISTRO=$(cast call $FACTORY "predict(bytes32)(address)" $DNZN_SALT --rpc-url "$R
 cast code $DISTRO --rpc-url "$RPC"      # must print 0x — #22, the second place this is checked
 ```
 
-Then the send, with the table and the delay as § 0 variables added for this step. Their M05 values —
-the Sepolia table, `DNZN_DELAY` 604800 and `OWNER` the Ops vault, decision 50 — are M05's to fill; this document carries them as variables, and § Rehearsed on
-anvil marks its own values as the rehearsal's placeholders.
+Then the send. `DNZN_DESCRIPTION`, `DNZN_TABLE` and `DNZN_DELAY` are § 0's, filled there with M05's
+values — the Sepolia table and description, `DNZN_DELAY` 604800 on the mainnets (decision 50) and
+86400 on the two testnets (decision 42), `OWNER` the Ops vault. **Export `DNZN_DELAY=86400` for a
+testnet** and leave § 0's default for a mainnet. § Rehearsed on anvil marks its own values as the
+rehearsal's placeholders, and the two rules below are what reject a wrong table.
 
 ```sh
-export DNZN_DELAY=<uint32 seconds>
-export DNZN_DESCRIPTION="<string>"
-export DNZN_TABLE='[(<address>,<bps>,"<name>","<note>"),(…)]'   # see the two rules below
-
 cast send $FACTORY \
   'create(address,uint32,string,(address,uint96,string,string)[],bytes32)' \
   $OWNER $DNZN_DELAY "$DNZN_DESCRIPTION" "$DNZN_TABLE" $DNZN_SALT \
@@ -1760,7 +1770,11 @@ Base Sepolia were submitted and verified here.
 
 Every one reports solc `v0.8.34+commit.80d5c536`, optimizer on.
 
-### Step 6 is Denizen's
+### Step 6 is Denizen's — the M04 record, superseded 2026-11-19
+
+> **This section is M04's record and is kept as read, not corrected.** Every value in it was the
+> value of the day; § 0 carries what step 6 passes now, and the paragraph after this block says what
+> moved.
 
 **Step 6 was not run on either chain and is not this document's to run here**: the DNZN Creator key
 is Denizen's and never lives on the engineer's host. Its two values are
@@ -1770,3 +1784,10 @@ is Denizen's and never lives on the engineer's host. Its two values are
 complete command per chain, and that exact table string was rehearsed on anvil first: it parsed,
 `DISTRO` landed at the `predict` address `0x633e24C2320B8d86A2A36aB659b64850e5aC6148`,
 `owner()` the Ops vault and `delay()` 86400.
+
+**What step 6 passes now is § 0's, and three things above have moved** (m05-t01, 2026-11-19). The
+description is `DNZN // FUND DISTRIBUTION`, not `FEE` — decision 51, and the live Sepolia
+distribution answers it. The table is decision 50's 2,000 / 4,000 / 4,000 over Treasury, Ops and the
+Creator, not decision 42's 1,000 / 3,000 / 6,000. The delay is 604800 on the mainnets (decision 50),
+86400 on the two testnets (decision 42). The `predict` address above is a function of the pre-#201
+factory and moved with the re-mine. Part B records the deploy that uses § 0's values below this.
