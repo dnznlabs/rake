@@ -103,6 +103,23 @@ it from init code and salt; Run B is uploading to a contract that already exists
 only creates a way to upload to the wrong one. `SIGNER` is not in the list because Run B sends nothing
 from the engineer's key: it proposes, and the Product Owner's signature is what moves anything.
 
+**The base-fee stop, before every send on a chain where ETH costs money.** Read it first and compare
+it to the chain's stop:
+
+```sh
+cast base-fee --rpc-url "$RPC"
+```
+
+**On Ethereum the stop is 1 gwei.** `MILESTONE.md:239-248` sizes the mainnet ask at 0.03 ETH for
+Run A, Run B and step 6, and that covers them to about that price — at Sepolia's pricing, which the
+§ 1 estimate table shows is the dearer reading; Ethereum prices code deposit well under it, so 1 gwei
+is where a send waits rather than where it becomes unaffordable. On the L2s the stop is the figure the
+deploy task's gate records, since their fees run three orders of magnitude below Ethereum's. **The
+testnets have no stop** — their fees are wei, and a testnet send is never deferred for price.
+
+A fee above the stop for days is not a reason to put a buffer in a hot key: it is a top-up and a
+raised rule, by the Product Owner's word. The stop defers a send; it never silently widens the budget.
+
 **`OWNER` is one value for every chain on purpose**, as `state-collection`'s `PAYEE` is: there is no
 second constant to pick the wrong one of. The Ops vault is at this address on all eight chains of
 § 1 — read 2026-10-30, table on [#114](https://github.com/dnznlabs/rake/issues/114), ruled as
@@ -1718,7 +1735,9 @@ against `forge inspect App deployedBytecode` reports **equal, byte for byte**, o
 | signer balance after | 0.104863387533085144 ETH, nonce 4 | 0.009975784947982522 ETH, nonce 2 |
 | Creator key balance, read 2026-11-08 | 0.010000000000000000 ETH, nonce 0 | 0.010000000000000000 ETH, nonce 0 |
 
-Both chains sat far under the 20 gwei stop of step 0. **Sepolia charged roughly 7× what cancun does
+Both chains sat far under any stop worth naming — and § 0's stop rule is the one that applies, which
+sets no stop on a testnet at all; the figure cited here before this edit was m04-t03's plan and was
+in no step of this document. **Sepolia charged roughly 7× what cancun does
 for the same init code** (16,789,404 against anvil's 2,262,485, and 11,506,694 against 1,648,295)
 while Base Sepolia charged about 1.05× (2,380,182 and 1,655,660) — the per-chain creation pricing
 step 1e now reads from the node rather than from a simulation. **M05 must re-read it per mainnet; the
