@@ -45,7 +45,9 @@
   has code is left alone rather than re-created (#22).
 - `lib/` are submodules pinned to a tag. `forge install` would move them. A fresh `git worktree add`
   checks out without them, so the first `forge` command dies on `forge-std/Script.sol`: run
-  `git submodule update --init --recursive` in the worktree first (#41).
+  `make setup` in the worktree first (#41). `make build`, `test`, `serve` and `deploy` take a `libs`
+  prerequisite that stops on an empty `lib/` and names `make setup`, rather than letting forge clone
+  each dependency's default branch over the pin.
 - The toolchain is pinned in `devbox.json`; run forge through devbox. `forge build` must print no
   `warning[` and no `Warning (` line, and lint findings differ across foundry versions.
 - `.gas-snapshot` is tracked and CI runs `forge snapshot --check` with no tolerance. Regenerate with

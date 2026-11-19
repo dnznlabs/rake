@@ -88,7 +88,7 @@ make help           # List every command
 Tools come from devbox, loaded by direnv; run forge through devbox, since the pinned version is the one the gas snapshot matches. See [Contracts and the dev chain](AGENTS.md#contracts-and-the-dev-chain).
 
 ```bash
-git submodule update --init --recursive   # forge-std and solady
+make setup                               # Fetch the pinned submodules: forge-std and solady
 devbox run -- forge build                 # Build, with no warnings expected
 devbox run -- forge snapshot --check      # Gas snapshot, as CI runs it
 node --test test/*.test.mjs               # Dapp and widget tests

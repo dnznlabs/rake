@@ -16,16 +16,32 @@ FORGE_SEND := --rpc-url $(RPC) --broadcast $(SEND_FLAGS)
 # CREATE2, and a CREATE-only filter would leave `addresses` and the `deploy::` guard below blind.
 DEPLOYED    = jq -r '.transactions[]|select(.transactionType=="CREATE" or .transactionType=="CREATE2")|"\(.contractName) \(.contractAddress)"' broadcast/*/$(CHAIN_ID)/run-latest.json
 
-.PHONY: serve build test fmt clean deploy addresses slither
+# Listed, not read from .gitmodules, so an empty lib/ is told apart from a project that has none.
+# A later mk/ file that pins another submodule appends to it: LIBS += lib/<name>
+LIBS := lib/forge-std lib/solady
 
-serve: ## Start the dev stack: anvil, a deploy, and whatever else procs/ holds
+.PHONY: setup libs serve build test fmt clean deploy addresses slither
+
+setup: ## Fetch the pinned submodules
+	git submodule update --init --recursive
+
+# Checks, never fetches. On an empty lib/ forge clones each dependency's default branch instead of
+# the pin; an update here would drag a deliberately moved submodule back to it.
+libs:
+	@for d in $(LIBS); do \
+	  [ -n "$$(ls -A $$d 2>/dev/null)" ] || \
+	    { echo "$$d is empty — the pinned submodules are not checked out. Run 'make setup' first."; exit 1; }; \
+	done
+
+serve: libs ## Start the dev stack: anvil, a deploy, and whatever else procs/ holds
 	process-compose $(addprefix -f ,$(sort $(wildcard procs/*.yml))) up
 
-# Double-colon: later mk/ files add their own recipe to the same target, run in file order.
-build:: ## Compile
+# Double-colon: later mk/ files add their own recipe to the same target, run in file order. The
+# libs prerequisite belongs to these rules alone, and runs before any of them.
+build:: libs ## Compile
 	forge build
 
-test:: ## Run the test suites
+test:: libs ## Run the test suites
 	forge test
 
 fmt:: ## Check formatting
@@ -54,7 +70,7 @@ slither: ## Static analysis gate — every result triaged in SECURITY.md
 # falls through and deploys.
 # `deploy::` is double-colon, so this `exit 1` stops `make` before the seed, fixtures and dapp
 # recipes in the later mk/ files run — which is the point.
-deploy:: ## Deploy to the chain at RPC (anvil by default)
+deploy:: libs ## Deploy to the chain at RPC (anvil by default)
 	@cast block-number --rpc-url $(RPC) >/dev/null 2>&1 || \
 	  { echo "deploy: no chain at $(RPC) — 'make serve' starts one"; exit 1; }
 	@if ls broadcast/*/$(CHAIN_ID)/run-latest.json >/dev/null 2>&1; then \
