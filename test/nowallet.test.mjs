@@ -56,6 +56,52 @@ test('readProvider ships and falls back to the public endpoint', () => {
   );
 });
 
+/* `rpcProvider` as shipped, run against a stubbed `fetch`: the declaration is lifted out of the page
+   so what is exercised is the page's own text. */
+const provider = response => {
+  const at = SHIPPED.indexOf('const rpcProvider =');
+  const decl = SHIPPED.slice(at, SHIPPED.indexOf('\n});', at) + 4);
+  return new Function('fetch', `${decl}; return rpcProvider('http://x');`)(async () => response);
+};
+const ask = p => p.request({ method: 'eth_blockNumber', params: [] });
+
+test('rpcProvider turns a non-JSON HTTP failure into a sentence carrying the status', async () => {
+  const p = provider({ ok: false, status: 429, json: async () => { throw new SyntaxError('Unexpected token <'); } });
+
+  const err = await ask(p).then(() => null, e => e);
+
+  assert.deepEqual(err, { message: 'the RPC endpoint answered HTTP 429', data: { httpStatus: 429 } });
+});
+
+test('rpcProvider throws the JSON-RPC error even under an HTTP error status', async () => {
+  const refusal = { code: -32614, message: 'eth_getLogs is limited to a 200 range' };
+  const p = provider({ ok: false, status: 400, json: async () => ({ error: refusal }) });
+
+  const err = await ask(p).then(() => null, e => e);
+
+  assert.equal(err, refusal);
+});
+
+test('rpcProvider refuses a body with no result and keeps a null one', async () => {
+  const empty = provider({ ok: true, status: 200, json: async () => ({ jsonrpc: '2.0', id: 1 }) });
+  const nul = provider({ ok: true, status: 200, json: async () => ({ jsonrpc: '2.0', id: 1, result: null }) });
+
+  const err = await ask(empty).then(() => null, e => e);
+  const res = await ask(nul);
+
+  assert.equal(err.message, 'the RPC endpoint sent no result');
+  assert.equal(res, null);
+});
+
+test('the network menu offers a switch and names an endpoint only where there is one', () => {
+  const from = SHIPPED.indexOf('function who()');
+  const body = SHIPPED.slice(from, SHIPPED.indexOf('\n}\n', from));
+
+  assert.ok(body.includes('WALLET && wrong ? `<div data-a="switch"'), 'no wallet, so nothing to switch');
+  assert.ok(body.includes('WALLET && CHAIN ? cname(CHAIN)'), 'the endpoint\'s chain is not a wallet\'s');
+  assert.ok(!body.includes('new URL(PUBLIC_RPC['), 'an unlisted chain has no endpoint, and new URL(undefined) throws');
+});
+
 test('discover routes whatever it found through readProvider', () => {
   const from = SHIPPED.indexOf('async function discover');
   const to = SHIPPED.indexOf('async function connect');

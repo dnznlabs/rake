@@ -67,7 +67,14 @@ let WRPC = '';
 const rpcProvider = url => ({
   request: async ({ method, params }) => {
     const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
-    const j = await r.json(); if (j.error) throw j.error; return j.result;
+    /* A public endpoint answers a rate limit or an outage with a status and often an HTML body, so the
+       body may not parse. The status rides at `data.httpStatus`, where `Model.isWrappedRefusal` reads
+       a 413 and `logs()` shrinks its window. `null` is a real result (an unmined receipt); only a
+       missing one is a failure. */
+    const j = await r.json().catch(() => null);
+    if (j && j.error) throw j.error;
+    if (!r.ok || !j || j.result === undefined) throw { message: r.ok ? 'the RPC endpoint sent no result' : `the RPC endpoint answered HTTP ${r.status}`, data: { httpStatus: r.status } };
+    return j.result;
   }
 });
 // Which transport reads the chain: the injected provider when there is one, else this chain's public
@@ -605,12 +612,15 @@ function who() {
   if (!ACC) wm.hidden = true;
   const pill = document.getElementById('net'), wrong = wrongChain();
   document.getElementById('netname').textContent = CHAIN ? cname(CHAIN) : cname(CFG.chainId);
+  /* Without a wallet `CHAIN` is the public endpoint's answer, so the switch is a wallet's alone. A
+     chain with no `PUBLIC_RPC` entry has no read path to name: `P` is null there. */
+  const pub = PUBLIC_RPC[CFG.chainId];
   nm.innerHTML = (WALLET
       ? `<div class="k">This app lives on ${cname(CFG.chainId)}. Reads and transactions go through your wallet, so it has to be on the same network.</div>`
       : `<div class="k">no wallet found — open this page in a browser with a wallet to act.</div>`
-        + `<div class="k">reads go through ${new URL(PUBLIC_RPC[CFG.chainId]).host}</div>`)
+        + (pub ? `<div class="k">reads go through ${new URL(pub).host}</div>` : ''))
     + `<div class="k">wallet: ${WALLET && CHAIN ? cname(CHAIN) : 'none'}</div>`
-    + (wrong ? `<div data-a="switch">switch wallet to ${cname(CFG.chainId)}</div>` : '');
+    + (WALLET && wrong ? `<div data-a="switch">switch wallet to ${cname(CFG.chainId)}</div>` : '');
   pill.classList.toggle('warn', wrong);
   pill.title = wrong ? `expected ${cname(CFG.chainId)}` : '';
 }
