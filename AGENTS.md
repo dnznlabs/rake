@@ -104,7 +104,12 @@
 <!-- fragment: dapp -->
 ## The dapp
 
-- `app/src/index.html` is the dapp: no dependencies, no network but the wallet's EIP-1193 provider.
+- `app/src/index.html` is the dapp: no dependencies, and two network paths. **Reads** go through the
+  injected EIP-1193 provider when `discover` found one, and otherwise through this chain's
+  `PUBLIC_RPC` entry, so every route paints for a visitor with no wallet (#273); `readProvider`
+  chooses between them and `WALLET` records which it was. **Writes** always go through the wallet, and
+  every write control renders disabled or absent without one. A chain absent from `PUBLIC_RPC` has no
+  read path without a wallet, and is the one case `route()`'s "No wallet found" notice is reached on.
   The build inlines `eth.js` (keccak and the ABI subset), `model.js`, `widget.js`, `theme.css` and
   `layout.html` into it.
 - `app/src/model.js` is everything that needs no DOM and no provider: `pct`, `countdown`,
