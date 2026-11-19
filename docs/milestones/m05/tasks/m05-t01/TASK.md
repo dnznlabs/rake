@@ -162,9 +162,30 @@ outside the repo.
    `MILESTONE.md:231-233` left open is answered by this reading, and the 0.03 ETH ask there is
    generous rather than tight at today's base fee (0.12 gwei on 2026-11-19). Write the table beside
    § 1 (MegaETH and Robinhood Chain rows read the same way, or marked `no answer` with the error if
-   the RPC refuses). State the rule once, in § Gas beside `:910-920`: **a chain's chunk size is
-   24,000 bytes while a full chunk estimates at or under half its block limit; otherwise it is the
-   largest multiple of 1,000 whose estimate does, and that chain's size is a column of this table.**
+   the RPC refuses).
+
+   **The condition the table holds under, written beside it, not only the date.** Each row holds
+   while that chain prices code deposit at the rate measured on the date stated. The two estimates
+   put Sepolia near 1,560 gas per byte and Ethereum, OP Mainnet, Base and Base Sepolia near 220
+   (Elanik's derivation on #267, 2026-11-19: 37,435,995 ÷ 24,000 and 5,286,009 ÷ 24,000); the plan
+   does not say which upgrade causes the difference, only that the readings differ. So the Sepolia
+   row is read as the figure every other chain would show at Sepolia's rate: on Ethereum the same
+   chunk would be 37,435,995 ÷ 60,000,000 = **62.4%** of the block, over the rule's half, and the
+   rule would cut at **19,000 bytes** (29,640,000 gas, 49.4%), which changes the piece count, the
+   committed `calldata/` and the proposal split. For proportion, the money holds either way: Run B
+   measured 85,666,566 gas on Sepolia (§ Uploads row 3) and at 0.12 gwei that is ≈ 0.0103 ETH, and
+   three full 24,000-byte pieces at Sepolia's rate, 112,307,985 gas, ≈ 0.0135 ETH — both inside the
+   0.03 ETH ask; what moves is the block share and the chunk size, not the budget.
+
+   State the rule once, in § Gas beside `:910-920`: **a chain's chunk size is 24,000 bytes while a
+   full chunk estimates at or under half its block limit; otherwise it is the largest multiple of
+   1,000 whose estimate does, and that chain's size is a column of this table. The rule is
+   re-evaluated immediately before any mainnet cut, in the task that cuts it: the chunk estimate is
+   re-read on that chain on that day, and if the size it gives differs from the committed default,
+   `--max-chunk` moves and the calldata and the proposal split are regenerated in that task before
+   anything is proposed.** A re-run that records a new figure and leaves `--max-chunk` where Part A
+   set it regenerates nothing; the rule changing its answer invalidates the committed calldata, and
+   Part A's artifacts are fixed at Part A's merge while the mainnet cut is a later task.
    Today every chain passes at 24,000, so the per-chain size is 24,000 everywhere and the mechanism
    is what this step adds: `tools/step4-calldata.mjs` takes `--max-chunk <bytes>` defaulting to
    24,000 (`:54` becomes the default, and the usage line at `:64` names the flag), and
@@ -174,8 +195,9 @@ outside the repo.
    keep it off the chain), red with the flag ignored. The proposal cap of 32,768 bytes (`:915-918`)
    bounds the size from above whatever the table says; say so in the same sentence.
 
-   Check: the table in `RUNBOOK.md` with eight rows, each figure dated; `grep -c -- '--max-chunk'
-   tools/step4-calldata.mjs` ≥ 2 (today 0); `grep -c 'envOr("MAX_CHUNK"' scripts/forge/Chunks.s.sol`
+   Check: the table in `RUNBOOK.md` with eight rows, each figure dated, and the condition paragraph
+   beside it; `grep -ci 'before any mainnet cut' RUNBOOK.md` → 1 (today 0), inside § Gas's rule;
+   `grep -c -- '--max-chunk' tools/step4-calldata.mjs` ≥ 2 (today 0); `grep -c 'envOr("MAX_CHUNK"' scripts/forge/Chunks.s.sol`
    → 1 (today 0); `node tools/step4-calldata.mjs --chain 11155111 --app-nonce 7 --out <tmp>` with
    no flag regenerates `calldata/11155111/` byte-identical (`git status --porcelain` empty after
    copying over) — the default must not move a committed upload.
@@ -439,7 +461,11 @@ an address. Baselines are `main` at `78b5eb7`, 2026-11-19.
 4. **#207 folded.** `grep -c 'not exact_match' RUNBOOK.md` → 1 (baseline 0); the handoff shows the
    loop exiting non-zero on a `null` address and 0 on three `exact_match`.
 5. **#188 folded by measurement.** The § 1 table has a row per chain of § 1 with both estimates and
-   the block limit, dated; `grep -c -- '--max-chunk' tools/step4-calldata.mjs` ≥ 2 (baseline 0);
+   the block limit, dated, and the paragraph beside it stating the rate each row holds under and
+   the Sepolia row's reading as the other chains' figure at that rate; `grep -ci 'before any
+   mainnet cut' RUNBOOK.md` → 1 (baseline 0), in § Gas's sizing rule, with the regeneration of the
+   calldata and the proposal split named in the same sentence; `grep -c -- '--max-chunk'
+   tools/step4-calldata.mjs` ≥ 2 (baseline 0);
    `grep -c 'envOr("MAX_CHUNK"' scripts/forge/Chunks.s.sol` → 1 (baseline 0); the new test reds with
    the flag ignored (plant it, quote the red, revert); `--app-nonce 7` regenerates
    `calldata/11155111/` byte-identical with no flag.
