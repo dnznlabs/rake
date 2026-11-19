@@ -271,10 +271,14 @@ states its `main` baseline at `78b5eb7`.
    `make coverage` → `No rule to make target 'coverage'` on `main`.
 4. **The exclusion list is exactly the optimizer-off failures, with its denominator.** The
    pattern matches only the gas-frame tests:
-   `forge test --list | grep -E '^\s+(test|invariant)' | sed -E 's/^\s+//' | grep -cE "^(<the SKIP names>)$"`
-   → the list's length (21 at `78b5eb7`; `--list` prints bare names, so the script's trailing `\(`
-   is dropped here), `forge test --list --match-path test/TableCap.t.sol` → 3 names, and both
-   figures are stated beside the 83 of criterion 3. For every name in `SKIP`,
+   `forge test --list | grep -E '^\s+(test|invariant)' | sed -E 's/^\s+//' | grep -E "^(<the SKIP names>)$"`
+   prints exactly the gas-frame test names and nothing else, the printed names pasted into the
+   handoff with their count (21 at `78b5eb7`; `--list` prints bare names, so the script's trailing
+   `\(` is dropped here); `forge test --list --match-path test/TableCap.t.sol` → 3 names; and the
+   coverage run's enumerated total equals `forge test --list`'s count minus both figures (83 =
+   107 − 21 − 3 at `78b5eb7`). **A pattern that matches nothing floors the full suite and reads
+   as a pass**, which is why the count is a criterion and not a note: 0 matched names, or an
+   enumerated total of 107, fails this criterion whatever the floor script exits. For every name in `SKIP`,
    `FOUNDRY_OPTIMIZER=false forge test --match-test <name>` fails and `forge test --match-test
    <name>` passes;
    `FOUNDRY_OPTIMIZER=false forge test 2>&1 | grep -E '^\[FAIL' | sed -E 's/^\[FAIL.*\] ([A-Za-z0-9_]+)\(.*/\1/' | sort -u`
