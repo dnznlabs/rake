@@ -204,7 +204,7 @@ which is the one whose page runs the owner probe when `from=` is any account tha
      `disabled`; after the probe, the same selector's enabled set equal to what `main` paints for the
      same account (record both lists). Then the same page with `from=<the vault's signer>` → the
      `copy calldata for your vault` controls appear enabled only after the probe. Remove the route and
-     load the seed distribution once: `h1` is its description, three history sections painted.
+     load the seed distribution once: `h1` is its description, the `funds`, `changes` and `activity` sections painted.
    - (b) **Refresh (#243 part 2).** On the seed distribution's page, read `#asof`'s text (`as of block
      N`); from another anvil account send one `distribute` outside the page (`cast send`); press
      `#refresh`; record that the button reads `reading…` and is `disabled` while in flight, that
