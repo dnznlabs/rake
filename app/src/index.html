@@ -239,7 +239,7 @@ if (Q.get('maxwin')) MAX_WINDOWS = Number(Q.get('maxwin'));
    the browser check count the requests a refresh press makes.
    `route` clears it, so a route entry re-pulls the head rather than serving the boot value. */
 let HEAD = null;
-/* #243 part 2: the block the route's own read was made at, in the nav beside the control that
+/* #243 part 2: the block the route's own read was made at, under the nav beside the control that
    re-makes it. Written wherever the head resolves, which is every route that reads one. */
 const stamp = n => { const el = document.getElementById('asof'); if (el) el.textContent = `as of block ${n}`; };
 const head = () => HEAD ?? (HEAD = P.request({ method: 'eth_blockNumber' }).then(h => { const n = parseInt(h, 16); stamp(n); return n; }));
@@ -2220,11 +2220,11 @@ let BUSY = null;
 function track(p) {
   BUSY = p;
   const b = document.getElementById('refresh');
-  if (b) { b.disabled = true; b.textContent = 'reading…'; }
+  if (b) { b.disabled = true; b.classList.add('on'); }
   const end = () => {
     if (BUSY !== p) return;
     const el = document.getElementById('refresh');
-    if (el) { el.disabled = false; el.textContent = 'refresh'; }
+    if (el) { el.disabled = false; el.classList.remove('on'); }
   };
   p.then(end, e => { end(); return Promise.reject(e); });
 }
