@@ -94,6 +94,12 @@ devbox run -- forge snapshot --check      # Gas snapshot, as CI runs it
 node --test test/*.test.mjs               # Dapp and widget tests
 ```
 
+## Credits
+
+The design of these contracts derives from [multisig.software](https://multisig.software) by Src Co / z0r0z: the timelock, the self-call setters, the PUSH0 clones and the sender-bound salt. The low-level patterns follow [Solady](https://github.com/Vectorized/solady).
+
+Rake is a fully on-chain contract-hosted dapp, also after z0r0z's work: the dapp is served by the `html()` view of a contract, as [ERC-8244](https://github.com/ethereum/ERCs/pull/1712) proposes, and gateways reach the same contract through ERC-5219. There is no server behind it; the widget is served the same way.
+
 ## Development Team
 
 | Name | GPG Key | GitHub | EOA |
