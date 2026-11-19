@@ -70,9 +70,9 @@ on purpose, and says so.
    Directly under the moved `rpcProvider`, one function that answers which transport reads the
    chain: `const readProvider = injected => { const u = PUBLIC_RPC[CFG.chainId]; return injected ||
    (u ? rpcProvider(u) : null); };` — the injected provider when there is one, else the chain's
-   public endpoint, else `null`. This function is the one seam the settings page of
-   [#275](https://github.com/dnznlabs/rake/issues/275) would insert a user RPC URL and a route
-   choice into, after going public; nothing of that page is here. In `discover`, after `:106`
+   public endpoint, else `null`. This function is the seam a later settings page
+   ([#275](https://github.com/dnznlabs/rake/issues/275), after going public) reuses to insert a
+   user RPC URL and a route choice; nothing of that page is here. In `discover`, after `:106`
    (`P = (found[0] && found[0].provider) || window.ethereum || null;`): `WALLET = !!P;
    P = readProvider(P);` then `:107`'s `if (!P) return;` stands. The dev branch (`:95-101`) leaves
    `WALLET` false, so `?rpc=` without `from=` behaves as a visitor
