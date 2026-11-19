@@ -220,8 +220,12 @@ to `origin/main`'s for the same account (AC 5).
    read-provider helper (`:88`), step 3's `reads go through` host (`:622`), step 4's landing `rpc`
    (`:1220`), the `#/docs` preview (`:2224`). Step 2's local figure of `2` stands as a step figure.
    These four were `:76`, `:611`, `:1205` and `:2209` when the amendment was written; the count is
-   unchanged and only the lines moved, under `f37145b` and the review's item 1. The line numbers are
-   mine and not a quotation of `TASK.md`, which carries none.
+   unchanged and only the lines moved. **Measured, because the first version of this sentence got it
+   wrong:** `app/src/index.html` grew by `f37145b` (net **+10** lines) and `62f7ce4` (net **+5**),
+   which is the +15 the two later sites moved exactly; the two earlier sites moved +12 and +11
+   because some of those lines sit below them. The review's item 1 moved **nothing** — it is +4 −4,
+   net zero — so crediting it, as this sentence first did, was wrong in both directions. The line
+   numbers are mine and not a quotation of `TASK.md`, which carries none.
 2. **AC 4** — `No wallet found` `2` ~~`1`~~, plus a new case-sensitive check
    `grep -c -F 'No wallet found' app/src/index.html` → `1` pinning `route()`'s own notice. Every
    grep in the plan is `grep -ic -F`, and step 3 prescribes a lowercase line matching the same
