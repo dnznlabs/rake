@@ -609,7 +609,7 @@ function who() {
       ? `<div class="k">This app lives on ${cname(CFG.chainId)}. Reads and transactions go through your wallet, so it has to be on the same network.</div>`
       : `<div class="k">no wallet found — open this page in a browser with a wallet to act.</div>`
         + `<div class="k">reads go through ${new URL(PUBLIC_RPC[CFG.chainId]).host}</div>`)
-    + `<div class="k">wallet: ${CHAIN ? cname(CHAIN) : 'none'}</div>`
+    + `<div class="k">wallet: ${WALLET && CHAIN ? cname(CHAIN) : 'none'}</div>`
     + (wrong ? `<div data-a="switch">switch wallet to ${cname(CFG.chainId)}</div>` : '');
   pill.classList.toggle('warn', wrong);
   pill.title = wrong ? `expected ${cname(CFG.chainId)}` : '';
