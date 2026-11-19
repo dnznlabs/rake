@@ -665,6 +665,14 @@ async function loadDistro(addr) {
   return { ...d, owner, delay, nonce, description, table, pending: null, rebuilt: true };
 }
 
+/* The successor of a one-row table (decision 6), read so that a target which will not answer costs the
+   page one row and nothing else (#241). "Has code" is not a proxy for "answers" — EIP-7702 puts code
+   on an account that is not a contract at all — and a read that reverts rejects its promise, which the
+   `Promise.all` in `detail` then threw past the paint, leaving the whole page on `reading 0x…`.
+   `rejected` is the third shape a target comes back in, beside `missing` and `foreign` above, and
+   nothing else in the page reads it: it is one row's business and no other screen's. */
+const loadHeir = next => loadDistro(next).catch(e => ({ addr: next, rejected: true, why: errText(e) }));
+
 /* The histories, as two log queries with their topic0s OR'd. `from` is the distribution's own first
    block when the `Created` scan found it, else the factory's — never genesis. */
 const CHANGE_EVENTS = [['Queued(bytes32,uint32,uint256,bytes)', 'queued'], ['Applied(bytes32)', 'applied'], ['Cancelled(bytes32)', 'cancelled'],
@@ -849,6 +857,15 @@ const unreadable = addr => notice(`could not read a distribution at ${ext('addre
 /* The other half of "could not read": there is code at the address, but it is not a clone of this
    factory's implementation, so nothing below this line would be this app's state (R3). */
 const notFactory = addr => notice(`${ext('address', addr, short(addr))} on ${cname(CFG.chainId)} has code, but it is not a distribution of this app's factory — this page will not read it.`, 'err');
+/* Decision 6's forward, as one row rather than as the page's fate (#241). Three answers, not two: a
+   distribution this page can read, one it cannot — `missing`, `foreign`, or a read that rejected, all
+   of which say the same thing to a reader and none of which is a link worth offering — and `null`,
+   which is the first paint, before the successor has been read at all (decision 57 § 3). */
+const heirRow = (next, heir) => `<div class="status warn">${!heir
+  ? `superseded by ${ext('address', next, short(next))} — reading that distribution…`
+  : heir.missing || heir.foreign || heir.rejected
+    ? `forwards everything it receives to ${ext('address', next, short(next))} — not a distribution of this app's factory, so there is nothing to show for it.`
+    : `superseded by <a href="#/distros/${next}">${esc(heir.description)}</a> — this table forwards everything it receives.`}</div>`;
 
 /* Owner, delay and the balance behind `distribute`. The owner cell takes a second line while a
    transfer is waiting for its nominee to accept (decision 21): the current owner above it still holds
@@ -1280,7 +1297,7 @@ async function detail(addr) {
   addRecent(d.addr);
   // Decision 6: a one-row table at 100% is a forward to a successor, so that successor is named first.
   const next = Model.supersededBy(d.table);
-  const [heir, view] = await Promise.all([next ? loadDistro(next) : null, ownerView(d)]);
+  const [heir, view] = await Promise.all([next ? loadHeir(next) : null, ownerView(d)]);
   if (stale(t)) return;
   DS = { d, next, heir, qtx: null, failed: false, h: null, fundsReady: false, f: null };
   VIEW = view;
@@ -1375,7 +1392,7 @@ function paintDetail() {
   const d = DS.d, next = DS.next, heir = DS.heir;
   V.innerHTML = '<div class="distro">' + eyebrow(`${ext('address', d.addr, short(d.addr))} · ${cname(CFG.chainId)}`)
     + `<h1>${esc(d.description)}</h1>`
-    + (next ? `<div class="status warn">superseded by ${heir.missing || heir.foreign ? ext('address', next, short(next)) : `<a href="#/distros/${next}">${esc(heir.description)}</a>`} — this table forwards everything it receives.</div>` : '')
+    + (next ? heirRow(next, heir) : '')
     + bar(d.table, { small: true }) + ticks(d.table, {}) + ledger(d.table)
     + `<div id="pending">${pendingBlock(d, true)}</div>`
     + meta(d)
