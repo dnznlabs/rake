@@ -115,7 +115,10 @@ async function discover() {
   WALLET = !!P;
   P = readProvider(P);
   if (!P) return;
-  try { const a = await P.request({ method: 'eth_accounts' }); ACC = a[0] || null; } catch (e) {}
+  /* Only a wallet has an account to report. A public endpoint has no notion of "your account" —
+     `eth_accounts` on a dev chain answers with its own unlocked keys, which would paint a connected
+     account for a visitor who has no wallet at all. */
+  if (WALLET) { try { const a = await P.request({ method: 'eth_accounts' }); ACC = a[0] || null; } catch (e) {} }
   if (P.on) { P.on('accountsChanged', a => { ACC = a[0] || null; who(); route(); }); P.on('chainChanged', () => location.reload()); }
 }
 async function connect() { const a = await P.request({ method: 'eth_requestAccounts' }); ACC = a[0] || null; who(); route(); }
