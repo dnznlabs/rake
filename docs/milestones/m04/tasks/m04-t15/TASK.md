@@ -20,14 +20,12 @@ the repo. **Branch `m04/t15-post-uat` from `origin/main` at or after `78b5eb7`**
 `0eaec45`; its `predictLocal` moved every line of `app/src/index.html` below `:399` by 24). Check
 hooks with `ls .git/hooks | grep -v sample` → `pre-commit`, `post-commit`. **Line numbers below are
 `main` at `78b5eb7`** for `app/src/index.html` and `app/src/layout.html`; trust names over numbers.
-Elanik measured the #243 lines at `78b5eb7` on 2026-11-19
-([#243 comment](https://github.com/dnznlabs/rake/issues/243#issuecomment-7002047647)); each one
-here was re-read against that commit before it was cited. The line numbers inside #243 and #241 are
-at `3751211` and are 24 lower than these from `detail` down, and #243's `:1257` was already off at
-`3751211` (`supersededBy` is `:1258`, the `Promise.all` `:1259`). #243 also says three history
-sections carry `loading…`; it is two. `:1385` is `funds`, under
-`notice('reading the balances and the escrow…')`, and only `:1386` (`changes`) and `:1387`
-(`activity`) say `loading…` — the count in step 0 is the measured one, not the issue's. [#227](https://github.com/dnznlabs/rake/pull/227) (m04-t12) is held and this task does not
+The #243 lines at `78b5eb7` are Elanik's table of 2026-11-19
+([#243 comment](https://github.com/dnznlabs/rake/issues/243#issuecomment-7002047647)), each re-read
+against that commit here; the issues' own numbers are at `3751211`, 24 lower from `detail` down.
+Two corrections from that comment: #243's `:1257` was already off at `3751211`, and its "three
+history sections carry `loading…`" is two — `:1385` is `funds` under a different notice — so the
+count in step 0 is the measured one, not the issue's. [#227](https://github.com/dnznlabs/rake/pull/227) (m04-t12) is held and this task does not
 depend on it or touch `logs()`/`histLogs()`, which it wraps.
 
 **m04-t05 step 3 ([#245](https://github.com/dnznlabs/rake/issues/245)) does not gate this task.**
