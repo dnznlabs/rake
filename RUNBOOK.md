@@ -998,11 +998,27 @@ env -u ETHERSCAN_API_KEY forge verify-contract $APP src/App.sol:App \
   --constructor-args "$(cast abi-encode 'constructor(address,string)' "$OWNER" "$APP_VERSION")"
 
 for a in $FACTORY $IMPL $APP; do
-  curl -s "https://sourcify.dev/server/v2/contract/$CHAIN_ID/$a" | jq -r .match   # exact_match
+  m=$(curl -s "https://sourcify.dev/server/v2/contract/$CHAIN_ID/$a" | jq -r .match)
+  printf '%s %s\n' "$a" "$m"
+  [ "$m" = exact_match ] || { echo "sourcify: $a is $m, not exact_match"; exit 1; }
 done
 ```
 
-`record:` each address's `match`.
+**The loop is the gate, and the operator's eye is not**
+([#207](https://github.com/dnznlabs/rake/issues/207)). Passing is *exit 0 with three `exact_match`
+lines* and nothing else: an address Sourcify does not hold answers `null`, which reads like a blank
+line to anyone skimming, so the comparison is made by the shell and the step stops on it rather than
+leaving a human to notice a missing word. Rehearsed in both directions before it was written in
+(m05-t01, 2026-11-19, handbook `docs/contract-verification.md` § Sourcify): against an address with
+no code it printed `null` and exited **1**; against the three M04 Sepolia addresses it printed
+`exact_match` three times and exited **0**.
+
+`env -u ETHERSCAN_API_KEY` stays on the three `verify-contract` commands above for the reason given
+there — with the key set, forge ignores `--verifier sourcify`, goes to Etherscan, reports
+`already verified` and exits 0, so a Sourcify verification that never ran looks done. The loop is
+what catches that, and it only catches it while the key is unset for the verifies.
+
+`record:` each address's `match`, and the loop's exit code.
 
 A distribution is a clone, and Sourcify does not report one as verified (`match: null`). What covers
 it is the function, error and event signatures on OpenChain, keyed by selector rather than by chain,
