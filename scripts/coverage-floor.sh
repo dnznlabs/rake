@@ -63,8 +63,14 @@ SKIP_RE="^($(IFS='|'; echo "${SKIP_NAMES[*]}"))\\("
 # Floors: the measured figures rounded down and one point under, so ordinary drift is not a red
 # build but a real regression is. Lines and branches only; statements and funcs are printed, not
 # gated. A `src/` file with no entry here is an error below, not a pass.
-declare -A FLOOR_LINES=( [src/App.sol]=91 [src/Distribution.sol]=88 )
-declare -A FLOOR_BRANCHES=( [src/App.sol]=91 [src/Distribution.sol]=88 )
+#
+# Re-measured on this branch after § Mutation's new tests: App 96.20% lines / 100.00% branches,
+# Distribution 90.16% / 92.11%. Deliberately not left at the figures inherited from `e770054`
+# (91/91, 88/88) — a floor five points under the figure `SECURITY.md` prints is a gate that does not
+# hold the number the reader is shown. On `App.sol`'s 13 branches one branch is 7.7 points, so a 99
+# floor means all 13: there is no sub-point drift to absorb at that denominator.
+declare -A FLOOR_LINES=( [src/App.sol]=95 [src/Distribution.sol]=89 )
+declare -A FLOOR_BRANCHES=( [src/App.sol]=99 [src/Distribution.sol]=91 )
 
 LOG="$(mktemp -t coverage-floor.XXXXXX)"
 trap 'rm -f "$LOG"' EXIT
