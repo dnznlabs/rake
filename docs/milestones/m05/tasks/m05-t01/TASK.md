@@ -35,13 +35,15 @@ the mainnets get. **Part A has no chain in it and starts on this plan's merge** 
 amendment, the tool change and the anvil rehearsal read nothing that M04's remaining tasks can
 change. Part B also waits for Part A's PR to merge: Part B deploys from the salts Part A commits.
 
-**Step 14 has its own gate inside Part B: m04-t15's task PR merged to `main`.** The post-UAT `app/`
-bundle (#243, #241, R9, R19, R18) takes no Run C on the M04 `App`; it rides this task's Run B on the
-redeployed testnets ([m04-t15 TASK.md](../../../m04/tasks/m04-t15/TASK.md) § The upload, its
-criterion 12). So the bundle step 14 builds is the one m04-t15 shipped, and the hashes it uploads
-are the ones m04-t15's handoff § For the next upload records. Run A (step 13) does not wait on it —
-nothing in Run A reads `app/`. If m04-t15 is not merged when steps 12–13 are done, step 14 waits;
-the handoff says so, and nothing is built or proposed from an older `app/` in the meantime.
+**Step 14 has its own gate inside Part B: m04-t15's and m04-t16's task PRs merged to `main`.** The
+post-UAT `app/` bundle (#243, #241, R9, R19, R18, then #273 and #274) takes no Run C on the M04
+`App`; it rides this task's Run B on the redeployed testnets
+([m04-t15 TASK.md](../../../m04/tasks/m04-t15/TASK.md) § The upload, its criterion 12;
+[m04-t16 TASK.md](../../../m04/tasks/m04-t16/TASK.md) § The upload, its criterion 9). So the bundle
+step 14 builds is the one m04-t16 shipped on top of m04-t15, and the hashes it uploads are the ones
+m04-t16's handoff § For the next upload records. Run A (step 13) does not wait on either — nothing
+in Run A reads `app/`. If either is not merged when steps 12–13 are done, step 14 waits; the handoff
+says so, and nothing is built or proposed from an older `app/` in the meantime.
 
 Measured 2026-11-19 at `78b5eb7`; re-run rather than quote: `forge test` **107 passed**;
 `node --test test/*.test.mjs` **167 pass**; `grep -c '' .gas-snapshot` **107**; `git status
@@ -360,14 +362,15 @@ Sepolia; **every `record:` line is committed before the next transaction** (`:22
     equal; `owner()` the Ops vault, `version()` `v0.1`, `locked()` `false`; the Sourcify loop exits
     0 with three `exact_match`; `getsourcecode` names the three contracts.
 
-14. **Run B 4a on both chains, then stop — gated on m04-t15's task PR being on `main`.** Before
-    the first `make`, `git merge-base --is-ancestor <m04-t15's merge commit> HEAD` exits 0 and the
-    branch is cut from `main` at or after it; if m04-t15 is not merged, this step waits, the handoff
-    says so under § Gates with the date, and no bundle is built from an older `app/` — there is no
-    fallback bundle (§ Gate). Then `make dapp-nodev CHAIN_ID=$CHAIN_ID`, and the `sha256` of
-    `app/dist/index.html` and `app/dist/widget.js` per chain equal the figures in
-    [m04-t15 HANDOFF.md](../../../m04/tasks/m04-t15/HANDOFF.md) § For the next upload before
-    anything else runs (a mismatch is a stop: either `app/` moved after m04-t15 or the build is not
+14. **Run B 4a on both chains, then stop — gated on m04-t15's and m04-t16's task PRs being on
+    `main`.** Before the first `make`, `git merge-base --is-ancestor <m04-t16's merge commit> HEAD`
+    exits 0 (m04-t16 branches after m04-t15's merge, so one check covers both) and the branch is cut
+    from `main` at or after it; if either is not merged, this step waits, the handoff says so under
+    § Gates with the date, and no bundle is built from an older `app/` — there is no fallback bundle
+    (§ Gate). Then `make dapp-nodev CHAIN_ID=$CHAIN_ID`, and the `sha256` of `app/dist/index.html`
+    and `app/dist/widget.js` per chain equal the figures in
+    [m04-t16 HANDOFF.md](../../../m04/tasks/m04-t16/HANDOFF.md) § For the next upload before
+    anything else runs (a mismatch is a stop: either `app/` moved after m04-t16 or the build is not
     reproducible, and both are findings, not something to re-hash past). Then
     `tools/step4-calldata.mjs --chain $CHAIN_ID --rpc "$RPC" --out calldata` (`App` is fresh, so the
     tool reads nonce 1); every file under 65,536 characters; the fork estimate of § Gas
@@ -377,8 +380,8 @@ Sepolia; **every `record:` line is committed before the next transaction** (`:22
     generating commit, then write the 4b checklist per chain in `HANDOFF.md` § For Denizen and
     stop. Commit and push before messaging.
 
-    Check: m04-t15's merge commit named in § Gates and an ancestor of the branch; the two `sha256`
-    per chain equal m04-t15's handoff § For the next upload, quoted beside them; six rows read back,
+    Check: m04-t15's and m04-t16's merge commits named in § Gates and ancestors of the branch; the
+    two `sha256` per chain equal m04-t16's handoff § For the next upload, quoted beside them; six rows read back,
     each with exactly one `ecdsa` signature from `$ENGINEER`; the commit of the calldata named in
     § Uploads' new rows (filled as "proposed" until 4c).
 
@@ -518,12 +521,12 @@ an address. Baselines are `main` at `78b5eb7`, 2026-11-19.
 17. **The public record.** `grep -ci superseded README.md` ≥ 2 (baseline 0); § Contracts carries the
     new three addresses; `grep -ci 'No mainnet deployment' README.md` → 1 (unchanged);
     state-collection#74 carries the engineer's comment with the new address.
-18. **The bundle is m04-t15's.** The handoff § Gates names m04-t15's task PR and its merge commit,
-    and `git merge-base --is-ancestor <that commit> <Part B's head>` exits 0; the `sha256` of
-    `app/dist/index.html` and `app/dist/widget.js` per chain in the handoff equal the figures in
-    m04-t15's handoff § For the next upload, and § Uploads rows 5 and 6 carry those hashes. No
-    proposal of step 14 is dated before that merge. If m04-t15 was not merged when steps 12–13
-    were done, the handoff records the wait and its dates; a bundle built from an older `app/`
+18. **The bundle is m04-t16's, on top of m04-t15's.** The handoff § Gates names both task PRs and
+    their merge commits, and `git merge-base --is-ancestor <m04-t16's commit> <Part B's head>` exits
+    0; the `sha256` of `app/dist/index.html` and `app/dist/widget.js` per chain in the handoff equal
+    the figures in m04-t16's handoff § For the next upload, and § Uploads rows 5 and 6 carry those
+    hashes. No proposal of step 14 is dated before the later merge. If either was not merged when
+    steps 12–13 were done, the handoff records the wait and its dates; a bundle built from an older `app/`
     fails this criterion whatever its hashes.
 19. **Part B's PR closes this task's issue**, and `HANDOFF.md` has one row per criterion above —
     nineteen rows.
