@@ -46,6 +46,12 @@ ports (`ANVIL_PORT=<a> APP_PORT=<b> make deploy && make fixtures`), `app/dist` s
 `python3 -m http.server <b>` (never `npx serve`), every page opened as
 `http://127.0.0.1:<b>/?rpc=http://127.0.0.1:<a>&from=<account>#/<route>` — the query **before** the
 `#` fragment; a `?` inside the hash leaves `location.search` empty and the page reads it at `:44`.
+That form is dev-build-only by construction: `:44` (`const Q = new URLSearchParams(location.search)`)
+and its consumer at `:96-99` sit inside `/*DEV*/` fences (`:43-47`, `:95-101`) that
+`app/build.mjs:145` strips unless `--dev`, which `make dapp` passes (`mk/20-dapp.mk:7`) and
+`make dapp-nodev` does not (`:10`). On a nodev or hosted document the `from=` assertion below would
+pass while nothing reads it, and every case would run as the default account — so the browser check
+runs on `make dapp` output only, never on `app/dist` from `dapp-nodev`.
 After every navigation, `location.search` is read back through `page.evaluate` and the harness
 **asserts** it contains `from=<the account that open named>`, failing the run otherwise (the dev
 stack's clean-URL redirect can drop a query; a read-back that only records would let an empty string
