@@ -11,6 +11,12 @@ started:        2026-11-19T14:22:47-06:00
 wall time:      522 seconds
 finished:       2026-11-19T14:31:29-06:00
 exit:           0
+score:          DistributionFactory 40 caught of 40 compiling, 0 uncaught
+score overall:  755 caught of 847 compiling, 92 uncaught — every campaign*.log in this directory summed
+note:           the score lines are computed from this file's own class summaries;
+                the tool output below them is byte-for-byte as the run emitted it.
+                The branch was renamed to m05/t01b-self-review after both runs;
+                the `branch:` line above is the name the run recorded.
 
 INFO:Slither-Mutate:Starting mutation campaign in src
 INFO:Slither-Mutate:Preparing to mutate contracts:
