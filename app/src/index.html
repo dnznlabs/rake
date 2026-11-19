@@ -529,6 +529,11 @@ async function resolveName(acc) {
   }
   return null;
 }
+/* The button is the one printed address that does not go through `ext`, so it gets its name here —
+   by the same resolver (decision 13's order), behind the same gate (R10, `Model.plainName`) and
+   under the same winner-alone rule. `ACC` is re-read after the `await`, so an account switched
+   mid-resolve keeps the newer account's text. */
+async function nameWho(acc) { const n = await resolveName(acc); if (n && Model.plainName(n) && same(ACC, acc)) document.getElementById('who').textContent = n; }
 /* Reverse display, in place. Every address the page printed went through `ext`, which marked it, so
    one pass after the paint replaces the ones that have a name without re-rendering anything and
    without any view having to know that names exist. On anvil `resolveName` returns before it asks.
@@ -591,6 +596,9 @@ function who() {
   b.textContent = ACC ? short(ACC) : 'connect';
   b.title = ACC || '';
   b.onclick = ACC ? e => { e.stopPropagation(); toggle(wm); } : WALLET ? connect : e => { e.stopPropagation(); toggle(nm); };
+  // Not awaited: the short address is on the button before any round trip, and `who()` stays
+  // synchronous for `accountsChanged`, `connect` and `disconnect`, which each already call it.
+  if (ACC) nameWho(ACC);
   if (!ACC) wm.hidden = true;
   const pill = document.getElementById('net'), wrong = wrongChain();
   document.getElementById('netname').textContent = CHAIN ? cname(CHAIN) : cname(CFG.chainId);
