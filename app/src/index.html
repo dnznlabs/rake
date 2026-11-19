@@ -196,10 +196,16 @@ function txError(e) {
 }
 /* `navigator.clipboard` is missing on an insecure origin and can be refused on a secure one, so the
    calldata is never only in the clipboard: the fallback is a textarea, selected, for a manual copy. */
-async function copyCalldata(data, slot) {
-  try { await navigator.clipboard.writeText(data); slot.innerHTML = `<div class="status">copied · ${data.length / 2 - 1} bytes</div>`; return; }
+/* R19, decision 57 § 2: the three things a signer has to check the calldata against, beside the
+   calldata itself. The target goes through `ext`, which is the sink every address the page prints
+   uses (R2), so nothing here is escaped by hand; the value goes through the page's own formatter, and
+   every `wctl` write today carries none, so `Ξ0` is what ships until one does. It sits under both
+   branches below, because a signer reading the textarea needs it exactly as much. */
+const cdCheck = w => `for ${ext('address', w.to, short(w.to))} on ${cname(CFG.chainId)} · value ${eth(w.value ? w.value() : 0n)} — check these three in your vault before signing.`;
+async function copyCalldata(data, slot, w) {
+  try { await navigator.clipboard.writeText(data); slot.innerHTML = `<div class="status">copied · ${data.length / 2 - 1} bytes</div><div class="status cdmeta">${cdCheck(w)}</div>`; return; }
   catch (e) {}
-  slot.innerHTML = `<textarea class="cd" readonly rows="3" aria-label="calldata">${esc(data)}</textarea><div class="status">clipboard refused — select all and copy</div>`;
+  slot.innerHTML = `<textarea class="cd" readonly rows="3" aria-label="calldata">${esc(data)}</textarea><div class="status">clipboard refused — select all and copy</div><div class="status cdmeta">${cdCheck(w)}</div>`;
   const ta = slot.querySelector('textarea');
   ta.focus(); ta.select();
 }
@@ -1105,7 +1111,7 @@ function bindWrites(reload) {
       let args;
       try { args = w.args(); } catch (e) { txSay(w.label, esc(e.message || String(e)), 'bad'); return; }
       if (!args) return;
-      copyCalldata(Eth.enc(w.sig, args), document.getElementById('txs'));
+      copyCalldata(Eth.enc(w.sig, args), document.getElementById('txs'), w);
     };
   });
 }
