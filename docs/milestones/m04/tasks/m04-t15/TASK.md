@@ -43,9 +43,14 @@ file before the task starts, and the handoff quotes the text as shipped.
 The browser check runs as m04-t13 step 9 did: `playwright-core` outside the repo driving the cached
 chromium `AGENTS.md` § The dapp names, against the dev build (`make dapp`) on a dev stack on spare
 ports (`ANVIL_PORT=<a> APP_PORT=<b> make deploy && make fixtures`), `app/dist` served with
-`python3 -m http.server <b>` (never `npx serve`), the page opened with
-`?rpc=http://127.0.0.1:<a>&from=<account>` and `location.search` read back through `page.evaluate`
-and recorded before any result is read. `page errors: none` in every run. `make fixtures` creates a
+`python3 -m http.server <b>` (never `npx serve`), every page opened as
+`http://127.0.0.1:<b>/?rpc=http://127.0.0.1:<a>&from=<account>#/<route>` — the query **before** the
+`#` fragment; a `?` inside the hash leaves `location.search` empty and the page reads it at `:44`.
+After every navigation, `location.search` is read back through `page.evaluate` and the harness
+**asserts** it contains `from=<the account that open named>`, failing the run otherwise (the dev
+stack's clean-URL redirect can drop a query; a read-back that only records would let an empty string
+through and run every case as the default account); the asserted value is recorded. `page errors:
+none` in every run. `make fixtures` creates a
 distribution owned by a `MockVault` (`scripts/forge/Fixtures.s.sol:53`, `:69`, printed as `vault`),
 which is the one whose page runs the owner probe when `from=` is any account that is not the vault.
 
@@ -109,7 +114,11 @@ which is the one whose page runs the owner probe when `from=` is any account tha
    history. The button's handler is `route`; while the current route's read is in flight the button is
    `disabled` and its text `reading…`, restored when the paint that ends the read runs (a module-level
    `BUSY` promise `route` sets and the three routes resolve). `#/docs` and `#/create` read nothing at
-   entry (`:2149`, `:1735`): the control and stamp are `hidden` there, and nowhere else. No
+   entry (`:2149`, `:1735`): the control and stamp are `hidden` there, and nowhere else. The stamp
+   describes the route's own read at entry, not every read the page makes: `#/create`'s salt probe
+   (`predict`, then `eth_getCode`, `:1856-1860`, painting `a distribution already exists at …` or
+   `will deploy to …`) reads the chain mid-route and is deliberately unstamped — that is the rule,
+   not a gap, and 9(b)'s `hidden` on `#/create` follows from it. No
    per-section control (#243: one read repaints every section; a `re-read` in the history header
    waits on t05's figures and the #227 decision). Styling: one `.asof` rule in `app/src/theme.css`
    in the pill's family, no new colour.
@@ -191,16 +200,19 @@ which is the one whose page runs the owner probe when `from=` is any account tha
    touched. Check: `grep -c '^| R' SECURITY.md` → `24`; `grep -c 'accepted\`' SECURITY.md` → `6`
    (baseline 8: seven rows and the summary line; the two rows leave).
 
-9. **The browser check**, on the dev stack as the preamble says, `location.search` read back first,
-   `page errors: none` in every run, each with the figure the reviewer compares:
+9. **The browser check**, on the dev stack as the preamble says: every open below is
+   `…/?rpc=…&from=<address>#/<route>` with the query before the fragment, and after each one the
+   `location.search` assertion on `from=<address>` runs before any result is read, `page errors:
+   none` in every run, each with the figure the reviewer compares:
    - (a) **The first paint (#243 part 1).** `page.route` on the dev endpoint delaying every
-     `eth_call` by 2,000 ms and passing everything else through; open `#/distros/<the vault-owned
-     distribution>` with `from=<anvil account 1>` (not the vault, so `ownerView` runs `signsFor`).
+     `eth_call` by 2,000 ms and passing everything else through; open
+     `…/?rpc=…&from=<anvil account 1>#/distros/<the vault-owned distribution>` (not the vault, so
+     `ownerView` runs `signsFor`).
      Record: the time from navigation to the first `.sechead` in the DOM (→ under 1,000 ms; before the
      fix the view holds one `.notice` until the probe answers, record that time as the red); at the
      phase-1 paint, the count of `[data-send],[data-copy]` buttons (≥ 1) and that every one is
      `disabled`; after the probe, the same selector's enabled set equal to what `main` paints for the
-     same account (record both lists). Then the same page with `from=<the vault's signer>` → the
+     same account (record both lists). Then the same route opened with `from=<the vault's signer>` → the
      `copy calldata for your vault` controls appear enabled only after the probe. Remove the route and
      load the seed distribution once: `h1` is its description, the `funds`, `changes` and `activity` sections painted.
    - (b) **Refresh (#243 part 2).** On the seed distribution's page, read `#asof`'s text (`as of block
@@ -209,9 +221,11 @@ which is the one whose page runs the owner probe when `from=` is any account tha
      `#asof` now names a block greater than `N`, that the activity section carries the new row, and —
      through `page.route` counting bodies — that the press issued exactly one `eth_blockNumber` and
      the same set of methods a route entry does (list both). Before the fix there is no `#refresh`
-     (record `null` as the red) and the row appears only on reload. Then `#/`, `#/distros`: the stamp
-     is present with a block; `#/docs`, `#/create`: `#refresh` and `#asof` are `hidden`.
-   - (c) **The heir (#241).** `create` a distribution whose one row at 100 % is the implementation
+     (record `null` as the red) and the row appears only on reload. Then each of `#/`, `#/distros`
+     opened in the same URL form: the stamp is present with a block; `#/docs`, `#/create` likewise:
+     `#refresh` and `#asof` are `hidden` (the salt probe's verdict on `#/create` carries no stamp by
+     step 3's rule, so its presence is not a failure here).
+   - (c) **The heir (#241).** On `#/create` opened in the same URL form, `create` a distribution whose one row at 100 % is the implementation
      address (`S.impl`: code that is not the clone, so `loadDistro` returns `foreign` — #241's trigger
      set is unreachable on `main` because `isClone` answers first, which is the issue's own finding).
      The page paints fully and carries the step-4 sentence with the address and no link. Then
@@ -220,17 +234,19 @@ which is the one whose page runs the owner probe when `from=` is any account tha
      through — the one shape that rejects the promise: the page paints fully, the row reads the step-4
      sentence, and `page errors: none`. Before the fix the same route leaves the page on
      `reading 0x…` with the rejection in `page errors` — record it as the red.
-   - (d) **R19.** As the vault's signer on the vault-owned distribution, press one `copy calldata
+   - (d) **R19.** The vault-owned distribution's page opened with `from=<the vault's signer>` in
+     the same URL form; press one `copy calldata
      for your vault` control; `#txs` contains `.cdmeta` whose text names the distribution's address
      (through `ext`, so `data-addr` carries it), `cname(31337)`'s text and `value Ξ0`. Record the
      text. For the fallback branch, `page.addInitScript` replaces `navigator.clipboard.writeText` with
      a function that throws, so `copyCalldata` takes its `catch`: the same line sits under the
      textarea.
-   - (e) **R9.** On a distribution with one token distributed and one received-only: the ledger's
+   - (e) **R9.** The page of a distribution with one token distributed and one received-only,
+     opened in the same URL form: the ledger's
      `.status.warn` under `other tokens received` contains `listed means distributed here at least
      once`; `#/docs` § Receiving funds contains the capitalised form.
-   - (f) **The whole page once more** with no route: a distribution page, `#/distros`, `#/docs`,
-     `#/create` step 2, `#/` — `page errors: none`.
+   - (f) **The whole page once more** with no `page.route`, each opened in the same URL form: a
+     distribution page, `#/distros`, `#/docs`, `#/create` step 2, `#/` — `page errors: none`.
 
 10. **`HANDOFF.md`** beside this file, from the handbook template: the AC table with one row per
     criterion below, the figures beside step 0's re-run baselines; one row per hunk (steps 2–6) with
