@@ -63,7 +63,8 @@ that belongs here.
 ```sh
 export RPC=<full https URL>          # every command passes --rpc-url "$RPC"
 export CHAIN_ID=<from § 1's table>
-export SIGNER="--account <keystore> --sender <address>"   # anvil: --unlocked --sender 0xf39F…2266
+export SIGNER="--account <keystore> --password-file <file> --sender <address>"   # forge script only
+export SENDER="--account <keystore> --password-file <file> --from <address>"     # cast send, forge create
 export OWNER=0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790    # the Ops vault: App's owner, and the owner passed to create
 export APP_VERSION=v0.1
 export FACTORY_SALT=0xf83d35cef117466f8f7d514b6413fda46f290e45d72f4d985312f746ce6e4193  # mined, decision 37
@@ -74,6 +75,16 @@ export DNZN_SALT=${CREATOR}000000000000000000000001        # top 20 bytes CREATO
 # filled in by step 1, never by hand
 export PROXY=0x4e59b44847b379578588920cA78FbF26c0B4956C FACTORY= IMPL= APP= DISTRO=
 ```
+
+**Two signer variables because the two commands spell it differently, and one rejects the other's
+spelling outright** ([#251](https://github.com/dnznlabs/rake/issues/251)). On the pinned toolchain
+(forge `1.7.1-dev`, measured 2026-11-19) `forge script --help` offers `--sender` and no `--from`,
+while `cast send --help` and `forge create --help` offer `--from` and **no `--sender`** — handed one
+they stop before sending with `error: unexpected argument '--sender' found`. So **`$SIGNER` is for
+`forge script` and nothing else** (steps 2 and 3), and **`$SENDER` is for `cast send` and
+`forge create`** (step 6). `cast wallet sign` takes `--account` with neither. On an anvil the
+keystore flags become `--unlocked` plus the account flag the command accepts: `--sender` for
+`forge script`, `--from` for `cast send`.
 
 **Run B needs five of these and no salts.** A document upload touches no address that mining decides,
 so the mined salts, `PROXY`, `FACTORY_SALT`, `APP_SALT`, `CREATOR` and `DNZN_SALT` are all Run A's.
@@ -132,8 +143,9 @@ referenced rather than restated so there is one copy of them.
 
 **Setting the creator key up for `cast`** is the handbook's too: `docs/multisig-transactions.md`
 § Setting the key up for `cast` covers `cast wallet import dnzn-creator --interactive`, verifying
-the address, and backing up the key itself before step 6 runs anywhere. Done, step 6's `SIGNER` is
-`--account dnzn-creator --sender <address>`.
+the address, and backing up the key itself before step 6 runs anywhere. Done, step 6's `SENDER` is
+`--account dnzn-creator --password-file <file> --from <address>` — step 6 is a `cast send`, so it
+takes the `$SENDER` spelling of § 0 and not `$SIGNER`'s.
 
 ## 1 — the chains
 
@@ -1033,16 +1045,17 @@ export DNZN_TABLE='[(<address>,<bps>,"<name>","<note>"),(…)]'   # see the two 
 cast send $FACTORY \
   'create(address,uint32,string,(address,uint96,string,string)[],bytes32)' \
   $OWNER $DNZN_DELAY "$DNZN_DESCRIPTION" "$DNZN_TABLE" $DNZN_SALT \
-  --rpc-url "$RPC" --unlocked --from <address>    # or: --account <keystore> --from <address>
+  --rpc-url "$RPC" $SENDER                        # anvil: --unlocked --from <address>
 
-cast call $DISTRO "owner()(address)" --rpc-url "$RPC"    # must equal OWNER
-cast call $DISTRO "delay()(uint32)" --rpc-url "$RPC"     # must equal DNZN_DELAY
+cast call $DISTRO "owner()(address)" --rpc-url "$RPC"       # must equal OWNER
+cast call $DISTRO "delay()(uint32)" --rpc-url "$RPC"        # must equal DNZN_DELAY
+cast call $DISTRO "description()(string)" --rpc-url "$RPC"  # must equal DNZN_DESCRIPTION
+cast call $DISTRO 'snapshot()((address,uint32,uint32,string,(address,uint96,string,string)[],(bytes32,uint256,bytes)[]))' \
+  --rpc-url "$RPC"                                          # the three rows, ascending by account
 ```
 
-**`cast send` takes `--from` where `forge script` takes `--sender`.** `$SIGNER` as § 0 defines it is
-a `forge script` spelling and `cast send` rejects `--sender` outright, so this is the one step that
-writes its signer flags out rather than reusing the variable. A paste of `$SIGNER` here fails with
-`unexpected argument '--sender' found`.
+**This step takes `$SENDER`, not `$SIGNER`** — the two spellings, and the error a paste of the wrong
+one stops with, are § 0's, stated once there.
 
 **Two rules on the table, both enforced by `_set` with the same error.** `BadTable()` —
 selector `0x40da0647`, which is what a revert here decodes to — covers both: the `bps` must sum to
