@@ -12,8 +12,7 @@ its place when one returns, the full address in the title, re-run on every accou
 ([#274](https://github.com/dnznlabs/rake/issues/274)). `app/src/index.html` and `test/*.mjs` only;
 nothing under `src/`, no `.gas-snapshot` change, no upload. Decision 61: this is the `app/` change
 after m04-t15 that the mainnet bundle carries, and the settings page
-([#275](https://github.com/dnznlabs/rake/issues/275)) is not here — it is m04-t17, after this task,
-and the one thing it takes from here is the read-only provider of step 2.
+([#275](https://github.com/dnznlabs/rake/issues/275)) is not here.
 
 ## Plan
 
@@ -71,10 +70,10 @@ on purpose, and says so.
    Directly under the moved `rpcProvider`, one function that answers which transport reads the
    chain: `const readProvider = injected => { const u = PUBLIC_RPC[CFG.chainId]; return injected ||
    (u ? rpcProvider(u) : null); };` — the injected provider when there is one, else the chain's
-   public endpoint, else `null`. **This function is the seam m04-t17 reuses: the user's RPC URL and
-   the wallet-or-RPC route choice of decision 61 are inserted inside `readProvider` and nowhere
-   else, so nothing of that page is here and nothing here moves when it lands.** In `discover`,
-   after `:106` (`P = (found[0] && found[0].provider) || window.ethereum || null;`): `WALLET = !!P;
+   public endpoint, else `null`. This function is the one seam the settings page of
+   [#275](https://github.com/dnznlabs/rake/issues/275) would insert a user RPC URL and a route
+   choice into, after going public; nothing of that page is here. In `discover`, after `:106`
+   (`P = (found[0] && found[0].provider) || window.ethereum || null;`): `WALLET = !!P;
    P = readProvider(P);` then `:107`'s `if (!P) return;` stands. The dev branch (`:95-101`) leaves
    `WALLET` false, so `?rpc=` without `from=` behaves as a visitor
    with no wallet, which is what case (a) of step 6 relies on. Nothing else changes: `load()` reads
@@ -226,11 +225,10 @@ on purpose, and says so.
 
 As [m04-t15 TASK.md](../m04-t15/TASK.md) § The upload: no upload here and no M04 row for one. The
 bundle rides m05-t01's Run B on the redeployed testnets, and that step's gate now waits for this
-task's merge as well as m04-t15's and m04-t17's (m05-t01 TASK.md § Gate and step 14, amended with
-this plan). This task starts after m04-t15 merges, m04-t17 starts after this one merges, and both
-are small enough to land before m05-t01's Part A is through; if either is not merged when
-m05-t01's steps 12–13 are done, step 14 waits exactly as it waits on m04-t15, and the architect
-re-sequences rather than letting a bundle without them be built.
+task's merge as well as m04-t15's (m05-t01 TASK.md § Gate and step 14, amended with this plan).
+This task starts after m04-t15 merges and is small enough to land before m05-t01's Part A is
+through; if it is not merged when m05-t01's steps 12–13 are done, step 14 waits on it exactly as it
+waits on m04-t15, and the architect re-sequences rather than letting a bundle without it be built.
 
 ## Acceptance criteria
 
@@ -283,11 +281,10 @@ branch point and recorded in the handoff with the commit. Every grep is `grep -i
 
 ## Out of scope
 
-- Everything of m04-t17 ([#275](https://github.com/dnznlabs/rake/issues/275), decision 61): a
-  settings page, a user RPC URL per chain, a wallet-or-RPC read route the reader chooses,
-  name-service priority, any `localStorage` key beyond `theme` and `rake.recent`. The public
-  endpoint is the table at `:41` and the reader does not pick it here; `readProvider` is where
-  m04-t17 lets them.
+- Everything in [#275](https://github.com/dnznlabs/rake/issues/275): a settings page, a user RPC
+  URL per chain, a wallet-or-RPC read route the reader chooses, name-service priority, any
+  `localStorage` key beyond `theme` and `rake.recent`. The public endpoint is the table at `:41`
+  and the reader does not pick it here.
 - Any `src/` byte, `.gas-snapshot`, `RUNBOOK.md`, `scripts/forge/*`, `mk/*`, the Makefile,
   `calldata/`, `SECURITY.md`, `app/src/layout.html`, `app/src/theme.css`, the build.
 - The widget (`app/src/widget.js`): criterion 7 holds its size at delta `0`.
