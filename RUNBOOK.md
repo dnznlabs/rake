@@ -63,17 +63,40 @@ that belongs here.
 ```sh
 export RPC=<full https URL>          # every command passes --rpc-url "$RPC"
 export CHAIN_ID=<from § 1's table>
-export SIGNER="--account <keystore> --sender <address>"   # anvil: --unlocked --sender 0xf39F…2266
+export SIGNER="--account <keystore> --password-file <file> --sender <address>"   # forge script only
+export SENDER="--account <keystore> --password-file <file> --from <address>"     # cast send, forge create
 export OWNER=0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790    # the Ops vault: App's owner, and the owner passed to create
 export APP_VERSION=v0.1
-export FACTORY_SALT=0xc7b08946793948e2cb78adf914cfa19ac8341e52b8a7a96ab26034fe6c476693  # mined, decision 37
-export APP_SALT=0xd9ad8a57dc1d24c639881670feb590b06bb437e8c698f3e9fc53d5920c04b7ef      # mined, decision 37
+export FACTORY_SALT=0xf83d35cef117466f8f7d514b6413fda46f290e45d72f4d985312f746ce6e4193  # mined, decision 37
+export APP_SALT=0x87cdf85b31cb82e688a11bbb8cf4c0249648f7dc2e5bec932424960920ead3f2      # mined, decision 37
 export CREATOR=0x68e0741D8d693e14BF56914567eADdC130b186eE  # DNZN Creator, decision 32
 export ENGINEER=0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d # Elanik's key, an Ops owner since 2026-11-16 (§ Step 4)
 export DNZN_SALT=${CREATOR}000000000000000000000001        # top 20 bytes CREATOR (decision 10), low 12 bytes 1
+# step 6's values — read from the chain and the decisions, never typed from memory
+export DNZN_DESCRIPTION="DNZN // FUND DISTRIBUTION"
+export DNZN_TABLE='[(0x00b6E7D12EdE9Ca4A74fE69be758aAB1ee02cFb9,2000,"treasury","long-term growth, future projects"),(0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790,4000,"ops","infrastructure, services, tokens"),(0x357836fFcB45307FA7ff2A574F505753c961902B,4000,"creator","founding engineer, product vision")]'
+export DNZN_DELAY=604800        # mainnets, decision 50; 86400 on the two testnets, decision 42
 # filled in by step 1, never by hand
 export PROXY=0x4e59b44847b379578588920cA78FbF26c0B4956C FACTORY= IMPL= APP= DISTRO=
 ```
+
+**Step 6's three values are read, not remembered.** The description and the table are the live
+Sepolia distribution's, read on 2026-11-19 with
+`cast call 0x71a4221974Fc2E95081AE513248918dF27CF7a4A 'snapshot()(…)'` and `description()` against
+that chain, and they match decision 50's record of the three names and notes and decision 51's
+string. The table is already sorted strictly ascending by account and its `bps` sum to 10,000, which
+is what `BadTable()` checks. `OWNER` above is the owner step 6 passes (decision 50) and the sender is
+the Creator key on every chain, testnets included (**decision 54**), with `$SENDER`.
+
+**Two signer variables because the two commands spell it differently, and one rejects the other's
+spelling outright** ([#251](https://github.com/dnznlabs/rake/issues/251)). On the pinned toolchain
+(forge `1.7.1-dev`, measured 2026-11-19) `forge script --help` offers `--sender` and no `--from`,
+while `cast send --help` and `forge create --help` offer `--from` and **no `--sender`** — handed one
+they stop before sending with `error: unexpected argument '--sender' found`. So **`$SIGNER` is for
+`forge script` and nothing else** (steps 2 and 3), and **`$SENDER` is for `cast send` and
+`forge create`** (step 6). `cast wallet sign` takes `--account` with neither. On an anvil the
+keystore flags become `--unlocked` plus the account flag the command accepts: `--sender` for
+`forge script`, `--from` for `cast send`.
 
 **Run B needs five of these and no salts.** A document upload touches no address that mining decides,
 so the mined salts, `PROXY`, `FACTORY_SALT`, `APP_SALT`, `CREATOR` and `DNZN_SALT` are all Run A's.
@@ -92,6 +115,23 @@ it from init code and salt; Run B is uploading to a contract that already exists
 only creates a way to upload to the wrong one. `SIGNER` is not in the list because Run B sends nothing
 from the engineer's key: it proposes, and the Product Owner's signature is what moves anything.
 
+**The base-fee stop, before every send on a chain where ETH costs money.** Read it first and compare
+it to the chain's stop:
+
+```sh
+cast base-fee --rpc-url "$RPC"
+```
+
+**On Ethereum the stop is 1 gwei.** `MILESTONE.md:239-248` sizes the mainnet ask at 0.03 ETH for
+Run A, Run B and step 6, and that covers them to about that price — at Sepolia's pricing, which the
+§ 1 estimate table shows is the dearer reading; Ethereum prices code deposit well under it, so 1 gwei
+is where a send waits rather than where it becomes unaffordable. On the L2s the stop is the figure the
+deploy task's gate records, since their fees run three orders of magnitude below Ethereum's. **The
+testnets have no stop** — their fees are wei, and a testnet send is never deferred for price.
+
+A fee above the stop for days is not a reason to put a buffer in a hot key: it is a top-up and a
+raised rule, by the Product Owner's word. The stop defers a send; it never silently widens the budget.
+
 **`OWNER` is one value for every chain on purpose**, as `state-collection`'s `PAYEE` is: there is no
 second constant to pick the wrong one of. The Ops vault is at this address on all eight chains of
 § 1 — read 2026-10-30, table on [#114](https://github.com/dnznlabs/rake/issues/114), ruled as
@@ -104,31 +144,37 @@ every chain. Changing any one of them on one chain puts `App` somewhere else the
 
 **The salts are mined.** [#115](https://github.com/dnznlabs/rake/issues/115) was ruled for vanity
 mining (**decision 37**, amended 2026-11-07 with the prefixes: `0x00d1…` for `DistributionFactory`,
-`0x00a9…` for `App`), and both were mined once, in
-[m03-t10](docs/milestones/m03/tasks/m03-t10/TASK.md), against the init-code hashes step 1f computes:
-`0xd8a1208ac79c66d94c864e7620534dd0f923bf0f7518d25ae87a7f619bc31cc5` for the factory and
-`0x0b2894a38c541f156e2be856b7469993004331006a2ba9c66fa4d040f7b9864a` for `App`. **A salt is tied to
+`0x00a9…` for `App`). Both were mined once in
+[m03-t10](docs/milestones/m03/tasks/m03-t10/TASK.md) against the 0.8.34 bytes, and **mined again in
+[m05-t01](docs/milestones/m05/tasks/m05-t01/TASK.md) against the 0.8.38 bytes `main` builds today** —
+why the run repeated is `ROADMAP.md` § Decisions M05-D1 and
+[#202](https://github.com/dnznlabs/rake/pull/202), not restated here. The salts above are the second
+run's, against the init-code hashes step 1f computes:
+`0x9778c35879aa3214905a41c9519ae6c704dc5d00333806ac56ed6e7fbd2d8945` for the factory and
+`0xa8bbb83700d29d4b2e4b871c680f31165f42c0eb9234071a7948ce79f9fe33a3` for `App`. **A salt is tied to
 the bytes it was mined against**: any later `src/` byte is a new factory address and a new mining
 run (decision 5 — a new version is a new factory anyway), and because `OWNER` and `APP_VERSION` are
 inside `App`'s hash, `APP_SALT` holds only for the Ops vault and `v0.1`. Step 1f recomputes both
 addresses from these variables on every chain; it never copies them.
 
-> **Stale since [#201](https://github.com/dnznlabs/rake/pull/201) (merged 2026-11-16, solc 0.8.34 → 0.8.38, no `src/` change).** Both salts above were mined against the 0.8.34 init-code hashes quoted here; `main` now compiles to different bytes, so step 1f computes different hashes and neither salt yields its `0x00…` prefix any more. Do not run the deploy steps against `main` until decision 37's mining run has been repeated for the new hashes and this block updated. The Sepolia and Base Sepolia deployments recorded below were made from the 0.8.34 bytes and remain self-consistent; they cannot share an address with anything deployed from `main`.
-
 **`CREATOR` is named** (decision 32; [#90](https://github.com/dnznlabs/rake/issues/90) closed at M03
-close-out): `0x68e0741D8d693e14BF56914567eADdC130b186eE`, and the salt's low 12 bytes are `…0001`,
-so **DNZN's distribution is `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`** on every chain where the
-factory is at the § 0 address — `predict($DNZN_SALT)` answered that on two anvils at close-out
-(`docs/milestones/m03/CLOSEOUT.md` criterion 6), and step 6 recomputes it on each chain rather than
-copying it from here. The rehearsal in § Rehearsed on anvil predates the key and uses the signing
-account for it, and says so. The creator key's two conditions — salted creates only, and never an owner or a signer for anything
+close-out): `0x68e0741D8d693e14BF56914567eADdC130b186eE`, and it is the sender of step 6 on every
+chain, testnets included (**decision 54**). The salt's low 12 bytes are `…0001`, so **DNZN's
+distribution is `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`** on every chain where the factory is at
+the § 0 address — `predict($DNZN_SALT)` answered that on m05-t01's anvil on 2026-11-19, with the
+factory at its § 0 address, and step 6 recomputes it on each chain rather than copying it from here.
+Both rehearsals stand the signing account in for the creator key when they send the `create` — § 0's
+real `DNZN_SALT` reverts `SaltDoesNotStartWith` from any other sender — so the address their `create`
+lands is the rehearsal's, while `predict($DNZN_SALT)` above is this one; § Rehearsed on anvil says so
+for its own run. The creator key's two conditions — salted creates only, and never an owner or a signer for anything
 else — are the handbook's, in `docs/multisig-transactions.md` § The DNZN Creator key, and are
 referenced rather than restated so there is one copy of them.
 
 **Setting the creator key up for `cast`** is the handbook's too: `docs/multisig-transactions.md`
 § Setting the key up for `cast` covers `cast wallet import dnzn-creator --interactive`, verifying
-the address, and backing up the key itself before step 6 runs anywhere. Done, step 6's `SIGNER` is
-`--account dnzn-creator --sender <address>`.
+the address, and backing up the key itself before step 6 runs anywhere. Done, step 6's `SENDER` is
+`--account dnzn-creator --password-file <file> --from <address>` — step 6 is a `cast send`, so it
+takes the `$SENDER` spelling of § 0 and not `$SIGNER`'s.
 
 ## 1 — the chains
 
@@ -150,6 +196,77 @@ creator key is live.
 The keccak is the same on all eight and is given in full once:
 `0x2fa86add0aed31f33a762c9d88e807c475bd51d0f52bd0955754b2608f7e4989`. Re-read per chain in step 1
 rather than trusted from this table — a table is a reading someone else took.
+
+### What a chunk costs per chain, read keylessly
+
+**All figures are `eth_estimateGas` estimates read 2026-11-19** through step 1e's instruments, no
+key and no wei: `cast estimate --rpc-url "$RPC" --create "$INIT"` for the factory, and for the chunk
+a synthetic SSTORE2-shaped init code — `0x00` plus 24,000 data bytes behind solady's 10-byte creation
+prefix, built out of `calldata/11155111/1-addChunk-0.hex`. The second instrument needs no `App` on
+the chain, which is what lets it run on the four mainnets before step 2; it reproduces the live
+`addChunk` figure to under 1% (§ Uploads row 3's 37,760,229 on Sepolia against **37,435,995** here).
+
+| chain | ID | factory `--create` | 24,000-byte chunk `--create` | block `gasLimit` | chunk ÷ limit | signing row |
+|:--|--:|--:|--:|--:|--:|:--|
+| Ethereum | 1 | 2,396,446 | 5,286,009 | 60,000,000 | 8.8% | yes |
+| OP Mainnet | 10 | 2,396,446 | 5,286,009 | 40,000,000 | 13.2% | yes |
+| Base | 8453 | 2,396,446 | 5,286,009 | 40,000,000 | 13.2% | yes |
+| Arbitrum One | 42161 | 2,489,291 | 5,651,278 | 32,000,000 (documented; the RPC field is a placeholder) | 17.7% | yes |
+| MegaETH | 4326 | 111,772,970 | 253,077,911 | 10,000,000,000 | 2.5% | yes |
+| Robinhood Chain | 4663 | 2,396,446 | 5,286,009 | no documented cap found (the RPC field is a placeholder) | — | yes |
+| Sepolia | 11155111 | 16,738,648 | 37,435,995 | 200,000,000 | 18.7% | yes |
+| Base Sepolia | 84532 | 2,396,446 | 5,286,009 | 120,000,000 | 4.4% | yes |
+
+**Arbitrum One and Robinhood Chain report `gasLimit` as `1125899906842624`** (2⁵⁰), a placeholder and
+not a ceiling, because both are Arbitrum chains — Robinhood Chain is built on Arbitrum Dedicated
+Blockchains, per its own docs. Arbitrum One's documented block gas limit is **32,000,000**
+([chain parameters](https://docs.arbitrum.io/arbitrum-essentials/reference/chain-params), read
+2026-11-19) and that is the figure the rule uses for it. Robinhood Chain publishes no equivalent
+figure that could be found on 2026-11-19, so its ceiling is unread and its row is the estimate
+alone; the sizing rule's re-evaluation before a cut on that chain is what covers it. It is a stretch
+row, not an M05 acceptance chain.
+
+**The `signing row` column is the coordination service's, not the signing app's** (step 10): one
+`wallets` row per chain per vault, read 2026-11-19 for the Ops vault
+`0x00c0e88778e3e3d17acaabc7550dec7ab61f3790`, which answered a row for **all eight** chain ids —
+1, 10, 8453, 42161, 4326, 4663, 11155111 and 84532. Its `owner_count` read 3 on the four mainnets
+and 4 on the testnets and MegaETH; that field is the service's cached figure and the chain is what
+to believe. Whether the Product Owner's signing app lists each mainnet is his reading, not this
+one, and a chain without a row or without the app is a runbook change first — never the unverified
+on-chain `approve(digest, true)` route improvised on deploy day.
+
+**The condition every row holds under, not only the date.** Each row holds while that chain prices
+code deposit at the rate measured on the date stated. Two readings per chain over bodies of 6,001
+and 24,001 bytes give the marginal cost directly: **217.978 gas per byte on Ethereum and 1,558.723
+on Sepolia**, a ratio of **7.151** — a per-byte price, not a fixed overhead. The repricing is
+[EIP-8037, State Creation Gas Cost Increase](https://eips.ethereum.org/EIPS/eip-8037) (Standards
+Track Core, status **Last Call** on 2026-11-19): code deposit moves from 200 gas per byte to a
+state-gas price of 1,530 per byte, metered in its own dimension. **Sepolia carries it; Ethereum, OP
+Mainnet, Base, Base Sepolia and Robinhood Chain do not yet** — their rows are identical to the byte.
+MegaETH prices it higher again, about 10,545 gas per byte, a third rate and its own reading.
+
+**So the Sepolia row is read as the figure every other chain would show at Sepolia's rate**, and that
+is what makes it worth keeping rather than dismissing as a testnet quirk. On Ethereum the same chunk
+would be 37,435,995 ÷ 60,000,000 = **62.4%** of the block, over the rule's half, and the rule would
+cut at **19,000 bytes** (29,640,000 gas, 49.4%) — which changes the piece count, the committed
+`calldata/` and the proposal split.
+
+**Ethereum prices code deposit as Base Sepolia does, not as Sepolia does**, which answers the
+question `MILESTONE.md:231-233` left open — and the money question turns entirely on that. Ethereum's
+base fee read **570,774,697 wei (0.5708 gwei)** on 2026-11-19, under § 0's 1 gwei stop. At that fee:
+
+| at 0.5708 gwei | gas | ETH |
+|:--|--:|--:|
+| Run A on Ethereum, factory + `App` at Ethereum's rate | 4,792,892 | 0.00274 |
+| three 24,000-byte pieces at **Ethereum's** rate | 15,858,027 | 0.00905 |
+| the same three at **Sepolia's** rate | 112,307,985 | 0.06410 |
+| Run B as measured on Sepolia (§ Uploads row 3) | 85,666,566 | 0.04890 |
+
+So `MILESTONE.md:239-248`'s **0.03 ETH ask holds comfortably at Ethereum's rate and would not hold at
+Sepolia's**: the ask is generous only while Ethereum stays off 8037. It is the deposit rate, not the
+base fee alone, that decides whether the ask is enough — and a chain that adopts 8037 before its cut
+needs the ask re-sized in the task that cuts it, beside the chunk size. The sizing rule those
+ceilings feed is in § Gas, stated once.
 
 **The EVM each chain must execute.** `foundry.toml` builds for **cancun**, and a clone's runtime is
 solady's **PUSH0** minimal proxy (`docs/REFERENCE.md:110-116`), so a chain that cannot execute PUSH0
@@ -311,7 +428,7 @@ cast estimate --rpc-url "$RPC" --create "$(forge inspect DistributionFactory byt
 cast estimate --rpc-url "$RPC" --create "$AINIT"   # the App init code of 1f, same reason
 ```
 
-The call must return the factory's **1,320-byte** runtime. The constructor runs
+The call must return the factory's **1,319-byte** runtime. The constructor runs
 `new Distribution`, whose bytecode is cancun/PUSH0, so a success here is the EVM check of § 1 —
 executed, not read off a feature list. Record the estimate; it is the gas figure for this chain.
 
@@ -364,7 +481,7 @@ done or stopped, so **identify it before doing anything else**:
 
 ```sh
 # Is it ours? The runtime must match the artifact, and the contract must answer step 3's reads.
-cast code $FACTORY --rpc-url "$RPC" | tr -d '\n' | wc -c                    # 2,642 chars = 1,320 bytes
+cast code $FACTORY --rpc-url "$RPC" | tr -d '\n' | wc -c                    # 2,640 chars = 1,319 bytes
 cast call $FACTORY "implementation()(address)" --rpc-url "$RPC"             # must be a contract, see below
 cast code $APP --rpc-url "$RPC" | tr -d '\n' | wc -c                        # must equal the artifact's length
 cmp <(cast code $APP --rpc-url "$RPC" | tr -d '\n') <(forge inspect App deployedBytecode | tr -d '\n')
@@ -907,17 +1024,39 @@ Base Sepolia live to within 2% and under-prices Sepolia by ~7×**: measured 2026
 code; for the rest the live estimate is, and on Sepolia the batch's real cost exceeds its fork figure
 by roughly the code-deposit term for the widget chunk.
 
-**`MAX_CHUNK = 24_000` is sized against one constraint and bound by three**
-([#188](https://github.com/dnznlabs/rake/issues/188)). The constant is a byte budget, chosen
-against the **24,576-byte code limit**. It has no **gas** term: Sepolia prices code deposit about 7×
-(§ 1e), so a 24,000-byte chunk estimates ~37.9M gas there against ~5.3M on Base Sepolia, 19% of a 200M
-block for one call, and a chain with a 30M block limit and Sepolia's pricing could not land it. And
-it has no **proposal-size** term: the coordination service and the dapp refuse a proposal whose
-calldata exceeds 65,536 hex characters (32,768 bytes), measured 2026-11-16; one `addChunk` of a
-24,000-byte chunk is 48,138 characters, 73% of the cap, and anything above ~32,700 bytes per chunk
-stops being proposable even as a plain call. That cap is what split the upload into three proposals
-(4a). Sizing the constant against all three at once is #188's question for the milestone that next
-touches the upload; this runbook does not change it.
+**The sizing rule, stated once** ([#188](https://github.com/dnznlabs/rake/issues/188)).
+`MAX_CHUNK = 24_000` began as a byte budget against the **24,576-byte code limit** alone, with no gas
+term and no proposal-size term. It now has all three:
+
+> **A chain's chunk size is 24,000 bytes while a full chunk estimates at or under both gas ceilings
+> — half that chain's block gas limit, and the per-transaction gas cap where the chain applies one.
+> Otherwise it is the largest multiple of 1,000 whose estimate does, and that chain's size is a
+> column of the § 1 estimate table. The rule is re-evaluated immediately **before any mainnet cut**,
+> in the task that cuts it, against whichever ceiling binds that day: the chunk estimate is re-read
+> on that chain on that day, and if the size it gives differs from the committed default then
+> `--max-chunk` moves and the calldata and the proposal split are regenerated in that task, before
+> anything is proposed.**
+
+The **proposal cap bounds the size from above whatever the gas ceilings say**: the coordination
+service and the dapp refuse a proposal whose calldata exceeds 65,536 hex characters (32,768 bytes),
+measured 2026-11-16, so no chunk above ~32,700 bytes is proposable at all — one `addChunk` of a
+24,000-byte chunk is 48,138 characters, 73% of the cap, and that cap is what split the upload into
+three proposals (4a).
+
+**The second gas ceiling** is [EIP-7825](https://eips.ethereum.org/EIPS/eip-7825)'s
+`TX_MAX_GAS_LIMIT` of 16,777,216, on a chain that carries 7825 **without** 8037's carve-out — 8037
+applies that cap to execution gas only, so deposit metered as state gas sits outside it. That
+carve-out is why the six `executeQueued` of 2026-11-18 on Sepolia, at up to 37,493,327 gas each,
+were valid at all; on a chain with 7825 and not 8037 they would have been **invalid, not merely
+expensive**.
+
+Today's mainnet chunk estimates **5,286,009** (§ 1's table, read 2026-11-19), under both ceilings on
+every chain of § 1, so the size is 24,000 everywhere and nothing in m05-t01 moves on this. What this
+runbook now carries is the mechanism rather than a second literal: `tools/step4-calldata.mjs` takes
+`--max-chunk <bytes>` defaulting to 24,000 and `Chunks.s.sol` reads
+`vm.envOr("MAX_CHUNK", uint256(24_000))`, so the dev chain and the tool cut at the same number. A
+re-run that records a new figure and leaves `--max-chunk` where it is regenerates nothing; it is the
+**rule changing its answer** that invalidates the committed calldata.
 
 ### Step 5 — explorer verification, named and not run
 
@@ -981,11 +1120,27 @@ env -u ETHERSCAN_API_KEY forge verify-contract $APP src/App.sol:App \
   --constructor-args "$(cast abi-encode 'constructor(address,string)' "$OWNER" "$APP_VERSION")"
 
 for a in $FACTORY $IMPL $APP; do
-  curl -s "https://sourcify.dev/server/v2/contract/$CHAIN_ID/$a" | jq -r .match   # exact_match
+  m=$(curl -s "https://sourcify.dev/server/v2/contract/$CHAIN_ID/$a" | jq -r .match)
+  printf '%s %s\n' "$a" "$m"
+  [ "$m" = exact_match ] || { echo "sourcify: $a is $m, not exact_match"; exit 1; }
 done
 ```
 
-`record:` each address's `match`.
+**The loop is the gate, and the operator's eye is not**
+([#207](https://github.com/dnznlabs/rake/issues/207)). Passing is *exit 0 with three `exact_match`
+lines* and nothing else: an address Sourcify does not hold answers `null`, which reads like a blank
+line to anyone skimming, so the comparison is made by the shell and the step stops on it rather than
+leaving a human to notice a missing word. Rehearsed in both directions before it was written in
+(m05-t01, 2026-11-19, handbook `docs/contract-verification.md` § Sourcify): against an address with
+no code it printed `null` and exited **1**; against the three M04 Sepolia addresses it printed
+`exact_match` three times and exited **0**.
+
+`env -u ETHERSCAN_API_KEY` stays on the three `verify-contract` commands above for the reason given
+there — with the key set, forge ignores `--verifier sourcify`, goes to Etherscan, reports
+`already verified` and exits 0, so a Sourcify verification that never ran looks done. The loop is
+what catches that, and it only catches it while the key is unset for the verifies.
+
+`record:` each address's `match`, and the loop's exit code.
 
 A distribution is a clone, and Sourcify does not report one as verified (`match: null`). What covers
 it is the function, error and event signatures on OpenChain, keyed by selector rather than by chain,
@@ -1006,7 +1161,7 @@ unchanged ABI on a new chain is all `Duplicated:`; an ABI change shows up as `Im
 
 ### Step 6 — DNZN's `create`
 
-**This is the one step the DNZN Creator key signs**, and the only one. Re-export `SIGNER` to that
+**This is the one step the DNZN Creator key signs**, and the only one. Re-export `SENDER` to that
 key for this step and back afterwards. Its two conditions are the handbook's, in
 `docs/multisig-transactions.md` § The DNZN Creator key — salted creates only, and never an owner or
 a signer for anything else.
@@ -1016,28 +1171,27 @@ DISTRO=$(cast call $FACTORY "predict(bytes32)(address)" $DNZN_SALT --rpc-url "$R
 cast code $DISTRO --rpc-url "$RPC"      # must print 0x — #22, the second place this is checked
 ```
 
-Then the send, with the table and the delay as § 0 variables added for this step. Their M05 values —
-the Sepolia table, `DNZN_DELAY` 604800 and `OWNER` the Ops vault, decision 50 — are M05's to fill; this document carries them as variables, and § Rehearsed on
-anvil marks its own values as the rehearsal's placeholders.
+Then the send. `DNZN_DESCRIPTION`, `DNZN_TABLE` and `DNZN_DELAY` are § 0's, filled there with M05's
+values — the Sepolia table and description, `DNZN_DELAY` 604800 on the mainnets (decision 50) and
+86400 on the two testnets (decision 42), `OWNER` the Ops vault. **Export `DNZN_DELAY=86400` for a
+testnet** and leave § 0's default for a mainnet. § Rehearsed on anvil marks its own values as the
+rehearsal's placeholders, and the two rules below are what reject a wrong table.
 
 ```sh
-export DNZN_DELAY=<uint32 seconds>
-export DNZN_DESCRIPTION="<string>"
-export DNZN_TABLE='[(<address>,<bps>,"<name>","<note>"),(…)]'   # see the two rules below
-
 cast send $FACTORY \
   'create(address,uint32,string,(address,uint96,string,string)[],bytes32)' \
   $OWNER $DNZN_DELAY "$DNZN_DESCRIPTION" "$DNZN_TABLE" $DNZN_SALT \
-  --rpc-url "$RPC" --unlocked --from <address>    # or: --account <keystore> --from <address>
+  --rpc-url "$RPC" $SENDER                        # anvil: --unlocked --from <address>
 
-cast call $DISTRO "owner()(address)" --rpc-url "$RPC"    # must equal OWNER
-cast call $DISTRO "delay()(uint32)" --rpc-url "$RPC"     # must equal DNZN_DELAY
+cast call $DISTRO "owner()(address)" --rpc-url "$RPC"       # must equal OWNER
+cast call $DISTRO "delay()(uint32)" --rpc-url "$RPC"        # must equal DNZN_DELAY
+cast call $DISTRO "description()(string)" --rpc-url "$RPC"  # must equal DNZN_DESCRIPTION
+cast call $DISTRO 'snapshot()((address,uint32,uint32,string,(address,uint96,string,string)[],(bytes32,uint256,bytes)[]))' \
+  --rpc-url "$RPC"                                          # the three rows, ascending by account
 ```
 
-**`cast send` takes `--from` where `forge script` takes `--sender`.** `$SIGNER` as § 0 defines it is
-a `forge script` spelling and `cast send` rejects `--sender` outright, so this is the one step that
-writes its signer flags out rather than reusing the variable. A paste of `$SIGNER` here fails with
-`unexpected argument '--sender' found`.
+**This step takes `$SENDER`, not `$SIGNER`** — the two spellings, and the error a paste of the wrong
+one stops with, are § 0's, stated once there.
 
 **Two rules on the table, both enforced by `_set` with the same error.** `BadTable()` —
 selector `0x40da0647`, which is what a revert here decodes to — covers both: the `bps` must sum to
@@ -1558,9 +1712,11 @@ estimate-then-send**: the false `DeploymentFailed()` is a wallet-path observatio
 `eth_estimateGas` one.
 
 Step 6 has not run on
-either chain:
-`cast code` at `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` prints `0x` on both and the Creator key
-is at **nonce 0** on both.
+either chain: ~~`cast code` at the pre-#201 predicted address prints `0x` on both~~ — **superseded
+2026-11-19 (m05-t01, M05-D1)**: that prediction was a function of the pre-#201 factory address and
+both moved with the re-mine, so the address this reading was taken at is no longer the one step 6
+reaches. The Creator key is at **nonce 0** on both. § 0 carries the current prediction and Part B
+re-reads `cast code` at it per chain.
 
 **Sepolia's steps 2 and 3 were sent by a run that was killed before it recorded anything**, at
 09:44–09:51 CST on 2026-11-08 from commit `4b6f95b`. This section **records** those transactions; it
@@ -1630,7 +1786,7 @@ exit **0** with 0 results. `forge test` **102 passed**, `node --test` **90 passe
 | 5 | 5 | explorer: factory / implementation / App | all three `Pass`, names `DistributionFactory` / `Distribution` / `App`; URLs below |
 | | 5 | Sourcify: factory / implementation / App | all three **`exact_match`**, with `creationMatch` and `runtimeMatch` also `exact_match`; read from `/v2/contract/11155111/<address>` on 2026-11-17 — factory `05:56:42Z`, implementation `05:56:56Z`, `App` `05:57:11Z` |
 | | 5 | OpenChain signatures | uploaded for `Distribution`, `DistributionFactory` and `App`. A `Distribution` clone is **not** verifiable on Sourcify (`match: null`), which is what these signatures exist to cover; a second upload prints `Duplicated:` per signature and changes nothing |
-| 6 | 6 | DNZN `create` | not run — Denizen's; `predict($DNZN_SALT)` = `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`, `cast code` `0x` |
+| 6 | 6 | DNZN `create` | not run — Denizen's; ~~`predict($DNZN_SALT)` = the pre-#201 address, `cast code` `0x`~~ **superseded 2026-11-19 (m05-t01, M05-D1)** — the re-mine moved the factory, so it moved this prediction; § 0 carries the current one |
 | | 6 | `owner()` on `DISTRO` | not run |
 
 One extra transaction belongs to this chain's record: **`0xf80fc26d6c99b686147c834eb35f8a19fdb2c39ede03d9aaa7c65e3e534b7c29`,
@@ -1659,7 +1815,7 @@ a collision and the successful send that followed it is not a resend.
 | 5 | 5 | explorer: factory / implementation / App | all three `Pass - Verified` this run; URLs below |
 | | 5 | Sourcify: factory / implementation / App | all three **`exact_match`**, with `creationMatch` and `runtimeMatch` also `exact_match`; read from `/v2/contract/84532/<address>` on 2026-11-17 — factory `05:58:43Z`, implementation `05:58:57Z`, `App` `05:59:13Z` |
 | | 5 | OpenChain signatures | the same three uploads cover this chain: signatures are keyed by selector, not by chain, so one upload serves every deployment of the same ABI |
-| 6 | 6 | DNZN `create` | not run — Denizen's; `predict($DNZN_SALT)` = `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`, `cast code` `0x` |
+| 6 | 6 | DNZN `create` | not run — Denizen's; ~~`predict($DNZN_SALT)` = the pre-#201 address, `cast code` `0x`~~ **superseded 2026-11-19 (m05-t01, M05-D1)** — the re-mine moved the factory, so it moved this prediction; § 0 carries the current one |
 | | 6 | `owner()` on `DISTRO` | not run |
 
 ### The runtime, compared to the artifact
@@ -1682,7 +1838,9 @@ against `forge inspect App deployedBytecode` reports **equal, byte for byte**, o
 | signer balance after | 0.104863387533085144 ETH, nonce 4 | 0.009975784947982522 ETH, nonce 2 |
 | Creator key balance, read 2026-11-08 | 0.010000000000000000 ETH, nonce 0 | 0.010000000000000000 ETH, nonce 0 |
 
-Both chains sat far under the 20 gwei stop of step 0. **Sepolia charged roughly 7× what cancun does
+Both chains sat far under any stop worth naming — and § 0's stop rule is the one that applies, which
+sets no stop on a testnet at all; the figure cited here before this edit was m04-t03's plan and was
+in no step of this document. **Sepolia charged roughly 7× what cancun does
 for the same init code** (16,789,404 against anvil's 2,262,485, and 11,506,694 against 1,648,295)
 while Base Sepolia charged about 1.05× (2,380,182 and 1,655,660) — the per-chain creation pricing
 step 1e now reads from the node rather than from a simulation. **M05 must re-read it per mainnet; the
@@ -1705,7 +1863,11 @@ Base Sepolia were submitted and verified here.
 
 Every one reports solc `v0.8.34+commit.80d5c536`, optimizer on.
 
-### Step 6 is Denizen's
+### Step 6 is Denizen's — the M04 record, superseded 2026-11-19
+
+> **This section is M04's record and is kept as read, not corrected.** Every value in it was the
+> value of the day; § 0 carries what step 6 passes now, and the paragraph after this block says what
+> moved.
 
 **Step 6 was not run on either chain and is not this document's to run here**: the DNZN Creator key
 is Denizen's and never lives on the engineer's host. Its two values are
@@ -1715,3 +1877,10 @@ is Denizen's and never lives on the engineer's host. Its two values are
 complete command per chain, and that exact table string was rehearsed on anvil first: it parsed,
 `DISTRO` landed at the `predict` address `0x633e24C2320B8d86A2A36aB659b64850e5aC6148`,
 `owner()` the Ops vault and `delay()` 86400.
+
+**What step 6 passes now is § 0's, and three things above have moved** (m05-t01, 2026-11-19). The
+description is `DNZN // FUND DISTRIBUTION`, not `FEE` — decision 51, and the live Sepolia
+distribution answers it. The table is decision 50's 2,000 / 4,000 / 4,000 over Treasury, Ops and the
+Creator, not decision 42's 1,000 / 3,000 / 6,000. The delay is 604800 on the mainnets (decision 50),
+86400 on the two testnets (decision 42). The `predict` address above is a function of the pre-#201
+factory and moved with the re-mine. Part B records the deploy that uses § 0's values below this.

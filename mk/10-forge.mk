@@ -16,16 +16,38 @@ FORGE_SEND := --rpc-url $(RPC) --broadcast $(SEND_FLAGS)
 # CREATE2, and a CREATE-only filter would leave `addresses` and the `deploy::` guard below blind.
 DEPLOYED    = jq -r '.transactions[]|select(.transactionType=="CREATE" or .transactionType=="CREATE2")|"\(.contractName) \(.contractAddress)"' broadcast/*/$(CHAIN_ID)/run-latest.json
 
-.PHONY: serve build test fmt clean deploy addresses slither
+# Every path under lib/ a forge command needs. The names are listed rather than globbed from
+# .gitmodules so that an empty lib/ is distinguishable from a lib/ that was never meant to hold
+# anything.
+LIBS := lib/forge-std lib/solady
 
-serve: ## Start the dev stack: anvil, a deploy, and whatever else procs/ holds
+.PHONY: serve build test fmt clean deploy addresses slither setup libs
+
+setup: ## Fetch the pinned submodules: the one step a fresh clone or `git worktree add` needs
+	git submodule update --init --recursive
+
+# `setup` is the only target that writes lib/. Nothing below it updates a submodule implicitly:
+# they are pinned to a tag, `forge install` would move them, and a build that quietly ran
+# `submodule update` would drag a deliberately-moved submodule back to the pin — the silent clobber
+# `init.sh` uses copy-if-absent to avoid. So the forge targets check and stop.
+#
+# Without the check, an uninitialised lib/ surfaces three layers down as an unresolved import
+# (`solady/utils/Base64.sol not found` from `src/App.sol:6`), which reads as a broken source tree
+# rather than an empty checkout.
+libs:
+	@for d in $(LIBS); do \
+	  [ -n "$$(ls -A $$d 2>/dev/null)" ] || \
+	    { echo "$$d is empty — the pinned submodules are not checked out. Run 'make setup' first."; exit 1; }; \
+	done
+
+serve: libs ## Start the dev stack: anvil, a deploy, and whatever else procs/ holds
 	process-compose $(addprefix -f ,$(sort $(wildcard procs/*.yml))) up
 
 # Double-colon: later mk/ files add their own recipe to the same target, run in file order.
-build:: ## Compile
+build:: libs ## Compile
 	forge build
 
-test:: ## Run the test suites
+test:: libs ## Run the test suites
 	forge test
 
 fmt:: ## Check formatting
@@ -54,7 +76,7 @@ slither: ## Static analysis gate — every result triaged in SECURITY.md
 # falls through and deploys.
 # `deploy::` is double-colon, so this `exit 1` stops `make` before the seed, fixtures and dapp
 # recipes in the later mk/ files run — which is the point.
-deploy:: ## Deploy to the chain at RPC (anvil by default)
+deploy:: libs ## Deploy to the chain at RPC (anvil by default)
 	@cast block-number --rpc-url $(RPC) >/dev/null 2>&1 || \
 	  { echo "deploy: no chain at $(RPC) — 'make serve' starts one"; exit 1; }
 	@if ls broadcast/*/$(CHAIN_ID)/run-latest.json >/dev/null 2>&1; then \

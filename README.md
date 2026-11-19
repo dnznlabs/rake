@@ -24,7 +24,7 @@ Alpha software. The contracts are reviewed by the shared two-model method and Sl
 
 ## Contracts
 
-Every address below is **the same on both chains it is deployed to**, so a bookmark or an integration does not change from one chain to the next. Both contracts are placed by a salted `CREATE2`, which binds the address to the init code — so the address repeats on a new chain only while the compiled bytes are unchanged. **They have changed:** `main` has compiled with solc `0.8.38` since [#201](https://github.com/dnznlabs/rake/pull/201), the salts were mined against the `0.8.34` init-code hashes, and a deploy from `main` today would land somewhere else entirely until that mining run is repeated ([RUNBOOK.md](RUNBOOK.md) § 0 — variables, [#202](https://github.com/dnznlabs/rake/pull/202)). The deployments below were made from the `0.8.34` bytes and are self-consistent; read the addresses here as a record of what is deployed, not as a prediction of where the next chain lands.
+Every address below is **the same on both chains it is deployed to**, so a bookmark or an integration does not change from one chain to the next. Both contracts are placed by a salted `CREATE2`, which binds the address to the init code — so the address repeats on a new chain only while the compiled bytes are unchanged. **They have changed:** `main` has compiled with solc `0.8.38` since [#201](https://github.com/dnznlabs/rake/pull/201), and the salts of record were mined against the `0.8.34` init-code hashes. That mining run has now been repeated against the bytes `main` builds today, so [RUNBOOK.md](RUNBOOK.md) § 0 — variables carries new salts and a new address for each contract ([#202](https://github.com/dnznlabs/rake/pull/202), m05-t01). **The deployments below are still the `0.8.34` ones** and are self-consistent; the two testnets are redeployed to the new addresses in the second half of m05-t01, and the rows here are updated with it. Read the addresses in this section as a record of what is deployed, not as a prediction of where the next chain lands.
 
 | CONTRACT | ADDRESS | ROLE |
 |:---|:---|:---|
@@ -32,7 +32,7 @@ Every address below is **the same on both chains it is deployed to**, so a bookm
 | `App` | [`0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE`](https://sepolia.etherscan.io/address/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE) | Serves the dapp and the widget from the chain over [ERC-5219](https://eips.ethereum.org/EIPS/eip-5219) |
 | `App`'s owner | [`0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`](https://sepolia.etherscan.io/address/0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790) | DNZN Ops, a multisig behind a time lock. Only it can change what `App` serves — and it owns nothing else here: `owner()` reverts on the factory, and each `Distribution` is owned by whoever created it |
 
-A `Distribution` is not listed here: there is one address per distribution, created on demand through the factory.
+A `Distribution` is not listed here: there is one address per distribution, created on demand through the factory. The one exception is DNZN's own fund distribution, because the dapp features it before a wallet is connected — at the new factory it is predicted to land at **`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`** on every chain, which is what `predict($DNZN_SALT)` answered on m05-t01's anvil with the factory at its § 0 address. It is **not created on any chain yet**; the second half of m05-t01 sends the first two `create`s and fills the status rows.
 
 ### Deployment Status
 
@@ -88,7 +88,7 @@ make help           # List every command
 Tools come from devbox, loaded by direnv; run forge through devbox, since the pinned version is the one the gas snapshot matches. See [Contracts and the dev chain](AGENTS.md#contracts-and-the-dev-chain).
 
 ```bash
-git submodule update --init --recursive   # forge-std and solady
+make setup                               # Fetch the pinned submodules: forge-std and solady
 devbox run -- forge build                 # Build, with no warnings expected
 devbox run -- forge snapshot --check      # Gas snapshot, as CI runs it
 node --test test/*.test.mjs               # Dapp and widget tests
