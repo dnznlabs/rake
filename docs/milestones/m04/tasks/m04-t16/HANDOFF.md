@@ -10,20 +10,22 @@ address. One line the plan did not prescribe was needed: `discover` was asking t
 who was connected, which on a dev chain answers with its own unlocked keys — see § Deviations. Two of
 the nine criteria carried figures the plan's own wording made unreachable; both were declared red at
 the first head and are **amended at the review of #286**, listed at the top of § Discoveries. Branch
-point `7724d73`; code commits `2a519ec`, `10fa1ba`, `49e7761`, `56939ce`.
+point `7724d73`. Code commits are mine — `2a519ec`, `10fa1ba`, `49e7761`, `56939ce` — plus
+**Denizen's `f37145b`**, which hardened the read path after his own review of the branch, and a final
+pass of mine for the three items the architect ruled from it.
 
 ## Acceptance criteria
 
 | AC | Result | Evidence |
 |:---|:-------|:---------|
-| 1 | pass | `git diff --name-only origin/main -- . ':!docs'` → 3 files: `app/src/index.html`, `test/nowallet.test.mjs`, `test/who.test.mjs`. This handoff is the one file outside that list; a handoff cannot count itself. The negative set — `git diff --stat origin/main -- src/ test/*.t.sol .gas-snapshot RUNBOOK.md scripts/ calldata/ audits/ SECURITY.md app/src/widget.js app/src/eth.js app/src/model.js app/src/layout.html app/src/theme.css app/build.mjs app/broadcast.mjs app/values.mjs` → empty. |
+| 1 | pass | `git diff --name-only origin/main -- . ':!docs'` → 4 files: `app/src/index.html`, `test/nowallet.test.mjs`, `test/who.test.mjs`, `AGENTS.md` — the last added to the scope by the review (amended in the task preamble). This handoff is the one file outside that list; a handoff cannot count itself. The negative set — `git diff --stat origin/main -- src/ test/*.t.sol .gas-snapshot RUNBOOK.md scripts/ calldata/ audits/ SECURITY.md app/src/widget.js app/src/eth.js app/src/model.js app/src/layout.html app/src/theme.css app/build.mjs app/broadcast.mjs app/values.mjs` → empty. |
 | 2 | pass | Four plants, each red on exactly the one predicted test; messages quoted in § Planted reds. Browser reds for 6 (a) and (c) recorded on `origin/main`'s own dev build in § Browser check. |
 | 3 | pass, against the amended figure | `grep -c 'const rpcProvider' app/dist/index.html` → **1** (baseline 0) after `make dapp-nodev CHAIN_ID=11155111`; `grep -c 'const capped' app/dist/index.html` → **0**; `devbox run -- node --test test/nowallet.test.mjs` → 4/4, and its strip literal equals `app/build.mjs:145`'s (the first test asserts exactly that); `rpcProvider` → **4**; `readProvider` → **2**; `let WALLET` → **1**; `PUBLIC_RPC[CFG.chainId]` → **4**, the amended figure, at the four sites the amendment names: `:76` `readProvider`, `:611` step 3's host, `:1205` step 4's landing `rpc`, `:2209` the `#/docs` preview. |
 | 4 | pass, against the amended figure | Step 6 (a) as recorded in § Browser check: five routes opened on the dev chain with no query and no injected provider, every write control `disabled` or absent with its existing line, the network menu's two step-3 lines. Step 6 (b) recorded on Sepolia through `ethereum-sepolia-rpc.publicnode.com`. `grep -ic -F 'No wallet found'` → **2**, the amended figure; the amendment's added check `grep -c -F 'No wallet found' app/src/index.html` → **1**, which is `route()`'s notice at `:2263` and proves it untouched — the second, lowercase match is step 3's own prescribed line at `:611`. `a wallet to act` → **1**; `reads go through` → **1**; `connect a wallet` → **8**, unchanged. |
 | 5 | pass | `eth_requestAccounts` → **1**, unchanged. Step 6 (e) with a stub holding no account: `#who` reads `connect`, the stub's `eth_requestAccounts` counter goes **0 → 1** on a click, and the button then reads `0xf39F…2266`. The enabled `[data-send]` set afterwards is `['cancel:0', 'dist:0x0000000000000000000000000000000000000000']`, **identical** to `origin/main`'s dev build for the same account. |
 | 6 | pass | `devbox run -- node --test test/who.test.mjs` → 4/4, the four rows of step 5. Step 6 (c): `#who` goes `connect` → `0xd8dA…6045` → `vitalik.eth`, `title` the full address in both address states, against that day's `cast` re-read of the reverse record (resolver `0x5fBb459C49BB06083C33109fA4f14810eC2Cf358`, `name()` → `"vitalik.eth"`). Step 6 (d): the button repaints to `0x7099…79C8` after a fired `accountsChanged`, one listener, no error. `nameWho` → **2**. |
-| 7 | pass | `make dapp-nodev CHAIN_ID=11155111` → `widget: raw 8509 bytes · budget 10240 · 1731 left`, **delta 0** against the re-run baseline, and `app/dist/widget.js` sha256 unchanged. `dapp:` 11155111 **raw +990, gzip +321** (149584/47241 → 150574/47562); 84532 **raw +990, gzip +321** (149582/47239 → 150572/47560). **Where the bytes went:** the plan's "about 300 raw bytes" was right about the thing it scoped — the moved `rpcProvider` declaration ships at **310 bytes**, measured in `app/dist/index.html` — and `readProvider` adds **69**; the remaining **611** are the rest of the code the plan prescribes and the estimate did not cover (`let WALLET`, the `eth_accounts` gate, `who()`'s two menu lines and its `WALLET` branch, step 4's landing `const rpc`, and `nameWho`). Both chains' hashes in § For the next upload. |
-| 8 | pass | `node --test test/*.test.mjs` → **183 tests, 183 pass, 0 fail**, against a re-run baseline of **175/175/0** at `7724d73`; the eight added are 4 in `test/nowallet.test.mjs` and 4 in `test/who.test.mjs`. `forge test` → **107 passed, 7 suites**, identical to the baseline tree at `7724d73`. `make fmt` exit 0; `forge lint` reports nothing. `git status --porcelain` empty after `make dapp-nodev CHAIN_ID=11155111`. This table has nine rows, one per criterion. CI passed on the code at `49e7761` — runs [44600608501](https://github.com/dnznlabs/rake/actions/runs/44600608501) (3m26s) and [44600623837](https://github.com/dnznlabs/rake/actions/runs/44600623837) (4m0s), both `SUCCESS`, the first green runs since CI resumed service at 19:02Z. The last code commit is `56939ce`; every commit after it is documentation, which `git diff --name-only 56939ce..HEAD -- . ':!docs'` being empty is the check for, rather than trusting a head named here — a handoff cannot name its own head. CI is re-run on each push and its result at the review head is the PR's own checks. |
+| 7 | pass | `make dapp-nodev CHAIN_ID=11155111` → `widget: raw 8509 bytes · budget 10240 · 1731 left`, **delta 0** against the re-run baseline, and `app/dist/widget.js` sha256 unchanged. `dapp:` 11155111 **raw +1258, gzip +418** (149584/47241 → 150842/47659); 84532 **raw +1258, gzip +418** (149582/47239 → 150840/47657). **Where the bytes went:** the plan's "about 300 raw bytes" was right about the thing it scoped — the moved `rpcProvider` declaration ships at **310 bytes**, measured in `app/dist/index.html` — and `readProvider` adds **69**. The rest is code the estimate did not cover: the plan's own (`let WALLET`, the `eth_accounts` gate, `who()`'s menu lines and `WALLET` branch, step 4's landing `const rpc`, `nameWho`), then Denizen's `rpcProvider` hardening in `f37145b`, then the review's item 1. Both chains' hashes in § For the next upload. |
+| 8 | pass | `node --test test/*.test.mjs` → **188 tests, 188 pass, 0 fail**, against a re-run baseline of **175/175/0** at `7724d73`; the thirteen added are **9** in `test/nowallet.test.mjs` (4 mine, 4 Denizen's in `f37145b`, 1 for the review's item 1) and **4** in `test/who.test.mjs`. `forge test` → **107 passed, 7 suites**, identical to the baseline tree at `7724d73`. `make fmt` exit 0; `forge lint` reports nothing. `git status --porcelain` empty after `make dapp-nodev CHAIN_ID=11155111`. This table has nine rows, one per criterion. CI passed on the code at `49e7761` — runs [44600608501](https://github.com/dnznlabs/rake/actions/runs/44600608501) (3m26s) and [44600623837](https://github.com/dnznlabs/rake/actions/runs/44600623837) (4m0s), both `SUCCESS`, the first green runs since CI resumed service at 19:02Z. Rather than naming a head here — a handoff cannot name its own head — the check is that `git diff --name-only <last code commit>..HEAD -- . ':!docs'` is empty, and CI's result at the review head is the PR's own checks. CI is re-run on each push and its result at the review head is the PR's own checks. |
 | 9 | pass | No upload is started here. § For the next upload names m05-t01's Run B step 14 as the upload and lists what the bundle carries. M05's bundle had not been built when this was ready, so no re-sequencing is needed. |
 
 ## Planted reds
@@ -96,7 +98,10 @@ EIP-6963 provider and sets no `window.ethereum`.
   re-deploying the dev chain, both branches of the ruling in one run: with no wallet the menu reads
   `no wallet found — …` / `reads go through ethereum-sepolia-rpc.publicnode.com` / **`wallet: none`**;
   with a stub holding `0xd8dA…6045` it reads step 3's original sentence and **`wallet: sepolia`**.
-  Zero page errors both ways.
+  Zero page errors both ways. After the review's item 1, the dev override was checked the same way:
+  a Sepolia build opened at `?rpc=https://ethereum-rpc.publicnode.com` reads `#netname` `mainnet` and
+  a menu of `no wallet found — …` / **`reads go through ethereum-rpc.publicnode.com`** / `wallet: none`
+  — the override's host, where before it named Sepolia's. Zero page errors.
 - `#/docs`: `#give-go` `disabled` with `title="connect a wallet to send"`, `#txs` "connect a wallet
   to send.", and the widget preview carrying `data-rpc`.
 - **the red, on `origin/main`'s own dev build:** all four of the landing, the distribution page,
@@ -166,6 +171,32 @@ to `origin/main`'s for the same account (AC 5).
    true (`56939ce`). Verified both ways in a browser — see § Browser check.
 5. **AC 3's and AC 4's figures were red at the first head** and are amended in `TASK.md` at the
    review, in m04-t11's form. Both AC rows now pass against the amended figures.
+6. **`f37145b` is Denizen's commit, not mine.** He reviewed the branch and pushed a fix on top of
+   `5e43893`, co-authored with Fable 5.2, and it closed two real holes in my hunks: `rpcProvider`
+   threw a raw `SyntaxError` out of `r.json()` when a public endpoint answered a rate limit or an
+   outage with an HTML body — and with no wallet that endpoint is the only read path, so the page went
+   blank — and `new URL(PUBLIC_RPC[CFG.chainId])` in my step-3 hunk throws for a chain absent from the
+   table, which I had noticed and implemented as prescribed rather than guarded. He also gated the
+   switch row on a wallet existing. His four tests came with it. The architect accepted the commit at
+   the review: the `data.httpStatus` shape is the one `Model.isWrappedRefusal` already reads, and
+   `null` is kept as a real result. Its signature first read `E` for me, which is a missing public key
+   rather than bad provenance — the key is `CD435BB6A7BED718D95616450DC6C60CFBD5E456`, his documented
+   fingerprint, and it verifies `U` once imported.
+7. **Three items from his review, ruled by the architect, two of them landed here.**
+   - **The dev `?rpc=` menu named the `PUBLIC_RPC` host rather than the override.** Step 3's own hunk:
+     the line now names `new URL(WRPC || pub).host` and the row is omitted only when both are absent.
+     "no wallet found" stays, since it is true on that path. One test row added, and it reds on the
+     defect: dropping `WRPC ||` fails `the menu names the dev override ahead of the public endpoint`
+     with `the dev \`?rpc=\` endpoint is what reads happen through when it is set`.
+   - **The docs still called the wallet the only network path.** `AGENTS.md` § The dapp and the two
+     comments above `PUBLIC_RPC` and `WRPC` now say reads go through the injected provider when there
+     is one and otherwise the chain's public endpoint, and that writes always go through the wallet.
+     This is why `AGENTS.md` is in the scope and the preamble is amended.
+   - **The landing widget never mounts for an EIP-6963-only wallet.** Carried as
+     [#289](https://github.com/dnznlabs/rake/issues/289), not fixed here: it predates this branch and
+     is neither #273 nor #274. Two causes, both named in the issue — `landing()`'s guard tests
+     `window.ethereum` where `discover` already holds the announced provider, and `widget.js:169`
+     reads the global itself, so a mount would have nothing to read with either.
 
 ## Decisions
 
@@ -195,8 +226,10 @@ to `origin/main`'s for the same account (AC 5).
 3. **Step 2** — the account is asked only of an injected provider, never of the public endpoint.
 4. **Step 6 (a)** — "`mine` and `owned` tabs `disabled`" becomes "`mine` `disabled` with its title",
    there being no `owned` tab; and `#/docs` is added to the route list.
-5. **Step 3's `wallet:` line** — its original expectation stands; the code was changed to match
-   rather than the plan.
+5. **Step 3's `wallet:` line — not an amendment.** Its expected text stands unamended; the ruling was
+   that the *code* move to match it, which `56939ce` does. Listed here so the five rulings read
+   together, not because `TASK.md` changed at that site.
+6. **The task preamble** — `AGENTS.md` added to the scope for the review's item 2 below.
 
 - **The paired control behind the step 2 amendment.** `eth_accounts` on anvil returns its ten
   unlocked keys; on `ethereum-sepolia-rpc.publicnode.com` it returns `[]`. One reading of a dev chain
@@ -233,8 +266,8 @@ merge as well as m04-t15's.
 
 | Chain | `make dapp-nodev` | `app/dist/index.html` sha256 | `app/dist/widget.js` sha256 |
 |:--|:--|:--|:--|
-| 11155111 | raw 150574 · gzip 47562 | `537efa94516e751810d6bec1ed9a40f324dd835ca862e1398a1ea2a869fbb3ae` | `8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368` |
-| 84532 | raw 150572 · gzip 47560 | `5c8afe27e2c3312d7e7000ff304006ac61d00749981aad1224606c7460572c27` | `8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368` |
+| 11155111 | raw 150842 · gzip 47659 | `5b2981205e3f9c36e212793c3e09e66f632d4417248db8c6b5f50229bbd40832` | `8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368` |
+| 84532 | raw 150840 · gzip 47657 | `b081be5202b06ad53b376c64fb5e878cd111b5ce1e79fced4be674d3c363290e` | `8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368` |
 
 The widget is byte-identical on both chains and unchanged from the branch point. What the bundle
 carries: m04-t15's five — R18, [#243](https://github.com/dnznlabs/rake/issues/243),

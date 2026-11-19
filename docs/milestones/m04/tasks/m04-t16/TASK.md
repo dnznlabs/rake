@@ -9,8 +9,12 @@ reached only on a chain the page knows no public endpoint for
 ([#273](https://github.com/dnznlabs/rake/issues/273)); and the wallet button names the connected
 account the way the page names every other address — the short address first, the resolved name in
 its place when one returns, the full address in the title, re-run on every account change
-([#274](https://github.com/dnznlabs/rake/issues/274)). `app/src/index.html` and `test/*.mjs` only;
-nothing under `src/`, no `.gas-snapshot` change, no upload. Decision 61: this is the `app/` change
+([#274](https://github.com/dnznlabs/rake/issues/274)). `app/src/index.html`, `test/*.mjs` and
+`AGENTS.md` ~~`app/src/index.html` and `test/*.mjs` only~~;
+nothing under `src/`, no `.gas-snapshot` change, no upload.
+*(amended 2026-11-19 at the review of [#286](https://github.com/dnznlabs/rake/pull/286): `AGENTS.md`
+§ The dapp added, with the two comments above `PUBLIC_RPC` and `WRPC`, because the paragraph still
+described the wallet as the page's only network path. Docs beside the handoff, no new file.)* Decision 61: this is the `app/` change
 after m04-t15 that the mainnet bundle carries, and the settings page
 ([#275](https://github.com/dnznlabs/rake/issues/275)) is not here.
 
