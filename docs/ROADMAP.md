@@ -942,6 +942,24 @@ convention. Numbered 45 because 44 is taken by
     verified, and going public can slip past that without M05 being any less done; a milestone
     that cannot close on its own criteria is two milestones.
 
+61. **The two no-wallet findings of m04-t05 step 3 are fixed before mainnet, as m04-t16 after
+    m04-t15, so the bundle m05-t01's Run B uploads reads without a wallet and names the connected
+    account; the settings page is decision issue #275 and follows going public.** Ruled by Denizen
+    on 2026-11-19 (Telegram, 09:59 CST). [#273](https://github.com/dnznlabs/rake/issues/273) (every
+    route but `#/docs` stops at "No wallet found"; the fix reads through the chain's public endpoint
+    when no provider is injected) and [#274](https://github.com/dnznlabs/rake/issues/274) (the
+    wallet button never shows the resolved name) are one small `app/` task, scoped the same day
+    ([m04-t16 TASK.md](milestones/m04/tasks/m04-t16/TASK.md)), gated on m04-t15's merge, and
+    m05-t01's step 14 waits for its merge as it waits for m04-t15's. The settings page raised in the
+    same session — name-service priority, a wallet-or-RPC read route, a user RPC URL per chain,
+    shared across the DNZN dapps — is [#275](https://github.com/dnznlabs/rake/issues/275), its
+    storage and sharing sub-choices recommended there, scoped as a milestone once M06 closes; nothing
+    in M04 or M05 waits on it. Supersedes nothing: m04-t15's "last `app/` change before M05" line
+    now describes m04-t16, and m04-t15's § The upload stands. Rejected: fixing #273 and #274 after
+    mainnet — a visitor with no wallet is the reader the mainnet document most needs to serve, and
+    the re-upload would cost one vault proposal round per chain to carry two small fixes a bundle
+    not yet built can carry for nothing.
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
