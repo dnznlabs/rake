@@ -1757,7 +1757,10 @@ function fundsHTML(d, f, other) {
   const others = !other ? '<div class="help">Token payments in could not be read from this provider, so a token never distributed here is not listed.</div>'
     : !n ? ''
     : `<details class="others" id="others"><summary>other tokens received (${n})</summary>`
-      + '<div class="status warn">unverified — anyone can send any token to this address. Check a token before distributing it; once distributed it is listed above.</div>'
+      /* R9, decision 57 § 1: the recognised set stays anyone's — `distribute` is permissionless by
+         decision 6 and that is what makes the contract usable without its owner — so the page says
+         what membership in it means instead of pretending to curate it. */
+      + '<div class="status warn">unverified — anyone can send any token to this address. Check a token before distributing it; once distributed it is listed above. listed means distributed here at least once — not checked, not endorsed.</div>'
       + `<div id="others-body">${notice('reading their balances…')}</div></details>`;
   return `<div class="ledger">${rows}${escrows}</div>${others}`
     + `<div class="help">anyone can call distribute() — the contract splits by the table above; you pay the gas.${ACC ? '' : ' Connect a wallet to send it.'}</div>`
@@ -2104,7 +2107,7 @@ function docs() {
 
   <h2 id="s-payin">Receiving funds</h2>
   <p>A distribution accepts ETH and any ERC-20 token at its address. Received funds are not paid out until <code>distribute</code> is called.</p>
-  <p>Because anyone can send any token to the address, this page lists a token by name only once it has been distributed there. A token that has been received but never distributed appears under <i>other tokens received</i>, by address and marked unverified, with its own distribute control.</p>
+  <p>Because anyone can send any token to the address, this page lists a token by name only once it has been distributed there. Listed means distributed here at least once — not checked, not endorsed. A token that has been received but never distributed appears under <i>other tokens received</i>, by address and marked unverified, with its own distribute control.</p>
   <p>A contract that sends ETH to a distribution must use <code>call</code> with sufficient gas. <code>transfer</code> and <code>send</code> forward a stipend of 2,300 gas, which does not cover receipt while the implementation is cold, and the payment then fails.</p>
 
   <h2 id="s-payout">Distributing funds</h2>
