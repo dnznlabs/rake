@@ -196,10 +196,16 @@ function txError(e) {
 }
 /* `navigator.clipboard` is missing on an insecure origin and can be refused on a secure one, so the
    calldata is never only in the clipboard: the fallback is a textarea, selected, for a manual copy. */
-async function copyCalldata(data, slot) {
-  try { await navigator.clipboard.writeText(data); slot.innerHTML = `<div class="status">copied · ${data.length / 2 - 1} bytes</div>`; return; }
+/* R19, decision 57 § 2: the three things a signer has to check the calldata against, beside the
+   calldata itself. The target goes through `ext`, which is the sink every address the page prints
+   uses (R2), so nothing here is escaped by hand; the value goes through the page's own formatter, and
+   every `wctl` write today carries none, so `Ξ0` is what ships until one does. It sits under both
+   branches below, because a signer reading the textarea needs it exactly as much. */
+const cdCheck = w => `for ${ext('address', w.to, short(w.to))} on ${cname(CFG.chainId)} · value ${eth(w.value ? w.value() : 0n)} — check these three in your vault before signing.`;
+async function copyCalldata(data, slot, w) {
+  try { await navigator.clipboard.writeText(data); slot.innerHTML = `<div class="status">copied · ${data.length / 2 - 1} bytes</div><div class="status cdmeta">${cdCheck(w)}</div>`; return; }
   catch (e) {}
-  slot.innerHTML = `<textarea class="cd" readonly rows="3" aria-label="calldata">${esc(data)}</textarea><div class="status">clipboard refused — select all and copy</div>`;
+  slot.innerHTML = `<textarea class="cd" readonly rows="3" aria-label="calldata">${esc(data)}</textarea><div class="status">clipboard refused — select all and copy</div><div class="status cdmeta">${cdCheck(w)}</div>`;
   const ta = slot.querySelector('textarea');
   ta.focus(); ta.select();
 }
@@ -226,10 +232,17 @@ let MAX_WINDOWS = 40;          // per log kind, per pass — 40 × 200 is 8,000 
 if (Q.get('win')) WINDOW_START = Number(Q.get('win'));
 if (Q.get('maxwin')) MAX_WINDOWS = Number(Q.get('maxwin'));
 /*DEV*/
-/* Read once per page load, and shared: the three queries of one history have to measure their
-   windows against the same `latest`, or the sections disagree about where the end is. */
+/* Read once per route entry, and shared: the three queries of one history have to measure their
+   windows against the same `latest`, or the sections disagree about where the end is. The *promise*
+   is what is kept and not the number, so the concurrent callers of one history pass make one request
+   between them rather than one each — which is also what makes the stamp below free, and what lets
+   the browser check count the requests a refresh press makes.
+   `route` clears it, so a route entry re-pulls the head rather than serving the boot value. */
 let HEAD = null;
-const head = async () => HEAD ?? (HEAD = parseInt(await P.request({ method: 'eth_blockNumber' }), 16));
+/* #243 part 2: the block the route's own read was made at, under the nav beside the control that
+   re-makes it. Written wherever the head resolves, which is every route that reads one. */
+const stamp = n => { const el = document.getElementById('asof'); if (el) el.textContent = `as of block ${n}`; };
+const head = () => HEAD ?? (HEAD = P.request({ method: 'eth_blockNumber' }).then(h => { const n = parseInt(h, 16); stamp(n); return n; }));
 /* A refusal, wherever the wallet put the text: MetaMask wraps the provider's JSON-RPC error and the
    message naming the cap can sit a level or two down from `message`. */
 const errText = e => [e && e.message, e && e.data && e.data.message, e && e.cause && e.cause.message]
@@ -665,6 +678,14 @@ async function loadDistro(addr) {
   return { ...d, owner, delay, nonce, description, table, pending: null, rebuilt: true };
 }
 
+/* The successor of a one-row table (decision 6), read so that a target which will not answer costs the
+   page one row and nothing else (#241). "Has code" is not a proxy for "answers" — EIP-7702 puts code
+   on an account that is not a contract at all — and a read that reverts rejects its promise, which the
+   `Promise.all` in `detail` then threw past the paint, leaving the whole page on `reading 0x…`.
+   `rejected` is the third shape a target comes back in, beside `missing` and `foreign` above, and
+   nothing else in the page reads it: it is one row's business and no other screen's. */
+const loadHeir = next => loadDistro(next).catch(e => ({ addr: next, rejected: true, why: errText(e) }));
+
 /* The histories, as two log queries with their topic0s OR'd. `from` is the distribution's own first
    block when the `Created` scan found it, else the factory's — never genesis. */
 const CHANGE_EVENTS = [['Queued(bytes32,uint32,uint256,bytes)', 'queued'], ['Applied(bytes32)', 'applied'], ['Cancelled(bytes32)', 'cancelled'],
@@ -849,6 +870,15 @@ const unreadable = addr => notice(`could not read a distribution at ${ext('addre
 /* The other half of "could not read": there is code at the address, but it is not a clone of this
    factory's implementation, so nothing below this line would be this app's state (R3). */
 const notFactory = addr => notice(`${ext('address', addr, short(addr))} on ${cname(CFG.chainId)} has code, but it is not a distribution of this app's factory — this page will not read it.`, 'err');
+/* Decision 6's forward, as one row rather than as the page's fate (#241). Three answers, not two: a
+   distribution this page can read, one it cannot — `missing`, `foreign`, or a read that rejected, all
+   of which say the same thing to a reader and none of which is a link worth offering — and `null`,
+   which is the first paint, before the successor has been read at all (decision 57 § 3). */
+const heirRow = (next, heir) => `<div class="status warn">${!heir
+  ? `superseded by ${ext('address', next, short(next))} — reading that distribution…`
+  : heir.missing || heir.foreign || heir.rejected
+    ? `forwards everything it receives to ${ext('address', next, short(next))} — not a distribution of this app's factory, so there is nothing to show for it.`
+    : `superseded by <a href="#/distros/${next}">${esc(heir.description)}</a> — this table forwards everything it receives.`}</div>`;
 
 /* Owner, delay and the balance behind `distribute`. The owner cell takes a second line while a
    transfer is waiting for its nominee to accept (decision 21): the current owner above it still holds
@@ -1037,14 +1067,23 @@ const WRITES = new Map();
 let VIEW = 'visitor';
 const OWNS = () => VIEW === 'owner' || VIEW === 'vault';
 const COPIES = () => VIEW === 'vault' || VIEW === 'pending-vault';
+/* The sixth value, and the only one no account ever reads as: `probing` is what a detail page holds
+   from its first paint until `ownerView` has answered (#243). `OWNS` and `COPIES` are both false for
+   it, so no owner power is offered before the probe decides there is one; and every control a view
+   does draw is drawn disabled rather than left out, because a bar that fills in several round trips
+   late reads as "nothing here is yours" and one drawn live early offers a write the probe may be
+   about to refuse. */
+const probeBtn = (key, label) => `<button class="btn off sm" data-send="${key}" disabled title="checking who you are…">${label}</button>`;
 function wctl(key, label, w) {
   WRITES.set(key, w);
+  if (VIEW === 'probing') return probeBtn(key, label);
   return COPIES()
     ? `<button class="btn sec sm" data-copy="${key}"${w.locked ? ' disabled' : ''}>copy calldata for your vault</button>`
     : w.hold ? `<button class="btn sec sm hold" data-send="${key}"${w.locked ? ' disabled' : ''}><span>${label}</span></button>` : `<button class="btn sm" data-send="${key}">${label}</button>`;
 }
 function sctl(key, label, w, off) {
   WRITES.set(key, w);
+  if (VIEW === 'probing') return probeBtn(key, label);
   if (!ACC) return `<button class="btn off sm" disabled title="connect a wallet to send">${label}</button>`;
   return off ? `<button class="btn off sm" disabled>${label}</button>` : `<button class="btn sm" data-send="${key}">${label}</button>`;
 }
@@ -1072,7 +1111,7 @@ function bindWrites(reload) {
       let args;
       try { args = w.args(); } catch (e) { txSay(w.label, esc(e.message || String(e)), 'bad'); return; }
       if (!args) return;
-      copyCalldata(Eth.enc(w.sig, args), document.getElementById('txs'));
+      copyCalldata(Eth.enc(w.sig, args), document.getElementById('txs'), w);
     };
   });
 }
@@ -1131,6 +1170,8 @@ async function landing() {
   // The live example is the widget itself, inlined below, mounted once the featured distribution is
   // known to exist: a chain without the seed leaves its slot empty rather than a widget in its error state.
   const t = TOKEN;
+  // This route reads no history, so the stamp has nothing else to come from (#243 part 2).
+  await head();
   /* No featured address — none seeded on this chain, or one the provider named that this page did
      not compute (R18) — is an empty slot, not a widget in its error state: `loadDistro(null)` would
      send `eth_getCode` with a null address. */
@@ -1236,7 +1277,10 @@ let EMBED = null;
 // The drawer's state outlives a repaint by design, so a landed proposal has to clear it here or the
 // form still holds what was just queued.
 const closeDrawer = () => { PROPOSE = null; DRAWER = false; OWNOPEN = false; ACK = 0; OWNMODE = 'transfer'; OWNER_IN = ''; };
-const bindAll = () => bindWrites(w => { if (w.sig === 'propose(bytes)') closeDrawer(); detail(DS.d.addr); });
+/* After a write lands the view is re-read as the refresh control re-reads it, minus the scroll: the
+   head is pulled again, or the history scan stops at the block before the write and its own row is
+   missing until a manual refresh. */
+const bindAll = () => bindWrites(w => { if (w.sig === 'propose(bytes)') closeDrawer(); HEAD = null; TOKEN++; track(detail(DS.d.addr)); });
 
 /* Decision 7: who this page is for is decided once per load. The owner's own account sends directly;
    a contract owner that answers `isOwner(ACC)` gets the same view with every owner write rendered as
@@ -1265,12 +1309,29 @@ async function ownerView(d) {
   return 'visitor';
 }
 
+/* Three phases, each ending in a paint (#243 part 1). Every read here is a round trip over whatever
+   endpoint the wallet picked, and this view used to make four of them before it drew anything: the
+   whole page was the one `reading 0x…` notice until the *owner probe* answered, which is the last read
+   of the four and the one a visitor has no use for at all. So the frame comes from the address alone,
+   the distribution fills it in, and who-you-are only decides which controls go live. */
 async function detail(addr) {
   const t = TOKEN;
-  if (!DS.d || DS.d.addr !== addr) { V.innerHTML = notice(`reading ${esc(short(addr))}…`); closeDrawer(); }
-  // The clock is read again here, not only at boot: every countdown on this page is measured against
-  // it, and a write that lands moves the chain's.
-  const [d] = await Promise.all([loadDistro(addr), readClock()]);
+  /* Phase 0, no read at all, and nothing before it but `closeDrawer()`: the eyebrow needs only the
+     address and the chain, and each section says what it is waiting for under its own head rather
+     than the page saying it once for all of them. */
+  if (!DS.d || DS.d.addr !== addr) {
+    closeDrawer();
+    V.innerHTML = '<div class="distro">' + eyebrow(`${ext('address', addr, short(addr))} · ${cname(CFG.chainId)}`)
+      + '<h1></h1>'
+      + `<div class="sechead"><b>the table</b><span>the beneficiaries, and the share each is owed</span></div>${notice('reading…')}`
+      + `<div class="sechead"><b>funds</b><span>moves by the table, permissionlessly — no approval involved</span></div>${notice('reading…')}`
+      + `<div class="sechead"><b>changes</b><span>every configuration change this contract has seen</span></div>${notice('reading…')}`
+      + `<div class="sechead"><b>activity</b><span>funds in, and every split and escrow since</span></div>${notice('reading…')}</div>`;
+  }
+  /* Phase 1, the distribution. The clock is read again here, not only at boot: every countdown on
+     this page is measured against it, and a write that lands moves the chain's. `head()` is in the
+     same batch for the stamp, and is the one the history read below shares. */
+  const [d] = await Promise.all([loadDistro(addr), readClock(), head()]);
   if (stale(t)) return;
   if (d.missing) { V.innerHTML = unreadable(addr); return; }
   /* Before `addRecent`, deliberately: the old order saved the address first and painted second, so
@@ -1280,10 +1341,8 @@ async function detail(addr) {
   addRecent(d.addr);
   // Decision 6: a one-row table at 100% is a forward to a successor, so that successor is named first.
   const next = Model.supersededBy(d.table);
-  const [heir, view] = await Promise.all([next ? loadDistro(next) : null, ownerView(d)]);
-  if (stale(t)) return;
-  DS = { d, next, heir, qtx: null, failed: false, h: null, fundsReady: false, f: null };
-  VIEW = view;
+  DS = { d, next, heir: null, qtx: null, failed: false, h: null, fundsReady: false, f: null };
+  VIEW = 'probing';
   WRITES.clear();
   paintDetail();
   // Progressive, and after the paint above: a slow or failed logs call never holds back the table.
@@ -1296,6 +1355,14 @@ async function detail(addr) {
     paintFailed();
     bindAll();
   });
+  /* Phase 2, the heir and the probe — started after the history above and not before it, so a slow
+     `isOwner` never holds the logs back. `paintDetail` repaints the whole view from `DS`, which is
+     also what `absorb` and the drawer do, so there is one paint path and no patching. */
+  const [heir, view] = await Promise.all([next ? loadHeir(next) : null, ownerView(d)]);
+  if (stale(t)) return;
+  DS.heir = heir;
+  VIEW = view;
+  paintDetail();
 }
 
 /* Everything the log-built sections need once a history pass has landed — on the first pass, and
@@ -1375,7 +1442,7 @@ function paintDetail() {
   const d = DS.d, next = DS.next, heir = DS.heir;
   V.innerHTML = '<div class="distro">' + eyebrow(`${ext('address', d.addr, short(d.addr))} · ${cname(CFG.chainId)}`)
     + `<h1>${esc(d.description)}</h1>`
-    + (next ? `<div class="status warn">superseded by ${heir.missing || heir.foreign ? ext('address', next, short(next)) : `<a href="#/distros/${next}">${esc(heir.description)}</a>`} — this table forwards everything it receives.</div>` : '')
+    + (next ? heirRow(next, heir) : '')
     + bar(d.table, { small: true }) + ticks(d.table, {}) + ledger(d.table)
     + `<div id="pending">${pendingBlock(d, true)}</div>`
     + meta(d)
@@ -1526,9 +1593,9 @@ function ownershipHTML(d) {
   return `<details class="danger" id="ownership"${OWNOPEN ? ' open' : ''}><summary>ownership</summary>`
     + `<div class="tabs">${[['transfer', 'change owner'], ['renounce', 'renounce ownership']].map(([k, l]) => `<button class="tab${OWNMODE === k ? ' on' : ''}" data-own="${k}">${l}</button>`).join('')}</div>`
     + (t
-      ? `<p class="help">Nominates another address as the next owner, which becomes the owner only when it calls <code>acceptOwnership()</code> itself. Your own address withdraws a nomination. Enter it, confirm each statement in turn${hold}.</p>`
+      ? `<p class="help">nominates another address as the next owner, which becomes the owner only when it calls <code>acceptOwnership()</code> itself. your own address withdraws a nomination. enter it, confirm each statement in turn${hold}.</p>`
         + (n => `<div class="field"><input id="q-owner" aria-label="new owner" placeholder="new owner — 0x… or .eth / .wei / .gwei" value="${esc(OWNER_IN)}"><div class="res${n.cls ? ' ' + n.cls : ''}" id="q-ownerres">${esc(n.text)}</div></div>`)(ownerNote())
-      : `<p class="help">Transfers ownership to nobody. Confirm each statement in turn${hold}.</p>`)
+      : `<p class="help">transfers ownership to nobody. confirm each statement in turn${hold}.</p>`)
     + acks.map((x, i) => `<label class="ack"><input type="checkbox" data-ack="${i}"${ACK > i ? ' checked' : ''}${ACK < i || !ok ? ' disabled' : ''}><span>${x}</span></label>`).join('')
     + wctl(OWNMODE, t ? 'hold to nominate' : 'hold to renounce', {
       to: d.addr, sig: 'propose(bytes)', label: t ? 'propose transferOwnership' : 'propose renounce', hold: true, locked: ACK < acks.length || !ok,
@@ -1629,7 +1696,7 @@ async function readOthers(d, other) {
   return rows.filter(r => r.waiting > 0n);
 }
 function othersHTML(d, rows) {
-  if (!rows.length) return '<div class="help">None of them still holds a balance here.</div>';
+  if (!rows.length) return '<div class="help">none of them still holds a balance here.</div>';
   return `<div class="ledger">${rows.map(r => frow(token(r.tk, false), `sent here ${r.ins.length} time${r.ins.length === 1 ? '' : 's'}, never distributed`, amt(r.waiting, r.dec),
     sctl(`dist:${r.tk}`, 'distribute', { to: d.addr, sig: 'distribute(address)', args: () => [r.tk], label: `distribute ${token(r.tk, false)}` }))).join('')}</div>`
     + histRows(rows.flatMap(r => r.ins).sort(newest));
@@ -1696,15 +1763,16 @@ function fundsHTML(d, f, other) {
     'err',
   )).join('');
   const n = other && new Set(other.map(e => e.token)).size;
-  const others = !other ? '<div class="help">Token payments in could not be read from this provider, so a token never distributed here is not listed.</div>'
+  const others = !other ? '<div class="help wide">token payments in could not be read from this provider, so a token never distributed here is not listed.</div>'
     : !n ? ''
     : `<details class="others" id="others"><summary>other tokens received (${n})</summary>`
-      + '<div class="status warn">unverified — anyone can send any token to this address. Check a token before distributing it; once distributed it is listed above.</div>'
+      /* R9, decision 57 § 1: the recognised set stays anyone's — `distribute` is permissionless by
+         decision 6 and that is what makes the contract usable without its owner — so the page says
+         what membership in it means instead of pretending to curate it. */
+      + '<div class="status warn">unverified — anyone can send any token to this address. Check a token before distributing it; once distributed it is listed above. listed means distributed here at least once — not checked, not endorsed.</div>'
       + `<div id="others-body">${notice('reading their balances…')}</div></details>`;
   return `<div class="ledger">${rows}${escrows}</div>${others}`
-    + `<div class="help">anyone can call distribute() — the contract splits by the table above; you pay the gas.${ACC ? '' : ' Connect a wallet to send it.'}</div>`
-    // #18, in the dapp's guidance for payers, as the ruling says M02 should state it.
-    + '<div class="help">Paying in from a contract with <code>.transfer()</code> or <code>.send()</code> can fail when the implementation is cold: the 2,300-gas stipend does not cover a clone\'s delegatecall to a cold implementation. Pay in with <code>call</code> and gas.</div>';
+    + `<div class="help wide">anyone can call distribute() — the contract splits by the table above; you pay the gas.${ACC ? '' : ' connect a wallet to send it.'} paying in from a contract? see <a class="link" href="#/docs#payin">receiving funds</a>.</div>`;
 }
 
 /* ---- create ---------------------------------------------------------------------------------- */
@@ -1746,12 +1814,12 @@ function createOne() {
   V.innerHTML = eyebrow('create a distribution · 1 of 2')
     + '<h1>Who controls it, and how slowly.</h1>'
     + field('name', `<input id="c-desc" aria-label="name" value="${esc(D.desc)}" placeholder="e.g. dnzn labs distribution">`,
-      "The distribution's display name, stored on chain as its description — shown everywhere it appears.")
+      "the distribution's display name, stored on chain as its description — shown everywhere it appears.")
     + field('owner', `<input id="c-owner" aria-label="owner" value="${esc(D.owner)}" placeholder="0x… or .eth / .wei / .gwei"><div class="res" id="c-ownerres"></div>`,
-      'Defaults to the connected wallet. A vault address here owns the distribution from its first block, and the salt stays yours (decision 10).')
+      'defaults to the connected wallet. a vault address here owns the distribution from its first block, and the salt stays yours (decision 10).')
     + '<div id="c-ownerack"></div>'
     + field('delay', `<input id="c-delay" class="narrow" aria-label="delay" value="${esc(D.delay)}">`,
-      'How long every future change waits in public. Accepts 7d, 48h, 0. Zero means changes apply instantly, and is flagged everywhere it shows.')
+      'how long every future change waits in public. accepts 7d, 48h, 0. zero means changes apply instantly, and is flagged everywhere it shows.')
     + '<div class="actions"><button class="btn" id="c-next">Next</button><span class="status" id="c-why"></span></div>';
   const desc = document.getElementById('c-desc'), own = document.getElementById('c-owner'), del = document.getElementById('c-delay');
   const why = document.getElementById('c-why'), next = document.getElementById('c-next');
@@ -1816,9 +1884,9 @@ function createTwo() {
     + editorHTML(D.rows)
     + '<div class="two">'
     + field('deposit <span class="opt">· optional</span>', ethIn(`id="c-dep" aria-label="deposit in ETH" value="${esc(D.deposit)}" placeholder="0"`),
-      'ETH sent with the creation transaction and deposited into the distribution. It arrives without a Received entry in the history.')
+      'ETH sent with the creation transaction and deposited into the distribution. it arrives without a Received entry in the history.')
     + field('salt #', `<input id="c-n" class="narrow" type="number" min="1" step="1" aria-label="salt number" value="${esc(D.n)}">`,
-      'The index in your salt. Its top 20 bytes are your own address (decision 10), so this is the only part you choose — and it alone fixes the address, on every chain.')
+      'the index in your salt. its top 20 bytes are your own address (decision 10), so this is the only part you choose — and it alone fixes the address, on every chain.')
     + '</div>'
     + `<div id="c-predict">${notice('reading the address this would deploy to…')}</div>`
     // The owner, again, where it is not the wallet signing: the reading step 1 was acknowledged for,
@@ -1900,6 +1968,9 @@ async function list() {
   const t = TOKEN, slot = document.getElementById('rows');
   let items = [], failed = false, scanned = null;
   try {
+    // In the try with the rest: the `recent` tab reads no logs, so this is the only read the stamp
+    // could describe on it, and a head this endpoint will not answer is a failed list either way.
+    await head();
     if (S.tab === 'mine') { const m = await mine(); items = m.rows; scanned = m.partial; }
     else items = (await Promise.all(recents().map(loadDistro))).filter(d => !d.missing && !d.foreign);
   } catch (e) { failed = true; }
@@ -1932,7 +2003,8 @@ async function list() {
    alpha (decision 45, and first because a visitor who reads one section reads the first), then what a
    distribution is, why, how, then the tasks.
    The contract's own surface is docs/REFERENCE.md in the repo, and the last section points there. The
-   ids are what the rail and `#/docs#<section>` reach; the owner bar's widget link depends on `widget`. */
+   ids are what the rail and `#/docs#<section>` reach; the owner bar's widget link depends on `widget`.
+   README.md § Credits carries the Credits section's text; change one, change both. */
 const SECTIONS = [['disclaimer', 'Disclaimer'], ['what', 'Overview'],['economics', 'Economics'], ['credits', 'Credits'], ['why', 'Purpose'], ['how', 'Mechanism'], ['create', 'Creating a distribution'], ['payin', 'Receiving funds'], ['payout', 'Distributing funds'], ['change', 'Changing a distribution'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['developers', 'For developers']];
 /* The two figures, hand-drawn rather than rendered from Mermaid: there is no Mermaid in the bundle and
    none at build time either, so the caption says what shipped. Colour comes through classes on
@@ -2016,7 +2088,7 @@ function docs() {
   ${S.featuredLie ? notice(`this page computes the featured distribution at ${ext('address', S.featuredLie.computed, esc(short(S.featuredLie.computed)))}; your wallet's provider answered ${esc(short(S.featuredLie.said))} instead — the support form is not shown.`, 'err') : ''}
   ${S.featured ? `<p>If this work is useful to you, please consider supporting its authors. A payment goes to the distribution this app features, ${ext('address', S.featured, esc(short(S.featured)))}, and is divided by its published table like any other.</p>
   <div class="give">${ethIn('id="give-amt" placeholder="amount" aria-label="amount in ETH"')}<button class="btn sec sm" id="give-go"${ACC ? '' : ' disabled title="connect a wallet to send"'}>send</button><a href="#/distros/${S.featured}">view the distribution →</a></div>
-  <div id="txs">${ACC ? '' : '<div class="help">Connect a wallet to send.</div>'}</div>` : ''}
+  <div id="txs">${ACC ? '' : '<div class="help">connect a wallet to send.</div>'}</div>` : ''}
 
   <h2 id="s-credits">Credits</h2>
   <p>The design of these contracts derives from <a href="https://multisig.software" target="_blank" rel="noopener noreferrer">multisig.software</a> by Src Co / z0r0z: the timelock, the self-call setters, the PUSH0 clones and the sender-bound salt. The low-level patterns follow <a href="https://github.com/Vectorized/solady" target="_blank" rel="noopener noreferrer">Solady</a>.</p>
@@ -2043,7 +2115,7 @@ function docs() {
 
   <h2 id="s-payin">Receiving funds</h2>
   <p>A distribution accepts ETH and any ERC-20 token at its address. Received funds are not paid out until <code>distribute</code> is called.</p>
-  <p>Because anyone can send any token to the address, this page lists a token by name only once it has been distributed there. A token that has been received but never distributed appears under <i>other tokens received</i>, by address and marked unverified, with its own distribute control.</p>
+  <p>Because anyone can send any token to the address, this page lists a token by name only once it has been distributed there. Listed means distributed here at least once — not checked, not endorsed. A token that has been received but never distributed appears under <i>other tokens received</i>, by address and marked unverified, with its own distribute control.</p>
   <p>A contract that sends ETH to a distribution must use <code>call</code> with sufficient gas. <code>transfer</code> and <code>send</code> forward a stipend of 2,300 gas, which does not cover receipt while the implementation is cold, and the payment then fails.</p>
 
   <h2 id="s-payout">Distributing funds</h2>
@@ -2139,11 +2211,38 @@ function docScroll(h) {
   const el = h[6] === '#' ? document.getElementById('s-' + h.slice(7)) : null;
   if (el) el.scrollIntoView(); else scrollTo(0, 0);
 }
+/* #243 part 2, the other half of the stamp. One control for the whole page, because one read repaints
+   every section of it, and its state is the route's read rather than anything a view has to track:
+   `BUSY` is the promise the route itself returns, so the button says `reading…` for exactly as long
+   as that route's own `await`s are outstanding, and a read that has since been superseded cannot
+   restore the button under the one that replaced it.
+   The rejection is passed on rather than swallowed: a view whose read throws reported that before
+   this control existed, and it still has to. */
+let BUSY = null;
+function track(p) {
+  BUSY = p;
+  const b = document.getElementById('refresh');
+  if (b) { b.disabled = true; b.classList.add('on'); }
+  const end = () => {
+    if (BUSY !== p) return;
+    const el = document.getElementById('refresh');
+    if (el) { el.disabled = false; el.classList.remove('on'); }
+  };
+  p.then(end, e => { end(); return Promise.reject(e); });
+}
+/* The stamp describes the route's own read at entry, so the two routes that make none carry neither
+   it nor the control. `#/create`'s salt probe (`predict`, then `eth_getCode`) reads the chain
+   mid-route and is deliberately unstamped: the stamp is a claim about where this view was read, not
+   about every request the page will go on to make. */
+const chrome = on => { for (const id of ['asof', 'refresh']) { const el = document.getElementById(id); if (el) el.hidden = !on; } };
 function route() {
   const h = location.hash || '#/';
   TOKEN++;
+  // A route entry re-pulls the head rather than serving the boot value; `refresh` is a route entry.
+  HEAD = null;
   document.getElementById('nav-distros').className = h.startsWith('#/distros') ? 'on' : '';
   document.getElementById('nav-docs').className = h.startsWith('#/docs') ? 'on' : '';
+  chrome(!(h.startsWith('#/docs') || h === '#/create'));
   /* Matched by prefix and painted before every check below it: the docs read with no wallet and on
      the wrong chain, which is most of the ways a stranger arrives at them. */
   if (h.startsWith('#/docs')) { docs(); docScroll(h); return; }
@@ -2155,11 +2254,12 @@ function route() {
   scrollTo(0, 0);
   if (h === '#/create') { createView(); return; }
   const at = h.match(/^#\/distros\/(0x[0-9a-fA-F]{40})$/);
-  if (at) { detail(Eth.checksum(at[1])); return; }
-  if (h.startsWith('#/distros')) { list(); return; }
-  landing();
+  if (at) { track(detail(Eth.checksum(at[1]))); return; }
+  if (h.startsWith('#/distros')) { track(list()); return; }
+  track(landing());
 }
 addEventListener('hashchange', route);
+document.getElementById('refresh').onclick = () => route();
 const tb = document.getElementById('theme-btn'), tm = document.getElementById('theme-menu'), wm = document.getElementById('who-menu'), nm = document.getElementById('net-menu');
 const menus = [tm, wm, nm], toggle = m => menus.forEach(x => x.hidden = x === m ? !x.hidden : true);
 tb.onclick = e => { e.stopPropagation(); toggle(tm); const t = localStorage.getItem('theme') || 'system'; tm.querySelectorAll('div').forEach(d => d.className = d.dataset.t === t ? 'on' : ''); };
