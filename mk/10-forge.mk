@@ -90,6 +90,14 @@ coverage: libs ## Coverage gate — floors lines and branches per src/ file
 # the factory starts at `:432`, zero mutants at or after it. The first run is left naming all three
 # because it is what produced the committed log, and the gap is visible in that log rather than
 # papered over. `SECURITY.md` § Mutation and `audits/README.md` § Provenance both say so.
+#
+# The second `--output-dir` is a **sibling** directory, not the first run's: `slither-mutate`
+# `rmtree`s its own output directory before it starts
+# (`slither/tools/mutator/__main__.py:244-245`), so pointing both runs at one directory would delete
+# the first run's survivor sources. Both logs still land in the same `<sha>/` directory, because the
+# log is what the provenance field sums and a campaign is one record; only the survivor sources are
+# split. `scripts/audit.sh` therefore picks the campaign directory by each log's own `started:`
+# header and never by directory name — the sibling sorts last and holds no log.
 mutate: libs ## Mutation campaign over src/ — hours; results land in audits/mutation/<sha>/
 	@sha=$$(git rev-parse --short HEAD); \
 	mkdir -p audits/mutation/$$sha; \

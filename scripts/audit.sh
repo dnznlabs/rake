@@ -344,8 +344,24 @@ fi
 # declared in a shared file, so `DistributionFactory` needs its own run and its own log beside the
 # first. Globbing `campaign.log` alone reported 715 of 807 and left the factory's 40 of 40 out —
 # and a score short by one contract reads exactly like a complete one.
-MUTATION_DIR=$(ls -1d audits/mutation/*/ 2>/dev/null | tail -1)
-MUTATION_LOGS=$(ls -1 "${MUTATION_DIR:-/nonexistent/}"campaign*.log 2>/dev/null)
+#
+# The directory is chosen by **each log's own `started:` header**, never by directory name. A short
+# sha has no order, so `ls | tail -1` is lexicographic and wrong twice over: it picks
+# `audits/mutation/<sha>-factory/`, the sibling `mk/10-forge.mk` must give the factory run because
+# `slither-mutate` `rmtree`s its own `--output-dir` (`slither/tools/mutator/__main__.py:244-245`)
+# and would otherwise delete the first run's survivors — that sibling holds survivor sources and no
+# log, so the field read `not recorded`; and for a later campaign whose sha sorts earlier it kept
+# reading the older directory's figure. Both measured. `date -d` normalises the header's ISO
+# timestamp so a run either side of a DST change still orders correctly.
+MUTATION_DIR=$(
+  for f in audits/mutation/*/campaign.log; do
+    [ -r "$f" ] || continue
+    started=$(sed -n 's/^started:[[:space:]]*//p' "$f" | head -1)
+    epoch=$(date -d "$started" +%s 2>/dev/null || echo 0)
+    printf '%s\t%s\n' "$epoch" "$(dirname "$f")"
+  done | sort -n -k1,1 | tail -1 | cut -f2
+)
+MUTATION_LOGS=$(ls -1 "${MUTATION_DIR:-/nonexistent}"/campaign*.log 2>/dev/null)
 if [ -n "$MUTATION_LOGS" ]; then
   MUTATION_SCORE=$(printf '%s\n' "$MUTATION_LOGS" | xargs awk '
     match($0, /[A-Za-z]+ mutants: [0-9]+ caught of [0-9]+/) {
@@ -354,9 +370,9 @@ if [ -n "$MUTATION_LOGS" ]; then
     END { if (m > 0) printf "%d of %d caught", c, m; else printf "no class summary in the logs" }
   ')
   MUTATION_LOG_COUNT=$(printf '%s\n' "$MUTATION_LOGS" | grep -c '')
-  MUTATION_SCORE="$MUTATION_SCORE (compiling mutants, from $MUTATION_LOG_COUNT log(s) in $MUTATION_DIR)"
+  MUTATION_SCORE="$MUTATION_SCORE (compiling mutants, from $MUTATION_LOG_COUNT log(s) in $MUTATION_DIR/)"
 else
-  MUTATION_SCORE="not recorded — no audits/mutation/*/campaign*.log in the tree"
+  MUTATION_SCORE="not recorded — no audits/mutation/*/campaign.log in the tree"
 fi
 
 PROVENANCE="$SCRATCH/provenance.txt"
