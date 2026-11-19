@@ -197,6 +197,77 @@ The keccak is the same on all eight and is given in full once:
 `0x2fa86add0aed31f33a762c9d88e807c475bd51d0f52bd0955754b2608f7e4989`. Re-read per chain in step 1
 rather than trusted from this table — a table is a reading someone else took.
 
+### What a chunk costs per chain, read keylessly
+
+**All figures are `eth_estimateGas` estimates read 2026-11-19** through step 1e's instruments, no
+key and no wei: `cast estimate --rpc-url "$RPC" --create "$INIT"` for the factory, and for the chunk
+a synthetic SSTORE2-shaped init code — `0x00` plus 24,000 data bytes behind solady's 10-byte creation
+prefix, built out of `calldata/11155111/1-addChunk-0.hex`. The second instrument needs no `App` on
+the chain, which is what lets it run on the four mainnets before step 2; it reproduces the live
+`addChunk` figure to under 1% (§ Uploads row 3's 37,760,229 on Sepolia against **37,435,995** here).
+
+| chain | ID | factory `--create` | 24,000-byte chunk `--create` | block `gasLimit` | chunk ÷ limit | signing row |
+|:--|--:|--:|--:|--:|--:|:--|
+| Ethereum | 1 | 2,396,446 | 5,286,009 | 60,000,000 | 8.8% | yes |
+| OP Mainnet | 10 | 2,396,446 | 5,286,009 | 40,000,000 | 13.2% | yes |
+| Base | 8453 | 2,396,446 | 5,286,009 | 40,000,000 | 13.2% | yes |
+| Arbitrum One | 42161 | 2,489,291 | 5,651,278 | 32,000,000 (documented; the RPC field is a placeholder) | 17.7% | yes |
+| MegaETH | 4326 | 111,772,970 | 253,077,911 | 10,000,000,000 | 2.5% | yes |
+| Robinhood Chain | 4663 | 2,396,446 | 5,286,009 | no documented cap found (the RPC field is a placeholder) | — | yes |
+| Sepolia | 11155111 | 16,738,648 | 37,435,995 | 200,000,000 | 18.7% | yes |
+| Base Sepolia | 84532 | 2,396,446 | 5,286,009 | 120,000,000 | 4.4% | yes |
+
+**Arbitrum One and Robinhood Chain report `gasLimit` as `1125899906842624`** (2⁵⁰), a placeholder and
+not a ceiling, because both are Arbitrum chains — Robinhood Chain is built on Arbitrum Dedicated
+Blockchains, per its own docs. Arbitrum One's documented block gas limit is **32,000,000**
+([chain parameters](https://docs.arbitrum.io/arbitrum-essentials/reference/chain-params), read
+2026-11-19) and that is the figure the rule uses for it. Robinhood Chain publishes no equivalent
+figure that could be found on 2026-11-19, so its ceiling is unread and its row is the estimate
+alone; the sizing rule's re-evaluation before a cut on that chain is what covers it. It is a stretch
+row, not an M05 acceptance chain.
+
+**The `signing row` column is the coordination service's, not the signing app's** (step 10): one
+`wallets` row per chain per vault, read 2026-11-19 for the Ops vault
+`0x00c0e88778e3e3d17acaabc7550dec7ab61f3790`, which answered a row for **all eight** chain ids —
+1, 10, 8453, 42161, 4326, 4663, 11155111 and 84532. Its `owner_count` read 3 on the four mainnets
+and 4 on the testnets and MegaETH; that field is the service's cached figure and the chain is what
+to believe. Whether the Product Owner's signing app lists each mainnet is his reading, not this
+one, and a chain without a row or without the app is a runbook change first — never the unverified
+on-chain `approve(digest, true)` route improvised on deploy day.
+
+**The condition every row holds under, not only the date.** Each row holds while that chain prices
+code deposit at the rate measured on the date stated. Two readings per chain over bodies of 6,001
+and 24,001 bytes give the marginal cost directly: **217.978 gas per byte on Ethereum and 1,558.723
+on Sepolia**, a ratio of **7.151** — a per-byte price, not a fixed overhead. The repricing is
+[EIP-8037, State Creation Gas Cost Increase](https://eips.ethereum.org/EIPS/eip-8037) (Standards
+Track Core, status **Last Call** on 2026-11-19): code deposit moves from 200 gas per byte to a
+state-gas price of 1,530 per byte, metered in its own dimension. **Sepolia carries it; Ethereum, OP
+Mainnet, Base, Base Sepolia and Robinhood Chain do not yet** — their rows are identical to the byte.
+MegaETH prices it higher again, about 10,545 gas per byte, a third rate and its own reading.
+
+**So the Sepolia row is read as the figure every other chain would show at Sepolia's rate**, and that
+is what makes it worth keeping rather than dismissing as a testnet quirk. On Ethereum the same chunk
+would be 37,435,995 ÷ 60,000,000 = **62.4%** of the block, over the rule's half, and the rule would
+cut at **19,000 bytes** (29,640,000 gas, 49.4%) — which changes the piece count, the committed
+`calldata/` and the proposal split.
+
+**Ethereum prices code deposit as Base Sepolia does, not as Sepolia does**, which answers the
+question `MILESTONE.md:231-233` left open — and the money question turns entirely on that. Ethereum's
+base fee read **570,774,697 wei (0.5708 gwei)** on 2026-11-19, under § 0's 1 gwei stop. At that fee:
+
+| at 0.5708 gwei | gas | ETH |
+|:--|--:|--:|
+| Run A on Ethereum, factory + `App` at Ethereum's rate | 4,792,892 | 0.00274 |
+| three 24,000-byte pieces at **Ethereum's** rate | 15,858,027 | 0.00905 |
+| the same three at **Sepolia's** rate | 112,307,985 | 0.06410 |
+| Run B as measured on Sepolia (§ Uploads row 3) | 85,666,566 | 0.04890 |
+
+So `MILESTONE.md:239-248`'s **0.03 ETH ask holds comfortably at Ethereum's rate and would not hold at
+Sepolia's**: the ask is generous only while Ethereum stays off 8037. It is the deposit rate, not the
+base fee alone, that decides whether the ask is enough — and a chain that adopts 8037 before its cut
+needs the ask re-sized in the task that cuts it, beside the chunk size. The sizing rule those
+ceilings feed is in § Gas, stated once.
+
 **The EVM each chain must execute.** `foundry.toml` builds for **cancun**, and a clone's runtime is
 solady's **PUSH0** minimal proxy (`docs/REFERENCE.md:110-116`), so a chain that cannot execute PUSH0
 or transient storage cannot run this code at all. The lock inside `Distribution` is transient
@@ -953,17 +1024,39 @@ Base Sepolia live to within 2% and under-prices Sepolia by ~7×**: measured 2026
 code; for the rest the live estimate is, and on Sepolia the batch's real cost exceeds its fork figure
 by roughly the code-deposit term for the widget chunk.
 
-**`MAX_CHUNK = 24_000` is sized against one constraint and bound by three**
-([#188](https://github.com/dnznlabs/rake/issues/188)). The constant is a byte budget, chosen
-against the **24,576-byte code limit**. It has no **gas** term: Sepolia prices code deposit about 7×
-(§ 1e), so a 24,000-byte chunk estimates ~37.9M gas there against ~5.3M on Base Sepolia, 19% of a 200M
-block for one call, and a chain with a 30M block limit and Sepolia's pricing could not land it. And
-it has no **proposal-size** term: the coordination service and the dapp refuse a proposal whose
-calldata exceeds 65,536 hex characters (32,768 bytes), measured 2026-11-16; one `addChunk` of a
-24,000-byte chunk is 48,138 characters, 73% of the cap, and anything above ~32,700 bytes per chunk
-stops being proposable even as a plain call. That cap is what split the upload into three proposals
-(4a). Sizing the constant against all three at once is #188's question for the milestone that next
-touches the upload; this runbook does not change it.
+**The sizing rule, stated once** ([#188](https://github.com/dnznlabs/rake/issues/188)).
+`MAX_CHUNK = 24_000` began as a byte budget against the **24,576-byte code limit** alone, with no gas
+term and no proposal-size term. It now has all three:
+
+> **A chain's chunk size is 24,000 bytes while a full chunk estimates at or under both gas ceilings
+> — half that chain's block gas limit, and the per-transaction gas cap where the chain applies one.
+> Otherwise it is the largest multiple of 1,000 whose estimate does, and that chain's size is a
+> column of the § 1 estimate table. The rule is re-evaluated immediately **before any mainnet cut**,
+> in the task that cuts it, against whichever ceiling binds that day: the chunk estimate is re-read
+> on that chain on that day, and if the size it gives differs from the committed default then
+> `--max-chunk` moves and the calldata and the proposal split are regenerated in that task, before
+> anything is proposed.**
+
+The **proposal cap bounds the size from above whatever the gas ceilings say**: the coordination
+service and the dapp refuse a proposal whose calldata exceeds 65,536 hex characters (32,768 bytes),
+measured 2026-11-16, so no chunk above ~32,700 bytes is proposable at all — one `addChunk` of a
+24,000-byte chunk is 48,138 characters, 73% of the cap, and that cap is what split the upload into
+three proposals (4a).
+
+**The second gas ceiling** is [EIP-7825](https://eips.ethereum.org/EIPS/eip-7825)'s
+`TX_MAX_GAS_LIMIT` of 16,777,216, on a chain that carries 7825 **without** 8037's carve-out — 8037
+applies that cap to execution gas only, so deposit metered as state gas sits outside it. That
+carve-out is why the six `executeQueued` of 2026-11-18 on Sepolia, at up to 37,493,327 gas each,
+were valid at all; on a chain with 7825 and not 8037 they would have been **invalid, not merely
+expensive**.
+
+Today's mainnet chunk estimates **5,286,009** (§ 1's table, read 2026-11-19), under both ceilings on
+every chain of § 1, so the size is 24,000 everywhere and nothing in m05-t01 moves on this. What this
+runbook now carries is the mechanism rather than a second literal: `tools/step4-calldata.mjs` takes
+`--max-chunk <bytes>` defaulting to 24,000 and `Chunks.s.sol` reads
+`vm.envOr("MAX_CHUNK", uint256(24_000))`, so the dev chain and the tool cut at the same number. A
+re-run that records a new figure and leaves `--max-chunk` where it is regenerates nothing; it is the
+**rule changing its answer** that invalidates the committed calldata.
 
 ### Step 5 — explorer verification, named and not run
 
