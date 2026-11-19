@@ -14,7 +14,7 @@
 
    The split is `scripts/forge/Chunks.s.sol:_upload`'s, re-implemented rather than reused because the
    forge script broadcasts from one key and cannot run on a chain the engineer does not own:
-   MAX_CHUNK = 24_000 bytes, the payload cut from the front, the remainder in the last piece. That
+   `--max-chunk`, 24,000 bytes by default, the payload cut from the front, the remainder in the last piece. That
    constant is a *byte* budget — it keeps a chunk under the 24,576-byte code limit with SSTORE2's
    1-byte prefix — and carries no gas term, so the per-chunk gas is a measurement (§ 4 of the task),
    never an assumption.
@@ -51,8 +51,6 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 
-const MAX_CHUNK = 24_000; // Chunks.s.sol:13, byte for byte
-
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
   const i = argv.indexOf(`--${name}`);
@@ -61,7 +59,7 @@ const arg = (name, fallback) => {
 
 const chain = arg('chain');
 if (!chain) {
-  console.error('usage: node tools/step4-calldata.mjs --chain <id> (--rpc <url> | --app-nonce <n>) [--app 0x…] [--vault 0x…] [--out <dir>]');
+  console.error('usage: node tools/step4-calldata.mjs --chain <id> (--rpc <url> | --app-nonce <n>) [--app 0x…] [--vault 0x…] [--out <dir>] [--max-chunk <bytes>]');
   process.exit(2);
 }
 /* `App` is the same address on every chain of RUNBOOK § 1 (decision 35), so this is a default and
@@ -91,6 +89,20 @@ if (nonceFlag === undefined && rpc === undefined) {
 const digits = (s) => /^[0-9]+$/.test(String(s).trim());
 if (nonceFlag !== undefined && !digits(nonceFlag)) {
   console.error(`step4-calldata: --app-nonce must be a non-negative integer, got ${JSON.stringify(nonceFlag)}`);
+  process.exit(2);
+}
+
+/* The chunk size, one number shared with `Chunks.s.sol:13`'s `vm.envOr("MAX_CHUNK", …)` so the dev
+   chain and this tool cut identically. It is a flag and not a constant because RUNBOOK § Gas's
+   sizing rule can lower it on a chain whose gas price for code deposit makes a full chunk too large
+   a share of a block, and the rule is re-evaluated on the day of a cut rather than at this commit.
+   The default is the committed one: a run with no flag must regenerate a committed upload byte for
+   byte, so moving the default is moving the artifacts. */
+const MAX_CHUNK = Number(arg('max-chunk', 24_000));
+if (!Number.isInteger(MAX_CHUNK) || MAX_CHUNK < 1 || MAX_CHUNK > 24_575) {
+  /* 24,575 is the 24,576-byte code limit less SSTORE2's 1-byte prefix. Validated here with the rest
+     of the arguments, before the first file read, for the reason given above. */
+  console.error(`step4-calldata: --max-chunk must be an integer in 1..24575, got ${JSON.stringify(arg('max-chunk'))}`);
   process.exit(2);
 }
 

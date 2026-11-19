@@ -10,7 +10,10 @@ import {App} from "../../src/App.sol";
 /// env: APP (App address), GZIP (default true)
 /// Needs read access to ./app/dist in foundry.toml `fs_permissions`.
 contract Chunks is Script {
-    uint256 constant MAX_CHUNK = 24_000; // under the 24,576-byte code limit with SSTORE2's 1-byte prefix
+    /// Under the 24,576-byte code limit with SSTORE2's 1-byte prefix, and under both gas ceilings of
+    /// RUNBOOK § Gas at the prices read on 2026-11-19. Read from the environment so the dev chain and
+    /// `tools/step4-calldata.mjs --max-chunk` cut at the same number; the default is the committed one.
+    uint256 MAX_CHUNK = vm.envOr("MAX_CHUNK", uint256(24_000));
 
     function run() external {
         App app = App(vm.envAddress("APP"));
