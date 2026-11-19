@@ -8,9 +8,14 @@ repos:
     hooks:
       - id: check-yaml
         stages: [pre-commit]
+      # Audit artefacts are tool output committed as the record, and two kinds of it run past the
+      # 500 KB default: a leg's transcripts, and a mutation campaign's log — `slither-mutate -v`
+      # prints every mutant and every compiler error, which is 620 KB at `e770054`. Trimming either
+      # would make the record unreproducible, so both are excluded by path rather than by size. The
+      # survivor sources beside the log are ~23 KB each and need no exemption.
       - id: check-added-large-files
         stages: [pre-commit]
-        exclude: ^audits/.*/transcripts/
+        exclude: ^audits/(.*/transcripts/|mutation/)
 
   - repo: https://github.com/betterleaks/betterleaks
     rev: v1.8.1
