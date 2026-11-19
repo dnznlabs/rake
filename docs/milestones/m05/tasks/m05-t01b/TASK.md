@@ -311,10 +311,12 @@ states its `main` baseline at `78b5eb7`.
    bare greedy `sed 's/.*\]//'` strips past a name whose *signature* holds a bracket
    (`testFuzz_roundingNeverExceedsAmount(uint96,uint16[3])`, the last `]` sits after the name)
    and read 21 in Elanik's third review
-   ([#268](https://github.com/dnznlabs/rake/pull/268#issuecomment-7002548290)). The anchored
-   greedy form this file carried before (`s/^\[FAIL.*\] ([A-Za-z0-9_]+)\(.*/\1/`) read 22 on GNU
-   sed 4.9 only because the engine backtracks to the `] name(` pair; that is an implementation
-   property, not a guarantee, and it is replaced. The same pipeline over
+   ([#268](https://github.com/dnznlabs/rake/pull/268#issuecomment-7002548290), retracted in
+   [the next comment](https://github.com/dnznlabs/rake/pull/268#issuecomment-7002611331): the
+   bare strip was their own, not the file's form). The anchored sed this file carried before
+   (`s/^\[FAIL.*\] ([A-Za-z0-9_]+)\(.*/\1/`) was correct — 22 at `78b5eb7` — and the
+   `'\] name\('` form is kept on its merits: shorter, no whole-line regex, no naming convention,
+   and the same 22 under `grep -o`. The same pipeline over
    `forge coverage --ir-minimum` with no exclusions yields the identical set. Measured at
    `78b5eb7`: 22 failing, 83 passing, 105 enumerated, under both.
 5. **CI runs it in the right place.** `.github/workflows/ci.yml` has a `coverage` step after
