@@ -18,7 +18,8 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | **done 2026-11-07** — ten tasks (t01–t10), three two-leg reviews (`audits/2026-10-30`, `10-31`, `11-06`), 14 `SECURITY.md` rows, decisions 20–40; `src/` final at `3ad48ec` ([#153](https://github.com/dnznlabs/rake/pull/153)), `FACTORY_SALT`/`APP_SALT` mined against it (decision 37: `0x00D18B5b…`, `0x00A90943…`), `RUNBOOK.md` rehearsed on two anvils with the real Creator key; DNZN's predicted address `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`; criteria 1–8 re-run in [CLOSEOUT.md](milestones/m03/CLOSEOUT.md) |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | in progress — scoped 2026-11-07: seven tasks in four phases (Phase 1 done the same day: the dapp's carried items #164 and the `web3://` gateway in the dev stack #163, the ERC-5219 surface's first real consumer; then Slither as a third audit leg gating the deploy, invariant tests beside it, the runbook for real, then the gateway and a host page, then a scripted wallet session with a signoff line); two decisions open ([#156](https://github.com/dnznlabs/rake/issues/156) the test host, [#157](https://github.com/dnznlabs/rake/issues/157) DNZN's testnet table); needs testnet ETH on two keys and an Etherscan API key |
 | [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; the DNZN fund distribution live at its Sepolia address with the Sepolia table, the Ops vault as owner and a 7-day delay (decision 50); dapp mirrored and widget embedded in one DNZN app | not started — scoped 2026-11-18: six tasks in four phases plus a close-out (re-mine the salts against `main`'s post-[#201](https://github.com/dnznlabs/rake/pull/201) bytes and redeploy both testnets to match, with the threat model, coverage floor and mutation run of decision 56 beside it, then Base alone, then OP Mainnet, Arbitrum One and Ethereum with the stretch row beside them, then the mirror and the embed); four decisions opened (M05-D1 the stale salts, M05-D2 the step-6 key and salt, M05-D3 the paid-review go/no-go, M05-D4 the mirror and the host app; D2–D4 ruled as decisions 54, 55 and 59, D4's app name still open); gated on M04's close-out; needs mainnet ETH on three keys, twelve vault co-signatures and four `create`s |
-| [M06 — Owner integrations](milestones/m06/MILESTONE.md) | Optional, after mainnet. When the connected wallet is a member of the owner rather than the owner, route `propose`/`cancel` into the multisig vault's or Majeur DAO's own submit flow instead of copy-calldata. UI only; no contract change | not started |
+| [M06 — Going public](milestones/m06/MILESTONE.md) | `dnznlabs/rake` is public, as a new repository whose history is one signed commit from the mainnet tag; the private repository is renamed `rake.buildarchive`, archived and never published. Four phases: the labelling of outside issues and comments installed and proven on this repo; a staging tree from the tag with the build-out record removed (milestones, tasks, handoffs, review runs, dev-chain broadcasts), the roadmap reset to the mainnet row, `SECURITY.md` carrying no findings, and every document audited for a reader who has only the repo; a fresh review of the staging tree that must come back clean; then Denizen renames, archives, creates and flips | not started — gated on M05's close-out; scoped when M05 closes (decision 60) |
+| [M07 — Owner integrations](milestones/m07/MILESTONE.md) | Optional, after mainnet. When the connected wallet is a member of the owner rather than the owner, route `propose`/`cancel` into the multisig vault's or Majeur DAO's own submit flow instead of copy-calldata. UI only; no contract change | not started |
 
 ## Order
 
@@ -38,6 +39,8 @@ m02-t04 as a draft the agents wrote (decision 17); Denizen writes its final text
 and the signoff is not dated while the page still carries the draft. The checks on it — the reference
 file's struct and tables, the stipend-and-cold lines, criterion 9's greps — stay as they are and run
 against whatever he writes.
+
+**M06 is the last thing that happens in this repository.** Everything after the flip happens in the new one, in public, and nothing in M06 touches `src/` or the deployed contracts: the fresh review must find nothing, because a finding against immutable mainnet code is a disclosure or a redeploy, not a fix. M07 is optional and does not gate M06.
 
 **Same address, separate storage.** A distribution deployed to several chains is several contracts.
 Tables can drift and every owner action is queued once per chain. M02's acceptance criteria must show
@@ -926,6 +929,19 @@ convention. Numbered 45 because 44 is taken by
     Rejected: option (2), a landing under dnzn.dev linking each chain's gateway URL and serving no
     bundle (not a mirror in decision 12's sense).
 
+60. **Going public is its own milestone, M06, between mainnet and owner integrations; owner
+    integrations moves from M06 to M07.** Ruled by Denizen on 2026-11-19 (Telegram, 09:18 CST),
+    with the procedure agreed the same morning. The public repository is a new one whose history
+    starts at the mainnet tag; the private one is archived under the `.buildarchive` suffix, never
+    published. The repository keeps what a user needs to use, verify and develop the product and
+    nothing about how it was built; `SECURITY.md` keeps its shape and starts with no findings,
+    recording what is found after the flip exactly as it does today. The renumbering is safe
+    because nothing is bound to M06 at this date: no milestone file, no issue labelled `m06`, no
+    task ID under it; the five out-of-scope pointers to it in earlier milestone documents are
+    renumbered in the same change. Rejected: folding the flip into M05's close-out. M05 is done when mainnet is
+    verified, and going public can slip past that without M05 being any less done; a milestone
+    that cannot close on its own criteria is two milestones.
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
@@ -989,7 +1005,7 @@ milestone that first acts on it, and the issue list is the queue — this sectio
 - Streaming, vesting, conditional recipients, cross-chain messaging, ERC-777, EIP-7702 self-init.
   Non-goals in the overview; not reopened.
 - Owner-kind submit routes in v1. Designed as a later phase; v1 ships "copy calldata" everywhere, per
-  `design/HANDOFF.md`. Carried as the optional M06 above, decided 2026-10-10.
+  `design/HANDOFF.md`. Carried as the optional M07 above (M06 until decision 60), decided 2026-10-10.
 - The `Render` / `DocsRenderer` / `WidgetRenderer` split and the 60 KB uncompressed budget. Superseded
   by the scaffold's single `App` with gzipped SSTORE2 chunks. Measured 2026-10-10: the prototype
   comment-stripped is 74.0 KB, gzipped 20.7 KB; the widget 5.6 KB, gzipped 2.5 KB. Re-run before citing.

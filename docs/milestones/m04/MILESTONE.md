@@ -110,7 +110,7 @@ than quote. "Both chains" means Sepolia and Base Sepolia, every time.
   missed on three runs (#22, #54, nothing in `App.sol` or the scripts).
 - **The dnzn.dev mirror and IPFS** (decision 12's "mirrors of it") — M05. The test host of
   criterion 5 is a host page embedding the widget, not a mirror of the dapp.
-- **Owner-kind submit routes** (M06). The vault-owned distribution shows calldata, as shipped.
+- **Owner-kind submit routes** (M07). The vault-owned distribution shows calldata, as shipped.
 - **Freedom or any other native `web3://` client** as a criterion. Criterion 3 is the HTTPS
   gateway, decision 19's reason; if a native client is tried, it is recorded, not required.
 

@@ -138,7 +138,7 @@ Re-run rather than quote.
   decision 45's removal clause would then be impossible).
 - **Renounce or transfer of `App`'s ownership, and any owner change on DNZN's distribution.**
   Decision 50 sets the owner at `create`; nothing after.
-- **Owner-kind submit routes** (M06). The vault-owned distribution shows calldata, as shipped.
+- **Owner-kind submit routes** (M07). The vault-owned distribution shows calldata, as shipped.
 - **[#75](https://github.com/dnznlabs/rake/issues/75), the owner-declared token list**, labelled
   `m05` by decision 22. Its options (a) and (b) are contract changes, which this milestone cannot
   take, and (c) is dapp work that gates nothing on mainnet. Relabelled at close-out to the next
@@ -340,7 +340,7 @@ The dapp under dnzn.dev and the widget inside a DNZN product, as decisions 12 an
 The architect re-runs criteria 1–8, records them in `CLOSEOUT.md` beside this file, fills § Carried
 issues at close-out, comments on state-collection#74 with the live chains and the address, opens the
 `lock()` decision issue with a proposed watch period, notes the date decision 45's 90-day clock
-starts, and hands M06 nothing it needs. No task.
+starts, and hands M07 nothing it needs. No task.
 
 **Estimate, labelled as one:** six tasks, one optional; three to five weeks of calendar time, of
 which m05-t01 is about one week (two testnet signing rounds and two `create`s by hand), m05-t01b

@@ -137,7 +137,7 @@ rather than quote.
   every `Created` distribution's table (unbounded on mainnet) or an indexer, which overview § 2 goal 2
   rules out. v1 lists `recent` and `mine`; the gap is recorded for the overview, and a later milestone
   may add a `Created`-log scan behind an explicit "search the chain" action if Denizen wants it.
-- Owner-kind submit routes (multisig custom action, Majeur proposal) — **M06**. v1 is copy-calldata.
+- Owner-kind submit routes (multisig custom action, Majeur proposal) — **M07**. v1 is copy-calldata.
 - A browser-wallet acceptance by Denizen, the `web3://` gateway, and opening the chain's document over
   `file://` — **M04**. Here the document is proved byte-equal to the build; nothing more.
 - `SECURITY.md`, the payer-guidance *disposition* (#18 — M02 writes the one line, M03 decides), the

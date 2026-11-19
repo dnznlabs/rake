@@ -182,7 +182,7 @@ Use a fresh anvil for the recorded run; a second `make deploy` on a live chain m
 - Anything under `src/` and `.gas-snapshot` (the struct is frozen for M02); the named `release` error,
   `PUSH_GAS`, a beneficiaries cap, `SECURITY.md` and the payer-guidance *disposition* — M03.
 - `scripts/forge/Seed.s.sol` and `mk/15-seed.mk`: #35 owns them; the fixtures live beside, not inside.
-- Submitting through a vault or DAO (M06). v1 is copy-calldata, and the clipboard is the whole feature.
+- Submitting through a vault or DAO (M07). v1 is copy-calldata, and the clipboard is the whole feature.
 - The post-create "tip the authors" line and the footer link to the DNZN distribution — [#38](https://github.com/dnznlabs/rake/issues/38), default: M05.
 - `#/docs`, the widget, criterion 8 — t04.
 - Exercising name resolution against a registry — M04. Only the port and the gate are this task's.
