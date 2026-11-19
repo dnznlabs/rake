@@ -1,6 +1,6 @@
 # m04-t15 — handoff
 
-PR: #<n> · Branch: `m04/t15-page-fixes` · 2026-11-19
+PR: [#277](https://github.com/dnznlabs/rake/pull/277) · Branch: `m04/t15-page-fixes` · 2026-11-19
 
 A distribution page now paints its frame from the address alone and fills as each read lands: `detail`
 runs in three phases, the middle one under a sixth `VIEW` value `probing` where every write control is
