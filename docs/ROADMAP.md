@@ -17,7 +17,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 | [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain, and Denizen has ironed out the experience against it | done 2026-10-26 — t01 (#33), t02 (#40), t03 (#52), t04 (#60), t05 (#65), t06 done; Phase 5 signed off by Denizen in [#73](https://github.com/dnznlabs/rake/pull/73) |
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | **done 2026-11-07** — ten tasks (t01–t10), three two-leg reviews (`audits/2026-10-30`, `10-31`, `11-06`), 14 `SECURITY.md` rows, decisions 20–40; `src/` final at `3ad48ec` ([#153](https://github.com/dnznlabs/rake/pull/153)), `FACTORY_SALT`/`APP_SALT` mined against it (decision 37: `0x00D18B5b…`, `0x00A90943…`), `RUNBOOK.md` rehearsed on two anvils with the real Creator key; DNZN's predicted address `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`; criteria 1–8 re-run in [CLOSEOUT.md](milestones/m03/CLOSEOUT.md) |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | in progress — scoped 2026-11-07: seven tasks in four phases (Phase 1 done the same day: the dapp's carried items #164 and the `web3://` gateway in the dev stack #163, the ERC-5219 surface's first real consumer; then Slither as a third audit leg gating the deploy, invariant tests beside it, the runbook for real, then the gateway and a host page, then a scripted wallet session with a signoff line); two decisions open ([#156](https://github.com/dnznlabs/rake/issues/156) the test host, [#157](https://github.com/dnznlabs/rake/issues/157) DNZN's testnet table); needs testnet ETH on two keys and an Etherscan API key |
-| [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; the DNZN fund distribution live at its Sepolia address with the Sepolia table, the Ops vault as owner and a 7-day delay (decision 50); dapp mirrored and widget embedded in one DNZN app | not started — scoped 2026-11-18: five tasks in four phases plus a close-out (re-mine the salts against `main`'s post-[#201](https://github.com/dnznlabs/rake/pull/201) bytes and redeploy both testnets to match, then Base alone, then OP Mainnet, Arbitrum One and Ethereum with the stretch row beside them, then the mirror and the embed); four decisions to open (M05-D1 the stale salts, M05-D2 the step-6 key and salt, M05-D3 the paid-review go/no-go, M05-D4 the mirror and the host app); gated on M04's close-out; needs mainnet ETH on three keys, twelve vault co-signatures and four `create`s |
+| [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; the DNZN fund distribution live at its Sepolia address with the Sepolia table, the Ops vault as owner and a 7-day delay (decision 50); dapp mirrored and widget embedded in one DNZN app | not started — scoped 2026-11-18: six tasks in four phases plus a close-out (re-mine the salts against `main`'s post-[#201](https://github.com/dnznlabs/rake/pull/201) bytes and redeploy both testnets to match, with the threat model, coverage floor and mutation run of decision 56 beside it, then Base alone, then OP Mainnet, Arbitrum One and Ethereum with the stretch row beside them, then the mirror and the embed); four decisions opened (M05-D1 the stale salts, M05-D2 the step-6 key and salt, M05-D3 the paid-review go/no-go, M05-D4 the mirror and the host app; D2–D4 ruled as decisions 54, 55 and 59, D4's app name still open); gated on M04's close-out; needs mainnet ETH on three keys, twelve vault co-signatures and four `create`s |
 | [M06 — Owner integrations](milestones/m06/MILESTONE.md) | Optional, after mainnet. When the connected wallet is a member of the owner rather than the owner, route `propose`/`cancel` into the multisig vault's or Majeur DAO's own submit flow instead of copy-calldata. UI only; no contract change | not started |
 
 ## Order
@@ -854,6 +854,77 @@ convention. Numbered 45 because 44 is taken by
     the go/no-go input only; its method, scope and rollup stand. Rejected: options (1) and (2) of
     M05-D3 (every chain, or the three dear chains, waiting on a review) — both spend money there is
     none of; the quote request #167 stands for is withdrawn, not deferred.
+
+56. **Three reader-verifiable additions to the self-review before the first mainnet deploy: a threat
+    model, a coverage floor and a mutation run; the bytecode attestation rides the Base deploy; no
+    SMTChecker.** Decision 55's follow-up, ruled by Denizen on 2026-11-19 (GitHub,
+    [#262](https://github.com/dnznlabs/rake/issues/262), 06:40 UTC): "Option 2". Before m05-t02, as
+    one task (m05-t01b in the M05 plan): (a) `docs/THREAT_MODEL.md` listing actors, token classes,
+    chains and what each assumption's test is, each row naming a test `forge test --list` returns,
+    diffed against the Solodit checklist and two Pashov fee-distribution reports; (b) a `forge
+    coverage --ir-minimum` summary committed with a CI floor one point under the measured figure;
+    (c) `slither-mutate` over `src/` with `forge test`, results committed per commit, every survivor
+    getting a test or a one-line reason. Folded into m05-t02's deploy task, after the salts are
+    re-mined so the first attestation is the real one: (d) a `deployments/<chainId>.json` bytecode
+    attestation with a scheduled CI compare of `forge inspect deployedBytecode` against `cast code`
+    over a public RPC. Dropped: (e) the solc SMTChecker CHC profile. The next `audits/<date>/AUDIT.md`
+    provenance block names the coverage floor and the mutation score beside the leg versions. **Why:**
+    (a)–(c) are what make the review's silence mean something and cost under two days of agent time
+    with no spend; (d) belongs in the task that produces the bytes it attests; (e) is a week of z3
+    noise over arithmetic the invariants already sample. Amends decision 55's description of the review
+    of record by addition; nothing in it is superseded. Rejected: option (1), all five as one task
+    before m05-t02 (3.5–5 days, the SMTChecker leg the bulk of it); option (3), nothing beyond decision
+    55 (the alpha posture carries the risk alone). Rejected before the request, on maintenance: Aderyn,
+    Halmos, Mythril, 4naly3er, Gambit, vertigo, Solhint, Certora and a third agent lab, for the reasons
+    the issue lists.
+
+57. **R9 is a sentence, not a product change: recognised means "has been distributed once"; R19 and
+    #241 get plain-labelled lines; the sentences are drafted on the post-UAT `app/` task's PR.** Ruled
+    by Denizen on 2026-11-19 (GitHub, [#258](https://github.com/dnznlabs/rake/issues/258), 06:35 UTC):
+    "1a", the recommendation followed, "draft it". The three sentences are the page's voice under
+    decision 17, so the architect drafts them on the PR of the post-UAT `app/` task (M04's, m04-t15
+    once scoped) and they stay marked draft until Denizen accepts them by that merge; none of the text
+    is in this record. R9 (`SECURITY.md` § Front end): the ledger and `#/docs` say that a recognised
+    token is one that has been distributed once, and nothing more; the recognised set stays anyone's.
+    R19: a plain-labelled line beside the copied calldata giving the target address, the chain and the
+    value. [#241](https://github.com/dnznlabs/rake/issues/241): a plain-labelled row for the one-row
+    forward to a non-distribution, beside the code fix that rides the same task with
+    [#243](https://github.com/dnznlabs/rake/issues/243). Both `SECURITY.md` rows keep their `accepted`
+    disposition; the row text names this decision and the task. Rejected: 1(b), the recognised set
+    becomes the owner's — a product change to a function anyone may call (decision 11), where the
+    finding only needs the page to stop implying a verification the set does not carry.
+
+58. **The Ops vault keeps Elanik as an owner on all eight chains at the current threshold.** Ruled by
+    Denizen on 2026-11-19 (GitHub, [#257](https://github.com/dnznlabs/rake/issues/257), 06:33 UTC):
+    "Option 1", Elanik stays a signer on the Ops vault to streamline deployment, and whether the
+    threshold moves to 3-of-4 is out of scope for this project. So the owner set after
+    `addOwner(Elanik)` landed on 2026-11-16 is the set: four owners, threshold 2, a 3,600 s delay,
+    which the M05 plan measured on 2026-11-18 on every mainnet it targets
+    (`docs/milestones/m05/MILESTONE.md` § Acceptance criteria). No `removeOwner` or `setThreshold`
+    self-call is proposed by any rake task, and the deploy tasks' signing route (decision 47) is
+    unchanged. The handbook's `docs/multisig-transactions.md` is rewritten separately to say the
+    same; this record is rake's. Supersedes nothing in this file; decision 50's "2-of-3" description
+    of Ops was read on 2026-10-30, before the fourth owner, and its threshold and delay still hold.
+    Rejected: option (2), six `removeOwner` self-calls to match the owner set to where the vault acts
+    (six proposal-and-co-sign rounds for no deploy the vault needs); option (3), 3-of-4 on all eight
+    (every future proposal would need three signatures, and the question is not rake's).
+
+59. **The mirror is `rake.dnzn.dev`, served by GitHub Pages from a make target, with `/widget.js` at
+    the same path it has on chain; the DNZN app that embeds the widget is still unnamed.** M05-D4,
+    ruled in part by Denizen on 2026-11-19 (GitHub,
+    [#256](https://github.com/dnznlabs/rake/issues/256), 06:28 UTC). The URL is "rake.dnzn.dev"; the
+    host is GitHub Pages; the repo gets a make target of the shape "make deploy-ghpages-mirror" that
+    publishes the bundle; the mirror serves "/widget.js" from the same URL path the on-chain document
+    serves it at, so the `#/docs` snippet's host form holds on the mirror too. Which chain's bundle
+    the mirror serves was not said: the issue's option (1), the Ethereum bundle, stands as the
+    default until m05-t04's scoping says otherwise. The app that embeds the widget was not named
+    either; that half of M05-D4 stays open in the milestone's § Needs with the issue's default, named
+    at m05-t04's scoping. Which repository the Pages site is served from, and how a private rake fits
+    that, is m05-t04's scoping question, not ruled here. Decision 41 rejected GitHub Pages for the
+    widget's *test host* because it would have meant a new public repo for one snippet; that ruling
+    stands for the test host, and this one is for the mirror decision 12 said M05 would publish.
+    Rejected: option (2), a landing under dnzn.dev linking each chain's gateway URL and serving no
+    bundle (not a mirror in decision 12's sense).
 
 ## Findings carried forward
 

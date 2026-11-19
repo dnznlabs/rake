@@ -216,7 +216,12 @@ form; the numbers here are the milestone's and the record is `ROADMAP.md` § Dec
   written go, Phase 3 on the review's dispositions in `SECURITY.md` or his written waiver. Blocks
   m05-t02. *Record:* `ROADMAP.md` § Decisions as an amendment to decision 20; the accepted quote is
   its own decision.
-- **M05-D4, where the mirror lives and which DNZN app embeds the widget.** *Question:* which URL
+- **M05-D4, where the mirror lives and which DNZN app embeds the widget.** **Ruled in part
+  2026-11-19 ([#256](https://github.com/dnznlabs/rake/issues/256)), decision 59: the mirror is
+  `rake.dnzn.dev` on GitHub Pages, published by a make target of the shape
+  `make deploy-ghpages-mirror`, with `/widget.js` at the path it has on chain; the chain is the
+  option-(1) default, Ethereum, until m05-t04's scoping. Still open: the DNZN app that embeds the
+  widget, named at m05-t04's scoping as the default below says.** *Question:* which URL
   under dnzn.dev serves the mirror, which chain's bundle it serves (`make dapp-nodev` builds per
   chain, and Sepolia's and Base Sepolia's `inflated sha256` differ in § Uploads rows 3 and 4 while
   their widget hash is one), and which DNZN app carries the widget? *Options:* (1) the mirror serves the
@@ -263,8 +268,9 @@ form; the numbers here are the milestone's and the record is `ROADMAP.md` § Dec
   session and never committed.
 - ~~**Quotes for the paid review, now** (#167's default), and the spend decision when one arrives.~~
   Withdrawn by M05-D3 (decision 55): no paid review, no quote request.
-- **The mirror published and the widget embedded** under M05-D4, on Denizen's side, with the URLs in
-  m05-t04's handoff; and the Base signoff line under Phase 2 after the first real `distribute`.
+- **The Pages site and its DNS for `rake.dnzn.dev`, and the widget embedded** under M05-D4 (decision
+  59), on Denizen's side — the publish itself is the repo's make target — with the URLs in m05-t04's
+  handoff; and the Base signoff line under Phase 2 after the first real `distribute`.
 - **A branch protection rule on `main`**: `ROADMAP.md` § Not on the roadmap says "revisit at M05's
   go/no-go". A plan question for Denizen at M05-D3; it changes nothing in the criteria.
 
@@ -290,11 +296,13 @@ would teach is learned by going first except its code-deposit pricing, which ste
 ### Phase 1 — Same bytes everywhere
 
 The salts re-mined against `main`, the runbook amended by everything M04 found, and both testnets
-redeployed so six chains share one address set before any mainnet does.
+redeployed so six chains share one address set before any mainnet does; beside it, the three
+reader-verifiable additions to the self-review that decision 56 puts before the first mainnet deploy.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
 | m05-t01 | **Re-mine, amend, redeploy.** Decision 37's mining run against `main`'s init-code hashes (M05-D1; `0x00d1…`/`0x00a9…`, m03-t10's commands), `RUNBOOK.md` § 0 rewritten with the new salts and addresses and the stale block removed; the Step 5 read-back loop made an assertion ([#207](https://github.com/dnznlabs/rake/issues/207)); a per-chain chunk gas term — `cast estimate --create` of the factory on each of the six mainnets (step 1e) read into a table beside § 1, and `tools/step4-calldata.mjs`/`scripts/forge/Chunks.s.sol:13`'s `MAX_CHUNK` given a per-chain size where a 24,000-byte chunk would not clear the chain's block limit with margin ([#188](https://github.com/dnznlabs/rake/issues/188); Ethereum's limit read 60,000,000 and OP Mainnet's and Base's 40,000,000 on 2026-11-18, against a 37.8 M-gas chunk at Sepolia's pricing); the base-fee stop rule restored or its citation corrected (criterion 6); § 0's step-6 block filled with decisions 50 and 51's values and M05-D2's key; the signing app's and coordination service's mainnet chain support read and recorded. Then Run A steps 1–5, Run B and step 6 on Sepolia and Base Sepolia at the new addresses, § Executed on testnets amended, README § Contracts marking the M04 rows superseded, state-collection#74 told the new prediction. Closes #207, #188 | not started — scoped after M04's t14 merges and #227's decision is ruled, so the bundle this redeploy uploads is the one mainnet gets |
+| m05-t01b | **Threat model, coverage floor, mutation run** (decision 56, [#262](https://github.com/dnznlabs/rake/issues/262)). `docs/THREAT_MODEL.md` listing actors, token classes, chains and what each assumption's test is, each row naming a test `forge test --list` returns, diffed against the Solodit checklist and two Pashov fee-distribution reports; a `forge coverage --ir-minimum` summary committed with a CI floor one point under the measured figure; `slither-mutate` over `src/` with `forge test`, results committed per commit, every survivor given a test or a one-line reason. The next `audits/<date>/AUDIT.md` provenance block names the coverage floor and the mutation score beside the leg versions. § Out of scope's first line holds: a survivor whose only remedy is under `src/` is recorded with its reason, not fixed | not started |
 
 ### Phase 2 — The first mainnet
 
@@ -303,7 +311,7 @@ three are measured against.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m05-t02 | **Base.** Run A steps 1–5 in the runbook's order with every `record:` line read from the chain — the offline prediction before any transaction, the proxy check, step 1e's pricing read, the collision check, the native-balance assertion of § 1 re-run and recorded ([#127](https://github.com/dnznlabs/rake/issues/127)), the factory, `App`, explorer and Sourcify verification with the asserting loop; Run B through the Ops vault, three proposals at the vault's live nonce, co-signed, executed after the hour, 4d's byte comparison; `make gateway-check` against `https://<App>.8453.w3link.io/`; step 6 handed to the step-6 key's holder with the exact command and the `cast code` that must print `0x` first; § Executed on mainnets opened, README row, § Uploads row. Stops at any deviation that touches `src/` or the chunk size | not started — starts on M04's close-out merge and m05-t01's merge; M05-D3 ruled 2026-11-18 (decision 55) |
+| m05-t02 | **Base.** Run A steps 1–5 in the runbook's order with every `record:` line read from the chain — the offline prediction before any transaction, the proxy check, step 1e's pricing read, the collision check, the native-balance assertion of § 1 re-run and recorded ([#127](https://github.com/dnznlabs/rake/issues/127)), the factory, `App`, explorer and Sourcify verification with the asserting loop; Run B through the Ops vault, three proposals at the vault's live nonce, co-signed, executed after the hour, 4d's byte comparison; `make gateway-check` against `https://<App>.8453.w3link.io/`; step 6 handed to the step-6 key's holder with the exact command and the `cast code` that must print `0x` first; § Executed on mainnets opened, README row, § Uploads row. Decision 56's bytecode attestation: `deployments/8453.json` written from the deployed bytes, with a scheduled CI compare of `forge inspect deployedBytecode` against `cast code` over a public RPC, so the first attestation is the real one. Stops at any deviation that touches `src/` or the chunk size | not started — starts on M04's close-out merge and m05-t01's and m05-t01b's merges; M05-D3 ruled 2026-11-18 (decision 55) |
 
 **Signoff:** _not yet — a dated line by Denizen after reading DNZN's distribution on Base through the
 gateway from a wallet, and after the first deposit and `distribute` have run, goes here._
@@ -325,7 +333,7 @@ The dapp under dnzn.dev and the widget inside a DNZN product, as decisions 12 an
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m05-t04 | **The mirror and the embed** (M05-D4). The chain's `app/dist/index.html` published at the dnzn.dev URL Denizen names, byte-equal to `html()` on that chain, with decision 53's paragraph in `#/docs`' words; the `#/docs` snippet's chain list and gateway host checked against what criterion 3 measured and amended if the host form differs; the widget snippet placed in the DNZN app named, with the screenshot of criterion 5; README § Release Info's "deployed to Sepolia and Base Sepolia only" sentence rewritten, `0.1alpha` kept (decisions 45 and 48). `app/` changes, if any, ride one Run B upload on every live chain, so this task waits for the chain list to be final | not started — after m05-t02; beside m05-t03 |
+| m05-t04 | **The mirror and the embed** (M05-D4, decision 59). The chain's `app/dist/index.html` published at `rake.dnzn.dev` on GitHub Pages by a make target of the shape `make deploy-ghpages-mirror` (the chain is the Ethereum default until this task's scoping says otherwise; which repository serves the Pages site is its first scoping question), byte-equal to `html()` on that chain, with decision 53's paragraph in `#/docs`' words, and `app/dist/widget.js` served at `/widget.js`, the path it has on chain; the `#/docs` snippet's chain list and gateway host checked against what criterion 3 measured and amended if the host form differs; the widget snippet placed in the DNZN app named at this task's scoping, with the screenshot of criterion 5; README § Release Info's "deployed to Sepolia and Base Sepolia only" sentence rewritten, `0.1alpha` kept (decisions 45 and 48). `app/` changes, if any, ride one Run B upload on every live chain, so this task waits for the chain list to be final | not started — after m05-t02; beside m05-t03 |
 
 ### Phase 5 — Close-out
 
@@ -334,8 +342,9 @@ issues at close-out, comments on state-collection#74 with the live chains and th
 `lock()` decision issue with a proposed watch period, notes the date decision 45's 90-day clock
 starts, and hands M06 nothing it needs. No task.
 
-**Estimate, labelled as one:** five tasks, one optional; three to five weeks of calendar time, of
-which m05-t01 is about one week (two testnet signing rounds and two `create`s by hand), Phase 2 a
+**Estimate, labelled as one:** six tasks, one optional; three to five weeks of calendar time, of
+which m05-t01 is about one week (two testnet signing rounds and two `create`s by hand), m05-t01b
+under two days of agent time beside it (decision 56's figure, unmeasured), Phase 2 a
 few days after the go, and the rest is Denizen's signing sessions — twelve co-signatures and four
 `create`s on the four chains. The earlier six-to-ten-week figure carried a paid review's lead time,
 which M05-D3 (decision 55) removed. Re-estimate when m05-t02 reports.
