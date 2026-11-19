@@ -81,13 +81,26 @@ coverage: libs ## Coverage gate — floors lines and branches per src/ file
 #
 # A killed run leaves mutated files in `src/`: the tool edits in place and restores on the way out.
 # Check `git status` before trusting the tree afterwards.
+#
+# TWO RUNS, and the second one is not optional. `slither-mutate` mutates one contract per
+# `Mutating contract` section and takes that contract's own line range, so the second contract
+# declared in a shared file is dropped — silently, after being listed under `Preparing to mutate
+# contracts`. `DistributionFactory` lives in `src/Distribution.sol`, so the first run below names
+# all three and sections only two: measured at `e770054`, its mutated lines stopped at `:423` and
+# the factory starts at `:432`, zero mutants at or after it. The first run is left naming all three
+# because it is what produced the committed log, and the gap is visible in that log rather than
+# papered over. `SECURITY.md` § Mutation and `audits/README.md` § Provenance both say so.
 mutate: libs ## Mutation campaign over src/ — hours; results land in audits/mutation/<sha>/
 	@sha=$$(git rev-parse --short HEAD); \
 	mkdir -p audits/mutation/$$sha; \
 	slither-mutate src --test-cmd 'forge test' \
 	  --contract-names Distribution,DistributionFactory,App \
 	  --timeout 300 --output-dir audits/mutation/$$sha -v 2>&1 \
-	  | tee audits/mutation/$$sha/campaign.log
+	  | tee audits/mutation/$$sha/campaign.log; \
+	slither-mutate src --test-cmd 'forge test' \
+	  --contract-names DistributionFactory \
+	  --timeout 300 --output-dir audits/mutation/$$sha-factory -v 2>&1 \
+	  | tee audits/mutation/$$sha/campaign-factory.log
 
 # Every scripts/forge/Deploy*.s.sol, each with its own broadcast log. LC_ALL=C because glob order is
 # locale-dependent, and deploy order decides the addresses.

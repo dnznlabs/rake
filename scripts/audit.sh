@@ -338,17 +338,25 @@ fi
 
 # The per-contract class summaries are the tool's own words ("Revert mutants: N caught of M"), so
 # the total is their sum. A non-compiling mutant is not in either side of it.
-MUTATION_LOG=$(ls -1 audits/mutation/*/campaign.log 2>/dev/null | tail -1)
-if [ -r "$MUTATION_LOG" ]; then
-  MUTATION_SCORE=$(awk '
+#
+# EVERY log in the newest campaign directory, not just `campaign.log`. One campaign takes more than
+# one invocation: `slither-mutate` sections one contract at a time and drops the second contract
+# declared in a shared file, so `DistributionFactory` needs its own run and its own log beside the
+# first. Globbing `campaign.log` alone reported 715 of 807 and left the factory's 40 of 40 out —
+# and a score short by one contract reads exactly like a complete one.
+MUTATION_DIR=$(ls -1d audits/mutation/*/ 2>/dev/null | tail -1)
+MUTATION_LOGS=$(ls -1 "${MUTATION_DIR:-/nonexistent/}"campaign*.log 2>/dev/null)
+if [ -n "$MUTATION_LOGS" ]; then
+  MUTATION_SCORE=$(printf '%s\n' "$MUTATION_LOGS" | xargs awk '
     match($0, /[A-Za-z]+ mutants: [0-9]+ caught of [0-9]+/) {
       s = substr($0, RSTART, RLENGTH); split(s, p, " "); c += p[3]; m += p[6]
     }
-    END { if (m > 0) printf "%d of %d caught", c, m; else printf "no class summary in the log" }
-  ' "$MUTATION_LOG")
-  MUTATION_SCORE="$MUTATION_SCORE (compiling mutants, from $MUTATION_LOG)"
+    END { if (m > 0) printf "%d of %d caught", c, m; else printf "no class summary in the logs" }
+  ')
+  MUTATION_LOG_COUNT=$(printf '%s\n' "$MUTATION_LOGS" | grep -c '')
+  MUTATION_SCORE="$MUTATION_SCORE (compiling mutants, from $MUTATION_LOG_COUNT log(s) in $MUTATION_DIR)"
 else
-  MUTATION_SCORE="not recorded — no audits/mutation/*/campaign.log in the tree"
+  MUTATION_SCORE="not recorded — no audits/mutation/*/campaign*.log in the tree"
 fi
 
 PROVENANCE="$SCRATCH/provenance.txt"
