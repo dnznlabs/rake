@@ -39,8 +39,8 @@ const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.
 /* Two readers. It is what the widget snippet in #/docs puts in `data-rpc` — the embedding page's
    developer picks their own endpoint; these are only known public ones, so the example works when
    pasted — and it is this page's own read path when `discover` found no injected provider (#273), by
-   way of `readProvider`. A chain absent from this table has no read path without a wallet, which is
-   the one case `route()`'s "No wallet found" notice is still reached on. */
+   way of the read-provider helper below. A chain absent from this table has no read path without a
+   wallet, which is the one case `route()`'s no-provider notice is still reached on. */
 const PUBLIC_RPC = { 1: 'https://ethereum-rpc.publicnode.com', 10: 'https://mainnet.optimism.io', 8453: 'https://mainnet.base.org', 42161: 'https://arb1.arbitrum.io/rpc', 11155111: 'https://ethereum-sepolia-rpc.publicnode.com', 84532: 'https://sepolia.base.org', 31337: 'http://127.0.0.1:8545', 31338: 'http://127.0.0.1:8546' };
 const ZERO = '0x' + '0'.repeat(40);
 /*DEV*/
@@ -65,8 +65,8 @@ let P = null, ACC = null, CHAIN = null;
 let WALLET = false;
 // The endpoint the landing's widget is handed in `data-rpc`: the dev `?rpc=` override when there is
 // one, and otherwise empty, in which case the mount falls back to this chain's `PUBLIC_RPC` entry for
-// a visitor with no wallet and to `window.ethereum` for one who has it. Reads never require a wallet;
-// writes always do.
+// a visitor with no wallet and to the injected EIP-1193 global for one who has it. Reads never
+// require a wallet; writes always do.
 let WRPC = '';
 // The page's read path when there is no wallet, and the transport behind the dev `?rpc=` override.
 const rpcProvider = url => ({
