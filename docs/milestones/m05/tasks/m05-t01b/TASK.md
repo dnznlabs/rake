@@ -31,8 +31,12 @@ Every command runs from the repo root through `devbox run --` (forge `1.7.1-dev`
 both already in `devbox.json` — **no new package**; `slither-mutate` ships inside
 `slither-analyzer@0.11.5`, measured). Branch `m05/t01b-self-review` from `origin/main` at or after
 `78b5eb7`. Check hooks: `ls .git/hooks | grep -v sample` prints `pre-commit` and `post-commit`.
-Figures below were measured by the architect on 2026-11-19 at `78b5eb7` on this host; **re-run
-rather than quote**, and record what the re-run returns beside each.
+**Measured baseline** — Elanik (engineer), 2026-11-19, `78b5eb7`, through the devbox pin, posted on
+[#262](https://github.com/dnznlabs/rake/issues/262#issuecomment-7002043948): `forge test` exit 0,
+107 passed, 32 s; `forge coverage --ir-minimum` exit 1, 83 passed / 22 failed, 105 enumerated, 4 of
+7 suites failed, 47 s. The architect reproduced both the same day on the same commit (exit 0 / 107 /
+12 s; exit 1 / 83 + 22 / 105 / 46 s) and measured the rest of the figures below on this host.
+**Re-run rather than quote**, and record what the re-run returns beside each.
 
 0. **Baseline.** `forge test` → 107 passed (`SECURITY.md:438` still says 102; the five are
    `test/ColdStipend.t.sol`'s four and `DistributionTest`'s 57th, and that sentence is amended in
@@ -96,35 +100,60 @@ rather than quote**, and record what the re-run returns beside each.
 
 2. **The coverage floor — `make coverage`, a floor script, a CI step.**
 
-   **The measurement that shapes this step:** `forge coverage` compiles with the optimizer off and
-   there is no way round it in 1.7.1 — `--optimize true --optimizer-runs 1000` is accepted and
-   ignored (measured: the same result). **22 of the 107 tests fail under that binary**, because
-   their assertions pin optimizer-dependent gas: `test_hookRecipientStarvesLaterRows`'s 95,226,000
-   bisect, `ColdStipendTest`'s two measured frames, `PushGasTest`'s real-path stipend, all three of
-   `TableCapTest` (its `setUp` reverts, one failure line for the suite), and eighteen
-   `DistributionTest` cases — sixteen `test_` and two `testFuzz_` — every one `EvmError: Revert`
-   under the unoptimized binary (the per-test cause is not diagnosed here; membership is decided by
-   the reproduction below, not by an explanation). The same 22, by name, fail under
-   `FOUNDRY_OPTIMIZER=false forge test` with no coverage involved — **that is the test for
-   membership of the exclusion list**, and a test that passes with the optimizer off is not
-   excluded whatever else it does. `forge coverage --ir-minimum --report summary` at `78b5eb7`:
-   exit 1, 49 s wall, and — because the failing tests still ran their lines up to the revert —
-   `src/App.sol` 92.41 % lines / 92.31 % branches, `src/Distribution.sol` 90.16 % / 92.11 %. With
-   the 22 excluded by name: exit 0, 45 s, `src/App.sol` **92.41 % lines (73/79), 92.31 % branches
-   (12/13)**, `src/Distribution.sol` **89.62 % lines (164/183), 89.47 % branches (34/38)**, funcs
-   100 % on both, 82 tests run. The `Total` row (68.58 %) counts `test/` and `lib/` and is not the
-   figure; the two `src/` rows are.
+   **The measurement that shapes this step (Elanik's finding on #262, reproduced):** `forge
+   coverage` does not run clean on `main`. The paired control is `forge test` at the same commit,
+   exit 0 with 107 passed, so the instrumentation is the variable: `--ir-minimum` recompiles at
+   minimal optimisation and coverage inserts counters, so gas changes by construction, and this
+   suite asserts measured gas frames on purpose (the 2,300-gas stipend behaviour the dapp warns
+   about). `--optimize true --optimizer-runs 1000` is accepted and ignored by 1.7.1 (measured: the
+   same exit, counts and rows). **22 of the 107 tests fail under that binary**:
+   `test_hookRecipientStarvesLaterRows`'s 95,226,000 bisect, `ColdStipendTest`'s two measured
+   frames (`test_coldReceiveFitsTheMeasuredFrame`,
+   `test_receiveUnderStipendPassesOnceImplementationIsWarm`), `PushGasTest`'s
+   `test_realPathPaysASafeAndAVaultClone`, all three of `TableCapTest` — its `setUp` reverts, so
+   coverage prints one failure line for the suite and **enumerates 105 tests, not 107** — and
+   eighteen `DistributionTest` cases, sixteen `test_` and two `testFuzz_`
+   (`testFuzz_claimMovesExactlyEscrow`, `testFuzz_roundingNeverExceedsAmount`), every one a bare
+   `EvmError: Revert` (the per-test cause is not diagnosed here; membership is decided by the
+   reproduction, not by an explanation). The same 22, by name, fail under
+   `FOUNDRY_OPTIMIZER=false forge test` with no coverage involved (exit 1, 83 + 22, 105
+   enumerated; name sets diffed, identical) — **that is the test for membership of the exclusion
+   list**, and a test that passes with the optimizer off is not excluded whatever else it does.
+   `forge coverage --ir-minimum --report summary` as it stands: exit 1, 46 s, and — because the
+   failing tests still ran their lines up to the revert — `src/App.sol` 92.41 % lines / 92.31 %
+   branches, `src/Distribution.sol` 90.16 % / 92.11 %.
+
+   **Recommendation: exclude the gas-frame tests from the coverage run by a named pattern and
+   floor the measured subset.** The floor measures line and branch coverage of `src/` over the
+   named subset; **a floor expressed as a test count is out** — coverage and `forge test`
+   enumerate different populations (105 vs 107 above), so a count compares two things. Measured
+   with the 21 names and the one path excluded: exit 0, 44 s, **83 tests run (107 − 21 − 3)**,
+   `src/App.sol` **92.41 % lines (73/79), 92.31 % branches (12/13)**, `src/Distribution.sol`
+   **89.62 % lines (164/183), 89.47 % branches (34/38)**, funcs 100 % on both. The `Total` row
+   (68.85 %) counts `test/` and `lib/` and is not the figure; the two `src/` rows are. The cost of
+   this choice is stated in `SECURITY.md`: the lines those 21 tests alone reach are reported
+   uncovered (one line and one branch of `Distribution` at `78b5eb7`, by the two runs' difference),
+   and a new gas-pinning test joins the list in its own PR or the gate goes red.
+   **Alternative, rejected: accept the failing run and read the report.** The rows print
+   either way and are a point higher, but a gate that passes on exit 1 cannot distinguish "22
+   gas-frame failures" from "22 failures of any kind", so it would have to parse the failure list
+   for the expected names — the same list, maintained in a worse place — and CI would carry a
+   step that is always red. If Denizen prefers it, the script changes shape and the floors are the
+   unexcluded rows; nothing else in the task moves.
 
    - `mk/10-forge.mk` gains, after `slither:` (`:42`), a `coverage:` target (add it to `.PHONY`,
      `:19`) that runs `bash scripts/coverage-floor.sh`. The script: `forge coverage --ir-minimum
      --report summary --no-match-test "$SKIP" --no-match-path 'test/TableCap.t.sol'`, tees the
      output, parses the two `src/` rows, and exits non-zero when any of the four figures (lines
-     and branches, per file) is under its floor. `SKIP` is the 21 test names as one regex, in the
-     script, each with the one-word reason beside it (`gas-pin`), so the list is read where it
-     bites; `TableCapTest` is excluded by path because its `setUp` is what reverts. **Floors, from the measured figures rounded down and one point under:** `App` lines
-     **91**, branches **91**; `Distribution` lines **88**, branches **88**. Re-measure first; if
-     the re-run differs, the floors follow it and the handoff says so. Statements and funcs are
-     printed, not gated.
+     and branches, per file) is under its floor. `SKIP` is the 21 test names as one regex of the
+     form `^(name|name|…)\(` — **the `\(` is load-bearing**: `--no-match-test` matches the
+     signature, and `^(…)$` matched nothing (measured: 104 ran, 21 failed, exit 1) — built in the
+     script from a list with the one-word reason beside each name (`gas-pin`), so the list is read
+     where it bites; `TableCapTest` is excluded by path because its `setUp` is what reverts.
+     **Floors, from the measured figures rounded down and one point under:** `App` lines **91**,
+     branches **91**; `Distribution` lines **88**, branches **88**. Re-measure first; if the re-run
+     differs, the floors follow it and the handoff says so. Statements and funcs are printed, not
+     gated.
    - `.github/workflows/ci.yml` gains a `coverage` step **after `gas snapshot` (`:73`) and before
      `slither` (`:83`)**: coverage compiles with its own settings into `out/`, so anything that
      reads `out/` after it pays a rebuild — the same reason Slither is ordered last, and Slither
@@ -132,8 +161,9 @@ rather than quote**, and record what the re-run returns beside each.
    - `SECURITY.md` gains **§ Coverage** after § Invariants the suite holds (`:436`) and before
      § What the review did not cover (`:612`): the command, the commit, the two `src/` rows as
      measured, the floors, the sentence that `--ir-minimum`'s source map is "relatively accurate"
-     by forge's own help and the numbers are approximate to the line, and the 22 excluded tests
-     with the reason and the `FOUNDRY_OPTIMIZER=false` reproduction. The uncovered lines (19 in
+     by forge's own help and the numbers are approximate to the line, the 21 excluded tests and
+     the one excluded suite with the reason and the `FOUNDRY_OPTIMIZER=false` reproduction, and
+     Elanik's finding credited by name with the #262 comment link. The uncovered lines (19 in
      `Distribution`, 6 in `App` at `78b5eb7`, in the excluded run) are listed by line with one phrase each — these are
      where step 3's survivors are expected first.
 
@@ -226,21 +256,32 @@ states its `main` baseline at `78b5eb7`.
    `grep -oE '(test_|testFuzz_|invariant_)[A-Za-z0-9_]+' docs/THREAT_MODEL.md | sort -u > /tmp/named; forge test --list | grep -oE '(test_|testFuzz_|invariant_)[A-Za-z0-9_]+' | sort -u > /tmp/have; comm -23 /tmp/named /tmp/have`
    prints nothing, and `wc -l < /tmp/named` is at least 20. Baseline: the file does not exist on
    `main` (`test -e docs/THREAT_MODEL.md` → 1). The same pipeline run over this `TASK.md` prints
-   nothing for its sixteen names (checked 2026-11-19).
+   nothing for its twenty names (checked 2026-11-19).
 2. **The four sections and the checklist diff are there.** `grep -c -i '^## ' docs/THREAT_MODEL.md`
    → 4 or more; `grep -c -i 'SOL-' docs/THREAT_MODEL.md` → 10 or more; the file's § Checklist diff
    names the `Cyfrin/audit-checklist` commit and the two `pashov/audits` report paths with the
    corpus commit; `grep -c -i '| open' docs/THREAT_MODEL.md` is stated in the handoff (0 is a
    result, not a requirement).
-3. **The floor holds and bites.** `devbox run -- make coverage` → exit 0, and the two `src/` rows
-   are printed; with one floor raised above its measured figure in a scratch copy of
-   `scripts/coverage-floor.sh`, the same command exits non-zero naming the row — both runs in the
-   handoff. Baseline: `make coverage` → `No rule to make target 'coverage'` on `main`.
-4. **The exclusion list is exactly the optimizer-off failures.** For every name in the script's
-   `SKIP`, `FOUNDRY_OPTIMIZER=false forge test --match-test <name>` fails and `forge test
-   --match-test <name>` passes; `FOUNDRY_OPTIMIZER=false forge test 2>&1 | grep -c '^\[FAIL'`
-   equals the list's length plus the `TableCapTest` setUp line. Measured at `78b5eb7`: 22 failing,
-   83 passing, same set as under `forge coverage`.
+3. **The floor holds and bites.** `devbox run -- make coverage` → exit 0, its `Ran N test suites`
+   line reports **0 failed** and a total equal to `forge test --list`'s count minus the exclusions
+   (83 at `78b5eb7`: 107 − 21 − 3), and the two `src/` rows are printed; with one floor raised
+   above its measured figure in a scratch copy of `scripts/coverage-floor.sh`, the same command
+   exits non-zero naming the row — both runs in the handoff. The floors are line and branch
+   percentages of the two `src/` rows; no criterion in this task gates on a test count. Baseline:
+   `make coverage` → `No rule to make target 'coverage'` on `main`.
+4. **The exclusion list is exactly the optimizer-off failures, with its denominator.** The
+   pattern matches only the gas-frame tests:
+   `forge test --list | grep -E '^\s+(test|invariant)' | sed -E 's/^\s+//' | grep -cE "^(<the SKIP names>)$"`
+   → the list's length (21 at `78b5eb7`; `--list` prints bare names, so the script's trailing `\(`
+   is dropped here), `forge test --list --match-path test/TableCap.t.sol` → 3 names, and both
+   figures are stated beside the 83 of criterion 3. For every name in `SKIP`,
+   `FOUNDRY_OPTIMIZER=false forge test --match-test <name>` fails and `forge test --match-test
+   <name>` passes;
+   `FOUNDRY_OPTIMIZER=false forge test 2>&1 | grep -E '^\[FAIL' | sed -E 's/^\[FAIL.*\] ([A-Za-z0-9_]+)\(.*/\1/' | sort -u`
+   (unique names — forge prints each failure twice, per suite and in the summary, so a bare
+   `grep -c` double-counts: 48 lines for 22 failures at `78b5eb7`) equals the `SKIP` names plus
+   `setUp`, and is identical to the same pipeline over `forge coverage --ir-minimum` with no
+   exclusions. Measured at `78b5eb7`: 22 failing, 83 passing, 105 enumerated, under both.
 5. **CI runs it in the right place.** `.github/workflows/ci.yml` has a `coverage` step after
    `gas snapshot` and before `slither`, with the ordering reason in a comment; the run on the
    branch head is green and the step's log prints the two `src/` rows. Baseline:
