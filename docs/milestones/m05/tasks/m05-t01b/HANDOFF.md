@@ -9,7 +9,7 @@ one point under them; and a `slither-mutate` campaign over `src/` is committed u
 did not go to plan — the tool mutates one contract per section and **silently dropped
 `DistributionFactory`**, the second contract declared in `src/Distribution.sol`, so the record is
 two logs and the scope question went back to the architect before any test was written
-([#272](https://github.com/dnznlabs/rake/issues/272#issuecomment-7021439731), ruled). 29 survivors
+([#272](https://github.com/dnznlabs/rake/issues/272#issuecomment-7021222156), ruled). 29 survivors
 got a test, from 15 new tests; 2 are `unreachable`; 61 are `equivalent`, 5 of them pinned by a test
 that passes on both the original and the mutant. No survivor is a real defect, so there is no
 § Stop, and no `src/` byte moved.
@@ -37,10 +37,17 @@ that passes on both the original and the mutant. No survivor is a real defect, s
   `App`: its mutated lines stop at `:423` and the factory starts at `src/Distribution.sol:432`,
   zero mutants at or after it. A second run naming the factory alone produces
   `campaign-factory.log`. Reported before writing any test and **ruled by the architect** on
-  [#272](https://github.com/dnznlabs/rake/issues/272#issuecomment-7021439731): the factory's
+  [#272](https://github.com/dnznlabs/rake/issues/272#issuecomment-7021222156): the factory's
   survivors join § Mutation as one record, the score is stated per contract for all three, and
   § Provenance says why there are two logs. `make mutate` now runs both; the first invocation is
   left naming all three so it still reproduces the committed log, and the gap stays visible in it.
+  The campaign-of-record scope and the one-PR split were ruled in the same thread
+  ([7021073832](https://github.com/dnznlabs/rake/issues/272#issuecomment-7021073832),
+  [7021378804](https://github.com/dnznlabs/rake/issues/272#issuecomment-7021378804)); the
+  classification table they rest on is
+  [7021368184](https://github.com/dnznlabs/rake/issues/272#issuecomment-7021368184) and the finished
+  factory figures are
+  [7021439731](https://github.com/dnznlabs/rake/issues/272#issuecomment-7021439731).
 - **The coverage floors were raised, not inherited.** `e770054`'s floors were 91/91 and 88/88; the
   new tests moved `App` to 96.20 %/100.00 % and `Distribution`'s branches to 92.11 %, and the plan's
   own rule is "the measured figures rounded down and one point under". Left alone they would sit
