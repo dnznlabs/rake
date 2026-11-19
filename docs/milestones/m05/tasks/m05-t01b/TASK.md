@@ -145,12 +145,24 @@ both already in `devbox.json` — **no new package**; `slither-mutate` ships ins
    - `mk/10-forge.mk` gains, after `slither:` (`:42`), a `coverage:` target (add it to `.PHONY`,
      `:19`) that runs `bash scripts/coverage-floor.sh`. The script: `forge coverage --ir-minimum
      --report summary --no-match-test "$SKIP" --no-match-path 'test/TableCap.t.sol'`, tees the
-     output, parses the two `src/` rows, and exits non-zero when any of the four figures (lines
-     and branches, per file) is under its floor. `SKIP` is the 21 test names as one regex of the
-     form `^(name|name|…)\(` — **the `\(` is load-bearing**: `--no-match-test` matches the
-     signature, and `^(…)$` matched nothing (measured: 104 ran, 21 failed, exit 1) — built in the
-     script from a list with the one-word reason beside each name (`gas-pin`), so the list is read
-     where it bites; `TableCapTest` is excluded by path because its `setUp` is what reverts.
+     output, parses every `src/` row, and exits non-zero when any of the four figures (lines
+     and branches, per file) is under its floor. **The script also asserts that the number of
+     `src/` rows it parsed equals the number of `src/*.sol` files** (`ls src/*.sol | wc -l` → 2 at
+     `78b5eb7`: `App.sol`, `Distribution.sol`), and exits non-zero naming the unexpected file
+     otherwise — a third contract with no floor is a red run that says so, not a green one that
+     gates two files and ignores the third (Elanik's second review,
+     [#268](https://github.com/dnznlabs/rake/pull/268#issuecomment-7002429826)). `SKIP` is the 21
+     test names as one regex of the form `^(name|name|…)\(` — **the `\(` is load-bearing**:
+     `--no-match-test` matches the signature, `^(…)$` matched nothing (measured: 104 ran, 21
+     failed, exit 1), and without the `\(` a listed name excludes every test it prefixes. The
+     collision is inside this list: `test_receiveUnderStipend` prefixes
+     `test_receiveUnderStipendPassesOnceImplementationIsWarm`, and Elanik showed
+     `--no-match-test '^(test_receiveUnderStipend)\('` removes exactly one (83 / 21 / 104 against
+     83 / 22 / 105; same comment). Dropping it would exclude a test nobody listed and raise
+     coverage while the floor passes, which is why criterion 4 keeps both the per-name
+     `--match-test` check and the enumerated count. The regex is built in the script from a list
+     with the one-word reason beside each name (`gas-pin`), so the list is read where it bites;
+     `TableCapTest` is excluded by path because its `setUp` is what reverts.
      **Floors, from the measured figures rounded down and one point under:** `App` lines **91**,
      branches **91**; `Distribution` lines **88**, branches **88**. Re-measure first; if the re-run
      differs, the floors follow it and the handoff says so. Statements and funcs are printed, not
@@ -267,9 +279,12 @@ states its `main` baseline at `78b5eb7`.
    line reports **0 failed** and a total equal to `forge test --list`'s count minus the exclusions
    (83 at `78b5eb7`: 107 − 21 − 3), and the two `src/` rows are printed; with one floor raised
    above its measured figure in a scratch copy of `scripts/coverage-floor.sh`, the same command
-   exits non-zero naming the row — both runs in the handoff. The floors are line and branch
-   percentages of the two `src/` rows; no criterion in this task gates on a test count. Baseline:
-   `make coverage` → `No rule to make target 'coverage'` on `main`.
+   exits non-zero naming the row — both runs in the handoff. **The row count is gated too:** with
+   a scratch `src/Foo.sol` (an empty contract, deleted after) or the script's expected count
+   edited in a scratch copy, the same command exits non-zero naming the unexpected file — quoted
+   in the handoff beside `ls src/*.sol | wc -l` → 2 (baseline at `78b5eb7`). The floors are line
+   and branch percentages of the `src/` rows; no criterion in this task gates on a test count.
+   Baseline: `make coverage` → `No rule to make target 'coverage'` on `main`.
 4. **The exclusion list is exactly the optimizer-off failures, with its denominator.** The
    pattern matches only the gas-frame tests:
    `forge test --list | grep -E '^\s+(test|invariant)' | sed -E 's/^\s+//' | grep -E "^(<the SKIP names>)$"`
