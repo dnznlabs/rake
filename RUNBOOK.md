@@ -428,7 +428,7 @@ cast estimate --rpc-url "$RPC" --create "$(forge inspect DistributionFactory byt
 cast estimate --rpc-url "$RPC" --create "$AINIT"   # the App init code of 1f, same reason
 ```
 
-The call must return the factory's **1,320-byte** runtime. The constructor runs
+The call must return the factory's **1,319-byte** runtime. The constructor runs
 `new Distribution`, whose bytecode is cancun/PUSH0, so a success here is the EVM check of § 1 —
 executed, not read off a feature list. Record the estimate; it is the gas figure for this chain.
 
@@ -481,7 +481,7 @@ done or stopped, so **identify it before doing anything else**:
 
 ```sh
 # Is it ours? The runtime must match the artifact, and the contract must answer step 3's reads.
-cast code $FACTORY --rpc-url "$RPC" | tr -d '\n' | wc -c                    # 2,642 chars = 1,320 bytes
+cast code $FACTORY --rpc-url "$RPC" | tr -d '\n' | wc -c                    # 2,640 chars = 1,319 bytes
 cast call $FACTORY "implementation()(address)" --rpc-url "$RPC"             # must be a contract, see below
 cast code $APP --rpc-url "$RPC" | tr -d '\n' | wc -c                        # must equal the artifact's length
 cmp <(cast code $APP --rpc-url "$RPC" | tr -d '\n') <(forge inspect App deployedBytecode | tr -d '\n')
@@ -1161,7 +1161,7 @@ unchanged ABI on a new chain is all `Duplicated:`; an ABI change shows up as `Im
 
 ### Step 6 — DNZN's `create`
 
-**This is the one step the DNZN Creator key signs**, and the only one. Re-export `SIGNER` to that
+**This is the one step the DNZN Creator key signs**, and the only one. Re-export `SENDER` to that
 key for this step and back afterwards. Its two conditions are the handbook's, in
 `docs/multisig-transactions.md` § The DNZN Creator key — salted creates only, and never an owner or
 a signer for anything else.
