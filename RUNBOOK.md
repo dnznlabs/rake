@@ -66,8 +66,8 @@ export CHAIN_ID=<from § 1's table>
 export SIGNER="--account <keystore> --sender <address>"   # anvil: --unlocked --sender 0xf39F…2266
 export OWNER=0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790    # the Ops vault: App's owner, and the owner passed to create
 export APP_VERSION=v0.1
-export FACTORY_SALT=0xc7b08946793948e2cb78adf914cfa19ac8341e52b8a7a96ab26034fe6c476693  # mined, decision 37
-export APP_SALT=0xd9ad8a57dc1d24c639881670feb590b06bb437e8c698f3e9fc53d5920c04b7ef      # mined, decision 37
+export FACTORY_SALT=0xf83d35cef117466f8f7d514b6413fda46f290e45d72f4d985312f746ce6e4193  # mined, decision 37
+export APP_SALT=0x87cdf85b31cb82e688a11bbb8cf4c0249648f7dc2e5bec932424960920ead3f2      # mined, decision 37
 export CREATOR=0x68e0741D8d693e14BF56914567eADdC130b186eE  # DNZN Creator, decision 32
 export ENGINEER=0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d # Elanik's key, an Ops owner since 2026-11-16 (§ Step 4)
 export DNZN_SALT=${CREATOR}000000000000000000000001        # top 20 bytes CREATOR (decision 10), low 12 bytes 1
@@ -104,24 +104,29 @@ every chain. Changing any one of them on one chain puts `App` somewhere else the
 
 **The salts are mined.** [#115](https://github.com/dnznlabs/rake/issues/115) was ruled for vanity
 mining (**decision 37**, amended 2026-11-07 with the prefixes: `0x00d1…` for `DistributionFactory`,
-`0x00a9…` for `App`), and both were mined once, in
-[m03-t10](docs/milestones/m03/tasks/m03-t10/TASK.md), against the init-code hashes step 1f computes:
-`0xd8a1208ac79c66d94c864e7620534dd0f923bf0f7518d25ae87a7f619bc31cc5` for the factory and
-`0x0b2894a38c541f156e2be856b7469993004331006a2ba9c66fa4d040f7b9864a` for `App`. **A salt is tied to
+`0x00a9…` for `App`). Both were mined once in
+[m03-t10](docs/milestones/m03/tasks/m03-t10/TASK.md) against the 0.8.34 bytes, and **mined again in
+[m05-t01](docs/milestones/m05/tasks/m05-t01/TASK.md) against the 0.8.38 bytes `main` builds today** —
+why the run repeated is `ROADMAP.md` § Decisions M05-D1 and
+[#202](https://github.com/dnznlabs/rake/pull/202), not restated here. The salts above are the second
+run's, against the init-code hashes step 1f computes:
+`0x9778c35879aa3214905a41c9519ae6c704dc5d00333806ac56ed6e7fbd2d8945` for the factory and
+`0xa8bbb83700d29d4b2e4b871c680f31165f42c0eb9234071a7948ce79f9fe33a3` for `App`. **A salt is tied to
 the bytes it was mined against**: any later `src/` byte is a new factory address and a new mining
 run (decision 5 — a new version is a new factory anyway), and because `OWNER` and `APP_VERSION` are
 inside `App`'s hash, `APP_SALT` holds only for the Ops vault and `v0.1`. Step 1f recomputes both
 addresses from these variables on every chain; it never copies them.
 
-> **Stale since [#201](https://github.com/dnznlabs/rake/pull/201) (merged 2026-11-16, solc 0.8.34 → 0.8.38, no `src/` change).** Both salts above were mined against the 0.8.34 init-code hashes quoted here; `main` now compiles to different bytes, so step 1f computes different hashes and neither salt yields its `0x00…` prefix any more. Do not run the deploy steps against `main` until decision 37's mining run has been repeated for the new hashes and this block updated. The Sepolia and Base Sepolia deployments recorded below were made from the 0.8.34 bytes and remain self-consistent; they cannot share an address with anything deployed from `main`.
-
 **`CREATOR` is named** (decision 32; [#90](https://github.com/dnznlabs/rake/issues/90) closed at M03
-close-out): `0x68e0741D8d693e14BF56914567eADdC130b186eE`, and the salt's low 12 bytes are `…0001`,
-so **DNZN's distribution is `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`** on every chain where the
-factory is at the § 0 address — `predict($DNZN_SALT)` answered that on two anvils at close-out
-(`docs/milestones/m03/CLOSEOUT.md` criterion 6), and step 6 recomputes it on each chain rather than
-copying it from here. The rehearsal in § Rehearsed on anvil predates the key and uses the signing
-account for it, and says so. The creator key's two conditions — salted creates only, and never an owner or a signer for anything
+close-out): `0x68e0741D8d693e14BF56914567eADdC130b186eE`, and it is the sender of step 6 on every
+chain, testnets included (**decision 54**). The salt's low 12 bytes are `…0001`, so **DNZN's
+distribution is `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`** on every chain where the factory is at
+the § 0 address — `predict($DNZN_SALT)` answered that on m05-t01's anvil on 2026-11-19, with the
+factory at its § 0 address, and step 6 recomputes it on each chain rather than copying it from here.
+Both rehearsals stand the signing account in for the creator key when they send the `create` — § 0's
+real `DNZN_SALT` reverts `SaltDoesNotStartWith` from any other sender — so the address their `create`
+lands is the rehearsal's, while `predict($DNZN_SALT)` above is this one; § Rehearsed on anvil says so
+for its own run. The creator key's two conditions — salted creates only, and never an owner or a signer for anything
 else — are the handbook's, in `docs/multisig-transactions.md` § The DNZN Creator key, and are
 referenced rather than restated so there is one copy of them.
 
@@ -1558,9 +1563,11 @@ estimate-then-send**: the false `DeploymentFailed()` is a wallet-path observatio
 `eth_estimateGas` one.
 
 Step 6 has not run on
-either chain:
-`cast code` at `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` prints `0x` on both and the Creator key
-is at **nonce 0** on both.
+either chain: ~~`cast code` at the pre-#201 predicted address prints `0x` on both~~ — **superseded
+2026-11-19 (m05-t01, M05-D1)**: that prediction was a function of the pre-#201 factory address and
+both moved with the re-mine, so the address this reading was taken at is no longer the one step 6
+reaches. The Creator key is at **nonce 0** on both. § 0 carries the current prediction and Part B
+re-reads `cast code` at it per chain.
 
 **Sepolia's steps 2 and 3 were sent by a run that was killed before it recorded anything**, at
 09:44–09:51 CST on 2026-11-08 from commit `4b6f95b`. This section **records** those transactions; it
@@ -1630,7 +1637,7 @@ exit **0** with 0 results. `forge test` **102 passed**, `node --test` **90 passe
 | 5 | 5 | explorer: factory / implementation / App | all three `Pass`, names `DistributionFactory` / `Distribution` / `App`; URLs below |
 | | 5 | Sourcify: factory / implementation / App | all three **`exact_match`**, with `creationMatch` and `runtimeMatch` also `exact_match`; read from `/v2/contract/11155111/<address>` on 2026-11-17 — factory `05:56:42Z`, implementation `05:56:56Z`, `App` `05:57:11Z` |
 | | 5 | OpenChain signatures | uploaded for `Distribution`, `DistributionFactory` and `App`. A `Distribution` clone is **not** verifiable on Sourcify (`match: null`), which is what these signatures exist to cover; a second upload prints `Duplicated:` per signature and changes nothing |
-| 6 | 6 | DNZN `create` | not run — Denizen's; `predict($DNZN_SALT)` = `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`, `cast code` `0x` |
+| 6 | 6 | DNZN `create` | not run — Denizen's; ~~`predict($DNZN_SALT)` = the pre-#201 address, `cast code` `0x`~~ **superseded 2026-11-19 (m05-t01, M05-D1)** — the re-mine moved the factory, so it moved this prediction; § 0 carries the current one |
 | | 6 | `owner()` on `DISTRO` | not run |
 
 One extra transaction belongs to this chain's record: **`0xf80fc26d6c99b686147c834eb35f8a19fdb2c39ede03d9aaa7c65e3e534b7c29`,
@@ -1659,7 +1666,7 @@ a collision and the successful send that followed it is not a resend.
 | 5 | 5 | explorer: factory / implementation / App | all three `Pass - Verified` this run; URLs below |
 | | 5 | Sourcify: factory / implementation / App | all three **`exact_match`**, with `creationMatch` and `runtimeMatch` also `exact_match`; read from `/v2/contract/84532/<address>` on 2026-11-17 — factory `05:58:43Z`, implementation `05:58:57Z`, `App` `05:59:13Z` |
 | | 5 | OpenChain signatures | the same three uploads cover this chain: signatures are keyed by selector, not by chain, so one upload serves every deployment of the same ABI |
-| 6 | 6 | DNZN `create` | not run — Denizen's; `predict($DNZN_SALT)` = `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`, `cast code` `0x` |
+| 6 | 6 | DNZN `create` | not run — Denizen's; ~~`predict($DNZN_SALT)` = the pre-#201 address, `cast code` `0x`~~ **superseded 2026-11-19 (m05-t01, M05-D1)** — the re-mine moved the factory, so it moved this prediction; § 0 carries the current one |
 | | 6 | `owner()` on `DISTRO` | not run |
 
 ### The runtime, compared to the artifact
