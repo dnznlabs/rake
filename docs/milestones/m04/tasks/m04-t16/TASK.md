@@ -12,7 +12,8 @@ its place when one returns, the full address in the title, re-run on every accou
 ([#274](https://github.com/dnznlabs/rake/issues/274)). `app/src/index.html` and `test/*.mjs` only;
 nothing under `src/`, no `.gas-snapshot` change, no upload. Decision 61: this is the `app/` change
 after m04-t15 that the mainnet bundle carries, and the settings page
-([#275](https://github.com/dnznlabs/rake/issues/275)) is not here.
+([#275](https://github.com/dnznlabs/rake/issues/275)) is not here — it is m04-t17, after this task,
+and the one thing it takes from here is the read-only provider of step 2.
 
 ## Plan
 
@@ -66,11 +67,16 @@ on purpose, and says so.
    with its own one-line comment saying it is the page's read path without a wallet and the dev
    `?rpc=` override; `capped` (`:79-92`) stays inside the fence, which now opens on its comment.
    Declare `let WALLET = false;` beside `:59` — true only when `discover` found an injected
-   provider, and the one thing `who()` reads to tell "no wallet" from "wallet, not connected". In
-   `discover`, after `:106` (`P = (found[0] && found[0].provider) || window.ethereum || null;`):
-   `WALLET = !!P;` then, in place of `:107`'s `if (!P) return;`:
-   `if (!P) { if (PUBLIC_RPC[CFG.chainId]) P = rpcProvider(PUBLIC_RPC[CFG.chainId]); return; }`.
-   The dev branch (`:95-101`) leaves `WALLET` false, so `?rpc=` without `from=` behaves as a visitor
+   provider, and the one thing `who()` reads to tell "no wallet" from "wallet, not connected".
+   Directly under the moved `rpcProvider`, one function that answers which transport reads the
+   chain: `const readProvider = injected => { const u = PUBLIC_RPC[CFG.chainId]; return injected ||
+   (u ? rpcProvider(u) : null); };` — the injected provider when there is one, else the chain's
+   public endpoint, else `null`. **This function is the seam m04-t17 reuses: the user's RPC URL and
+   the wallet-or-RPC route choice of decision 61 are inserted inside `readProvider` and nowhere
+   else, so nothing of that page is here and nothing here moves when it lands.** In `discover`,
+   after `:106` (`P = (found[0] && found[0].provider) || window.ethereum || null;`): `WALLET = !!P;
+   P = readProvider(P);` then `:107`'s `if (!P) return;` stands. The dev branch (`:95-101`) leaves
+   `WALLET` false, so `?rpc=` without `from=` behaves as a visitor
    with no wallet, which is what case (a) of step 6 relies on. Nothing else changes: `load()` reads
    `eth_chainId` through `P` (`:584`) and the public endpoint answers it, so `CHAIN`, `wrongChain()`
    and `resolveName`'s chain gate (`:503`) all work as they do under a wallet; the boot sequence at
@@ -84,14 +90,17 @@ on purpose, and says so.
    strip from `app/build.mjs:145` by asserting the file contains the literal
    `html.replace(/\/\*DEV\*\/[\s\S]*?\/\*DEV\*\//g, '')` (so a changed strip fails the test rather
    than silently diverging from it), applies that same regex to the page, and asserts on the stripped
-   text: `const rpcProvider =` present once; `const capped` absent; and the slice from `async function
-   discover` to `async function connect` contains `rpcProvider(PUBLIC_RPC[CFG.chainId])`. **Predicted
-   reds, two plants:** `const rpcProvider` moved back under the `/*DEV*/` at `:63` reds the first and
-   third assertions (quote both messages); the fallback line removed from `discover` reds the third
-   alone. Greps: `grep -c 'const rpcProvider' app/dist/index.html` → `1` after `make dapp-nodev
-   CHAIN_ID=11155111` (baseline 0); `grep -c 'const capped' app/dist/index.html` → `0`, unchanged;
-   `rpcProvider` in the source → `3`, unchanged (the declaration moved, nothing added); `let WALLET`
-   → `1`; `PUBLIC_RPC[CFG.chainId]` → `2`.
+   text: `const rpcProvider =` present once; `const capped` absent; `const readProvider =` present
+   once and the text from it to the next `;\n` contains `rpcProvider(`; and the slice from `async
+   function discover` to `async function connect` contains `readProvider(P)`. **Predicted reds,
+   two plants:** `const rpcProvider` moved back under the `/*DEV*/` at `:63` reds the first
+   assertion (quote the message); `readProvider` rewritten to `injected => injected` (the fallback
+   removed) reds the third alone. Greps: `grep -c 'const rpcProvider' app/dist/index.html` → `1`
+   after `make dapp-nodev CHAIN_ID=11155111` (baseline 0); `grep -c 'const capped'
+   app/dist/index.html` → `0`, unchanged; `rpcProvider` in the source → `4` (baseline 3: the
+   declaration, the dev `?rpc=` call and a comment at `:185`; the call inside `readProvider` is the
+   one addition); `readProvider` → `2` (the declaration and the call in `discover`); `let WALLET`
+   → `1`; `PUBLIC_RPC[CFG.chainId]` → `2` (baseline 1, the `#/docs` preview at `:2112`).
 
 3. **The header with no wallet, `who()` `:566-580`.** Today the button's click is `null` with no
    provider and `connect` otherwise (`:570`); with step 2 there is always a provider, and
@@ -217,10 +226,11 @@ on purpose, and says so.
 
 As [m04-t15 TASK.md](../m04-t15/TASK.md) § The upload: no upload here and no M04 row for one. The
 bundle rides m05-t01's Run B on the redeployed testnets, and that step's gate now waits for this
-task's merge as well as m04-t15's (m05-t01 TASK.md § Gate and step 14, amended with this plan).
-This task starts after m04-t15 merges and is small enough to land before m05-t01's Part A is
-through; if it is not merged when m05-t01's steps 12–13 are done, step 14 waits on it exactly as it
-waits on m04-t15, and the architect re-sequences rather than letting a bundle without it be built.
+task's merge as well as m04-t15's and m04-t17's (m05-t01 TASK.md § Gate and step 14, amended with
+this plan). This task starts after m04-t15 merges, m04-t17 starts after this one merges, and both
+are small enough to land before m05-t01's Part A is through; if either is not merged when
+m05-t01's steps 12–13 are done, step 14 waits exactly as it waits on m04-t15, and the architect
+re-sequences rather than letting a bundle without them be built.
 
 ## Acceptance criteria
 
@@ -240,7 +250,8 @@ branch point and recorded in the handoff with the commit. Every grep is `grep -i
 3. **The provider ships.** `grep -c 'const rpcProvider' app/dist/index.html` → `1` after `make
    dapp-nodev CHAIN_ID=11155111` (baseline 0); `grep -c 'const capped' app/dist/index.html` → `0`;
    `test/nowallet.test.mjs` passes, and its strip literal equals `app/build.mjs:145`'s; `rpcProvider`
-   → `3`, unchanged; `let WALLET` → `1`; `PUBLIC_RPC[CFG.chainId]` → `2`.
+   → `4` (baseline 3); `readProvider` → `2`; `let WALLET` → `1`; `PUBLIC_RPC[CFG.chainId]` → `2`
+   (baseline 1).
 4. **Every route reads without a wallet (#273).** Step 6 (a) as recorded: four routes painted with
    rows on the dev chain with no query and no injected provider, every write control `disabled` or
    absent with its existing line, the network menu's two step-3 lines; step 6 (b) as recorded on
@@ -272,10 +283,11 @@ branch point and recorded in the handoff with the commit. Every grep is `grep -i
 
 ## Out of scope
 
-- Everything in [#275](https://github.com/dnznlabs/rake/issues/275): a settings page, a user RPC
-  URL per chain, a wallet-or-RPC read route the reader chooses, name-service priority, any
-  `localStorage` key beyond `theme` and `rake.recent`. The public endpoint is the table at `:41`
-  and the reader does not pick it here.
+- Everything of m04-t17 ([#275](https://github.com/dnznlabs/rake/issues/275), decision 61): a
+  settings page, a user RPC URL per chain, a wallet-or-RPC read route the reader chooses,
+  name-service priority, any `localStorage` key beyond `theme` and `rake.recent`. The public
+  endpoint is the table at `:41` and the reader does not pick it here; `readProvider` is where
+  m04-t17 lets them.
 - Any `src/` byte, `.gas-snapshot`, `RUNBOOK.md`, `scripts/forge/*`, `mk/*`, the Makefile,
   `calldata/`, `SECURITY.md`, `app/src/layout.html`, `app/src/theme.css`, the build.
 - The widget (`app/src/widget.js`): criterion 7 holds its size at delta `0`.

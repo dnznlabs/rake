@@ -942,23 +942,29 @@ convention. Numbered 45 because 44 is taken by
     verified, and going public can slip past that without M05 being any less done; a milestone
     that cannot close on its own criteria is two milestones.
 
-61. **The two no-wallet findings of m04-t05 step 3 are fixed before mainnet, as m04-t16 after
-    m04-t15, so the bundle m05-t01's Run B uploads reads without a wallet and names the connected
-    account; the settings page is decision issue #275 and follows going public.** Ruled by Denizen
-    on 2026-11-19 (Telegram, 09:59 CST). [#273](https://github.com/dnznlabs/rake/issues/273) (every
-    route but `#/docs` stops at "No wallet found"; the fix reads through the chain's public endpoint
-    when no provider is injected) and [#274](https://github.com/dnznlabs/rake/issues/274) (the
-    wallet button never shows the resolved name) are one small `app/` task, scoped the same day
-    ([m04-t16 TASK.md](milestones/m04/tasks/m04-t16/TASK.md)), gated on m04-t15's merge, and
-    m05-t01's step 14 waits for its merge as it waits for m04-t15's. The settings page raised in the
-    same session — name-service priority, a wallet-or-RPC read route, a user RPC URL per chain,
-    shared across the DNZN dapps — is [#275](https://github.com/dnznlabs/rake/issues/275), its
-    storage and sharing sub-choices recommended there, scoped as a milestone once M06 closes; nothing
-    in M04 or M05 waits on it. Supersedes nothing: m04-t15's "last `app/` change before M05" line
-    now describes m04-t16, and m04-t15's § The upload stands. Rejected: fixing #273 and #274 after
+61. **The two no-wallet findings of m04-t05 step 3 are fixed before mainnet as m04-t16 after
+    m04-t15, and a minimal user settings page is built before mainnet as m04-t17 after m04-t16, so
+    the bundle m05-t01's Run B uploads reads without a wallet, names the connected account and gives
+    a user a way around a public endpoint at capacity; the shared cross-dapp module, the
+    shared-origin iframe and anything cross-device are deferred to after going public.** Ruled by
+    Denizen on 2026-11-19 (Telegram, 09:59 and 10:08 CST); it closes decision issue
+    [#275](https://github.com/dnznlabs/rake/issues/275) with its option 2 for the minimal set.
+    [#273](https://github.com/dnznlabs/rake/issues/273) (every route but `#/docs` stops at "No
+    wallet found"; the fix reads through the chain's public endpoint when no provider is injected)
+    and [#274](https://github.com/dnznlabs/rake/issues/274) (the wallet button never shows the
+    resolved name) are one small `app/` task, scoped the same day
+    ([m04-t16 TASK.md](milestones/m04/tasks/m04-t16/TASK.md)), gated on m04-t15's merge. The
+    settings page is m04-t17, scoped separately: a user RPC URL per chain, a read route of
+    wallet-or-RPC with the wallet the default, name-service priority, plain `localStorage` per
+    origin, and a `#/docs` section; m04-t16's read-only provider is the one seam it reuses. m05-t01's
+    step 14 waits for m04-t16's and m04-t17's merges as it waits for m04-t15's, so the mainnet
+    bundle carries all three. Supersedes nothing: m04-t15's "last `app/` change before M05" line
+    now describes m04-t17, and m04-t15's § The upload stands. Rejected: fixing #273 and #274 after
     mainnet — a visitor with no wallet is the reader the mainnet document most needs to serve, and
     the re-upload would cost one vault proposal round per chain to carry two small fixes a bundle
-    not yet built can carry for nothing.
+    not yet built can carry for nothing. Rejected at 10:08, overruling the 09:59 default: #275's
+    option 1, the settings page after going public — a public RPC at capacity with no user recourse
+    would kill the launch, and the page is the recourse.
 
 ## Findings carried forward
 
