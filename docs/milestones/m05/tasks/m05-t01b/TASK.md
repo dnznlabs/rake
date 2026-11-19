@@ -125,8 +125,9 @@ both already in `devbox.json` — **no new package**; `slither-mutate` ships ins
 
    **Recommendation: exclude the gas-frame tests from the coverage run by a named pattern and
    floor the measured subset.** The floor measures line and branch coverage of `src/` over the
-   named subset; **a floor expressed as a test count is out** — coverage and `forge test`
-   enumerate different populations (105 vs 107 above), so a count compares two things. Measured
+   named subset; **a floor expressed as a test count is out** — coverage enumerates 105 where
+   `forge test` enumerates 107, because a reverting `setUp` contributes no per-test rows and
+   one failure line for the suite, so a count compares two populations. Measured
    with the 21 names and the one path excluded: exit 0, 44 s, **83 tests run (107 − 21 − 3)**,
    `src/App.sol` **92.41 % lines (73/79), 92.31 % branches (12/13)**, `src/Distribution.sol`
    **89.62 % lines (164/183), 89.47 % branches (34/38)**, funcs 100 % on both. The `Total` row
@@ -284,8 +285,17 @@ states its `main` baseline at `78b5eb7`.
    `FOUNDRY_OPTIMIZER=false forge test 2>&1 | grep -E '^\[FAIL' | sed -E 's/^\[FAIL.*\] ([A-Za-z0-9_]+)\(.*/\1/' | sort -u`
    (unique names — forge prints each failure twice, per suite and in the summary, so a bare
    `grep -c` double-counts: 48 lines for 22 failures at `78b5eb7`) equals the `SKIP` names plus
-   `setUp`, and is identical to the same pipeline over `forge coverage --ir-minimum` with no
-   exclusions. Measured at `78b5eb7`: 22 failing, 83 passing, 105 enumerated, under both.
+   `setUp`, **and its count equals the sum of forge's `Encountered N failing tests in <suite>`
+   lines** (four suites at `78b5eb7`: ColdStipend 2, Distribution 18, PushGas 1, TableCap 1,
+   sum 22, the same sum under both commands), so a scrape that drops names is loud, not silent.
+   The greedy `.*\]` in that sed is what survives a fuzz counterexample's embedded `]` — at
+   `78b5eb7` the line
+   `[FAIL: EvmError: Revert; counterexample: calldata=0x189a7f5c…0001 args=[1]] testFuzz_claimMovesExactlyEscrow(uint128) (runs: 0, μ: 0, ~: 0)`
+   yields `testFuzz_claimMovesExactlyEscrow`, where a `\[FAIL[^]]*\]` form stops at `args=[1]`
+   and yields nothing, losing both `testFuzz_` members (Elanik hit this re-deriving the list,
+   [#268](https://github.com/dnznlabs/rake/pull/268#issuecomment-7002371261)). The same
+   pipeline over `forge coverage --ir-minimum` with no exclusions yields the identical set.
+   Measured at `78b5eb7`: 22 failing, 83 passing, 105 enumerated, under both.
 5. **CI runs it in the right place.** `.github/workflows/ci.yml` has a `coverage` step after
    `gas snapshot` and before `slither`, with the ordering reason in a comment; the run on the
    branch head is green and the step's log prints the two `src/` rows. Baseline:
