@@ -16,17 +16,24 @@ FORGE_SEND := --rpc-url $(RPC) --broadcast $(SEND_FLAGS)
 # CREATE2, and a CREATE-only filter would leave `addresses` and the `deploy::` guard below blind.
 DEPLOYED    = jq -r '.transactions[]|select(.transactionType=="CREATE" or .transactionType=="CREATE2")|"\(.contractName) \(.contractAddress)"' broadcast/*/$(CHAIN_ID)/run-latest.json
 
-# Listed, not read from .gitmodules, so an empty lib/ is told apart from a project that has none.
-# A later mk/ file that pins another submodule appends to it: LIBS += lib/<name>
+# Every path under lib/ a forge command needs. The names are listed rather than globbed from
+# .gitmodules so that an empty lib/ is distinguishable from a lib/ that was never meant to hold
+# anything.
 LIBS := lib/forge-std lib/solady
 
-.PHONY: setup libs serve build test fmt clean deploy addresses slither
+.PHONY: serve build test fmt clean deploy addresses slither setup libs
 
-setup: ## Fetch the pinned submodules
+setup: ## Fetch the pinned submodules: the one step a fresh clone or `git worktree add` needs
 	git submodule update --init --recursive
 
-# Checks, never fetches. On an empty lib/ forge clones each dependency's default branch instead of
-# the pin; an update here would drag a deliberately moved submodule back to it.
+# `setup` is the only target that writes lib/. Nothing below it updates a submodule implicitly:
+# they are pinned to a tag, `forge install` would move them, and a build that quietly ran
+# `submodule update` would drag a deliberately-moved submodule back to the pin — the silent clobber
+# `init.sh` uses copy-if-absent to avoid. So the forge targets check and stop.
+#
+# Without the check, an uninitialised lib/ surfaces three layers down as an unresolved import
+# (`solady/utils/Base64.sol not found` from `src/App.sol:6`), which reads as a broken source tree
+# rather than an empty checkout.
 libs:
 	@for d in $(LIBS); do \
 	  [ -n "$$(ls -A $$d 2>/dev/null)" ] || \
@@ -36,8 +43,7 @@ libs:
 serve: libs ## Start the dev stack: anvil, a deploy, and whatever else procs/ holds
 	process-compose $(addprefix -f ,$(sort $(wildcard procs/*.yml))) up
 
-# Double-colon: later mk/ files add their own recipe to the same target, run in file order. The
-# libs prerequisite belongs to these rules alone, and runs before any of them.
+# Double-colon: later mk/ files add their own recipe to the same target, run in file order.
 build:: libs ## Compile
 	forge build
 
