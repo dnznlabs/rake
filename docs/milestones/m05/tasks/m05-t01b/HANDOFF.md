@@ -1,6 +1,6 @@
 # m05-t01b — handoff
 
-PR: #<n> · Branch: `m05/t01b-self-review` · 2026-11-19
+PR: #292 · Branch: `m05/t01b-self-review` · 2026-11-19
 
 Decision 56's three additions are in: `docs/THREAT_MODEL.md` names every actor, token class and
 chain with the test that holds each assumption; `make coverage` prints the `src/` figures and fails
@@ -19,7 +19,7 @@ that passes on both the original and the mutant. No survivor is a real defect, s
 | AC | Result | Evidence |
 |:---|:-------|:---------|
 | 1 | pass | `grep -oE '(test_\|testFuzz_\|invariant_)[A-Za-z0-9_]+' docs/THREAT_MODEL.md \| sort -u` → **63** names (≥ 20 required); `comm -23 /tmp/named /tmp/have` against `forge test --list` prints **nothing**. Baseline: `test -e docs/THREAT_MODEL.md` → 1 on `main` |
-| 2 | pass | `grep -c -i '^## ' docs/THREAT_MODEL.md` → **5** (≥ 4); `grep -c -i 'SOL-'` → **64** (≥ 10); § Checklist diff names `Cyfrin/audit-checklist` `008855f` and `pashov/audits` `5550be9`; `grep -c -i '| open'` → **5**, and 3 actor rows carry `none —` |
+| 2 | pass | `grep -c -i '^## ' docs/THREAT_MODEL.md` → **5** (≥ 4); `grep -c -i 'SOL-'` → **64** (≥ 10); § Checklist diff names `Cyfrin/audit-checklist` `008855f` and `pashov/audits` `5550be9`; `grep -c -i '| open'` → **2** after the review re-dispositioned the `propose` rows (see row 11), and **two** rows carry `none —` — one in § Token classes, one in § Chains, **neither in § Actors**, so every actor row names a test |
 | 3 | pass | `make coverage` → **exit 0**, `Ran 6 test suites … 100 tests passed, 0 failed`, both `src/` rows printed, `100 = 124 − 21 − 3`. Floors `App 95/99`, `Distribution 89/91` against measured `96.20 %/100.00 %` and `90.16 %/92.11 %`. **It bites:** one floor raised to 99 in a scratch copy → **exit 1**, `coverage-floor: src/Distribution.sol lines 90.16% is under its floor of 99%`. **Row count gated:** with a scratch `src/Foo.sol` → **exit 2**, `parsed 2 src/ rows, but src/ holds 3 file(s): src/Foo.sol`, deleted after, `ls src/*.sol \| wc -l` → **2**. Baseline: `No rule to make target 'coverage'` on `main` |
 | 4 | pass | `SKIP_NAMES` is **21**, exactly the optimizer-off failures: `comm` both ways against the extraction differs only by `setUp`, which `TableCapTest` contributes and the script excludes **by path**. All 21 appear in `forge test --list`, **0** absent; `forge test --list --match-path test/TableCap.t.sol` → **3**. `FOUNDRY_OPTIMIZER=false forge test` → exit 1, **100 passed / 22 failed, 122 enumerated** — the coverage run's own totals. The prescribed extraction (`grep -E '^\[FAIL'` then `grep -oE '\] name\('`) → **22 unique names from 44 `[FAIL` lines**, and that equals forge's own `Encountered N failing tests` sum: ColdStipend 2 + Distribution 18 + PushGas 1 + TableCap 1 = **22**. Per name, **42 runs, 21 behaving as the list claims, 0 mismatches** |
 | 5 | pass | `.github/workflows/ci.yml`: `coverage` step runs `devbox run -- make coverage`, placed after `gas snapshot` and before `slither`, for the rebuild-cost reason the step's own comment records |
@@ -28,7 +28,7 @@ that passes on both the original and the mutant. No survivor is a real defect, s
 | 8 | pass | **29 of 29 kill proofs pass** — each named test passes on pristine source and fails with the survivor's file copied over it (10 App pairs, 19 Distribution pairs, `pristine=0 mutant=1` throughout). The **5 pinned equivalences pass the other way round** (`pristine=0 mutant=0`); a pin that killed its mutant would mean the row was misclassified. `git diff --name-only origin/main -- src/` prints **nothing** |
 | 9 | pass | `forge test` → exit 0, **124 passed, 0 failed** (107 at `e770054` plus 17 new). `forge snapshot --check` → **exit 0** after `forge build --force`; `.gas-snapshot` is **124 rows**. `node --test test/*.test.mjs` → exit 0, **175 tests, 175 pass, 0 fail**. `forge build --force` → `Compiler run successful!` with **0** `Warning` lines; `make fmt` exit 0; `make slither` exit 0, `0 result(s) found` |
 | 10 | pass | `grep -c -i 'coverage floor' audits/README.md scripts/audit.sh` → **1** each. The provenance field computes `755 of 847 caught (compiling mutants, from 2 log(s) in audits/mutation/e770054/)`, and the floors field `App 95/99 · Distribution 89/91`, both read from the tree |
-| 11 | see § Open questions | The PR closes [#272](https://github.com/dnznlabs/rake/issues/272); there is no `open` row, so `Carries forward:` lists none |
+| 11 | pass | The PR closes [#272](https://github.com/dnznlabs/rake/issues/272). **Corrected at review:** this row read "there is no `open` row" while row 2 counted five, which was a contradiction inside this file. `docs/THREAT_MODEL.md` § Open list now carries **two** `open` rows naming two findings, each with an issue — [#127](https://github.com/dnznlabs/rake/issues/127) (`carried`, `m04`, open) for the native-balance alias and [#293](https://github.com/dnznlabs/rake/issues/293) (`carried`, `m05`, opened at review) for views readable mid-`distribute` — and **two** `none —` rows whose reason the criterion accepts: ERC-1363 is `none — decision 28`, and the § Chains alias row is the same finding as SOL-Token-FE-5 so #127 carries it. The three `propose`-validation rows (`:110`, `:154`, `:159`) now read `design — decision 25`: [#54](https://github.com/dnznlabs/rake/issues/54) is **closed** (2026-10-31, completed), decision 25 ruled the shape documented rather than validated in `propose` or cancellable (`docs/ROADMAP.md:316-320`), and `SECURITY.md:446` already recorded it as documented and not changed. So `Carries forward: #127, #293` |
 
 ## Deviations from the plan
 
@@ -55,8 +55,17 @@ that passes on both the original and the mutant. No survivor is a real defect, s
   the reader is shown. Now 95/99 and 89/91; `App.sol`'s 13 branches make one branch 7.7 points, so
   99 means all 13.
 - **`scripts/audit.sh`'s mutation-score field now sums every `campaign*.log` in the newest campaign
-  directory.** It globbed one `campaign.log` and would have reported `715 of 807` — short by a whole
-  contract, and a score missing a contract reads exactly like a complete one.
+  directory, and picks that directory by each log's own `started:` header.** It globbed one
+  `campaign.log` and would have reported `715 of 807` — short by a whole contract, and a score
+  missing a contract reads exactly like a complete one. **Amended at review:** the first fix still
+  chose the directory with `ls | tail -1`, which is lexicographic and wrong twice over, both
+  measured: with the `<sha>-factory` sibling present — which `mk/10-forge.mk` must create, because
+  `slither-mutate` `rmtree`s its own `--output-dir`
+  (`slither/tools/mutator/__main__.py:244-245`) and would otherwise delete the first run's
+  survivors — the field read `not recorded`; and with a later campaign whose short sha sorts
+  earlier it kept reporting the older directory's figure. Selecting on the header fixes both and
+  leaves the committed figure unchanged at `755 of 847`. A short sha has no order, so no
+  name-based rule can work.
 - **`.pre-commit-config.yaml`'s large-file exclusion was extended to `audits/mutation/`.** The
   620 KB `campaign.log` exceeds the 500 KB default. This follows the exclusion the file already
   carries for a leg's transcripts, for the same reason: the log is tool output committed as the
