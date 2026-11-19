@@ -132,7 +132,7 @@ with an **open list**: two rows of that diff are dispositioned `open`, naming tw
 that stay readable mid-`distribute` and that no test pins,
 [#293](https://github.com/dnznlabs/rake/issues/293). The `propose` validation gap reads `design —
 decision 25` on all three of its rows, because [#54](https://github.com/dnznlabs/rake/issues/54) is
-closed by that ruling and `:446` below records it as documented and not changed. Two further rows
+closed by that ruling and `:449` below records it as documented and not changed. Two further rows
 carry no test at all, each with a reason rather than an issue. That
 list, not the table above, is what the review still owes a reader. First of decision 56's three
 additions; § Coverage and § Mutation are the other two.
@@ -664,12 +664,10 @@ under the figure printed above is a gate that does not hold the number the reade
 On `App.sol`'s 13 branches one branch is 7.7 points, so the 99 floor means all 13 — at that
 denominator there is no sub-point drift to absorb.
 
-**Two things about re-running it.** The gate reports only on a fresh compile: run immediately after
-another `forge coverage`, it prints `Nothing to compile`, emits no summary, and the script then
-fails with `no 'Ran N test suites' line` rather than a floor verdict — failing safe, but it is not a
-floor result and must not be read as one. And a scratch copy of the script run from outside the
-repository returns that same empty result, so the raised-floor proof below is produced by copying
-the script to a dotted name inside `scripts/` and deleting it afterwards.
+**How the raised-floor proof below is produced:** copy the script to a dotted name inside
+`scripts/`, raise one floor in the copy, run it, and delete the copy. Run that way it returns the
+summary and the floor verdict; two attempts from outside the repository returned no summary at all,
+which was not isolated to a cause and is recorded as a procedure rather than a property.
 
 `--ir-minimum`'s source map is "relatively accurate" by forge's own help text, so these numbers are
 approximate to the line — in particular the assembly blocks below are reported uncovered while

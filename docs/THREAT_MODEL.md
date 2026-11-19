@@ -107,7 +107,7 @@ owner-set table through a timelock. Disposition is one of `held by test <name>`,
 | SOL-CR-4 | Can the admin change a critical property immediately? | held by test `test_delayZeroAppliesInline` — only when `delay` is 0, which the mainnet deploy sets to 604,800 s (decision 50) |
 | SOL-CR-5 | Is any privileged setter missing events? | held by test `test_renounceEmitsOwnershipTransferred` — #111 was exactly this |
 | SOL-CR-6 | How is ownership transferred? | held by test `test_acceptOwnershipByPendingOwner` |
-| SOL-CR-7 | Is there proper validation in privileged setter functions? | design — decision 25. `propose` (`src/Distribution.sol:220`) validates nothing about the action it queues and a malformed action is caught only at `applyQueued`, a full `delay` later. That is the ruled behaviour and not a gap: [#54](https://github.com/dnznlabs/rake/issues/54) is **closed** (2026-10-31), decision 25 documents the shape rather than validating in `propose` or letting anyone cancel, and `SECURITY.md:446` records it as documented and not changed |
+| SOL-CR-7 | Is there proper validation in privileged setter functions? | design — decision 25. `propose` (`src/Distribution.sol:220`) validates nothing about the action it queues and a malformed action is caught only at `applyQueued`, a full `delay` later. That is the ruled behaviour and not a gap: [#54](https://github.com/dnznlabs/rake/issues/54) is **closed** (2026-10-31), decision 25 documents the shape rather than validating in `propose` or letting anyone cancel, and `SECURITY.md:449` records it as documented and not changed |
 | SOL-AM-DOSA-1 | Is the withdrawal pattern followed to prevent DoS? | held by test `test_escrowRevertingEthRecipientOthersPaid` — a failed push escrows and the rest are paid |
 | SOL-AM-DOSA-2 | Is a minimum transaction amount enforced? | not applicable — a zero-value `distribute` is a no-op, not a failure |
 | SOL-AM-DOSA-3 | How are tokens with blacklisting handled? | design — decision 23's neighbour: a blocked row's ERC-20 `transfer` reverts the whole `distribute` for that token. Unlike ETH there is no escrow fallback for ERC-20 |
@@ -170,7 +170,7 @@ per decision 56.
 from the Solodit checklist (SOL-CR-7) and once from each Pashov report ([M-02], [L-01]) — was
 dispositioned `open` against [#54](https://github.com/dnznlabs/rake/issues/54). That issue is
 **closed** (2026-10-31) by **decision 25**, which ruled the shape documented rather than validated
-in `propose` or cancellable (`docs/ROADMAP.md:316-320`, and `SECURITY.md:446` records it as
+in `propose` or cancellable (`docs/ROADMAP.md:316-320`, and `SECURITY.md:449` records it as
 documented and not changed). Behaviour a ruling put outside the code is `design`, not `open`, so all
 three rows now read `design — decision 25` and the finding is not carried.
 

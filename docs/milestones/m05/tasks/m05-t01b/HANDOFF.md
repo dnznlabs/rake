@@ -28,7 +28,7 @@ that passes on both the original and the mutant. No survivor is a real defect, s
 | 8 | pass | **29 of 29 kill proofs pass** — each named test passes on pristine source and fails with the survivor's file copied over it (10 App pairs, 19 Distribution pairs, `pristine=0 mutant=1` throughout). The **5 pinned equivalences pass the other way round** (`pristine=0 mutant=0`); a pin that killed its mutant would mean the row was misclassified. `git diff --name-only origin/main -- src/` prints **nothing** |
 | 9 | pass | `forge test` → exit 0, **124 passed, 0 failed** (107 at `e770054` plus 17 new). `forge snapshot --check` → **exit 0** after `forge build --force`; `.gas-snapshot` is **124 rows**. `node --test test/*.test.mjs` → exit 0, **175 tests, 175 pass, 0 fail**. `forge build --force` → `Compiler run successful!` with **0** `Warning` lines; `make fmt` exit 0; `make slither` exit 0, `0 result(s) found` |
 | 10 | pass | `grep -c -i 'coverage floor' audits/README.md scripts/audit.sh` → **1** each. The provenance field computes `755 of 847 caught (compiling mutants, from 2 log(s) in audits/mutation/e770054/)`, and the floors field `App 95/99 · Distribution 89/91`, both read from the tree |
-| 11 | pass | The PR closes [#272](https://github.com/dnznlabs/rake/issues/272). **Corrected at review:** this row read "there is no `open` row" while row 2 counted five, which was a contradiction inside this file. `docs/THREAT_MODEL.md` § Open list now carries **two** `open` rows naming two findings, each with an issue — [#127](https://github.com/dnznlabs/rake/issues/127) (`carried`, `m04`, open) for the native-balance alias and [#293](https://github.com/dnznlabs/rake/issues/293) (`carried`, `m05`, opened at review) for views readable mid-`distribute` — and **two** `none —` rows whose reason the criterion accepts: ERC-1363 is `none — decision 28`, and the § Chains alias row is the same finding as SOL-Token-FE-5 so #127 carries it. The three `propose`-validation rows (`:110`, `:154`, `:159`) now read `design — decision 25`: [#54](https://github.com/dnznlabs/rake/issues/54) is **closed** (2026-10-31, completed), decision 25 ruled the shape documented rather than validated in `propose` or cancellable (`docs/ROADMAP.md:316-320`), and `SECURITY.md:446` already recorded it as documented and not changed. So `Carries forward: #127, #293` |
+| 11 | pass | The PR closes [#272](https://github.com/dnznlabs/rake/issues/272). **Corrected at review:** this row read "there is no `open` row" while row 2 counted five, which was a contradiction inside this file. `docs/THREAT_MODEL.md` § Open list now carries **two** `open` rows naming two findings, each with an issue — [#127](https://github.com/dnznlabs/rake/issues/127) (`carried`, `m04`, open) for the native-balance alias and [#293](https://github.com/dnznlabs/rake/issues/293) (`carried`, `m05`, opened at review) for views readable mid-`distribute` — and **two** `none —` rows whose reason the criterion accepts: ERC-1363 is `none — decision 28`, and the § Chains alias row is the same finding as SOL-Token-FE-5 so #127 carries it. The three `propose`-validation rows (`:110`, `:154`, `:159`) now read `design — decision 25`: [#54](https://github.com/dnznlabs/rake/issues/54) is **closed** (2026-10-31, completed), decision 25 ruled the shape documented rather than validated in `propose` or cancellable (`docs/ROADMAP.md:316-320`), and `SECURITY.md:449` already recorded it as documented and not changed. So `Carries forward: #127, #293` |
 
 ## Deviations from the plan
 
@@ -113,11 +113,13 @@ that passes on both the original and the mutant. No survivor is a real defect, s
   compilation failures against campaign 2's 432, and 2 uncaught against 92 — `334 of 336`, a 99.4 %
   score produced by discarding three quarters of the population. A compile-failure count far above a
   comparable run is the signal.
-- **`make coverage` reports only on a fresh compile.** Run straight after another `forge coverage`
-  it prints `Nothing to compile`, emits no summary, and the script stops at `no 'Ran N test suites'
-  line` — failing safe, but it is not a floor result. A scratch copy run from **outside** the
-  repository returns the same empty result, which is why AC 3's red proof copies the script to a
-  dotted name inside `scripts/`.
+- **Struck at review (architect's ruling, 2026-11-19): a `make coverage` run straight after another
+  returning `Nothing to compile` and no summary.** It did not reproduce for the reviewer and did not
+  reproduce on my own second attempt, and a trap note nobody can trigger is not a discovery. What
+  remains is a procedure and not a property: AC 3's red proof is produced by copying the script to a
+  dotted name inside `scripts/` and deleting it after, because two attempts from outside the
+  repository returned no summary — a cause I never isolated, so it is written as the recipe that
+  worked rather than an explanation of the one that did not.
 - **Growing a test contract moves every gas row in it.** 83 of 100 pre-existing `.gas-snapshot`
   figures moved, all upward, median +452 and max +36,482 on `test_tableCapBoundary`. The control:
   `ColdStipendTest`, `PushGasTest` and `TableCapTest` — the three suites not edited — moved **0**
