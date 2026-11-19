@@ -1277,7 +1277,10 @@ let EMBED = null;
 // The drawer's state outlives a repaint by design, so a landed proposal has to clear it here or the
 // form still holds what was just queued.
 const closeDrawer = () => { PROPOSE = null; DRAWER = false; OWNOPEN = false; ACK = 0; OWNMODE = 'transfer'; OWNER_IN = ''; };
-const bindAll = () => bindWrites(w => { if (w.sig === 'propose(bytes)') closeDrawer(); detail(DS.d.addr); });
+/* After a write lands the view is re-read as the refresh control re-reads it, minus the scroll: the
+   head is pulled again, or the history scan stops at the block before the write and its own row is
+   missing until a manual refresh. */
+const bindAll = () => bindWrites(w => { if (w.sig === 'propose(bytes)') closeDrawer(); HEAD = null; TOKEN++; track(detail(DS.d.addr)); });
 
 /* Decision 7: who this page is for is decided once per load. The owner's own account sends directly;
    a contract owner that answers `isOwner(ACC)` gets the same view with every owner write rendered as
@@ -2000,7 +2003,8 @@ async function list() {
    alpha (decision 45, and first because a visitor who reads one section reads the first), then what a
    distribution is, why, how, then the tasks.
    The contract's own surface is docs/REFERENCE.md in the repo, and the last section points there. The
-   ids are what the rail and `#/docs#<section>` reach; the owner bar's widget link depends on `widget`. */
+   ids are what the rail and `#/docs#<section>` reach; the owner bar's widget link depends on `widget`.
+   README.md § Credits carries the Credits section's text; change one, change both. */
 const SECTIONS = [['disclaimer', 'Disclaimer'], ['what', 'Overview'],['economics', 'Economics'], ['credits', 'Credits'], ['why', 'Purpose'], ['how', 'Mechanism'], ['create', 'Creating a distribution'], ['payin', 'Receiving funds'], ['payout', 'Distributing funds'], ['change', 'Changing a distribution'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['developers', 'For developers']];
 /* The two figures, hand-drawn rather than rendered from Mermaid: there is no Mermaid in the bundle and
    none at build time either, so the caption says what shipped. Colour comes through classes on
