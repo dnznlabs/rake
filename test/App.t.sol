@@ -430,4 +430,144 @@ contract AppTest is Test {
         assertEq(app.widget(), widgetBefore);
         assertEq(app.widget(), "(function(){})();");
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // The mutation campaign's survivors (m05-t01b, decision 56). Each of these pins a behaviour a
+    // document promises and the suite did not assert: `slither-mutate` removed it and nothing went
+    // red. `SECURITY.md` § Mutation carries the campaign's figures and the survivors that got a
+    // one-line reason instead of a test.
+    // ---------------------------------------------------------------------------------------------
+
+    /// @notice `setChunks` after `lock()` reverts. `test_lock` pinned that door for `addChunk` and
+    /// `setVersion`, and `test_lockCoversWidget` for the widget pair, but not for `setChunks` — the
+    /// one mutator that can replace the whole document in a single call.
+    /// @dev Found by the m05-t01b mutation campaign: forcing `setChunks`'s `locked` to `false`
+    /// (`[MIA] Line 121`) survived the whole suite. Three of the five one-way doors were pinned and
+    /// two were not. The assertion is on the document as well as the revert: a lock that refuses the
+    /// call but has already cleared `chunks` would keep the error and lose the promise.
+    function test_setChunksRevertsWhenLocked() public {
+        // Arrange — a locked App whose document is readable, which is what `lock()` guarantees.
+        vm.startPrank(owner);
+        address kept = app.addChunk("<!DOCTYPE html><p>locked</p>");
+        app.lock();
+        assertTrue(app.locked());
+        // A pointer that is itself valid, so the lock is the only thing the call can fail on.
+        address[] memory ptrs = new address[](1);
+        ptrs[0] = kept;
+
+        // Act / assert
+        vm.expectRevert(App.Locked.selector);
+        app.setChunks(ptrs, true);
+        vm.stopPrank();
+
+        // The document the lock froze is still the document, and still unwrapped.
+        assertEq(app.chunkCount(), 1);
+        assertEq(app.html(), "<!DOCTYPE html><p>locked</p>");
+        assertFalse(app.gzipped(), "a refused setChunks did not take the gzip flag with it");
+    }
+
+    /// @notice `setVersion` sets the version and logs it. The suite asserted only that it reverts
+    /// once locked, so every assertion it had was about the function failing.
+    /// @dev Found by the m05-t01b campaign with three survivors on one function: `version = v`
+    /// (`[RR] Line 155`) and `emit VersionSet(v)` (`[RR] Line 156`) both replaced by `revert()`, and
+    /// `setVersion`'s `locked` forced to `true` (`[MIA] Line 154`) so it always reverts. All three
+    /// live under `test_lock`, which expects a revert and gets one. Nothing called `setVersion`
+    /// successfully, so the function was pinned exclusively from its failing side.
+    function test_setVersionSetsAndEmits() public {
+        // Arrange
+        assertEq(app.version(), "v0.1", "the constructor's value");
+
+        // Act / assert
+        vm.expectEmit(false, false, false, true, address(app));
+        emit App.VersionSet("v0.2");
+        vm.prank(owner);
+        app.setVersion("v0.2");
+
+        assertEq(app.version(), "v0.2");
+    }
+
+    /// @notice A multi-segment path ending at the widget is a 404, not the widget. `request` serves
+    /// `widget.js` only as a whole one-element resource.
+    /// @dev Found by the m05-t01b campaign: `resource.length == 1` relaxed to `>= 1`
+    /// (`[ROR] Line 102`) survived, because nothing asked for the widget under a longer path. The
+    /// `<= 1` mutant on the same line is `equivalent` — `:95` has already returned for length 0 —
+    /// which is why only this side gets a test.
+    function test_multiSegmentWidgetPathIs404() public {
+        // Arrange — a widget that really is servable at its own one-element path.
+        vm.startPrank(owner);
+        app.addChunk("<p>x</p>");
+        app.addWidgetChunk("(function(){})();");
+        vm.stopPrank();
+        App.KeyValue[] memory params = new App.KeyValue[](0);
+        string[] memory one = new string[](1);
+        one[0] = "widget.js";
+        (uint16 served,,) = app.request(one, params);
+        assertEq(served, 200, "the control: the widget is reachable at its own path");
+
+        // Act / assert — the same last segment under a longer path answers like any unknown path.
+        string[] memory two = new string[](2);
+        two[0] = "widget.js";
+        two[1] = "extra";
+        (uint16 code, string memory body, App.KeyValue[] memory hdr) = app.request(two, params);
+        assertEq(code, 404);
+        assertEq(body, "");
+        assertEq(hdr.length, 0);
+
+        // And a longer path whose first segment is the widget's name is not the root either.
+        two[0] = "index.html";
+        two[1] = "widget.js";
+        (code, body,) = app.request(two, params);
+        assertEq(code, 404, "a two-segment index.html is not the root");
+    }
+
+    /// @notice The four document mutators and `lock()` log what they did. `App`'s deploy runbook
+    /// reads progress from these events, so an emission removed in silence is a deploy nobody can
+    /// follow.
+    /// @dev Found by the m05-t01b campaign: five `[CR]` survivors, one per emission — `:115`,
+    /// `:129`, `:137`, `:150` and `:179` — the suite holding no assertion on any of them. The counts
+    /// in the arguments are asserted, not just the topic: `addChunk` logs the list length after the
+    /// push and `setChunks` the length it was given, which are different expressions of the same
+    /// number and the mutation campaign cannot tell apart.
+    function test_documentMutatorsEmitTheirCounts() public {
+        vm.startPrank(owner);
+
+        // addChunk — the running count, after the push, and the current gzip flag.
+        vm.expectEmit(false, false, false, true, address(app));
+        emit App.ChunksSet(1, false);
+        address first = app.addChunk("<!DOCTYPE html><p>a</p>");
+
+        vm.expectEmit(false, false, false, true, address(app));
+        emit App.ChunksSet(2, false);
+        address second = app.addChunk("<p>b</p>");
+
+        // setChunks — the length of the list it was handed, and the flag it was handed.
+        address[] memory ptrs = new address[](2);
+        ptrs[0] = first;
+        ptrs[1] = second;
+        vm.expectEmit(false, false, false, true, address(app));
+        emit App.ChunksSet(2, true);
+        app.setChunks(ptrs, true);
+
+        // addWidgetChunk — the widget list's own count, with no flag.
+        vm.expectEmit(false, false, false, true, address(app));
+        emit App.WidgetChunksSet(1);
+        address w = app.addWidgetChunk("(function(){})();");
+
+        // setWidgetChunks — the length of the list it was handed.
+        address[] memory widgetPtrs = new address[](1);
+        widgetPtrs[0] = w;
+        vm.expectEmit(false, false, false, true, address(app));
+        emit App.WidgetChunksSet(1);
+        app.setWidgetChunks(widgetPtrs);
+
+        // lock — the one-way door announces itself.
+        vm.expectEmit(false, false, false, true, address(app));
+        emit App.AppLocked();
+        app.lock();
+
+        vm.stopPrank();
+        assertTrue(app.locked());
+        assertEq(app.chunkCount(), 2);
+        assertEq(app.widgetChunkCount(), 1);
+    }
 }
