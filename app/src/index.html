@@ -1054,14 +1054,23 @@ const WRITES = new Map();
 let VIEW = 'visitor';
 const OWNS = () => VIEW === 'owner' || VIEW === 'vault';
 const COPIES = () => VIEW === 'vault' || VIEW === 'pending-vault';
+/* The sixth value, and the only one no account ever reads as: `probing` is what a detail page holds
+   from its first paint until `ownerView` has answered (#243). `OWNS` and `COPIES` are both false for
+   it, so no owner power is offered before the probe decides there is one; and every control a view
+   does draw is drawn disabled rather than left out, because a bar that fills in several round trips
+   late reads as "nothing here is yours" and one drawn live early offers a write the probe may be
+   about to refuse. */
+const probeBtn = (key, label) => `<button class="btn off sm" data-send="${key}" disabled title="checking who you are…">${label}</button>`;
 function wctl(key, label, w) {
   WRITES.set(key, w);
+  if (VIEW === 'probing') return probeBtn(key, label);
   return COPIES()
     ? `<button class="btn sec sm" data-copy="${key}"${w.locked ? ' disabled' : ''}>copy calldata for your vault</button>`
     : w.hold ? `<button class="btn sec sm hold" data-send="${key}"${w.locked ? ' disabled' : ''}><span>${label}</span></button>` : `<button class="btn sm" data-send="${key}">${label}</button>`;
 }
 function sctl(key, label, w, off) {
   WRITES.set(key, w);
+  if (VIEW === 'probing') return probeBtn(key, label);
   if (!ACC) return `<button class="btn off sm" disabled title="connect a wallet to send">${label}</button>`;
   return off ? `<button class="btn off sm" disabled>${label}</button>` : `<button class="btn sm" data-send="${key}">${label}</button>`;
 }
@@ -1282,11 +1291,27 @@ async function ownerView(d) {
   return 'visitor';
 }
 
+/* Three phases, each ending in a paint (#243 part 1). Every read here is a round trip over whatever
+   endpoint the wallet picked, and this view used to make four of them before it drew anything: the
+   whole page was the one `reading 0x…` notice until the *owner probe* answered, which is the last read
+   of the four and the one a visitor has no use for at all. So the frame comes from the address alone,
+   the distribution fills it in, and who-you-are only decides which controls go live. */
 async function detail(addr) {
   const t = TOKEN;
-  if (!DS.d || DS.d.addr !== addr) { V.innerHTML = notice(`reading ${esc(short(addr))}…`); closeDrawer(); }
-  // The clock is read again here, not only at boot: every countdown on this page is measured against
-  // it, and a write that lands moves the chain's.
+  /* Phase 0, no read at all, and nothing before it but `closeDrawer()`: the eyebrow needs only the
+     address and the chain, and each section says what it is waiting for under its own head rather
+     than the page saying it once for all of them. */
+  if (!DS.d || DS.d.addr !== addr) {
+    closeDrawer();
+    V.innerHTML = '<div class="distro">' + eyebrow(`${ext('address', addr, short(addr))} · ${cname(CFG.chainId)}`)
+      + '<h1></h1>'
+      + `<div class="sechead"><b>the table</b><span>the beneficiaries, and the share each is owed</span></div>${notice('reading…')}`
+      + `<div class="sechead"><b>funds</b><span>moves by the table, permissionlessly — no approval involved</span></div>${notice('reading…')}`
+      + `<div class="sechead"><b>changes</b><span>every configuration change this contract has seen</span></div>${notice('reading…')}`
+      + `<div class="sechead"><b>activity</b><span>funds in, and every split and escrow since</span></div>${notice('reading…')}</div>`;
+  }
+  /* Phase 1, the distribution. The clock is read again here, not only at boot: every countdown on
+     this page is measured against it, and a write that lands moves the chain's. */
   const [d] = await Promise.all([loadDistro(addr), readClock()]);
   if (stale(t)) return;
   if (d.missing) { V.innerHTML = unreadable(addr); return; }
@@ -1297,10 +1322,8 @@ async function detail(addr) {
   addRecent(d.addr);
   // Decision 6: a one-row table at 100% is a forward to a successor, so that successor is named first.
   const next = Model.supersededBy(d.table);
-  const [heir, view] = await Promise.all([next ? loadHeir(next) : null, ownerView(d)]);
-  if (stale(t)) return;
-  DS = { d, next, heir, qtx: null, failed: false, h: null, fundsReady: false, f: null };
-  VIEW = view;
+  DS = { d, next, heir: null, qtx: null, failed: false, h: null, fundsReady: false, f: null };
+  VIEW = 'probing';
   WRITES.clear();
   paintDetail();
   // Progressive, and after the paint above: a slow or failed logs call never holds back the table.
@@ -1313,6 +1336,14 @@ async function detail(addr) {
     paintFailed();
     bindAll();
   });
+  /* Phase 2, the heir and the probe — started after the history above and not before it, so a slow
+     `isOwner` never holds the logs back. `paintDetail` repaints the whole view from `DS`, which is
+     also what `absorb` and the drawer do, so there is one paint path and no patching. */
+  const [heir, view] = await Promise.all([next ? loadHeir(next) : null, ownerView(d)]);
+  if (stale(t)) return;
+  DS.heir = heir;
+  VIEW = view;
+  paintDetail();
 }
 
 /* Everything the log-built sections need once a history pass has landed — on the first pass, and
