@@ -194,10 +194,20 @@ skill             pashov/skills @ <SKILL_PIN>  · solidity-auditor VERSION <n> �
 leg 1             codex <version> · <model as the session header reported it> · effort high · 1 pass
 leg 2             claude <version> · <model> · 1 pass
 tokens            <per leg, if the harness reports them>
+coverage floor    <App lines/branches · Distribution lines/branches, from scripts/coverage-floor.sh>
+mutation score    <caught of compiling, from audits/mutation/<sha>/campaign.log>
 ```
 
 `upstream` is the VERSION on the skill repo's default branch, read by the runner, which has network
 the legs do not. The legs are told to skip the skill's own upstream check.
+
+The last two fields are decision 56's, and like every other field they are **read from the tree at
+the run's commit, never typed**: the floors come out of `scripts/coverage-floor.sh`, where the gate
+keeps them, and the score is the sum of the per-class summaries in the newest committed
+`campaign.log`, in `slither-mutate`'s own words. A non-compiling mutant is on neither side of that
+ratio. If either source is missing from the tree the field says so — a missing figure and a zero
+figure must not read alike. `scripts/audit.sh` is the only writer, so the next `make audit` picks
+them up; the run that added the fields did not itself run one.
 
 `code commit` carries a dirty flag because an audit of an uncommitted tree cannot be re-run by anyone
 else, and that fact belongs in the artifact rather than in someone's memory.

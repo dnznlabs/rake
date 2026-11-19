@@ -120,6 +120,22 @@ may come later as its own decision. Everything the review reads is public, so a 
 
 ---
 
+## Threat model
+
+What the review assumed is written down, not implied: [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
+names every actor, token class and chain the self-review had in mind, and beside each assumption the
+test that holds it — 63 distinct names, every one a name `forge test --list` returns, which is the
+file's own stated check. It closes with a diff against two inputs pinned by commit, the Solodit
+checklist (370 items under 62 labels) and the two `pashov/audits` reports nearest rake's shape, and
+with an **open list**: five rows of that diff are dispositioned `open`, naming three distinct
+findings — the `propose` validation gap of [#54](https://github.com/dnznlabs/rake/issues/54), the
+native-balance alias token of [#127](https://github.com/dnznlabs/rake/issues/127), and views that
+stay readable mid-`distribute` and that no test pins. Two further rows carry no test at all. That
+list, not the table above, is what the review still owes a reader. First of decision 56's three
+additions; § Coverage and § Mutation are the other two.
+
+---
+
 ## Findings — disposition
 
 **Three runs now feed this table, and each numbered its own findings from F1.** To keep one stable
@@ -437,9 +453,11 @@ column records which leg reported it, from `AUDIT.md`'s grading section.
 
 ## Invariants the suite holds
 
-From `forge test --list --json`: **102 tests** in six suites — `DistributionTest` 56, `AppTest` 27,
-`DistributionInvariantsTest` 7, `DistributionFactoryTest` 6, `PushGasTest` 3, `TableCapTest` 3.
-Grouped by the property each group holds. A property asserted by a test is stronger than a finding: a
+From `forge test --list --json`: **107 tests** in seven suites — `DistributionTest` 57, `AppTest` 27,
+`DistributionInvariantsTest` 7, `DistributionFactoryTest` 6, `ColdStipendTest` 4, `PushGasTest` 3,
+`TableCapTest` 3. The groups below account for **102** of those; the five outside every group are
+`ColdStipendTest`'s four and `DistributionTest`'s 57th, all added after this section was last
+reconciled. Grouped by the property each group holds. A property asserted by a test is stronger than a finding: a
 finding gets fixed once, a test refuses to let it come back. The last eleven are m04-t07's — the whole
 of `DistributionInvariantsTest` and four of `DistributionTest`'s — and are the group at the end; the
 count read **91** in five suites before them, which is the figure the reconciliation in the next
@@ -607,7 +625,111 @@ reports green. Both numbers are in the t07 handoff, and `AGENTS.md` § Contracts
 prefix and a wrong one), `testFuzz_applyWindow` (every offset from the proposal to a month past the
 lapse), `testFuzz_claimMovesExactlyEscrow` (every amount an unpushable row can be owed) — 11 tests.
 
-8 + 15 + 11 + 20 + 4 + 7 + 21 + 5 + 11 = **102**, the whole suite.
+8 + 15 + 11 + 20 + 4 + 7 + 21 + 5 + 11 = **102**, of the suite's 107. The five not in any group
+above are `ColdStipendTest`'s four and `DistributionTest`'s 57th; § Coverage lists two of the four
+among the tests the coverage binary cannot run, which is where they are accounted for instead.
+
+---
+
+## Coverage
+
+What the tests reach, as a figure a reader can re-run — the second of decision 56's three
+additions. `make coverage` is the gate; `scripts/coverage-floor.sh` is the script it runs, and it
+carries the exclusion list with a reason beside each name.
+
+```
+forge coverage --ir-minimum --report summary --no-match-test "$SKIP" --no-match-path 'test/TableCap.t.sol'
+```
+
+Measured on 2026-11-19 at `e770054` (`src/` byte-identical to `main`) through the devbox pin, forge
+`1.7.1-dev`: exit 0, 47 s, **83 tests passed, 0 failed** over six suites.
+
+| file | lines | branches | floor (lines / branches) |
+|:--|:--|:--|:--|
+| `src/App.sol` | **92.41 % (73/79)** | **92.31 % (12/13)** | 91 / 91 |
+| `src/Distribution.sol` | **89.62 % (164/183)** | **89.47 % (34/38)** | 88 / 88 |
+
+Functions are 100 % on both files (16/16 and 29/29). Statements and functions are printed, not
+gated. The `Total` row the command prints (68.85 %) counts `test/` and `lib/` and is **not** the
+figure; the two `src/` rows are. The floors are the measured figures rounded down and one point
+under, so ordinary drift is not a red build and a real regression is.
+
+`--ir-minimum`'s source map is "relatively accurate" by forge's own help text, so these numbers are
+approximate to the line — in particular the assembly blocks below are reported uncovered while
+being plainly exercised by passing tests.
+
+**The script gates the row count too.** It asserts that the number of `src/` rows it parsed equals
+`ls src/*.sol | wc -l` (2 here) and that every row has a floor, and exits non-zero naming the file
+otherwise. A third contract added with no floor is a red run that names it, not a green one that
+gates two files and ignores the third.
+
+### Why 22 of the 107 tests are excluded
+
+`forge coverage` does not run clean on `main`, and the reason is the instrument, not the suite. The
+paired control is `forge test` at the same commit: exit 0, 107 passed. `--ir-minimum` recompiles at
+minimal optimisation and coverage inserts per-line counters, so **gas changes by construction** —
+and this suite asserts measured gas frames on purpose, the 2,300-gas stipend behaviour among them.
+`--optimize true --optimizer-runs 1000` is accepted and ignored by 1.7.1 (same exit, counts and
+rows).
+
+**The membership test is not coverage.** `FOUNDRY_OPTIMIZER=false forge test`, with no coverage
+involved at all, fails the same 22 by name — exit 1, 83 passed / 22 failed, 105 enumerated, the two
+name sets diffed and identical. A test that passes with the optimizer off is **not** excluded
+whatever else it does. Per name, each of the 21 fails under
+`FOUNDRY_OPTIMIZER=false forge test --match-test <name>` and passes under
+`forge test --match-test <name>`; all 42 runs checked.
+
+Twenty-one go by name, in `ColdStipendTest` (2), `DistributionTest` (18) and `PushGasTest` (1):
+
+`test_claimEthToOtherAddress`, `test_claimEthToSelfUncapped`, `test_claimReentrancyLocked`,
+`test_coldReceiveFitsTheMeasuredFrame`, `test_createAcceptsZeroOwnerBornRenounced`,
+`test_delayZeroOwnerSweepsAtomically`, `test_distributeDiscardsEthReturnData`,
+`test_distributeReleaseDistributeKeepsReserved`, `test_escrowRevertingEthRecipientOthersPaid`,
+`testFuzz_claimMovesExactlyEscrow`, `testFuzz_roundingNeverExceedsAmount`,
+`test_hookRecipientStarvesLaterRows`, `test_realPathPaysASafeAndAVaultClone`,
+`test_receiveUnderStipend`, `test_receiveUnderStipendPassesOnceImplementationIsWarm`,
+`test_reentrantRecipientIsEscrowed`, `test_releaseFailedEthRecipient`,
+`test_releaseStillBubblesEthReason`, `test_renounceFreezes`, `test_rounding_3333_3333_3334`,
+`test_selfRowRecycles`.
+
+`TableCapTest` is excluded **by path**, not by name: what reverts there is its `setUp`, so the suite
+contributes one failure line and no per-test rows. That is also why coverage enumerates **105**
+where `forge test` enumerates 107, and why **no figure in this gate is a test count** — a count
+would compare two different populations. 83 = 107 − 21 − 3.
+
+The regex the script builds is `^(name|name|…)\(`, and the trailing `\(` is load-bearing:
+`--no-match-test` matches the signature, so `^(…)$` matches nothing — and a pattern that matches
+nothing floors the whole suite and reads as a pass. Without the `\(` a listed name excludes every
+test it prefixes, and the collision is inside this list: `test_receiveUnderStipend` prefixes
+`test_receiveUnderStipendPassesOnceImplementationIsWarm`.
+
+**The cost of the exclusion, stated.** The lines those 21 tests alone reach are reported uncovered.
+Against the same run without exclusions (`src/Distribution.sol` 90.16 % lines, 92.11 % branches),
+the difference is exactly **one line and one branch** of `Distribution`. The standing consequence:
+a new `test/` assertion that pins gas joins the list in the same PR, or `make coverage` goes red.
+
+This measurement is Elanik's finding on
+[#262](https://github.com/dnznlabs/rake/issues/262#issuecomment-7002043948), reproduced by the
+architect on the same commit, and the row-count assertion is their second review on
+[#268](https://github.com/dnznlabs/rake/pull/268#issuecomment-7002429826).
+
+### The uncovered lines
+
+Where § Mutation's survivors are expected first. 6 in `App`, 19 in `Distribution`, from the lcov
+report of the excluded run.
+
+| file:line | what it is |
+|:--|:--|
+| `App.sol:121` | the `notLocked` revert on `addChunk` |
+| `App.sol:155-156` | `setVersion`'s assignment and its event |
+| `App.sol:203-205` | the `extcodesize`/`extcodecopy` assembly of `_requireChunk` — exercised, unattributed by the `--ir-minimum` source map |
+| `Distribution.sol:110` | the transient lock's revert arm |
+| `Distribution.sol:212` | `claim`'s long-reason bubble |
+| `Distribution.sol:296, 310` | `_clearQueue` from the renounce and accept paths |
+| `Distribution.sol:412` | the capped `call` of `_push`, in assembly |
+| `Distribution.sol:423` | `_bubble`'s `revert` with returned data, in assembly |
+| `Distribution.sol:473-481` | the clone's `create2` and its `DeploymentFailed` arm, in assembly — exercised by every `create` test, unattributed |
+| `Distribution.sol:493-497` | `predict`'s init-code hash, in assembly — same |
 
 ---
 

@@ -24,6 +24,22 @@
 - `mk/*.mk` hold the make targets, included in name order; `procs/*.yml` the `make serve` processes,
   merged in name order. `build`, `test`, `fmt`, `clean` and `deploy` are double-colon targets, so
   extend one by adding a recipe in a new numbered file rather than editing an existing one.
+- `make coverage` is the coverage gate (`scripts/coverage-floor.sh`), and it runs **83 of the 107
+  tests**: 22 fail under the coverage binary because `--ir-minimum` recompiles at minimal
+  optimisation and inserts per-line counters, so gas changes by construction, and this suite asserts
+  measured gas frames on purpose. The membership test is not coverage — it is
+  `FOUNDRY_OPTIMIZER=false forge test`, which fails the same 22 by name with no coverage involved. A
+  test that passes with the optimizer off is not excluded whatever else it does. 21 go by name and
+  `TableCapTest` by path, because what reverts there is its `setUp`. **If you add a `test/` assertion
+  that pins gas, it joins the list in `scripts/coverage-floor.sh` in the same PR, or `make coverage`
+  goes red.** No figure in the gate is a test count: coverage enumerates 105 where `forge test`
+  enumerates 107.
+- `make mutate` runs the `slither-mutate` campaign over `src/`. **Not a CI step and not part of
+  `make test`**: the oracle is the whole suite and the tool runs it once per compiling mutant, so it
+  is hours. Results land in `audits/mutation/<short-sha>/` — the log is the record, and the
+  directory is the **survivor list**, because the tool writes a mutated source file only for a mutant
+  the suite failed to catch. A killed run leaves mutated files in `src/`; check `git status` before
+  trusting the tree. Every survivor needs a row in `SECURITY.md` § Mutation.
 - `make serve` starts anvil and runs `make deploy`: every `scripts/forge/Deploy*.s.sol`, in name order.
 - Addresses are read from `broadcast/*/<chain>/run-latest.json`, never hard-coded. `make addresses`
   prints them and flags any with no code on the chain.

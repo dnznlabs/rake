@@ -307,6 +307,50 @@ info "wall ${CLAUDE_SECONDS}s · model ${CLAUDE_MODEL_OBSERVED} · tokens ${CLAU
 # Observed values, captured at run time. audits/README.md § Provenance is the field list; the rollup
 # reproduces this block verbatim rather than composing one, so no field is ever a model's guess.
 
+# The two self-review figures of decision 56, both READ FROM THE TREE at this run's commit and
+# never typed: the floors `make coverage` enforces, and the score of the newest committed mutation
+# campaign. If either source is absent the field says so rather than going quiet, because a missing
+# figure and a zero figure must not read alike.
+COVERAGE_FLOOR_SRC="scripts/coverage-floor.sh"
+if [ -r "$COVERAGE_FLOOR_SRC" ]; then
+  COVERAGE_FLOOR=$(awk '
+    function harvest(line, arr,   s, p, f) {
+      while (match(line, /\[src\/[^]]+\]=[0-9]+/)) {
+        s = substr(line, RSTART, RLENGTH); split(s, p, "]="); f = substr(p[1], 2)
+        arr[f] = p[2]
+        if (!(f in seen)) { seen[f] = 1; order[++n] = f }
+        line = substr(line, RSTART + RLENGTH)
+      }
+    }
+    /^declare -A FLOOR_LINES=/    { harvest($0, L) }
+    /^declare -A FLOOR_BRANCHES=/ { harvest($0, B) }
+    END {
+      for (i = 1; i <= n; i++) {
+        g = order[i]; sub(/^src\//, "", g); sub(/\.sol$/, "", g)
+        printf "%s%s %s/%s", (i > 1 ? " \xc2\xb7 " : ""), g, L[order[i]], B[order[i]]
+      }
+    }
+  ' "$COVERAGE_FLOOR_SRC")
+  COVERAGE_FLOOR="${COVERAGE_FLOOR:-not parsed} (lines/branches, from $COVERAGE_FLOOR_SRC)"
+else
+  COVERAGE_FLOOR="not recorded — $COVERAGE_FLOOR_SRC absent"
+fi
+
+# The per-contract class summaries are the tool's own words ("Revert mutants: N caught of M"), so
+# the total is their sum. A non-compiling mutant is not in either side of it.
+MUTATION_LOG=$(ls -1 audits/mutation/*/campaign.log 2>/dev/null | tail -1)
+if [ -r "$MUTATION_LOG" ]; then
+  MUTATION_SCORE=$(awk '
+    match($0, /[A-Za-z]+ mutants: [0-9]+ caught of [0-9]+/) {
+      s = substr($0, RSTART, RLENGTH); split(s, p, " "); c += p[3]; m += p[6]
+    }
+    END { if (m > 0) printf "%d of %d caught", c, m; else printf "no class summary in the log" }
+  ' "$MUTATION_LOG")
+  MUTATION_SCORE="$MUTATION_SCORE (compiling mutants, from $MUTATION_LOG)"
+else
+  MUTATION_SCORE="not recorded — no audits/mutation/*/campaign.log in the tree"
+fi
+
 PROVENANCE="$SCRATCH/provenance.txt"
 {
   printf 'audit date        %s\n' "$AUDIT_DATE"
@@ -319,6 +363,8 @@ PROVENANCE="$SCRATCH/provenance.txt"
   printf 'leg 2             claude %s · requested %s → observed %s · 1 pass · %ss wall\n' \
     "$CLAUDE_VERSION" "$CLAUDE_MODEL" "${CLAUDE_MODEL_OBSERVED:-not reported}" "$CLAUDE_SECONDS"
   printf 'tokens            leg 1 %s · leg 2 %s\n' "${CODEX_TOKENS:-not reported}" "${CLAUDE_TOKENS:-not reported}"
+  printf 'coverage floor    %s\n' "$COVERAGE_FLOOR"
+  printf 'mutation score    %s\n' "$MUTATION_SCORE"
 } > "$PROVENANCE"
 
 say "provenance"
