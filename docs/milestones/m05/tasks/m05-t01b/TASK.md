@@ -297,20 +297,26 @@ states its `main` baseline at `78b5eb7`.
    enumerated total of 107, fails this criterion whatever the floor script exits. For every name in `SKIP`,
    `FOUNDRY_OPTIMIZER=false forge test --match-test <name>` fails and `forge test --match-test
    <name>` passes;
-   `FOUNDRY_OPTIMIZER=false forge test 2>&1 | grep -E '^\[FAIL' | sed -E 's/^\[FAIL.*\] ([A-Za-z0-9_]+)\(.*/\1/' | sort -u`
+   `FOUNDRY_OPTIMIZER=false forge test 2>&1 | grep -E '^\[FAIL' | grep -oE '\] [A-Za-z_][A-Za-z_0-9]*\(' | sed -E 's/^\] //; s/\($//' | sort -u`
    (unique names — forge prints each failure twice, per suite and in the summary, so a bare
    `grep -c` double-counts: 48 lines for 22 failures at `78b5eb7`) equals the `SKIP` names plus
    `setUp`, **and its count equals the sum of forge's `Encountered N failing tests in <suite>`
    lines** (four suites at `78b5eb7`: ColdStipend 2, Distribution 18, PushGas 1, TableCap 1,
    sum 22, the same sum under both commands), so a scrape that drops names is loud, not silent.
-   The greedy `.*\]` in that sed is what survives a fuzz counterexample's embedded `]` — at
-   `78b5eb7` the line
-   `[FAIL: EvmError: Revert; counterexample: calldata=0x189a7f5c…0001 args=[1]] testFuzz_claimMovesExactlyEscrow(uint128) (runs: 0, μ: 0, ~: 0)`
-   yields `testFuzz_claimMovesExactlyEscrow`, where a `\[FAIL[^]]*\]` form stops at `args=[1]`
-   and yields nothing, losing both `testFuzz_` members (Elanik hit this re-deriving the list,
-   [#268](https://github.com/dnznlabs/rake/pull/268#issuecomment-7002371261)). The same
-   pipeline over `forge coverage --ir-minimum` with no exclusions yields the identical set.
-   Measured at `78b5eb7`: 22 failing, 83 passing, 105 enumerated, under both.
+   That extraction anchors on `] name(` — the name and its opening parenthesis — and reads **22
+   over both logs at `78b5eb7`**; it depends on no naming convention and on no bracket being the
+   last one. Two forms that look right are short by one, each on a different fuzz line, and
+   **the per-suite cross-check is what caught both**: `\[FAIL[^]]*\]` stops at a counterexample's
+   embedded `]` (`args=[1]] testFuzz_claimMovesExactlyEscrow(uint128)`) and drops that name; a
+   bare greedy `sed 's/.*\]//'` strips past a name whose *signature* holds a bracket
+   (`testFuzz_roundingNeverExceedsAmount(uint96,uint16[3])`, the last `]` sits after the name)
+   and read 21 in Elanik's third review
+   ([#268](https://github.com/dnznlabs/rake/pull/268#issuecomment-7002548290)). The anchored
+   greedy form this file carried before (`s/^\[FAIL.*\] ([A-Za-z0-9_]+)\(.*/\1/`) read 22 on GNU
+   sed 4.9 only because the engine backtracks to the `] name(` pair; that is an implementation
+   property, not a guarantee, and it is replaced. The same pipeline over
+   `forge coverage --ir-minimum` with no exclusions yields the identical set. Measured at
+   `78b5eb7`: 22 failing, 83 passing, 105 enumerated, under both.
 5. **CI runs it in the right place.** `.github/workflows/ci.yml` has a `coverage` step after
    `gas snapshot` and before `slither`, with the ordering reason in a comment; the run on the
    branch head is green and the step's log prints the two `src/` rows. Baseline:
