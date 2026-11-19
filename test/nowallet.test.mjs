@@ -102,6 +102,14 @@ test('the network menu offers a switch and names an endpoint only where there is
   assert.ok(!body.includes('new URL(PUBLIC_RPC['), 'an unlisted chain has no endpoint, and new URL(undefined) throws');
 });
 
+test('the menu names the dev override ahead of the public endpoint', () => {
+  const from = SHIPPED.indexOf('function who()');
+  const body = SHIPPED.slice(from, SHIPPED.indexOf('\n}\n', from));
+
+  assert.ok(body.includes('WRPC || pub'), 'the dev `?rpc=` endpoint is what reads happen through when it is set');
+  assert.ok(body.includes('new URL(read).host'), 'the row names whichever endpoint is actually read');
+});
+
 test('discover routes whatever it found through readProvider', () => {
   const from = SHIPPED.indexOf('async function discover');
   const to = SHIPPED.indexOf('async function connect');

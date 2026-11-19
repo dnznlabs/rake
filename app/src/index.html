@@ -36,8 +36,11 @@ const CONTRACTS = [['DistributionFactory', CFG.factory]];
 const CHAINS = { 1: 'mainnet', 10: 'op mainnet', 8453: 'base', 42161: 'arbitrum', 11155111: 'sepolia', 84532: 'base sepolia', 31337: 'anvil', 31338: 'anvil-b' };
 /* A dev chain has no explorer, so `ext()` prints plain text with the full value in the title. */
 const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.io', 8453: 'https://basescan.org', 42161: 'https://arbiscan.io', 11155111: 'https://sepolia.etherscan.io', 84532: 'https://sepolia.basescan.org' };
-/* What the widget snippet in #/docs puts in `data-rpc`. The embedding page's developer picks their own
-   endpoint; these are only known public ones, so the example works when pasted. */
+/* Two readers. It is what the widget snippet in #/docs puts in `data-rpc` — the embedding page's
+   developer picks their own endpoint; these are only known public ones, so the example works when
+   pasted — and it is this page's own read path when `discover` found no injected provider (#273), by
+   way of `readProvider`. A chain absent from this table has no read path without a wallet, which is
+   the one case `route()`'s "No wallet found" notice is still reached on. */
 const PUBLIC_RPC = { 1: 'https://ethereum-rpc.publicnode.com', 10: 'https://mainnet.optimism.io', 8453: 'https://mainnet.base.org', 42161: 'https://arb1.arbitrum.io/rpc', 11155111: 'https://ethereum-sepolia-rpc.publicnode.com', 84532: 'https://sepolia.base.org', 31337: 'http://127.0.0.1:8545', 31338: 'http://127.0.0.1:8546' };
 const ZERO = '0x' + '0'.repeat(40);
 /*DEV*/
@@ -60,8 +63,10 @@ let P = null, ACC = null, CHAIN = null;
 // True only when `discover` found an injected provider: the one thing `who()` reads to tell a visitor
 // with no wallet from a wallet that is there but not connected.
 let WALLET = false;
-// The landing's widget reads through the wallet, as a host page's does without `data-rpc`; only the dev
-// build hands it an endpoint, the same `?rpc=` the page itself reads through.
+// The endpoint the landing's widget is handed in `data-rpc`: the dev `?rpc=` override when there is
+// one, and otherwise empty, in which case the mount falls back to this chain's `PUBLIC_RPC` entry for
+// a visitor with no wallet and to `window.ethereum` for one who has it. Reads never require a wallet;
+// writes always do.
 let WRPC = '';
 // The page's read path when there is no wallet, and the transport behind the dev `?rpc=` override.
 const rpcProvider = url => ({
@@ -614,11 +619,11 @@ function who() {
   document.getElementById('netname').textContent = CHAIN ? cname(CHAIN) : cname(CFG.chainId);
   /* Without a wallet `CHAIN` is the public endpoint's answer, so the switch is a wallet's alone. A
      chain with no `PUBLIC_RPC` entry has no read path to name: `P` is null there. */
-  const pub = PUBLIC_RPC[CFG.chainId];
+  const pub = PUBLIC_RPC[CFG.chainId], read = WRPC || pub;
   nm.innerHTML = (WALLET
       ? `<div class="k">This app lives on ${cname(CFG.chainId)}. Reads and transactions go through your wallet, so it has to be on the same network.</div>`
       : `<div class="k">no wallet found — open this page in a browser with a wallet to act.</div>`
-        + (pub ? `<div class="k">reads go through ${new URL(pub).host}</div>` : ''))
+        + (read ? `<div class="k">reads go through ${new URL(read).host}</div>` : ''))
     + `<div class="k">wallet: ${WALLET && CHAIN ? cname(CHAIN) : 'none'}</div>`
     + (WALLET && wrong ? `<div data-a="switch">switch wallet to ${cname(CFG.chainId)}</div>` : '');
   pill.classList.toggle('warn', wrong);
