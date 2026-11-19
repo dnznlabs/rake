@@ -108,6 +108,8 @@ input.narrow{max-width:160px}
 .field .opt{text-transform:none;letter-spacing:0;color:var(--dim)}
 .two{display:flex;gap:40px;flex-wrap:wrap}.two>.field{flex:1 1 260px}
 .help{font:12px/1.55 var(--sans);color:var(--dim);margin-top:6px;max-width:60ch}
+/* Under a full-measure table the notes run its width; 60ch there leaves a ragged block beside it. */
+.help.wide{max-width:none}
 .help code{font:11.5px var(--mono);color:var(--muted)}
 .help .btn{margin:0 2px}
 /* A button that is a sentence's own word, not a control beside it. */

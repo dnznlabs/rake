@@ -1590,9 +1590,9 @@ function ownershipHTML(d) {
   return `<details class="danger" id="ownership"${OWNOPEN ? ' open' : ''}><summary>ownership</summary>`
     + `<div class="tabs">${[['transfer', 'change owner'], ['renounce', 'renounce ownership']].map(([k, l]) => `<button class="tab${OWNMODE === k ? ' on' : ''}" data-own="${k}">${l}</button>`).join('')}</div>`
     + (t
-      ? `<p class="help">Nominates another address as the next owner, which becomes the owner only when it calls <code>acceptOwnership()</code> itself. Your own address withdraws a nomination. Enter it, confirm each statement in turn${hold}.</p>`
+      ? `<p class="help">nominates another address as the next owner, which becomes the owner only when it calls <code>acceptOwnership()</code> itself. your own address withdraws a nomination. enter it, confirm each statement in turn${hold}.</p>`
         + (n => `<div class="field"><input id="q-owner" aria-label="new owner" placeholder="new owner — 0x… or .eth / .wei / .gwei" value="${esc(OWNER_IN)}"><div class="res${n.cls ? ' ' + n.cls : ''}" id="q-ownerres">${esc(n.text)}</div></div>`)(ownerNote())
-      : `<p class="help">Transfers ownership to nobody. Confirm each statement in turn${hold}.</p>`)
+      : `<p class="help">transfers ownership to nobody. confirm each statement in turn${hold}.</p>`)
     + acks.map((x, i) => `<label class="ack"><input type="checkbox" data-ack="${i}"${ACK > i ? ' checked' : ''}${ACK < i || !ok ? ' disabled' : ''}><span>${x}</span></label>`).join('')
     + wctl(OWNMODE, t ? 'hold to nominate' : 'hold to renounce', {
       to: d.addr, sig: 'propose(bytes)', label: t ? 'propose transferOwnership' : 'propose renounce', hold: true, locked: ACK < acks.length || !ok,
@@ -1693,7 +1693,7 @@ async function readOthers(d, other) {
   return rows.filter(r => r.waiting > 0n);
 }
 function othersHTML(d, rows) {
-  if (!rows.length) return '<div class="help">None of them still holds a balance here.</div>';
+  if (!rows.length) return '<div class="help">none of them still holds a balance here.</div>';
   return `<div class="ledger">${rows.map(r => frow(token(r.tk, false), `sent here ${r.ins.length} time${r.ins.length === 1 ? '' : 's'}, never distributed`, amt(r.waiting, r.dec),
     sctl(`dist:${r.tk}`, 'distribute', { to: d.addr, sig: 'distribute(address)', args: () => [r.tk], label: `distribute ${token(r.tk, false)}` }))).join('')}</div>`
     + histRows(rows.flatMap(r => r.ins).sort(newest));
@@ -1760,7 +1760,7 @@ function fundsHTML(d, f, other) {
     'err',
   )).join('');
   const n = other && new Set(other.map(e => e.token)).size;
-  const others = !other ? '<div class="help">Token payments in could not be read from this provider, so a token never distributed here is not listed.</div>'
+  const others = !other ? '<div class="help wide">token payments in could not be read from this provider, so a token never distributed here is not listed.</div>'
     : !n ? ''
     : `<details class="others" id="others"><summary>other tokens received (${n})</summary>`
       /* R9, decision 57 § 1: the recognised set stays anyone's — `distribute` is permissionless by
@@ -1769,9 +1769,7 @@ function fundsHTML(d, f, other) {
       + '<div class="status warn">unverified — anyone can send any token to this address. Check a token before distributing it; once distributed it is listed above. listed means distributed here at least once — not checked, not endorsed.</div>'
       + `<div id="others-body">${notice('reading their balances…')}</div></details>`;
   return `<div class="ledger">${rows}${escrows}</div>${others}`
-    + `<div class="help">anyone can call distribute() — the contract splits by the table above; you pay the gas.${ACC ? '' : ' Connect a wallet to send it.'}</div>`
-    // #18, in the dapp's guidance for payers, as the ruling says M02 should state it.
-    + '<div class="help">Paying in from a contract with <code>.transfer()</code> or <code>.send()</code> can fail when the implementation is cold: the 2,300-gas stipend does not cover a clone\'s delegatecall to a cold implementation. Pay in with <code>call</code> and gas.</div>';
+    + `<div class="help wide">anyone can call distribute() — the contract splits by the table above; you pay the gas.${ACC ? '' : ' connect a wallet to send it.'} paying in from a contract? see <a class="link" href="#/docs#payin">receiving funds</a>.</div>`;
 }
 
 /* ---- create ---------------------------------------------------------------------------------- */
@@ -1813,12 +1811,12 @@ function createOne() {
   V.innerHTML = eyebrow('create a distribution · 1 of 2')
     + '<h1>Who controls it, and how slowly.</h1>'
     + field('name', `<input id="c-desc" aria-label="name" value="${esc(D.desc)}" placeholder="e.g. dnzn labs distribution">`,
-      "The distribution's display name, stored on chain as its description — shown everywhere it appears.")
+      "the distribution's display name, stored on chain as its description — shown everywhere it appears.")
     + field('owner', `<input id="c-owner" aria-label="owner" value="${esc(D.owner)}" placeholder="0x… or .eth / .wei / .gwei"><div class="res" id="c-ownerres"></div>`,
-      'Defaults to the connected wallet. A vault address here owns the distribution from its first block, and the salt stays yours (decision 10).')
+      'defaults to the connected wallet. a vault address here owns the distribution from its first block, and the salt stays yours (decision 10).')
     + '<div id="c-ownerack"></div>'
     + field('delay', `<input id="c-delay" class="narrow" aria-label="delay" value="${esc(D.delay)}">`,
-      'How long every future change waits in public. Accepts 7d, 48h, 0. Zero means changes apply instantly, and is flagged everywhere it shows.')
+      'how long every future change waits in public. accepts 7d, 48h, 0. zero means changes apply instantly, and is flagged everywhere it shows.')
     + '<div class="actions"><button class="btn" id="c-next">Next</button><span class="status" id="c-why"></span></div>';
   const desc = document.getElementById('c-desc'), own = document.getElementById('c-owner'), del = document.getElementById('c-delay');
   const why = document.getElementById('c-why'), next = document.getElementById('c-next');
@@ -1883,9 +1881,9 @@ function createTwo() {
     + editorHTML(D.rows)
     + '<div class="two">'
     + field('deposit <span class="opt">· optional</span>', ethIn(`id="c-dep" aria-label="deposit in ETH" value="${esc(D.deposit)}" placeholder="0"`),
-      'ETH sent with the creation transaction and deposited into the distribution. It arrives without a Received entry in the history.')
+      'ETH sent with the creation transaction and deposited into the distribution. it arrives without a Received entry in the history.')
     + field('salt #', `<input id="c-n" class="narrow" type="number" min="1" step="1" aria-label="salt number" value="${esc(D.n)}">`,
-      'The index in your salt. Its top 20 bytes are your own address (decision 10), so this is the only part you choose — and it alone fixes the address, on every chain.')
+      'the index in your salt. its top 20 bytes are your own address (decision 10), so this is the only part you choose — and it alone fixes the address, on every chain.')
     + '</div>'
     + `<div id="c-predict">${notice('reading the address this would deploy to…')}</div>`
     // The owner, again, where it is not the wallet signing: the reading step 1 was acknowledged for,
@@ -2086,7 +2084,7 @@ function docs() {
   ${S.featuredLie ? notice(`this page computes the featured distribution at ${ext('address', S.featuredLie.computed, esc(short(S.featuredLie.computed)))}; your wallet's provider answered ${esc(short(S.featuredLie.said))} instead — the support form is not shown.`, 'err') : ''}
   ${S.featured ? `<p>If this work is useful to you, please consider supporting its authors. A payment goes to the distribution this app features, ${ext('address', S.featured, esc(short(S.featured)))}, and is divided by its published table like any other.</p>
   <div class="give">${ethIn('id="give-amt" placeholder="amount" aria-label="amount in ETH"')}<button class="btn sec sm" id="give-go"${ACC ? '' : ' disabled title="connect a wallet to send"'}>send</button><a href="#/distros/${S.featured}">view the distribution →</a></div>
-  <div id="txs">${ACC ? '' : '<div class="help">Connect a wallet to send.</div>'}</div>` : ''}
+  <div id="txs">${ACC ? '' : '<div class="help">connect a wallet to send.</div>'}</div>` : ''}
 
   <h2 id="s-credits">Credits</h2>
   <p>The design of these contracts derives from <a href="https://multisig.software" target="_blank" rel="noopener noreferrer">multisig.software</a> by Src Co / z0r0z: the timelock, the self-call setters, the PUSH0 clones and the sender-bound salt. The low-level patterns follow <a href="https://github.com/Vectorized/solady" target="_blank" rel="noopener noreferrer">Solady</a>.</p>
