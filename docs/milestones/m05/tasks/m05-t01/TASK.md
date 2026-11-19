@@ -167,8 +167,14 @@ outside the repo.
    **The condition the table holds under, written beside it, not only the date.** Each row holds
    while that chain prices code deposit at the rate measured on the date stated. The two estimates
    put Sepolia near 1,560 gas per byte and Ethereum, OP Mainnet, Base and Base Sepolia near 220
-   (Elanik's derivation on #267, 2026-11-19: 37,435,995 ÷ 24,000 and 5,286,009 ÷ 24,000); the plan
-   does not say which upgrade causes the difference, only that the readings differ. So the Sepolia
+   (Elanik's derivation on #267, 2026-11-19: 37,435,995 ÷ 24,000 and 5,286,009 ÷ 24,000). The
+   repricing is [EIP-8037, State Creation Gas Cost Increase](https://eips.ethereum.org/EIPS/eip-8037)
+   (Standards Track Core, status **Last Call** on 2026-11-19): code deposit moves from 200 gas per
+   byte to a state-gas price of 1,530 per byte, metered in its own dimension. Sepolia carries it and
+   Ethereum does not yet, and Elanik's three-point slope measurement on #267 (2026-11-19 at
+   `78b5eb7`, bodies of 6,001 / 18,001 / 24,001 bytes, two independent marginal slopes per chain)
+   reads **218.0 gas per byte on Ethereum and 1,558.7 on Sepolia**, 7.15×, each the EIP's rate plus
+   calldata and initcode-word cost — a per-byte price, not a fixed overhead. So the Sepolia
    row is read as the figure every other chain would show at Sepolia's rate: on Ethereum the same
    chunk would be 37,435,995 ÷ 60,000,000 = **62.4%** of the block, over the rule's half, and the
    rule would cut at **19,000 bytes** (29,640,000 gas, 49.4%), which changes the piece count, the
@@ -178,12 +184,20 @@ outside the repo.
    0.03 ETH ask; what moves is the block share and the chunk size, not the budget.
 
    State the rule once, in § Gas beside `:910-920`: **a chain's chunk size is 24,000 bytes while a
-   full chunk estimates at or under half its block limit; otherwise it is the largest multiple of
-   1,000 whose estimate does, and that chain's size is a column of this table. The rule is
-   re-evaluated immediately before any mainnet cut, in the task that cuts it: the chunk estimate is
-   re-read on that chain on that day, and if the size it gives differs from the committed default,
-   `--max-chunk` moves and the calldata and the proposal split are regenerated in that task before
-   anything is proposed.** A re-run that records a new figure and leaves `--max-chunk` where Part A
+   full chunk estimates at or under both ceilings — half its block limit, and the per-transaction
+   gas cap where the chain applies one; otherwise it is the largest multiple of 1,000 whose
+   estimate does, and that chain's size is a column of this table. The rule is re-evaluated
+   immediately before any mainnet cut, in the task that cuts it, against whichever ceiling binds
+   that day: the chunk estimate is re-read on that chain on that day, and if the size it gives
+   differs from the committed default, `--max-chunk` moves and the calldata and the proposal split
+   are regenerated in that task before anything is proposed.** The second ceiling is
+   [EIP-7825](https://eips.ethereum.org/EIPS/eip-7825)'s `TX_MAX_GAS_LIMIT` of 16,777,216 on a
+   chain that carries 7825 without 8037's carve-out — 8037 applies that cap to execution gas only,
+   so deposit metered as state gas sits outside it. That carve-out is why the six `executeQueued`
+   of 2026-11-18 on Sepolia, at up to 37,493,327 gas each, were valid at all; on a chain with 7825
+   and not 8037 they would have been invalid, not merely expensive. Today's mainnet chunk,
+   5,286,009, is under both ceilings, so nothing in Part A moves on this. A re-run that records a
+   new figure and leaves `--max-chunk` where Part A
    set it regenerates nothing; the rule changing its answer invalidates the committed calldata, and
    Part A's artifacts are fixed at Part A's merge while the mainnet cut is a later task.
    Today every chain passes at 24,000, so the per-chain size is 24,000 everywhere and the mechanism
