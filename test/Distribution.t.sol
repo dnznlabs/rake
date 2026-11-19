@@ -5,6 +5,7 @@ import {Test, stdError} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {Distribution, DistributionFactory} from "../src/Distribution.sol";
 import {
+    BalanceRevertingToken,
     BigToken,
     BlocklistToken,
     BloatingReceiver,
@@ -1423,6 +1424,342 @@ contract DistributionTest is Test {
         assertEq(raw.length, 33, "the payload is over the word release sorts by");
         vm.expectRevert(raw);
         d.release(address(0), address(bad));
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // The mutation campaign's survivors (m05-t01b, decision 56). Each of these pins a behaviour a
+    // document promises and the suite did not assert: `slither-mutate` removed it and nothing went
+    // red. `SECURITY.md` § Mutation carries the campaign's figures and the survivors that got a
+    // one-line reason instead of a test.
+    // ---------------------------------------------------------------------------------------------
+
+    /// @notice `claim` bubbles a real reason too. Decision 24's rule is stated at
+    /// `src/Distribution.sol:208` for `claim` exactly as it is for `release`, but every test of it
+    /// went through `release`, so the `claim` arm was promised and unasserted.
+    /// @dev Found by the m05-t01b mutation campaign: replacing `claim`'s `_bubble(data)` with a bare
+    /// `revert()` (`[RR] Line 212`) survived the whole suite. The escrowed account calls `claim`
+    /// itself and names itself as the destination, which is the only way to reach that line with a
+    /// payload over the word `claim` sorts by.
+    /// @dev Funded with `vm.deal` and not `_send`: `_send` pays through `PlainSender.transfer`, under
+    /// the 2,300-gas stipend, which makes the whole case a measured gas frame — it fails with the
+    /// optimizer off, and it would have to join `scripts/coverage-floor.sh`'s exclusion list and be
+    /// dropped from the coverage run. Nothing here is about the stipend, so the balance is set
+    /// directly and the case stays inside the gate.
+    function test_claimBubblesLongReason() public {
+        // Arrange
+        RawRevertReceiver bad = new RawRevertReceiver();
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](2);
+        t[0] = _row(address(bad), 5000);
+        t[1] = _row(A, 5000);
+        Distribution d = _deploy(0, _asc(t));
+        vm.deal(address(d), 10_000);
+
+        d.distribute(address(0));
+        assertEq(d.escrowed(address(0), address(bad)), 5000, "the push failed, so the row is escrowed");
+
+        // Act / assert — the 33 bytes themselves, not `ReleaseFailed(token)` and not a bare revert.
+        bytes memory raw = bad.rawRevertData();
+        assertEq(raw.length, 33, "the payload is over the word claim sorts by");
+        vm.prank(address(bad));
+        vm.expectRevert(raw);
+        d.claim(address(0), address(bad));
+
+        assertEq(d.escrowed(address(0), address(bad)), 5000, "a bubbled reason leaves the escrow");
+        assertEq(d.reserved(address(0)), 5000);
+    }
+
+    /// @notice A token whose `balanceOf` reverts gives its reason back, rather than a bare revert
+    /// from inside `_balance`.
+    /// @dev Found by the m05-t01b mutation campaign: replacing `_balance`'s `_bubble(data)` with
+    /// `revert()` (`[RR] Line 386`) survived the whole suite. `_balance` runs before any push, so
+    /// nothing else in the suite reaches that bubble — every other reverting-token case fails in
+    /// `transfer`, a different arm.
+    function test_distributeBubblesBalanceOfReason() public {
+        // Arrange
+        BalanceRevertingToken tk = new BalanceRevertingToken();
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](2);
+        t[0] = _row(A, 5000);
+        t[1] = _row(B, 5000);
+        Distribution d = _deploy(0, _asc(t));
+
+        // Act / assert — the token's own reason, wrapped by `Error(string)`.
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", tk.REASON()));
+        d.distribute(address(tk));
+    }
+
+    /// @notice `propose` logs what it queued. The dapp's pending list is event-derived, so a queued
+    /// action that leaves no `Queued` is invisible to every reader — the shape #111 was.
+    /// @dev Found by the m05-t01b campaign: commenting out the delayed branch's
+    /// `emit Queued(hash, n, eta, action)` (`[CR] Line 235`) survived the whole suite, which held no
+    /// assertion on the event at all. The hash is recomputed here rather than taken from the return
+    /// value, so the event is checked against the nonce rule and not against itself.
+    function test_proposeEmitsQueued() public {
+        // Arrange
+        Distribution d = _deploy(WEEK, _defaultTable());
+        bytes memory action = abi.encodeCall(Distribution.setDescription, ("queued"));
+        uint32 n = 1; // `propose` queues under `++nonce`, and this clone has had none
+        bytes32 hash = keccak256(abi.encode(action, n));
+        uint256 eta = block.timestamp + WEEK;
+
+        // Act / assert
+        vm.expectEmit(true, false, false, true, address(d));
+        emit Distribution.Queued(hash, n, eta, action);
+        vm.prank(OWNER);
+        bytes32 returned = d.propose(action);
+
+        assertEq(returned, hash, "the hash the event carried is the hash propose returned");
+        assertEq(d.queued(hash), eta);
+    }
+
+    /// @notice `applyQueued` logs that it applied. Same reasoning as `Queued`: an applied action
+    /// with no `Applied` leaves the dapp's history showing it still pending.
+    /// @dev Found by the m05-t01b campaign: commenting out `emit Applied(hash)` (`[CR] Line 254`)
+    /// survived. `propose` with a zero delay emits `Applied` from its own line, so this goes through
+    /// a real delay to reach the one the mutant removed.
+    function test_applyQueuedEmitsApplied() public {
+        // Arrange
+        Distribution d = _deploy(WEEK, _defaultTable());
+        bytes memory action = abi.encodeCall(Distribution.setDescription, ("applied"));
+        vm.prank(OWNER);
+        bytes32 hash = d.propose(action);
+        vm.warp(block.timestamp + WEEK);
+
+        // Act / assert
+        vm.expectEmit(true, false, false, true, address(d));
+        emit Distribution.Applied(hash);
+        d.applyQueued(action, 1);
+
+        assertEq(d.description(), "applied", "and it really applied");
+        assertEq(d.queued(hash), 0);
+    }
+
+    /// @notice `release` for an account holding no escrow is `NothingToDo`, not a silent success.
+    /// The suite asserted that error for `claim` and for `distribute` and never for `release`.
+    /// @dev Found by the m05-t01b campaign: forcing `release`'s `amount == 0` to `false`
+    /// (`[MIA] Line 179`) survived. Past the guard a zero release would subtract nothing, push
+    /// nothing and emit `Released(token, account, 0)` — a log of a payment that did not happen.
+    function test_releaseWithNoEscrowIsNothingToDo() public {
+        // Arrange — a clone that has distributed nothing, so no row holds an escrow.
+        Distribution d = _deploy(0, _defaultTable());
+        assertEq(d.escrowed(address(0), A), 0, "nothing is escrowed for A");
+
+        // Act / assert
+        vm.expectRevert(Distribution.NothingToDo.selector);
+        d.release(address(0), A);
+    }
+
+    /// @notice The owner cancelling an entry that does not exist is `NothingToDo`. A stranger gets
+    /// `NotOwner` for the same call, which the suite already pinned; the owner's arm it did not.
+    /// @dev Found by the m05-t01b campaign: forcing `cancel`'s `eta == 0` to `false`
+    /// (`[MIA] Line 267`) survived. Past the guard the call would emit `Cancelled(hash)` for an
+    /// action nobody ever queued, which a log reader's pending list cannot tell from a real one.
+    function test_ownerCancelOfUnknownHashIsNothingToDo() public {
+        // Arrange
+        Distribution d = _deploy(WEEK, _defaultTable());
+        bytes32 unknown = keccak256("never queued");
+        assertEq(d.queued(unknown), 0, "and it really is unknown");
+
+        // Act / assert
+        vm.prank(OWNER);
+        vm.expectRevert(Distribution.NothingToDo.selector);
+        d.cancel(unknown);
+    }
+
+    /// @notice A table summing to *more* than `BPS_TOTAL` is `BadTable()`. `test_tableValidation`
+    /// rejects a table that sums to 9,999; nothing rejected one that sums to 11,000, and the rule
+    /// `_set` enforces is equality, not a floor.
+    /// @dev Found by the m05-t01b mutation campaign: `sum != BPS_TOTAL` relaxed to
+    /// `sum < BPS_TOTAL` (`[ROR] Line 344`) survived the whole suite, because every table the suite
+    /// offered was short or exact. An over-sum table accepted here would make `distribute`
+    /// unrunnable for the clone's whole life: the last row takes `amount - paid`, and `paid` would
+    /// have passed `amount` by then, so the subtraction underflows and reverts on every call.
+    function test_tableSummingAboveBpsTotalReverts() public {
+        // Arrange — 11,000 in two rows that break no other rule: ascending, no zero share.
+        Distribution.Beneficiary[] memory over = new Distribution.Beneficiary[](2);
+        over[0] = _row(A, 6000);
+        over[1] = _row(B, 5000);
+        uint256 sum;
+        for (uint256 i; i < over.length; ++i) {
+            sum += over[i].bps;
+        }
+        assertGt(sum, BPS_TOTAL, "the table really does sum above 10,000");
+
+        // Act / assert — through both doors into `_set`.
+        _expectBadInit(over);
+        Distribution d = _deploy(0, _defaultTable());
+        _expectBadSet(d, over);
+        assertEq(d.beneficiaries().length, 2, "the live table never changed");
+    }
+
+    /// @notice Decision 24's boundary is `<= 32`, and 32 itself is named rather than bubbled. The
+    /// suite pinned a bare `false` (32 bytes) through `release` and 33 bytes through `claim`, so the
+    /// boundary byte was asserted on one arm and the long side on the other, and no case stood
+    /// exactly on 32 in `claim`.
+    /// @dev Found by the m05-t01b campaign: both `data.length != 32` (`[ROR] Line 211`) and
+    /// `data.length < 32` (`[ROR] Line 211`) survived. Each differs from `<= 32` at exactly one
+    /// length — 32 — so a case standing on it is the only thing that can tell them apart.
+    /// @dev Funded with `vm.deal`, not `_send`: `_send` pays through `PlainSender.transfer` under
+    /// the 2,300-gas stipend, which makes the case a measured gas frame and drops it from the
+    /// coverage run. Nothing here is about the stipend.
+    function test_claimNamesFailureAtThirtyTwoBytes() public {
+        // Arrange — a recipient whose revert payload is exactly the boundary length.
+        RawRevertReceiver bad = new RawRevertReceiver();
+        bad.setRevertBytes(32);
+        assertEq(bad.rawRevertData().length, 32, "standing exactly on the boundary");
+
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](2);
+        t[0] = _row(address(bad), 5000);
+        t[1] = _row(A, 5000);
+        Distribution d = _deploy(0, _asc(t));
+        vm.deal(address(d), 10_000);
+
+        d.distribute(address(0));
+        assertEq(d.escrowed(address(0), address(bad)), 5000, "the push failed, so the row is escrowed");
+
+        // Act / assert — named, not bubbled: `ReleaseFailed(address(0))` and not the 32 bytes.
+        vm.prank(address(bad));
+        vm.expectRevert(abi.encodeWithSelector(Distribution.ReleaseFailed.selector, address(0)));
+        d.claim(address(0), address(bad));
+
+        assertEq(d.escrowed(address(0), address(bad)), 5000, "a named failure leaves the escrow");
+        assertEq(d.reserved(address(0)), 5000);
+    }
+
+    /// @notice `GRACE` is fourteen days, and both promises that rest on its length hold at the day
+    /// itself and fail the moment after. The suite used `GRACE` symbolically everywhere and so held
+    /// its *length* to nothing at all.
+    /// @dev Found by the m05-t01b campaign with four survivors on one line: `14 days` rewritten to
+    /// `14 seconds`, `14 minutes`, `14 hours` and `14 weeks` (`[SBR] Line 65`) all survived. The
+    /// literal below is deliberately `14 days` and not `d.GRACE()`: reading the constant back from
+    /// the contract would make this test agree with whatever the constant says, which is exactly the
+    /// agreement the four survivors exploited.
+    /// @dev Every warp is absolute, from a fixed base, and no `block.timestamp` is read across one:
+    /// under `via_ir` a cached timestamp can materialise with the warped value.
+    function test_graceWindowIsFourteenDays() public {
+        // Arrange — a fixed base, so every instant below is a literal and not a reading.
+        uint256 base = 1_000_000;
+        uint256 grace = 14 days;
+        vm.warp(base);
+        Distribution d = _deploy(WEEK, _defaultTable());
+        uint256 eta = base + WEEK;
+
+        bytes memory inTime = abi.encodeCall(Distribution.setDescription, ("applied on the last day"));
+        bytes memory tooLate = abi.encodeCall(Distribution.setDescription, ("never applied"));
+        vm.startPrank(OWNER);
+        d.propose(inTime);
+        bytes32 lateHash = d.propose(tooLate);
+        vm.stopPrank();
+
+        // Act / assert — the last applicable instant is `eta + GRACE` itself.
+        vm.warp(eta + grace);
+        d.applyQueued(inTime, 1);
+        assertEq(d.description(), "applied on the last day", "eta + 14 days still applies");
+
+        // One second later the window has closed, and the entry is anyone's to drop.
+        vm.warp(eta + grace + 1);
+        vm.expectRevert(abi.encodeWithSelector(Distribution.Expired.selector, eta));
+        d.applyQueued(tooLate, 2);
+
+        vm.prank(C);
+        d.cancel(lateHash);
+        assertEq(d.queued(lateHash), 0, "and a stranger may drop an expired entry");
+        assertEq(d.description(), "applied on the last day", "the expired action never ran");
+    }
+
+    /// @notice The zero-delay branch logs the instant it ran at, not a zero. The dapp reads its
+    /// history from `Queued`, where the third field is the eta a reader sorts and displays by.
+    /// @dev Found by the m05-t01b campaign: `emit Queued(hash, n, block.timestamp, action)` with
+    /// `block.timestamp` replaced by `0` (`[SBR] Line 227`) survived — `test_proposeEmitsQueued`
+    /// covers the delayed branch at `:235`, and nothing asserted this one's arguments.
+    function test_proposeImmediateEmitsQueuedWithTimestamp() public {
+        // Arrange — an absolute instant, so the expected eta is a literal. Not named `at`: solc
+        // 0.8.38 warns that it will become a keyword.
+        uint256 moment = 2_000_000;
+        vm.warp(moment);
+        Distribution d = _deploy(0, _defaultTable());
+        bytes memory action = abi.encodeCall(Distribution.setDescription, ("now"));
+        bytes32 hash = keccak256(abi.encode(action, uint32(1)));
+
+        // Act / assert — the eta of an immediate action is the moment it happened.
+        vm.expectEmit(true, false, false, true, address(d));
+        emit Distribution.Queued(hash, 1, moment, action);
+        vm.prank(OWNER);
+        d.propose(action);
+
+        assertEq(d.description(), "now", "and it applied in the same call");
+        assertEq(d.queued(hash), 0, "an immediate action is never queued");
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // § Mutation's pinned equivalences. These three survivors are `equivalent`, so a test that
+    // killed one would be wrong: each asserts that the original and the mutated path reach the same
+    // observable state, which is what makes the cell a measurement rather than an argument.
+    // ---------------------------------------------------------------------------------------------
+
+    /// @notice A renounce drops a pending transfer with it, and leaves `pendingOwner` at zero.
+    /// @dev Pins `[CR] Line 297` — commenting out the renounce branch's `return` — as `equivalent`.
+    /// Without the `return`, control falls through to `:299`, where `owner` has just been zeroed and
+    /// `owner_` is itself zero, so the ternary takes its first arm and re-assigns the
+    /// `pendingOwner = address(0)` that `:295` already wrote. This test therefore passes on both
+    /// sources by design; it is the equivalence, measured.
+    function test_renounceLeavesNoPendingOwner() public {
+        // Arrange — a live pending transfer, so zeroing it is an observable and not a no-op.
+        Distribution d = _deploy(0, _defaultTable());
+        vm.prank(OWNER);
+        d.propose(abi.encodeCall(Distribution.transferOwnership, (B)));
+        assertEq(d.pendingOwner(), B, "the transfer is pending");
+
+        // Act
+        vm.prank(OWNER);
+        d.propose(abi.encodeCall(Distribution.transferOwnership, (address(0))));
+
+        // Assert — both the renounce and the dropped transfer.
+        assertEq(d.owner(), address(0), "renounced");
+        assertEq(d.pendingOwner(), address(0), "and the pending transfer went with it");
+        vm.prank(B);
+        vm.expectRevert(Distribution.Unauthorized.selector);
+        d.acceptOwnership();
+    }
+
+    /// @notice Removing the last entry in the pending queue leaves the entries before it untouched
+    /// and still cancellable.
+    /// @dev Pins `[ROR] Line 367` — `i != last` rewritten to `i < last` and to `i <= last` — as
+    /// `equivalent`. `i` is a 1-based index into `_pending`, so `i <= last` always holds: `i < last`
+    /// *is* `i != last`, and `i <= last` is a constant true. At `i == last` the row the swap moves
+    /// is the row being removed, so the swap is a self-assignment and the index it writes is deleted
+    /// on the next line. Passes on all three sources by design.
+    function test_removingTheLastPendingEntryKeepsTheQueue() public {
+        // Arrange — three queued actions, so the third one's index is `last`.
+        Distribution d = _deploy(WEEK, _defaultTable());
+        bytes memory one = abi.encodeCall(Distribution.setDescription, ("one"));
+        bytes memory two = abi.encodeCall(Distribution.setDescription, ("two"));
+        bytes memory three = abi.encodeCall(Distribution.setDescription, ("three"));
+        vm.startPrank(OWNER);
+        bytes32 h1 = d.propose(one);
+        bytes32 h2 = d.propose(two);
+        bytes32 h3 = d.propose(three);
+        vm.stopPrank();
+        assertEq(d.pendingCount(), 3);
+
+        // Act — drop the one whose index is the length, the `i == last` arm.
+        vm.prank(OWNER);
+        d.cancel(h3);
+
+        // Assert — the two before it, in order, each still queued and still droppable.
+        assertEq(d.pendingCount(), 2);
+        Distribution.Pending[] memory pending = d.snapshot().pending;
+        assertEq(pending.length, 2);
+        assertEq(pending[0].hash, h1, "the first entry did not move");
+        assertEq(pending[1].hash, h2, "and neither did the second");
+        assertEq(d.queued(h3), 0, "the dropped entry is gone");
+        assertGt(d.queued(h1), 0);
+        assertGt(d.queued(h2), 0);
+
+        vm.startPrank(OWNER);
+        d.cancel(h2);
+        d.cancel(h1);
+        vm.stopPrank();
+        assertEq(d.pendingCount(), 0, "both survivors were still reachable by their own index");
     }
 
     // ---------------------------------------------------------------------------------------------
