@@ -226,10 +226,17 @@ let MAX_WINDOWS = 40;          // per log kind, per pass — 40 × 200 is 8,000 
 if (Q.get('win')) WINDOW_START = Number(Q.get('win'));
 if (Q.get('maxwin')) MAX_WINDOWS = Number(Q.get('maxwin'));
 /*DEV*/
-/* Read once per page load, and shared: the three queries of one history have to measure their
-   windows against the same `latest`, or the sections disagree about where the end is. */
+/* Read once per route entry, and shared: the three queries of one history have to measure their
+   windows against the same `latest`, or the sections disagree about where the end is. The *promise*
+   is what is kept and not the number, so the concurrent callers of one history pass make one request
+   between them rather than one each — which is also what makes the stamp below free, and what lets
+   the browser check count the requests a refresh press makes.
+   `route` clears it, so a route entry re-pulls the head rather than serving the boot value. */
 let HEAD = null;
-const head = async () => HEAD ?? (HEAD = parseInt(await P.request({ method: 'eth_blockNumber' }), 16));
+/* #243 part 2: the block the route's own read was made at, in the nav beside the control that
+   re-makes it. Written wherever the head resolves, which is every route that reads one. */
+const stamp = n => { const el = document.getElementById('asof'); if (el) el.textContent = `as of block ${n}`; };
+const head = () => HEAD ?? (HEAD = P.request({ method: 'eth_blockNumber' }).then(h => { const n = parseInt(h, 16); stamp(n); return n; }));
 /* A refusal, wherever the wallet put the text: MetaMask wraps the provider's JSON-RPC error and the
    message naming the cap can sit a level or two down from `message`. */
 const errText = e => [e && e.message, e && e.data && e.data.message, e && e.cause && e.cause.message]
@@ -1157,6 +1164,8 @@ async function landing() {
   // The live example is the widget itself, inlined below, mounted once the featured distribution is
   // known to exist: a chain without the seed leaves its slot empty rather than a widget in its error state.
   const t = TOKEN;
+  // This route reads no history, so the stamp has nothing else to come from (#243 part 2).
+  await head();
   /* No featured address — none seeded on this chain, or one the provider named that this page did
      not compute (R18) — is an empty slot, not a widget in its error state: `loadDistro(null)` would
      send `eth_getCode` with a null address. */
@@ -1311,8 +1320,9 @@ async function detail(addr) {
       + `<div class="sechead"><b>activity</b><span>funds in, and every split and escrow since</span></div>${notice('reading…')}</div>`;
   }
   /* Phase 1, the distribution. The clock is read again here, not only at boot: every countdown on
-     this page is measured against it, and a write that lands moves the chain's. */
-  const [d] = await Promise.all([loadDistro(addr), readClock()]);
+     this page is measured against it, and a write that lands moves the chain's. `head()` is in the
+     same batch for the stamp, and is the one the history read below shares. */
+  const [d] = await Promise.all([loadDistro(addr), readClock(), head()]);
   if (stale(t)) return;
   if (d.missing) { V.innerHTML = unreadable(addr); return; }
   /* Before `addRecent`, deliberately: the old order saved the address first and painted second, so
@@ -1948,6 +1958,9 @@ async function list() {
   const t = TOKEN, slot = document.getElementById('rows');
   let items = [], failed = false, scanned = null;
   try {
+    // In the try with the rest: the `recent` tab reads no logs, so this is the only read the stamp
+    // could describe on it, and a head this endpoint will not answer is a failed list either way.
+    await head();
     if (S.tab === 'mine') { const m = await mine(); items = m.rows; scanned = m.partial; }
     else items = (await Promise.all(recents().map(loadDistro))).filter(d => !d.missing && !d.foreign);
   } catch (e) { failed = true; }
@@ -2187,11 +2200,38 @@ function docScroll(h) {
   const el = h[6] === '#' ? document.getElementById('s-' + h.slice(7)) : null;
   if (el) el.scrollIntoView(); else scrollTo(0, 0);
 }
+/* #243 part 2, the other half of the stamp. One control for the whole page, because one read repaints
+   every section of it, and its state is the route's read rather than anything a view has to track:
+   `BUSY` is the promise the route itself returns, so the button says `reading…` for exactly as long
+   as that route's own `await`s are outstanding, and a read that has since been superseded cannot
+   restore the button under the one that replaced it.
+   The rejection is passed on rather than swallowed: a view whose read throws reported that before
+   this control existed, and it still has to. */
+let BUSY = null;
+function track(p) {
+  BUSY = p;
+  const b = document.getElementById('refresh');
+  if (b) { b.disabled = true; b.textContent = 'reading…'; }
+  const end = () => {
+    if (BUSY !== p) return;
+    const el = document.getElementById('refresh');
+    if (el) { el.disabled = false; el.textContent = 'refresh'; }
+  };
+  p.then(end, e => { end(); return Promise.reject(e); });
+}
+/* The stamp describes the route's own read at entry, so the two routes that make none carry neither
+   it nor the control. `#/create`'s salt probe (`predict`, then `eth_getCode`) reads the chain
+   mid-route and is deliberately unstamped: the stamp is a claim about where this view was read, not
+   about every request the page will go on to make. */
+const chrome = on => { for (const id of ['asof', 'refresh']) { const el = document.getElementById(id); if (el) el.hidden = !on; } };
 function route() {
   const h = location.hash || '#/';
   TOKEN++;
+  // A route entry re-pulls the head rather than serving the boot value; `refresh` is a route entry.
+  HEAD = null;
   document.getElementById('nav-distros').className = h.startsWith('#/distros') ? 'on' : '';
   document.getElementById('nav-docs').className = h.startsWith('#/docs') ? 'on' : '';
+  chrome(!(h.startsWith('#/docs') || h === '#/create'));
   /* Matched by prefix and painted before every check below it: the docs read with no wallet and on
      the wrong chain, which is most of the ways a stranger arrives at them. */
   if (h.startsWith('#/docs')) { docs(); docScroll(h); return; }
@@ -2203,11 +2243,12 @@ function route() {
   scrollTo(0, 0);
   if (h === '#/create') { createView(); return; }
   const at = h.match(/^#\/distros\/(0x[0-9a-fA-F]{40})$/);
-  if (at) { detail(Eth.checksum(at[1])); return; }
-  if (h.startsWith('#/distros')) { list(); return; }
-  landing();
+  if (at) { track(detail(Eth.checksum(at[1]))); return; }
+  if (h.startsWith('#/distros')) { track(list()); return; }
+  track(landing());
 }
 addEventListener('hashchange', route);
+document.getElementById('refresh').onclick = () => route();
 const tb = document.getElementById('theme-btn'), tm = document.getElementById('theme-menu'), wm = document.getElementById('who-menu'), nm = document.getElementById('net-menu');
 const menus = [tm, wm, nm], toggle = m => menus.forEach(x => x.hidden = x === m ? !x.hidden : true);
 tb.onclick = e => { e.stopPropagation(); toggle(tm); const t = localStorage.getItem('theme') || 'system'; tm.querySelectorAll('div').forEach(d => d.className = d.dataset.t === t ? 'on' : ''); };

@@ -25,6 +25,10 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0
 .anchor{position:relative}
 .pill{border:1px solid var(--rule);padding:6px 10px;display:inline-flex;align-items:center;gap:6px}.pill.ink{border-color:var(--ink);padding:6px 14px}
 .pill.warn{border-color:var(--amber);color:var(--amber)}
+/* The block the view was read at, beside the control that re-reads it: the pill's own row, quieter
+   than the pills and never wrapping, and no colour of its own. */
+.asof{color:var(--dim);font-size:11px;white-space:nowrap}
+.asof[hidden],.pill[hidden]{display:none}
 .eyebrow{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:40px 0 12px}
 .eyebrow.amber{color:var(--amber)}.eyebrow.err{color:var(--err)}
 h1{font-size:28px;font-weight:700;letter-spacing:-.015em;margin:40px 0 8px}
