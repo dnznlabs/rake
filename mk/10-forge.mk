@@ -21,7 +21,7 @@ DEPLOYED    = jq -r '.transactions[]|select(.transactionType=="CREATE" or .trans
 # anything.
 LIBS := lib/forge-std lib/solady
 
-.PHONY: serve build test fmt clean deploy addresses slither setup libs
+.PHONY: serve build test fmt clean deploy addresses slither setup libs coverage mutate
 
 setup: ## Fetch the pinned submodules: the one step a fresh clone or `git worktree add` needs
 	git submodule update --init --recursive
@@ -63,6 +63,31 @@ clean:: ## Remove build artifacts
 # so a `forge test` or `forge snapshot --check` chained behind it pays a full rebuild.
 slither: ## Static analysis gate — every result triaged in SECURITY.md
 	slither .
+
+# The coverage gate. All of the reasoning — why 22 of the 107 tests are excluded, why the
+# membership test is `FOUNDRY_OPTIMIZER=false forge test` and not coverage itself, and why no
+# figure here is a test count — is in the script, beside the list it governs. `SECURITY.md`
+# § Coverage carries the measured rows and the cost of the exclusion.
+coverage: libs ## Coverage gate — floors lines and branches per src/ file
+	bash scripts/coverage-floor.sh
+
+# Not a CI step, and not part of `test`. The oracle is the whole suite at 14-27 s and
+# `slither-mutate` runs it once per compiling mutant, so this is an hours-long campaign run per
+# task and committed: one directory per commit, holding the log and one file per *uncaught* mutant
+# (the tool writes a mutated source only when the suite stayed silent, so the directory is the
+# survivor list and the log is the record). `--timeout` is set explicitly because its 30 s default
+# is under the suite's own wall time, which would score a slow mutant as a timeout rather than
+# caught. Every survivor gets a row in `SECURITY.md` § Mutation.
+#
+# A killed run leaves mutated files in `src/`: the tool edits in place and restores on the way out.
+# Check `git status` before trusting the tree afterwards.
+mutate: libs ## Mutation campaign over src/ — hours; results land in audits/mutation/<sha>/
+	@sha=$$(git rev-parse --short HEAD); \
+	mkdir -p audits/mutation/$$sha; \
+	slither-mutate src --test-cmd 'forge test' \
+	  --contract-names Distribution,DistributionFactory,App \
+	  --timeout 300 --output-dir audits/mutation/$$sha -v 2>&1 \
+	  | tee audits/mutation/$$sha/campaign.log
 
 # Every scripts/forge/Deploy*.s.sol, each with its own broadcast log. LC_ALL=C because glob order is
 # locale-dependent, and deploy order decides the addresses.

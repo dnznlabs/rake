@@ -73,6 +73,14 @@ jobs:
       - name: gas snapshot
         run: devbox run -- forge snapshot --check
 
+      # After `gas snapshot` for the same reason Slither is ordered last: `forge coverage
+      # --ir-minimum` recompiles the whole tree at minimal optimisation with per-line counters, so
+      # anything that reads `out/` behind it pays a full rebuild. It is placed before Slither
+      # rather than after only because Slither rebuilds `out/` anyway, so the two cannot both be
+      # free and this one is the cheaper of the pair to put first.
+      - name: coverage
+        run: devbox run -- make coverage
+
       # Last, after `gas snapshot`, and not between `test` and it as m04-t06's plan first ordered:
       # Slither compiles with its own `forge build --build-info --skip ./test/** --force`, which
       # leaves `out/` holding six artifacts and none of the tests'. `forge snapshot --check` reads
