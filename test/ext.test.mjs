@@ -29,14 +29,17 @@ const PAGE = readFileSync(join(root, 'app/src/index.html'), 'utf8');
    passes against a check the page no longer applies. */
 const OPEN = 'const isAddr = v =>';
 const CLOSE = 'title="open in explorer"';
-/* The deployed factory and the implementation it clones, read from both tracked `Deploy.s.sol` logs
-   and recomputed from their own init code (m04-t14 TASK.md step 0, re-run 2026-11-18). These are the
-   two values the build substitutes into `CFG`, which is what makes the featured address computable
-   on the page at all. */
+/* The factory and the implementation it clones, both fixed by m05-t01's re-mined `FACTORY_SALT`
+   against `main`'s 0.8.38 bytes: the factory is `cast create2`'s answer for `RUNBOOK.md` § 0's salt,
+   and the implementation is a salt-0 CREATE2 from the factory, so it follows the factory's address.
+   Read two ways on 2026-11-19 and equal both ways — `implementation()` on m05-t01's anvil, and
+   `cast create2 --deployer <factory> --salt 0` over `Distribution`'s init code. These are the two
+   values the build substitutes into `CFG`, which is what makes the featured address computable on
+   the page at all. The testnets carry them from m05-t01 Part B; nothing here reads a chain. */
 const DEPLOYED = {
   chainId: 11155111,
-  factory: '0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B',
-  impl: '0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0',
+  factory: '0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E',
+  impl: '0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A',
 };
 function lift(cfg = DEPLOYED) {
   const one = anchor => {
@@ -215,14 +218,15 @@ test('isClone reads an upper-cased answer as the same code', () => {
 /* ---- the featured address computed rather than asked for (R18) ------------------------------ */
 
 /* The DNZN salt `mk/15-seed.mk:10` passes on every chain that is not the dev one: the creator's
-   address in the top 20 bytes and the index in the bottom 12 (decision 10). */
-const DNZN_SALT = '0x357836ffcb45307fa7ff2a574f505753c961902b000000000000000000000001';
+   address in the top 20 bytes and the index in the bottom 12 (decision 10). The creator is the DNZN
+   Creator key on every chain, testnets included (decision 54). */
+const DNZN_SALT = '0x68e0741d8d693e14bf56914567eaddc130b186ee000000000000000000000001';
 
-test('predictLocal computes decision 50\'s address from the build alone', () => {
-  /* The address ROADMAP decision 50 states, read from both testnets 2026-11-17 and reproduced from
-     the two tracked `Deploy.s.sol` logs by m04-t14 step 0's rehearsal. Nothing on the wire takes
-     part: the factory and the implementation are `CFG`'s, and the salt is the build's. */
-  assert.equal(predictLocal(DNZN_SALT), '0x71a4221974Fc2E95081AE513248918dF27CF7a4A');
+test('predictLocal computes decision 54\'s address from the build alone', () => {
+  /* The address `predict($DNZN_SALT)` answered on m05-t01's anvil on 2026-11-19, with the factory at
+     its `RUNBOOK.md` § 0 address. Nothing on the wire takes part: the factory and the implementation
+     are `CFG`'s, and the salt is the build's. */
+  assert.equal(predictLocal(DNZN_SALT), '0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199');
 });
 
 test('a different salt gives a different address of the same shape', () => {
@@ -232,7 +236,7 @@ test('a different salt gives a different address of the same shape', () => {
   const got = predictLocal(second);
 
   assert.match(got, /^0x[0-9a-fA-F]{40}$/);
-  assert.notEqual(got.toLowerCase(), '0x71a4221974fc2e95081ae513248918df27cf7a4a');
+  assert.notEqual(got.toLowerCase(), '0xb611ff193da8fa9391c0a3daa29c3c9a0f4d5199');
 });
 
 test('the implementation\'s case does not move the address', () => {
@@ -241,5 +245,5 @@ test('the implementation\'s case does not move the address', () => {
      a value was printed. */
   const lower = lift({ ...DEPLOYED, impl: DEPLOYED.impl.toLowerCase() });
 
-  assert.equal(lower.predictLocal(DNZN_SALT), '0x71a4221974Fc2E95081AE513248918dF27CF7a4A');
+  assert.equal(lower.predictLocal(DNZN_SALT), '0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199');
 });

@@ -281,7 +281,7 @@ const SEPOLIA = {
   VERSION: '0.1alpha',
   DISTRIBUTIONFACTORY: '0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B',
   DISTRIBUTIONFACTORY_BLOCK: '0xb88091',
-  FEATURED_SALT: '0x357836ffcb45307fa7ff2a574f505753c961902b000000000000000000000001',
+  FEATURED_SALT: '0x68e0741d8d693e14bf56914567eaddc130b186ee000000000000000000000001',
   APP: '0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE',
 };
 
@@ -355,7 +355,7 @@ const buildRun = (...set) => {
   const after = existsSync(dist) ? statSync(dist).mtimeMs : null;
   return { ...r, before, after };
 };
-const DNZN = 'FEATURED_SALT=0x357836ffcb45307fa7ff2a574f505753c961902b000000000000000000000001';
+const DNZN = 'FEATURED_SALT=0x68e0741d8d693e14bf56914567eaddc130b186ee000000000000000000000001';
 
 test('a --set value outside its shape stops the build and leaves app/dist alone', () => {
   /* Leg 1's reproduction: `--set VERSION=…` discarded `version.mjs`'s validation entirely, because
