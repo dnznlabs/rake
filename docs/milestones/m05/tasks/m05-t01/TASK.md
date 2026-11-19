@@ -481,8 +481,13 @@ an address. Baselines are `main` at `78b5eb7`, 2026-11-19.
    calldata and the proposal split named in the same sentence; `grep -c -- '--max-chunk'
    tools/step4-calldata.mjs` ≥ 2 (baseline 0);
    `grep -c 'envOr("MAX_CHUNK"' scripts/forge/Chunks.s.sol` → 1 (baseline 0); the new test reds with
-   the flag ignored (plant it, quote the red, revert); `--app-nonce 7` regenerates
-   `calldata/11155111/` byte-identical with no flag.
+   the flag ignored (plant it, quote the red, revert); with no flag, `--app-nonce 7` at this head
+   writes the same five files, byte for byte, as `origin/main`'s `tools/step4-calldata.mjs` writes
+   from the same `app/dist` at the same nonce (run both tools into scratch directories and `cmp`
+   each pair), so the flag changes nothing on the default path. Amended 2026-11-19: the clause
+   read "regenerates `calldata/11155111/` byte-identical", which cannot hold, because the committed
+   calldata predates `app/` changes that reached `main` after the M04 upload (Part A's handoff,
+   Discovery 1); Part B step 14 regenerates it.
 6. **Criterion 6's rule.** `grep -ci '20 gwei stop of step 0' RUNBOOK.md` → 0 (baseline 1);
    `grep -ci '1 gwei' RUNBOOK.md` ≥ 1 (baseline 0), inside § 0.
 7. **Step 6's values.** `grep -c 'DNZN // FUND DISTRIBUTION' RUNBOOK.md` ≥ 1 (baseline 0); § 0
