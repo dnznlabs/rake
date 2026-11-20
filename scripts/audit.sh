@@ -307,6 +307,74 @@ info "wall ${CLAUDE_SECONDS}s · model ${CLAUDE_MODEL_OBSERVED} · tokens ${CLAU
 # Observed values, captured at run time. audits/README.md § Provenance is the field list; the rollup
 # reproduces this block verbatim rather than composing one, so no field is ever a model's guess.
 
+# The two self-review figures of decision 56, both READ FROM THE TREE at this run's commit and
+# never typed: the floors `make coverage` enforces, and the score of the newest committed mutation
+# campaign. If either source is absent the field says so rather than going quiet, because a missing
+# figure and a zero figure must not read alike.
+COVERAGE_FLOOR_SRC="scripts/coverage-floor.sh"
+if [ -r "$COVERAGE_FLOOR_SRC" ]; then
+  COVERAGE_FLOOR=$(awk '
+    function harvest(line, arr,   s, p, f) {
+      while (match(line, /\[src\/[^]]+\]=[0-9]+/)) {
+        s = substr(line, RSTART, RLENGTH); split(s, p, "]="); f = substr(p[1], 2)
+        arr[f] = p[2]
+        if (!(f in seen)) { seen[f] = 1; order[++n] = f }
+        line = substr(line, RSTART + RLENGTH)
+      }
+    }
+    /^declare -A FLOOR_LINES=/    { harvest($0, L) }
+    /^declare -A FLOOR_BRANCHES=/ { harvest($0, B) }
+    END {
+      for (i = 1; i <= n; i++) {
+        g = order[i]; sub(/^src\//, "", g); sub(/\.sol$/, "", g)
+        printf "%s%s %s/%s", (i > 1 ? " \xc2\xb7 " : ""), g, L[order[i]], B[order[i]]
+      }
+    }
+  ' "$COVERAGE_FLOOR_SRC")
+  COVERAGE_FLOOR="${COVERAGE_FLOOR:-not parsed} (lines/branches, from $COVERAGE_FLOOR_SRC)"
+else
+  COVERAGE_FLOOR="not recorded — $COVERAGE_FLOOR_SRC absent"
+fi
+
+# The per-contract class summaries are the tool's own words ("Revert mutants: N caught of M"), so
+# the total is their sum. A non-compiling mutant is not in either side of it.
+#
+# EVERY log in the newest campaign directory, not just `campaign.log`. One campaign takes more than
+# one invocation: `slither-mutate` sections one contract at a time and drops the second contract
+# declared in a shared file, so `DistributionFactory` needs its own run and its own log beside the
+# first. Globbing `campaign.log` alone reported 715 of 807 and left the factory's 40 of 40 out —
+# and a score short by one contract reads exactly like a complete one.
+#
+# The directory is chosen by **each log's own `started:` header**, never by directory name. A short
+# sha has no order, so `ls | tail -1` is lexicographic and wrong twice over: it picks
+# `audits/mutation/<sha>-factory/`, the sibling `mk/10-forge.mk` must give the factory run because
+# `slither-mutate` `rmtree`s its own `--output-dir` (`slither/tools/mutator/__main__.py:244-245`)
+# and would otherwise delete the first run's survivors — that sibling holds survivor sources and no
+# log, so the field read `not recorded`; and for a later campaign whose sha sorts earlier it kept
+# reading the older directory's figure. Both measured. `date -d` normalises the header's ISO
+# timestamp so a run either side of a DST change still orders correctly.
+MUTATION_DIR=$(
+  for f in audits/mutation/*/campaign.log; do
+    [ -r "$f" ] || continue
+    started=$(sed -n 's/^started:[[:space:]]*//p' "$f" | head -1)
+    epoch=$(date -d "$started" +%s 2>/dev/null || echo 0)
+    printf '%s\t%s\n' "$epoch" "$(dirname "$f")"
+  done | sort -n -k1,1 | tail -1 | cut -f2
+)
+MUTATION_LOGS=$(ls -1 "${MUTATION_DIR:-/nonexistent}"/campaign*.log 2>/dev/null)
+if [ -n "$MUTATION_LOGS" ]; then
+  MUTATION_SCORE=$(printf '%s\n' "$MUTATION_LOGS" | xargs awk '
+    match($0, /[A-Za-z]+ mutants: [0-9]+ caught of [0-9]+/) {
+      s = substr($0, RSTART, RLENGTH); split(s, p, " "); c += p[3]; m += p[6]
+    }
+    END { if (m > 0) printf "%d of %d caught", c, m; else printf "no class summary in the logs" }
+  ')
+  MUTATION_LOG_COUNT=$(printf '%s\n' "$MUTATION_LOGS" | grep -c '')
+  MUTATION_SCORE="$MUTATION_SCORE (compiling mutants, from $MUTATION_LOG_COUNT log(s) in $MUTATION_DIR/)"
+else
+  MUTATION_SCORE="not recorded — no audits/mutation/*/campaign.log in the tree"
+fi
+
 PROVENANCE="$SCRATCH/provenance.txt"
 {
   printf 'audit date        %s\n' "$AUDIT_DATE"
@@ -319,6 +387,8 @@ PROVENANCE="$SCRATCH/provenance.txt"
   printf 'leg 2             claude %s · requested %s → observed %s · 1 pass · %ss wall\n' \
     "$CLAUDE_VERSION" "$CLAUDE_MODEL" "${CLAUDE_MODEL_OBSERVED:-not reported}" "$CLAUDE_SECONDS"
   printf 'tokens            leg 1 %s · leg 2 %s\n' "${CODEX_TOKENS:-not reported}" "${CLAUDE_TOKENS:-not reported}"
+  printf 'coverage floor    %s\n' "$COVERAGE_FLOOR"
+  printf 'mutation score    %s\n' "$MUTATION_SCORE"
 } > "$PROVENANCE"
 
 say "provenance"

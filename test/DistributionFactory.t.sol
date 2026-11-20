@@ -208,6 +208,31 @@ contract DistributionFactoryTest is Test {
         assertEq(B.balance, 1.2 ether);
     }
 
+    /// @notice The other side of the guard above: an ordinary `create`, onto an address nobody
+    /// funded, logs no `Received` at all. Without this the guard was pinned only from its true side,
+    /// and a `create` announcing a phantom zero-value receipt would have read as correct.
+    /// @dev Found by the m05-t01b mutation campaign: forcing `init`'s `address(this).balance != 0`
+    /// to `true` (`[MIA] Line 143`) survived the whole suite.
+    function test_unfundedCreateLogsNoReceived() public {
+        // Arrange
+        DistributionFactory factory = new DistributionFactory();
+        bytes32 salt = bytes32(uint256(uint160(address(this))) << 96) | bytes32(uint256(8));
+        address predicted = factory.predict(salt);
+        assertEq(predicted.balance, 0, "nothing funded the counterfactual address");
+        Distribution.Beneficiary[] memory t = _table(A, 6000, B, 4000);
+
+        // Act
+        vm.recordLogs();
+        address d = factory.create(OWNER, 0, "desc", t, salt);
+
+        // Assert — the factory's `Created` and nothing else; in particular no `Received`.
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(logs.length, 1, "one log, so the index below means something");
+        assertEq(logs[0].topics[0], DistributionFactory.Created.selector);
+        assertTrue(logs[0].topics[0] != Distribution.Received.selector, "an unfunded create announces no receipt");
+        assertEq(d.balance, 0);
+    }
+
     function _table(address first, uint96 firstBps, address second, uint96 secondBps)
         internal
         pure

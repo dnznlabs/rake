@@ -1,0 +1,1151 @@
+# slither-mutate campaign (supplementary: DistributionFactory) — rake
+commit:         e770054 (e7700545474fcb44cda20bbbc4bf52865b8b0ed9)
+branch:         m05/t01b-selfreview (src/ byte-identical to origin/main)
+command:        slither-mutate src --test-cmd 'forge test' --contract-names DistributionFactory --timeout 300 --output-dir audits/mutation/e770054-factory -v
+why:            campaign 2 named DistributionFactory and emitted no section for it;
+                its mutated lines ran 9-423 and the factory starts at src/Distribution.sol:432.
+slither:        0.11.5
+forge:          Version: 1.7.1-dev
+host:           Linux 7.2.12-orbstack-00394-gbecdd6130068 aarch64, 10 cpus
+started:        2026-11-19T14:22:47-06:00
+wall time:      522 seconds
+finished:       2026-11-19T14:31:29-06:00
+exit:           0
+score:          DistributionFactory 40 caught of 40 compiling, 0 uncaught
+score overall:  755 caught of 847 compiling, 92 uncaught — every campaign*.log in this directory summed
+note:           the score lines are computed from this file's own class summaries;
+                the tool output below them is byte-for-byte as the run emitted it.
+                The branch was renamed to m05/t01b-self-review after both runs;
+                the `branch:` line above is the name the run recorded.
+
+INFO:Slither-Mutate:Starting mutation campaign in src
+INFO:Slither-Mutate:Preparing to mutate contracts:
+- DistributionFactory
+INFO:Slither-Mutate:Timing tests..
+INFO:Slither-Mutate:Test suite passes in 26 seconds, commencing mutation campaign with a timeout of 300 seconds
+
+INFO:Slither-Mutate:Mutating contract DistributionFactory
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 1.95ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (2314): Expected identifier but got '('
+stderr:    --> src/Distribution.sol:439:11:
+stderr:     |
+stderr: 439 |     revert();
+stderr:     |           ^
+INFO:Slither-Mutate:[RR] Line 439: 'address public immutable implementation = address(new Distribution{salt: bytes32(0)}())' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.22ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (8198): Identifier "impl" not found.
+stderr:    --> src/Distribution.sol:474:26:
+stderr:     |
+stderr: 474 |             mstore(0x14, impl)
+stderr:     |                          ^^^^
+INFO:Slither-Mutate:[RR] Line 466: 'address impl = implementation' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.44ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7576): Undeclared identifier.
+stderr:    --> src/Distribution.sol:468:13:
+stderr:     |
+stderr: 468 |         if (prefix != uint256(uint160(msg.sender))) revert SaltDoesNotStartWith();
+stderr:     |             ^^^^^^
+INFO:Slither-Mutate:[RR] Line 467: 'uint256 prefix = uint256(salt) >> 96' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.10ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (2314): Expected ';' but got identifier
+stderr:    --> src/Distribution.sol:473:9:
+stderr:     |
+stderr: 473 |         Distribution(payable(distribution)).init(owner_, delay_, description_, table_);
+stderr:     |         ^^^^^^^^^^^^
+INFO:Slither-Mutate:[RR] Line 472: 'assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            distribution := create2(callvalue(), 0x0e, 0x36, salt)
+            if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }
+            mstore(0x24, 0)
+        }' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.18ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7000): Function "revert" expects 2 arguments but got 0.
+stderr:    --> src/Distribution.sol:473:13:
+stderr:     |
+stderr: 473 |             revert()
+stderr:     |             ^^^^^^
+INFO:Slither-Mutate:[RR] Line 473: 'mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.19ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7000): Function "revert" expects 2 arguments but got 0.
+stderr:    --> src/Distribution.sol:474:13:
+stderr:     |
+stderr: 474 |             revert()
+stderr:     |             ^^^^^^
+INFO:Slither-Mutate:[RR] Line 474: 'mstore(0x14, impl)' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.31ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7000): Function "revert" expects 2 arguments but got 0.
+stderr:    --> src/Distribution.sol:475:13:
+stderr:     |
+stderr: 475 |             revert()
+stderr:     |             ^^^^^^
+INFO:Slither-Mutate:[RR] Line 475: 'mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.10ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7000): Function "revert" expects 2 arguments but got 0.
+stderr:    --> src/Distribution.sol:476:13:
+stderr:     |
+stderr: 476 |             revert()
+stderr:     |             ^^^^^^
+INFO:Slither-Mutate:[RR] Line 476: 'distribution := create2(callvalue(), 0x0e, 0x36, salt)' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.12ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7000): Function "revert" expects 2 arguments but got 0.
+stderr:    --> src/Distribution.sol:478:17:
+stderr:     |
+stderr: 478 |                 revert() // DeploymentFailed()
+stderr:     |                 ^^^^^^
+INFO:Slither-Mutate:[RR] Line 478: 'mstore(0x00, 0x30116425)' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.24ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7000): Function "revert" expects 2 arguments but got 0.
+stderr:    --> src/Distribution.sol:481:13:
+stderr:     |
+stderr: 481 |             revert()
+stderr:     |             ^^^^^^
+INFO:Slither-Mutate:[RR] Line 481: 'mstore(0x24, 0)' ==> 'revert()' --> COMPILATION FAILURE
+INFO:Slither-Mutate:[RR] Line 483: 'Distribution(payable(distribution)).init(owner_, delay_, description_, table_)' ==> 'revert()' --> CAUGHT
+INFO:Slither-Mutate:[RR] Line 484: 'emit Created(distribution, owner_)' ==> 'revert()' --> CAUGHT
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.94ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (8198): Identifier "impl" not found.
+stderr:    --> src/Distribution.sol:494:26:
+stderr:     |
+stderr: 494 |             mstore(0x14, impl)
+stderr:     |                          ^^^^
+INFO:Slither-Mutate:[RR] Line 490: 'address impl = implementation' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.23ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7576): Undeclared identifier.
+stderr:    --> src/Distribution.sol:499:97:
+stderr:     |
+stderr: 499 |         return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+stderr:     |                                                                                                 ^^^^^^^^^^^^
+INFO:Slither-Mutate:[RR] Line 491: 'bytes32 initCodeHash' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.06ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (2314): Expected ';' but got 'return'
+stderr:    --> src/Distribution.sol:493:9:
+stderr:     |
+stderr: 493 |         return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+stderr:     |         ^^^^^^
+INFO:Slither-Mutate:[RR] Line 492: 'assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.04ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7000): Function "revert" expects 2 arguments but got 0.
+stderr:    --> src/Distribution.sol:493:13:
+stderr:     |
+stderr: 493 |             revert()
+stderr:     |             ^^^^^^
+INFO:Slither-Mutate:[RR] Line 493: 'mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.07ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7000): Function "revert" expects 2 arguments but got 0.
+stderr:    --> src/Distribution.sol:494:13:
+stderr:     |
+stderr: 494 |             revert()
+stderr:     |             ^^^^^^
+INFO:Slither-Mutate:[RR] Line 494: 'mstore(0x14, impl)' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.79ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7000): Function "revert" expects 2 arguments but got 0.
+stderr:    --> src/Distribution.sol:495:13:
+stderr:     |
+stderr: 495 |             revert()
+stderr:     |             ^^^^^^
+INFO:Slither-Mutate:[RR] Line 495: 'mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.03ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7000): Function "revert" expects 2 arguments but got 0.
+stderr:    --> src/Distribution.sol:496:13:
+stderr:     |
+stderr: 496 |             revert()
+stderr:     |             ^^^^^^
+INFO:Slither-Mutate:[RR] Line 496: 'initCodeHash := keccak256(0x0e, 0x36)' ==> 'revert()' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.98ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7000): Function "revert" expects 2 arguments but got 0.
+stderr:    --> src/Distribution.sol:497:13:
+stderr:     |
+stderr: 497 |             revert()
+stderr:     |             ^^^^^^
+INFO:Slither-Mutate:[RR] Line 497: 'mstore(0x24, 0)' ==> 'revert()' --> COMPILATION FAILURE
+INFO:Slither-Mutate:[RR] Line 499: 'return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))))' ==> 'revert()' --> CAUGHT
+INFO:Slither-Mutate:Mutator RR found 3 caught revert mutants (out of 3 that compile)
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.49ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7576): Undeclared identifier.
+stderr:    --> src/Distribution.sol:466:24:
+stderr:     |
+stderr: 466 |         address impl = implementation;
+stderr:     |                        ^^^^^^^^^^^^^^
+stderr: 
+stderr: Error (7576): Undeclared identifier.
+stderr:    --> src/Distribution.sol:490:24:
+stderr:     |
+stderr: 490 |         address impl = implementation;
+stderr:     |                        ^^^^^^^^^^^^^^
+INFO:Slither-Mutate:[CR] Line 439: 'address public immutable implementation = address(new Distribution{salt: bytes32(0)}())' ==> '//address public immutable implementation = address(new Distribution{salt: bytes32(0)}())' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.09ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (2314): Expected '(' but got 'address'
+stderr:    --> src/Distribution.sol:466:9:
+stderr:     |
+stderr: 466 |         address impl = implementation;
+stderr:     |         ^^^^^^^
+INFO:Slither-Mutate:[CR] Line 465: '(address distribution)' ==> '//(address distribution)' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.18ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (8198): Identifier "impl" not found.
+stderr:    --> src/Distribution.sol:474:26:
+stderr:     |
+stderr: 474 |             mstore(0x14, impl)
+stderr:     |                          ^^^^
+INFO:Slither-Mutate:[CR] Line 466: 'address impl = implementation' ==> '//address impl = implementation' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.41ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7576): Undeclared identifier.
+stderr:    --> src/Distribution.sol:468:13:
+stderr:     |
+stderr: 468 |         if (prefix != uint256(uint160(msg.sender))) revert SaltDoesNotStartWith();
+stderr:     |             ^^^^^^
+INFO:Slither-Mutate:[CR] Line 467: 'uint256 prefix = uint256(salt) >> 96' ==> '//uint256 prefix = uint256(salt) >> 96' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.09ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (6933): Expected primary expression.
+stderr:    --> src/Distribution.sol:472:9:
+stderr:     |
+stderr: 472 |         assembly ("memory-safe") {
+stderr:     |         ^^^^^^^^
+INFO:Slither-Mutate:[CR] Line 468: 'prefix != uint256(uint160(msg.sender))' ==> '//prefix != uint256(uint160(msg.sender))' --> COMPILATION FAILURE
+INFO:Slither-Mutate:[CR] Line 468: 'revert SaltDoesNotStartWith()' ==> '//revert SaltDoesNotStartWith()' --> CAUGHT
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.28ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (2314): Expected ';' but got identifier
+stderr:    --> src/Distribution.sol:474:13:
+stderr:     |
+stderr: 474 |             mstore(0x14, impl)
+stderr:     |             ^^^^^^
+INFO:Slither-Mutate:[CR] Line 472: 'assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            distribution := create2(callvalue(), 0x0e, 0x36, salt)
+            if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }
+            mstore(0x24, 0)
+        }' ==> '//assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            distribution := create2(callvalue(), 0x0e, 0x36, salt)
+            if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }
+            mstore(0x24, 0)
+        }' --> COMPILATION FAILURE
+INFO:Slither-Mutate:[CR] Line 473: 'mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)' ==> '//mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)' --> CAUGHT
+INFO:Slither-Mutate:[CR] Line 474: 'mstore(0x14, impl)' ==> '//mstore(0x14, impl)' --> CAUGHT
+INFO:Slither-Mutate:[CR] Line 475: 'mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)' ==> '//mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)' --> CAUGHT
+INFO:Slither-Mutate:[CR] Line 476: 'distribution := create2(callvalue(), 0x0e, 0x36, salt)' ==> '//distribution := create2(callvalue(), 0x0e, 0x36, salt)' --> CAUGHT
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.38ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (2314): Expected ';' but got '}'
+stderr:    --> src/Distribution.sol:482:9:
+stderr:     |
+stderr: 482 |         }
+stderr:     |         ^
+INFO:Slither-Mutate:[CR] Line 477: 'if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }' ==> '//if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }' --> COMPILATION FAILURE
+INFO:Slither-Mutate:[CR] Line 478: 'mstore(0x00, 0x30116425)' ==> '//mstore(0x00, 0x30116425)' --> CAUGHT
+INFO:Slither-Mutate:[CR] Line 479: 'revert(0x1c, 0x04)' ==> '//revert(0x1c, 0x04)' --> CAUGHT
+INFO:Slither-Mutate:[CR] Line 481: 'mstore(0x24, 0)' ==> '//mstore(0x24, 0)' --> CAUGHT
+INFO:Slither-Mutate:[CR] Line 483: 'Distribution(payable(distribution)).init(owner_, delay_, description_, table_)' ==> '//Distribution(payable(distribution)).init(owner_, delay_, description_, table_)' --> CAUGHT
+INFO:Slither-Mutate:[CR] Line 484: 'emit Created(distribution, owner_)' ==> '//emit Created(distribution, owner_)' --> CAUGHT
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 4.03ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (8198): Identifier "impl" not found.
+stderr:    --> src/Distribution.sol:494:26:
+stderr:     |
+stderr: 494 |             mstore(0x14, impl)
+stderr:     |                          ^^^^
+INFO:Slither-Mutate:[CR] Line 490: 'address impl = implementation' ==> '//address impl = implementation' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.01ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7576): Undeclared identifier.
+stderr:    --> src/Distribution.sol:499:97:
+stderr:     |
+stderr: 499 |         return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+stderr:     |                                                                                                 ^^^^^^^^^^^^
+INFO:Slither-Mutate:[CR] Line 491: 'bytes32 initCodeHash' ==> '//bytes32 initCodeHash' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.58ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (2314): Expected ';' but got identifier
+stderr:    --> src/Distribution.sol:494:13:
+stderr:     |
+stderr: 494 |             mstore(0x14, impl)
+stderr:     |             ^^^^^^
+INFO:Slither-Mutate:[CR] Line 492: 'assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }' ==> '//assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }' --> COMPILATION FAILURE
+INFO:Slither-Mutate:[CR] Line 493: 'mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)' ==> '//mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)' --> CAUGHT
+INFO:Slither-Mutate:[CR] Line 494: 'mstore(0x14, impl)' ==> '//mstore(0x14, impl)' --> CAUGHT
+INFO:Slither-Mutate:[CR] Line 495: 'mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)' ==> '//mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)' --> CAUGHT
+INFO:Slither-Mutate:[CR] Line 496: 'initCodeHash := keccak256(0x0e, 0x36)' ==> '//initCodeHash := keccak256(0x0e, 0x36)' --> CAUGHT
+INFO:Slither-Mutate:[CR] Line 497: 'mstore(0x24, 0)' ==> '//mstore(0x24, 0)' --> CAUGHT
+INFO:Slither-Mutate:[CR] Line 499: 'return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))))' ==> '//return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))))' --> CAUGHT
+INFO:Slither-Mutate:Mutator CR found 16 caught comment mutants (out of 16 that compile)
+INFO:Slither-Mutate:Mutator AOR found 0 caught tweak mutants (out of 0 that compile)
+INFO:Slither-Mutate:Running total: found 0 caught tweak mutants (out of 0 that compile)
+INFO:Slither-Mutate:Mutator ASOR found 0 caught tweak mutants (out of 0 that compile)
+INFO:Slither-Mutate:Running total: found 0 caught tweak mutants (out of 0 that compile)
+INFO:Slither-Mutate:[BOR] Line 467: 'uint256 prefix = uint256(salt) >> 96' ==> 'uint256 prefix = uint256(salt) & 96' --> CAUGHT
+INFO:Slither-Mutate:[BOR] Line 467: 'uint256 prefix = uint256(salt) >> 96' ==> 'uint256 prefix = uint256(salt) | 96' --> CAUGHT
+INFO:Slither-Mutate:[BOR] Line 467: 'uint256 prefix = uint256(salt) >> 96' ==> 'uint256 prefix = uint256(salt) << 96' --> CAUGHT
+INFO:Slither-Mutate:[BOR] Line 467: 'uint256 prefix = uint256(salt) >> 96' ==> 'uint256 prefix = uint256(salt) ^ 96' --> CAUGHT
+INFO:Slither-Mutate:Mutator BOR found 4 caught tweak mutants (out of 4 that compile)
+INFO:Slither-Mutate:Running total: found 4 caught tweak mutants (out of 4 that compile)
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.31ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7858): Expected pragma, import directive or contract/interface/library/user-defined type/constant/function/error/event definition.
+stderr:    --> src/Distribution.sol:501:2:
+stderr:     |
+stderr: 501 | }{
+stderr:     |  ^
+INFO:Slither-Mutate:[FHR] Line 432: 'contract DistributionFactory {
+    event Created(address indexed distribution, address indexed owner);
+
+    error DeploymentFailed();
+    error SaltDoesNotStartWith();
+
+    /// @dev Deployed by the factory, so `Distribution.factory` is this contract on every clone.
+    address public immutable implementation = address(new Distribution{salt: bytes32(0)}());
+
+    /// @notice Deploy and initialise a clone at `predict(salt)`.
+    /// @param salt Its top 20 bytes must equal `msg.sender`. `msg.value` rides the CREATE2, so a
+    /// deposit lands in the clone without a `Received` log.
+    /// @dev Three properties the dapp has to know about this address:
+    /// 1. It depends on this factory and `salt` only — not on the owner, delay, description or table.
+    ///    So the sender fixes the address; the owner does not enter it. One EOA calls `create` with
+    ///    the same salt on every chain and passes the vault as `owner_`, and the clone is owned by
+    ///    that vault from its first block at one address, with no ownership transfer ever needed.
+    ///    Each chain is a separate contract: transferring ownership on one changes neither the salt
+    ///    nor any other chain, so the deploying key never needs to own anything.
+    /// 2. A second `create` with a used salt burns the whole gas limit before `DeploymentFailed`: a
+    ///    CREATE2 collision consumes every unit forwarded to it. Read `predict(salt)` with
+    ///    `eth_getCode` first and refuse a non-empty answer.
+    /// 3. Same-address-everywhere is this factory's address, not a clone's claim on its own. The
+    ///    factory is placed by CREATE2 through the keyless proxy at `0x4e59b448…0B4956C`
+    ///    (`scripts/forge/Deploy.s.sol`), so its address follows that proxy, `FACTORY_SALT` and this
+    ///    contract's bytes — never a deployer's nonce — and `RUNBOOK.md` puts it at one address on
+    ///    every chain it reaches.
+    function create(
+        address owner_,
+        uint32 delay_,
+        string calldata description_,
+        Distribution.Beneficiary[] calldata table_,
+        bytes32 salt
+    ) external payable returns (address distribution) {
+        address impl = implementation;
+        uint256 prefix = uint256(salt) >> 96;
+        if (prefix != uint256(uint160(msg.sender))) revert SaltDoesNotStartWith();
+
+        // The PUSH0 minimal-proxy init code, byte for byte as solady's `LibClone.initCode_PUSH0`
+        // writes it. The two `mstore`s at 0x24 overlap the free memory pointer and restore it.
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            distribution := create2(callvalue(), 0x0e, 0x36, salt)
+            if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }
+            mstore(0x24, 0)
+        }
+        Distribution(payable(distribution)).init(owner_, delay_, description_, table_);
+        emit Created(distribution, owner_);
+    }
+
+    /// @notice The address `create(..., salt)` would reach.
+    /// @dev No prefix check: the dapp predicts before it knows who will send.
+    function predict(bytes32 salt) external view returns (address) {
+        address impl = implementation;
+        bytes32 initCodeHash;
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }
+        return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+    }
+}' ==> 'contract DistributionFactory {
+    event Created(address indexed distribution, address indexed owner);
+
+    error DeploymentFailed();
+    error SaltDoesNotStartWith();
+
+    /// @dev Deployed by the factory, so `Distribution.factory` is this contract on every clone.
+    address public immutable implementation = address(new Distribution{salt: bytes32(0)}());
+
+    /// @notice Deploy and initialise a clone at `predict(salt)`.
+    /// @param salt Its top 20 bytes must equal `msg.sender`. `msg.value` rides the CREATE2, so a
+    /// deposit lands in the clone without a `Received` log.
+    /// @dev Three properties the dapp has to know about this address:
+    /// 1. It depends on this factory and `salt` only — not on the owner, delay, description or table.
+    ///    So the sender fixes the address; the owner does not enter it. One EOA calls `create` with
+    ///    the same salt on every chain and passes the vault as `owner_`, and the clone is owned by
+    ///    that vault from its first block at one address, with no ownership transfer ever needed.
+    ///    Each chain is a separate contract: transferring ownership on one changes neither the salt
+    ///    nor any other chain, so the deploying key never needs to own anything.
+    /// 2. A second `create` with a used salt burns the whole gas limit before `DeploymentFailed`: a
+    ///    CREATE2 collision consumes every unit forwarded to it. Read `predict(salt)` with
+    ///    `eth_getCode` first and refuse a non-empty answer.
+    /// 3. Same-address-everywhere is this factory's address, not a clone's claim on its own. The
+    ///    factory is placed by CREATE2 through the keyless proxy at `0x4e59b448…0B4956C`
+    ///    (`scripts/forge/Deploy.s.sol`), so its address follows that proxy, `FACTORY_SALT` and this
+    ///    contract's bytes — never a deployer's nonce — and `RUNBOOK.md` puts it at one address on
+    ///    every chain it reaches.
+    function create(
+        address owner_,
+        uint32 delay_,
+        string calldata description_,
+        Distribution.Beneficiary[] calldata table_,
+        bytes32 salt
+    ) external payable returns (address distribution) {
+        address impl = implementation;
+        uint256 prefix = uint256(salt) >> 96;
+        if (prefix != uint256(uint160(msg.sender))) revert SaltDoesNotStartWith();
+
+        // The PUSH0 minimal-proxy init code, byte for byte as solady's `LibClone.initCode_PUSH0`
+        // writes it. The two `mstore`s at 0x24 overlap the free memory pointer and restore it.
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            distribution := create2(callvalue(), 0x0e, 0x36, salt)
+            if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }
+            mstore(0x24, 0)
+        }
+        Distribution(payable(distribution)).init(owner_, delay_, description_, table_);
+        emit Created(distribution, owner_);
+    }
+
+    /// @notice The address `create(..., salt)` would reach.
+    /// @dev No prefix check: the dapp predicts before it knows who will send.
+    function predict(bytes32 salt) external pure returns (address) {
+        address impl = implementation;
+        bytes32 initCodeHash;
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }
+        return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+    }
+}' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.21ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7858): Expected pragma, import directive or contract/interface/library/user-defined type/constant/function/error/event definition.
+stderr:    --> src/Distribution.sol:501:2:
+stderr:     |
+stderr: 501 | }{
+stderr:     |  ^
+INFO:Slither-Mutate:[FHR] Line 432: 'contract DistributionFactory {
+    event Created(address indexed distribution, address indexed owner);
+
+    error DeploymentFailed();
+    error SaltDoesNotStartWith();
+
+    /// @dev Deployed by the factory, so `Distribution.factory` is this contract on every clone.
+    address public immutable implementation = address(new Distribution{salt: bytes32(0)}());
+
+    /// @notice Deploy and initialise a clone at `predict(salt)`.
+    /// @param salt Its top 20 bytes must equal `msg.sender`. `msg.value` rides the CREATE2, so a
+    /// deposit lands in the clone without a `Received` log.
+    /// @dev Three properties the dapp has to know about this address:
+    /// 1. It depends on this factory and `salt` only — not on the owner, delay, description or table.
+    ///    So the sender fixes the address; the owner does not enter it. One EOA calls `create` with
+    ///    the same salt on every chain and passes the vault as `owner_`, and the clone is owned by
+    ///    that vault from its first block at one address, with no ownership transfer ever needed.
+    ///    Each chain is a separate contract: transferring ownership on one changes neither the salt
+    ///    nor any other chain, so the deploying key never needs to own anything.
+    /// 2. A second `create` with a used salt burns the whole gas limit before `DeploymentFailed`: a
+    ///    CREATE2 collision consumes every unit forwarded to it. Read `predict(salt)` with
+    ///    `eth_getCode` first and refuse a non-empty answer.
+    /// 3. Same-address-everywhere is this factory's address, not a clone's claim on its own. The
+    ///    factory is placed by CREATE2 through the keyless proxy at `0x4e59b448…0B4956C`
+    ///    (`scripts/forge/Deploy.s.sol`), so its address follows that proxy, `FACTORY_SALT` and this
+    ///    contract's bytes — never a deployer's nonce — and `RUNBOOK.md` puts it at one address on
+    ///    every chain it reaches.
+    function create(
+        address owner_,
+        uint32 delay_,
+        string calldata description_,
+        Distribution.Beneficiary[] calldata table_,
+        bytes32 salt
+    ) external payable returns (address distribution) {
+        address impl = implementation;
+        uint256 prefix = uint256(salt) >> 96;
+        if (prefix != uint256(uint160(msg.sender))) revert SaltDoesNotStartWith();
+
+        // The PUSH0 minimal-proxy init code, byte for byte as solady's `LibClone.initCode_PUSH0`
+        // writes it. The two `mstore`s at 0x24 overlap the free memory pointer and restore it.
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            distribution := create2(callvalue(), 0x0e, 0x36, salt)
+            if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }
+            mstore(0x24, 0)
+        }
+        Distribution(payable(distribution)).init(owner_, delay_, description_, table_);
+        emit Created(distribution, owner_);
+    }
+
+    /// @notice The address `create(..., salt)` would reach.
+    /// @dev No prefix check: the dapp predicts before it knows who will send.
+    function predict(bytes32 salt) external view returns (address) {
+        address impl = implementation;
+        bytes32 initCodeHash;
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }
+        return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+    }
+}' ==> 'contract DistributionFactory {
+    event Created(address indexed distribution, address indexed owner);
+
+    error DeploymentFailed();
+    error SaltDoesNotStartWith();
+
+    /// @dev Deployed by the factory, so `Distribution.factory` is this contract on every clone.
+    address private immutable implementation = address(new Distribution{salt: bytes32(0)}());
+
+    /// @notice Deploy and initialise a clone at `predict(salt)`.
+    /// @param salt Its top 20 bytes must equal `msg.sender`. `msg.value` rides the CREATE2, so a
+    /// deposit lands in the clone without a `Received` log.
+    /// @dev Three properties the dapp has to know about this address:
+    /// 1. It depends on this factory and `salt` only — not on the owner, delay, description or table.
+    ///    So the sender fixes the address; the owner does not enter it. One EOA calls `create` with
+    ///    the same salt on every chain and passes the vault as `owner_`, and the clone is owned by
+    ///    that vault from its first block at one address, with no ownership transfer ever needed.
+    ///    Each chain is a separate contract: transferring ownership on one changes neither the salt
+    ///    nor any other chain, so the deploying key never needs to own anything.
+    /// 2. A second `create` with a used salt burns the whole gas limit before `DeploymentFailed`: a
+    ///    CREATE2 collision consumes every unit forwarded to it. Read `predict(salt)` with
+    ///    `eth_getCode` first and refuse a non-empty answer.
+    /// 3. Same-address-everywhere is this factory's address, not a clone's claim on its own. The
+    ///    factory is placed by CREATE2 through the keyless proxy at `0x4e59b448…0B4956C`
+    ///    (`scripts/forge/Deploy.s.sol`), so its address follows that proxy, `FACTORY_SALT` and this
+    ///    contract's bytes — never a deployer's nonce — and `RUNBOOK.md` puts it at one address on
+    ///    every chain it reaches.
+    function create(
+        address owner_,
+        uint32 delay_,
+        string calldata description_,
+        Distribution.Beneficiary[] calldata table_,
+        bytes32 salt
+    ) private payable returns (address distribution) {
+        address impl = implementation;
+        uint256 prefix = uint256(salt) >> 96;
+        if (prefix != uint256(uint160(msg.sender))) revert SaltDoesNotStartWith();
+
+        // The PUSH0 minimal-proxy init code, byte for byte as solady's `LibClone.initCode_PUSH0`
+        // writes it. The two `mstore`s at 0x24 overlap the free memory pointer and restore it.
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            distribution := create2(callvalue(), 0x0e, 0x36, salt)
+            if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }
+            mstore(0x24, 0)
+        }
+        Distribution(payable(distribution)).init(owner_, delay_, description_, table_);
+        emit Created(distribution, owner_);
+    }
+
+    /// @notice The address `create(..., salt)` would reach.
+    /// @dev No prefix check: the dapp predicts before it knows who will send.
+    function predict(bytes32 salt) private view returns (address) {
+        address impl = implementation;
+        bytes32 initCodeHash;
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }
+        return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+    }
+}' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.22ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (7858): Expected pragma, import directive or contract/interface/library/user-defined type/constant/function/error/event definition.
+stderr:    --> src/Distribution.sol:501:2:
+stderr:     |
+stderr: 501 | }{
+stderr:     |  ^
+INFO:Slither-Mutate:[FHR] Line 432: 'contract DistributionFactory {
+    event Created(address indexed distribution, address indexed owner);
+
+    error DeploymentFailed();
+    error SaltDoesNotStartWith();
+
+    /// @dev Deployed by the factory, so `Distribution.factory` is this contract on every clone.
+    address public immutable implementation = address(new Distribution{salt: bytes32(0)}());
+
+    /// @notice Deploy and initialise a clone at `predict(salt)`.
+    /// @param salt Its top 20 bytes must equal `msg.sender`. `msg.value` rides the CREATE2, so a
+    /// deposit lands in the clone without a `Received` log.
+    /// @dev Three properties the dapp has to know about this address:
+    /// 1. It depends on this factory and `salt` only — not on the owner, delay, description or table.
+    ///    So the sender fixes the address; the owner does not enter it. One EOA calls `create` with
+    ///    the same salt on every chain and passes the vault as `owner_`, and the clone is owned by
+    ///    that vault from its first block at one address, with no ownership transfer ever needed.
+    ///    Each chain is a separate contract: transferring ownership on one changes neither the salt
+    ///    nor any other chain, so the deploying key never needs to own anything.
+    /// 2. A second `create` with a used salt burns the whole gas limit before `DeploymentFailed`: a
+    ///    CREATE2 collision consumes every unit forwarded to it. Read `predict(salt)` with
+    ///    `eth_getCode` first and refuse a non-empty answer.
+    /// 3. Same-address-everywhere is this factory's address, not a clone's claim on its own. The
+    ///    factory is placed by CREATE2 through the keyless proxy at `0x4e59b448…0B4956C`
+    ///    (`scripts/forge/Deploy.s.sol`), so its address follows that proxy, `FACTORY_SALT` and this
+    ///    contract's bytes — never a deployer's nonce — and `RUNBOOK.md` puts it at one address on
+    ///    every chain it reaches.
+    function create(
+        address owner_,
+        uint32 delay_,
+        string calldata description_,
+        Distribution.Beneficiary[] calldata table_,
+        bytes32 salt
+    ) external payable returns (address distribution) {
+        address impl = implementation;
+        uint256 prefix = uint256(salt) >> 96;
+        if (prefix != uint256(uint160(msg.sender))) revert SaltDoesNotStartWith();
+
+        // The PUSH0 minimal-proxy init code, byte for byte as solady's `LibClone.initCode_PUSH0`
+        // writes it. The two `mstore`s at 0x24 overlap the free memory pointer and restore it.
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            distribution := create2(callvalue(), 0x0e, 0x36, salt)
+            if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }
+            mstore(0x24, 0)
+        }
+        Distribution(payable(distribution)).init(owner_, delay_, description_, table_);
+        emit Created(distribution, owner_);
+    }
+
+    /// @notice The address `create(..., salt)` would reach.
+    /// @dev No prefix check: the dapp predicts before it knows who will send.
+    function predict(bytes32 salt) external view returns (address) {
+        address impl = implementation;
+        bytes32 initCodeHash;
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }
+        return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+    }
+}' ==> 'contract DistributionFactory {
+    event Created(address indexed distribution, address indexed owner);
+
+    error DeploymentFailed();
+    error SaltDoesNotStartWith();
+
+    /// @dev Deployed by the factory, so `Distribution.factory` is this contract on every clone.
+    address internal immutable implementation = address(new Distribution{salt: bytes32(0)}());
+
+    /// @notice Deploy and initialise a clone at `predict(salt)`.
+    /// @param salt Its top 20 bytes must equal `msg.sender`. `msg.value` rides the CREATE2, so a
+    /// deposit lands in the clone without a `Received` log.
+    /// @dev Three properties the dapp has to know about this address:
+    /// 1. It depends on this factory and `salt` only — not on the owner, delay, description or table.
+    ///    So the sender fixes the address; the owner does not enter it. One EOA calls `create` with
+    ///    the same salt on every chain and passes the vault as `owner_`, and the clone is owned by
+    ///    that vault from its first block at one address, with no ownership transfer ever needed.
+    ///    Each chain is a separate contract: transferring ownership on one changes neither the salt
+    ///    nor any other chain, so the deploying key never needs to own anything.
+    /// 2. A second `create` with a used salt burns the whole gas limit before `DeploymentFailed`: a
+    ///    CREATE2 collision consumes every unit forwarded to it. Read `predict(salt)` with
+    ///    `eth_getCode` first and refuse a non-empty answer.
+    /// 3. Same-address-everywhere is this factory's address, not a clone's claim on its own. The
+    ///    factory is placed by CREATE2 through the keyless proxy at `0x4e59b448…0B4956C`
+    ///    (`scripts/forge/Deploy.s.sol`), so its address follows that proxy, `FACTORY_SALT` and this
+    ///    contract's bytes — never a deployer's nonce — and `RUNBOOK.md` puts it at one address on
+    ///    every chain it reaches.
+    function create(
+        address owner_,
+        uint32 delay_,
+        string calldata description_,
+        Distribution.Beneficiary[] calldata table_,
+        bytes32 salt
+    ) internal payable returns (address distribution) {
+        address impl = implementation;
+        uint256 prefix = uint256(salt) >> 96;
+        if (prefix != uint256(uint160(msg.sender))) revert SaltDoesNotStartWith();
+
+        // The PUSH0 minimal-proxy init code, byte for byte as solady's `LibClone.initCode_PUSH0`
+        // writes it. The two `mstore`s at 0x24 overlap the free memory pointer and restore it.
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            distribution := create2(callvalue(), 0x0e, 0x36, salt)
+            if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }
+            mstore(0x24, 0)
+        }
+        Distribution(payable(distribution)).init(owner_, delay_, description_, table_);
+        emit Created(distribution, owner_);
+    }
+
+    /// @notice The address `create(..., salt)` would reach.
+    /// @dev No prefix check: the dapp predicts before it knows who will send.
+    function predict(bytes32 salt) internal view returns (address) {
+        address impl = implementation;
+        bytes32 initCodeHash;
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }
+        return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+    }
+}' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.15ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (9182): Function, variable, struct or modifier declaration expected.
+stderr:    --> src/Distribution.sol:485:6:
+stderr:     |
+stderr: 485 |     }{
+stderr:     |      ^
+INFO:Slither-Mutate:[FHR] Line 459: 'function create(
+        address owner_,
+        uint32 delay_,
+        string calldata description_,
+        Distribution.Beneficiary[] calldata table_,
+        bytes32 salt
+    ) external payable returns (address distribution) {
+        address impl = implementation;
+        uint256 prefix = uint256(salt) >> 96;
+        if (prefix != uint256(uint160(msg.sender))) revert SaltDoesNotStartWith();
+
+        // The PUSH0 minimal-proxy init code, byte for byte as solady's `LibClone.initCode_PUSH0`
+        // writes it. The two `mstore`s at 0x24 overlap the free memory pointer and restore it.
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            distribution := create2(callvalue(), 0x0e, 0x36, salt)
+            if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }
+            mstore(0x24, 0)
+        }
+        Distribution(payable(distribution)).init(owner_, delay_, description_, table_);
+        emit Created(distribution, owner_);
+    }' ==> 'function create(
+        address owner_,
+        uint32 delay_,
+        string calldata description_,
+        Distribution.Beneficiary[] calldata table_,
+        bytes32 salt
+    ) private payable returns (address distribution) {
+        address impl = implementation;
+        uint256 prefix = uint256(salt) >> 96;
+        if (prefix != uint256(uint160(msg.sender))) revert SaltDoesNotStartWith();
+
+        // The PUSH0 minimal-proxy init code, byte for byte as solady's `LibClone.initCode_PUSH0`
+        // writes it. The two `mstore`s at 0x24 overlap the free memory pointer and restore it.
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            distribution := create2(callvalue(), 0x0e, 0x36, salt)
+            if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }
+            mstore(0x24, 0)
+        }
+        Distribution(payable(distribution)).init(owner_, delay_, description_, table_);
+        emit Created(distribution, owner_);
+    }' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.12ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (9182): Function, variable, struct or modifier declaration expected.
+stderr:    --> src/Distribution.sol:485:6:
+stderr:     |
+stderr: 485 |     }{
+stderr:     |      ^
+INFO:Slither-Mutate:[FHR] Line 459: 'function create(
+        address owner_,
+        uint32 delay_,
+        string calldata description_,
+        Distribution.Beneficiary[] calldata table_,
+        bytes32 salt
+    ) external payable returns (address distribution) {
+        address impl = implementation;
+        uint256 prefix = uint256(salt) >> 96;
+        if (prefix != uint256(uint160(msg.sender))) revert SaltDoesNotStartWith();
+
+        // The PUSH0 minimal-proxy init code, byte for byte as solady's `LibClone.initCode_PUSH0`
+        // writes it. The two `mstore`s at 0x24 overlap the free memory pointer and restore it.
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            distribution := create2(callvalue(), 0x0e, 0x36, salt)
+            if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }
+            mstore(0x24, 0)
+        }
+        Distribution(payable(distribution)).init(owner_, delay_, description_, table_);
+        emit Created(distribution, owner_);
+    }' ==> 'function create(
+        address owner_,
+        uint32 delay_,
+        string calldata description_,
+        Distribution.Beneficiary[] calldata table_,
+        bytes32 salt
+    ) internal payable returns (address distribution) {
+        address impl = implementation;
+        uint256 prefix = uint256(salt) >> 96;
+        if (prefix != uint256(uint160(msg.sender))) revert SaltDoesNotStartWith();
+
+        // The PUSH0 minimal-proxy init code, byte for byte as solady's `LibClone.initCode_PUSH0`
+        // writes it. The two `mstore`s at 0x24 overlap the free memory pointer and restore it.
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            distribution := create2(callvalue(), 0x0e, 0x36, salt)
+            if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }
+            mstore(0x24, 0)
+        }
+        Distribution(payable(distribution)).init(owner_, delay_, description_, table_);
+        emit Created(distribution, owner_);
+    }' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.14ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (9182): Function, variable, struct or modifier declaration expected.
+stderr:    --> src/Distribution.sol:500:6:
+stderr:     |
+stderr: 500 |     }{
+stderr:     |      ^
+INFO:Slither-Mutate:[FHR] Line 489: 'function predict(bytes32 salt) external view returns (address) {
+        address impl = implementation;
+        bytes32 initCodeHash;
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }
+        return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+    }' ==> 'function predict(bytes32 salt) external pure returns (address) {
+        address impl = implementation;
+        bytes32 initCodeHash;
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }
+        return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+    }' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.18ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (9182): Function, variable, struct or modifier declaration expected.
+stderr:    --> src/Distribution.sol:500:6:
+stderr:     |
+stderr: 500 |     }{
+stderr:     |      ^
+INFO:Slither-Mutate:[FHR] Line 489: 'function predict(bytes32 salt) external view returns (address) {
+        address impl = implementation;
+        bytes32 initCodeHash;
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }
+        return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+    }' ==> 'function predict(bytes32 salt) private view returns (address) {
+        address impl = implementation;
+        bytes32 initCodeHash;
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }
+        return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+    }' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 2.37ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (9182): Function, variable, struct or modifier declaration expected.
+stderr:    --> src/Distribution.sol:500:6:
+stderr:     |
+stderr: 500 |     }{
+stderr:     |      ^
+INFO:Slither-Mutate:[FHR] Line 489: 'function predict(bytes32 salt) external view returns (address) {
+        address impl = implementation;
+        bytes32 initCodeHash;
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }
+        return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+    }' ==> 'function predict(bytes32 salt) internal view returns (address) {
+        address impl = implementation;
+        bytes32 initCodeHash;
+        assembly ("memory-safe") {
+            mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3)
+            mstore(0x14, impl)
+            mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73)
+            initCodeHash := keccak256(0x0e, 0x36)
+            mstore(0x24, 0)
+        }
+        return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+    }' --> COMPILATION FAILURE
+INFO:Slither-Mutate:Mutator FHR found 0 caught tweak mutants (out of 0 that compile)
+INFO:Slither-Mutate:Running total: found 4 caught tweak mutants (out of 4 that compile)
+INFO:Slither-Mutate:Mutator LIR found 0 caught tweak mutants (out of 0 that compile)
+INFO:Slither-Mutate:Running total: found 4 caught tweak mutants (out of 4 that compile)
+INFO:Slither-Mutate:Mutator LOR found 0 caught tweak mutants (out of 0 that compile)
+INFO:Slither-Mutate:Running total: found 4 caught tweak mutants (out of 4 that compile)
+INFO:Slither-Mutate:[MIA] Line 468: 'prefix != uint256(uint160(msg.sender))' ==> 'true' --> CAUGHT
+INFO:Slither-Mutate:[MIA] Line 468: 'prefix != uint256(uint160(msg.sender))' ==> 'false' --> CAUGHT
+INFO:Slither-Mutate:[MIA] Line 468: 'prefix != uint256(uint160(msg.sender))' ==> '!(prefix != uint256(uint160(msg.sender)))' --> CAUGHT
+INFO:Slither-Mutate:[MIA] Line 477: 'if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }' ==> 'true' --> CAUGHT
+INFO:Slither-Mutate:[MIA] Line 477: 'if iszero(distribution) {
+                mstore(0x00, 0x30116425) // DeploymentFailed()
+                revert(0x1c, 0x04)
+            }' ==> 'false' --> CAUGHT
+INFO:Slither-Mutate:Mutator MIA found 5 caught tweak mutants (out of 5 that compile)
+INFO:Slither-Mutate:Running total: found 9 caught tweak mutants (out of 9 that compile)
+INFO:Slither-Mutate:[MVIE] Line 439: 'address public immutable implementation = address(new Distribution{salt: bytes32(0)}())' ==> 'address public immutable implementation ' --> CAUGHT
+INFO:Slither-Mutate:[MVIE] Line 466: 'address impl = implementation' ==> 'address impl ' --> CAUGHT
+INFO:Slither-Mutate:[MVIE] Line 467: 'uint256 prefix = uint256(salt) >> 96' ==> 'uint256 prefix ' --> CAUGHT
+INFO:Slither-Mutate:[MVIE] Line 490: 'address impl = implementation' ==> 'address impl ' --> CAUGHT
+INFO:Slither-Mutate:Mutator MVIE found 4 caught tweak mutants (out of 4 that compile)
+INFO:Slither-Mutate:Running total: found 13 caught tweak mutants (out of 13 that compile)
+INFO:Slither-Mutate:Mutator MVIV found 0 caught tweak mutants (out of 0 that compile)
+INFO:Slither-Mutate:Running total: found 13 caught tweak mutants (out of 13 that compile)
+INFO:Slither-Mutate:Mutator MWA found 0 caught tweak mutants (out of 0 that compile)
+INFO:Slither-Mutate:Running total: found 13 caught tweak mutants (out of 13 that compile)
+INFO:Slither-Mutate:[ROR] Line 468: 'prefix != uint256(uint160(msg.sender))' ==> 'prefix < uint256(uint160(msg.sender))' --> CAUGHT
+INFO:Slither-Mutate:[ROR] Line 468: 'prefix != uint256(uint160(msg.sender))' ==> 'prefix > uint256(uint160(msg.sender))' --> CAUGHT
+INFO:Slither-Mutate:[ROR] Line 468: 'prefix != uint256(uint160(msg.sender))' ==> 'prefix <= uint256(uint160(msg.sender))' --> CAUGHT
+INFO:Slither-Mutate:[ROR] Line 468: 'prefix != uint256(uint160(msg.sender))' ==> 'prefix >= uint256(uint160(msg.sender))' --> CAUGHT
+INFO:Slither-Mutate:[ROR] Line 468: 'prefix != uint256(uint160(msg.sender))' ==> 'prefix == uint256(uint160(msg.sender))' --> CAUGHT
+INFO:Slither-Mutate:Mutator ROR found 5 caught tweak mutants (out of 5 that compile)
+INFO:Slither-Mutate:Running total: found 18 caught tweak mutants (out of 18 that compile)
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.75ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (9640): Explicit type conversion not allowed from "bytes32" to "uint128".
+stderr:    --> src/Distribution.sol:467:26:
+stderr:     |
+stderr: 467 |         uint128 prefix = uint128(salt) >> 96;
+stderr:     |                          ^^^^^^^^^^^^^
+INFO:Slither-Mutate:[SBR] Line 467: 'uint256 prefix = uint256(salt) >> 96' ==> 'uint128 prefix = uint128(salt) >> 96' --> COMPILATION FAILURE
+INFO:Slither-Mutate:[SBR] Line 468: 'prefix != uint256(uint160(msg.sender))' ==> 'prefix != uint256(uint160(tx.origin))' --> CAUGHT
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.24ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (9640): Explicit type conversion not allowed from "address" to "uint80".
+stderr:    --> src/Distribution.sol:468:31:
+stderr:     |
+stderr: 468 |         if (prefix != uint256(uint80(msg.sender))) revert SaltDoesNotStartWith();
+stderr:     |                               ^^^^^^^^^^^^^^^^^^
+INFO:Slither-Mutate:[SBR] Line 468: 'prefix != uint256(uint160(msg.sender))' ==> 'prefix != uint256(uint80(msg.sender))' --> COMPILATION FAILURE
+INFO:Slither-Mutate:[SBR] Line 468: 'prefix != uint256(uint160(msg.sender))' ==> 'prefix != uint128(uint160(msg.sender))' --> CAUGHT
+INFO:Slither-Mutate:[SBR] Line 499: 'return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))))' ==> 'return address(uint160(uint256(keccak256(abi.encode(hex"ff", address(this), salt, initCodeHash)))))' --> CAUGHT
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.49ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (9640): Explicit type conversion not allowed from "uint80" to "address".
+stderr:    --> src/Distribution.sol:499:16:
+stderr:     |
+stderr: 499 |         return address(uint80(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+stderr:     |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INFO:Slither-Mutate:[SBR] Line 499: 'return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))))' ==> 'return address(uint80(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))))' --> COMPILATION FAILURE
+ERROR:CryticCompile:'forge' returned non-zero exit code 1
+ERROR:CryticCompile:Compiling 1 files with Solc 0.8.38
+stdout: Solc 0.8.38 finished in 3.35ms
+ERROR:CryticCompile:Error: Compiler run failed:
+stderr: Error (9640): Explicit type conversion not allowed from "bytes32" to "uint128".
+stderr:    --> src/Distribution.sol:499:32:
+stderr:     |
+stderr: 499 |         return address(uint160(uint128(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))));
+stderr:     |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INFO:Slither-Mutate:[SBR] Line 499: 'return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))))' ==> 'return address(uint160(uint128(keccak256(abi.encodePacked(hex"ff", address(this), salt, initCodeHash)))))' --> COMPILATION FAILURE
+INFO:Slither-Mutate:Mutator SBR found 3 caught tweak mutants (out of 3 that compile)
+INFO:Slither-Mutate:Running total: found 21 caught tweak mutants (out of 21 that compile)
+INFO:Slither-Mutate:Mutator UOR found 0 caught tweak mutants (out of 0 that compile)
+INFO:Slither-Mutate:Running total: found 21 caught tweak mutants (out of 21 that compile)
+INFO:Slither-Mutate:Done mutating DistributionFactory.
+INFO:Slither-Mutate:Revert mutants: 3 caught of 3 (100.0% caught)
+INFO:Slither-Mutate:Comment mutants: 16 caught of 16 (100.0% caught)
+INFO:Slither-Mutate:Tweak mutants: 21 caught of 21 (100.0% caught)
+INFO:Slither-Mutate:Finished mutation testing assessment of 'src' in 8 minutes
+

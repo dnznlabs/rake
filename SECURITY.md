@@ -120,6 +120,25 @@ may come later as its own decision. Everything the review reads is public, so a 
 
 ---
 
+## Threat model
+
+What the review assumed is written down, not implied: [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
+names every actor, token class and chain the self-review had in mind, and beside each assumption the
+test that holds it — 63 distinct names, every one a name `forge test --list` returns, which is the
+file's own stated check. It closes with a diff against two inputs pinned by commit, the Solodit
+checklist (370 items under 62 labels) and the two `pashov/audits` reports nearest rake's shape, and
+with an **open list**: two rows of that diff are dispositioned `open`, naming two distinct findings
+— the native-balance alias token of [#127](https://github.com/dnznlabs/rake/issues/127), and views
+that stay readable mid-`distribute` and that no test pins,
+[#293](https://github.com/dnznlabs/rake/issues/293). The `propose` validation gap reads `design —
+decision 25` on all three of its rows, because [#54](https://github.com/dnznlabs/rake/issues/54) is
+closed by that ruling and `:449` below records it as documented and not changed. Two further rows
+carry no test at all, each with a reason rather than an issue. That
+list, not the table above, is what the review still owes a reader. First of decision 56's three
+additions; § Coverage and § Mutation are the other two.
+
+---
+
 ## Findings — disposition
 
 **Three runs now feed this table, and each numbered its own findings from F1.** To keep one stable
@@ -437,9 +456,11 @@ column records which leg reported it, from `AUDIT.md`'s grading section.
 
 ## Invariants the suite holds
 
-From `forge test --list --json`: **102 tests** in six suites — `DistributionTest` 56, `AppTest` 27,
-`DistributionInvariantsTest` 7, `DistributionFactoryTest` 6, `PushGasTest` 3, `TableCapTest` 3.
-Grouped by the property each group holds. A property asserted by a test is stronger than a finding: a
+From `forge test --list --json`: **107 tests** in seven suites — `DistributionTest` 57, `AppTest` 27,
+`DistributionInvariantsTest` 7, `DistributionFactoryTest` 6, `ColdStipendTest` 4, `PushGasTest` 3,
+`TableCapTest` 3. The groups below account for **102** of those; the five outside every group are
+`ColdStipendTest`'s four and `DistributionTest`'s 57th, all added after this section was last
+reconciled. Grouped by the property each group holds. A property asserted by a test is stronger than a finding: a
 finding gets fixed once, a test refuses to let it come back. The last eleven are m04-t07's — the whole
 of `DistributionInvariantsTest` and four of `DistributionTest`'s — and are the group at the end; the
 count read **91** in five suites before them, which is the figure the reconciliation in the next
@@ -607,9 +628,301 @@ reports green. Both numbers are in the t07 handoff, and `AGENTS.md` § Contracts
 prefix and a wrong one), `testFuzz_applyWindow` (every offset from the proposal to a month past the
 lapse), `testFuzz_claimMovesExactlyEscrow` (every amount an unpushable row can be owed) — 11 tests.
 
-8 + 15 + 11 + 20 + 4 + 7 + 21 + 5 + 11 = **102**, the whole suite.
+8 + 15 + 11 + 20 + 4 + 7 + 21 + 5 + 11 = **102**, of the suite's 107. The five not in any group
+above are `ColdStipendTest`'s four and `DistributionTest`'s 57th; § Coverage lists two of the four
+among the tests the coverage binary cannot run, which is where they are accounted for instead.
 
 ---
+
+## Coverage
+
+What the tests reach, as a figure a reader can re-run — the second of decision 56's three
+additions. `make coverage` is the gate; `scripts/coverage-floor.sh` is the script it runs, and it
+carries the exclusion list with a reason beside each name.
+
+```
+forge coverage --ir-minimum --report summary --no-match-test "$SKIP" --no-match-path 'test/TableCap.t.sol'
+```
+
+Measured on 2026-11-19 on this branch through the devbox pin, forge `1.7.1-dev`, after § Mutation's
+17 new tests: exit 0, 37 s, **100 tests passed, 0 failed** over six suites — 100 = 124 − 21 − 3.
+
+| file | lines | branches | floor (lines / branches) |
+|:--|:--|:--|:--|
+| `src/App.sol` | **96.20 % (76/79)** | **100.00 % (13/13)** | 95 / 99 |
+| `src/Distribution.sol` | **90.16 % (165/183)** | **92.11 % (35/38)** | 89 / 91 |
+
+Functions are 100 % on both files (16/16 and 29/29). Statements and functions are printed, not
+gated. The `Total` row the command prints counts `test/` and `lib/` and is **not** the figure; the
+two `src/` rows are. The floors are the measured figures rounded down and one point under, so
+ordinary drift is not a red build and a real regression is.
+
+**The floors moved with the figures, deliberately.** At `e770054` they were 91/91 and 88/88, set
+from what this branch inherited; § Mutation's tests took `App` from 92.41 %/92.31 % to
+96.20 %/100.00 % and `Distribution`'s branches from 89.47 % to 92.11 %, and a floor five points
+under the figure printed above is a gate that does not hold the number the reader is being shown.
+On `App.sol`'s 13 branches one branch is 7.7 points, so the 99 floor means all 13 — at that
+denominator there is no sub-point drift to absorb.
+
+**How the raised-floor proof below is produced:** copy the script to a dotted name inside
+`scripts/`, raise one floor in the copy, run it, and delete the copy. Run that way it returns the
+summary and the floor verdict; two attempts from outside the repository returned no summary at all,
+which was not isolated to a cause and is recorded as a procedure rather than a property.
+
+`--ir-minimum`'s source map is "relatively accurate" by forge's own help text, so these numbers are
+approximate to the line — in particular the assembly blocks below are reported uncovered while
+being plainly exercised by passing tests.
+
+**The script gates the row count too.** It asserts that the number of `src/` rows it parsed equals
+`ls src/*.sol | wc -l` (2 here) and that every row has a floor, and exits non-zero naming the file
+otherwise. A third contract added with no floor is a red run that names it, not a green one that
+gates two files and ignores the third.
+
+### Why 22 of the 124 tests are excluded
+
+`forge coverage` does not run clean on `main`, and the reason is the instrument, not the suite. The
+paired control is `forge test` on the same tree: exit 0, 124 passed. `--ir-minimum` recompiles at
+minimal optimisation and coverage inserts per-line counters, so **gas changes by construction** —
+and this suite asserts measured gas frames on purpose, the 2,300-gas stipend behaviour among them.
+`--optimize true --optimizer-runs 1000` is accepted and ignored by 1.7.1 (same exit, counts and
+rows).
+
+**The membership test is not coverage.** `FOUNDRY_OPTIMIZER=false forge test`, with no coverage
+involved at all, fails the same 22 — exit 1, **100 passed / 22 failed, 122 enumerated**, the same
+totals the coverage run reports. A test that passes with the optimizer off is **not** excluded
+whatever else it does.
+
+**The cross-check is forge's own per-suite totals, not a name list.** It prints
+`Encountered 2 failing tests in …ColdStipendTest`, `18 …DistributionTest`, `1 …PushGasTest` and
+`1 …TableCapTest` — 22, and the same 2 / 18 / 1 split as before this branch, so none of
+§ Mutation's 17 new tests fails with the optimizer off and the list below is still 21 names.
+Reaching for those totals rather than parsing names is deliberate: a `\[FAIL[^]]*\]`-style class
+**stops at a fuzz counterexample's embedded `]`** and silently drops `testFuzz_` names, and a `]`
+anchor without the `[FAIL` prefix matches `[PASS]` lines too and returns the whole suite. Both were
+measured here while re-checking this list; forge's own arithmetic is the figure that cannot be
+mis-parsed.
+
+Twenty-one go by name, in `ColdStipendTest` (2), `DistributionTest` (18) and `PushGasTest` (1):
+
+`test_claimEthToOtherAddress`, `test_claimEthToSelfUncapped`, `test_claimReentrancyLocked`,
+`test_coldReceiveFitsTheMeasuredFrame`, `test_createAcceptsZeroOwnerBornRenounced`,
+`test_delayZeroOwnerSweepsAtomically`, `test_distributeDiscardsEthReturnData`,
+`test_distributeReleaseDistributeKeepsReserved`, `test_escrowRevertingEthRecipientOthersPaid`,
+`testFuzz_claimMovesExactlyEscrow`, `testFuzz_roundingNeverExceedsAmount`,
+`test_hookRecipientStarvesLaterRows`, `test_realPathPaysASafeAndAVaultClone`,
+`test_receiveUnderStipend`, `test_receiveUnderStipendPassesOnceImplementationIsWarm`,
+`test_reentrantRecipientIsEscrowed`, `test_releaseFailedEthRecipient`,
+`test_releaseStillBubblesEthReason`, `test_renounceFreezes`, `test_rounding_3333_3333_3334`,
+`test_selfRowRecycles`.
+
+`TableCapTest` is excluded **by path**, not by name: what reverts there is its `setUp`, so the suite
+contributes one failure line and no per-test rows. That is also why coverage enumerates **122**
+where `forge test` enumerates **124**, and why **no figure in this gate is a test count** — a count
+would compare two different populations. 100 = 124 − 21 − 3.
+
+The regex the script builds is `^(name|name|…)\(`, and the trailing `\(` is load-bearing:
+`--no-match-test` matches the signature, so `^(…)$` matches nothing — and a pattern that matches
+nothing floors the whole suite and reads as a pass. Without the `\(` a listed name excludes every
+test it prefixes, and the collision is inside this list: `test_receiveUnderStipend` prefixes
+`test_receiveUnderStipendPassesOnceImplementationIsWarm`.
+
+**The cost of the exclusion, stated.** The lines those 21 tests alone reach are reported uncovered.
+Against the same run without exclusions on this branch (exit 1, 100 passed / 22 failed, 122
+enumerated, `src/Distribution.sol` 90.71 % lines and 94.74 % branches, `src/App.sol` unchanged at
+96.20 %/100.00 %), the difference is exactly **one line and one branch** of `Distribution` and
+**nothing at all** of `App` — the same one-line, one-branch gap the figures showed at `e770054`.
+The standing consequence: a new `test/` assertion that pins gas joins the list in the same PR, or
+`make coverage` goes red. **§ Mutation's `test_claimBubblesLongReason` was caught by exactly that
+rule while this task was being built**, and rewritten rather than excluded: it funded a distribution
+through `PlainSender.transfer`, under the 2,300-gas stipend, which made the whole case a measured
+gas frame that fails with the optimizer off. It funds with `vm.deal` instead.
+`test_claimNamesFailureAtThirtyTwoBytes` reaches the same line from the other side of the boundary
+and was written with `vm.deal` from the start, on the strength of that recorded lesson rather than
+by repeating it. Between them, 17 new tests left the list at 21 and not 23.
+
+This measurement is Elanik's finding on
+[#262](https://github.com/dnznlabs/rake/issues/262#issuecomment-7002043948), reproduced by the
+architect on the same commit, and the row-count assertion is their second review on
+[#268](https://github.com/dnznlabs/rake/pull/268#issuecomment-7002429826).
+
+### The uncovered lines
+
+**3 in `App` and 18 in `Distribution`**, from the lcov report of the excluded run on this branch —
+down from 6 and 19, and the three that closed are the three § Mutation sent tests at. The lcov
+reconciles with the summary exactly: `App` 79 instrumented and 3 uncovered is 76/79, `Distribution`
+183 and 18 is 165/183.
+
+| file:line | what it is |
+|:--|:--|
+| `App.sol:203-205` | the `extcodesize`/`extcodecopy` assembly of `_requireChunk` — exercised, unattributed by the `--ir-minimum` source map |
+| `Distribution.sol:110` | the transient lock's revert arm |
+| `Distribution.sol:296, 310` | `_clearQueue` from the renounce and accept paths — **reported uncovered and demonstrably executed**: `test_renounceLeavesNoPendingOwner` runs `:296` and asserts the state it leaves. The same source-map approximation as the assembly rows, on a line that is not assembly |
+| `Distribution.sol:412` | the capped `call` of `_push`, in assembly |
+| `Distribution.sol:423` | `_bubble`'s `revert` with returned data, in assembly |
+| `Distribution.sol:473-479, 481` | the clone's `create2` and its `DeploymentFailed` arm, in assembly — exercised by every `create` test, unattributed |
+| `Distribution.sol:493-497` | `predict`'s init-code hash, in assembly — same |
+
+**Closed by this branch:** `App.sol:121` (the lock check on `setChunks`, now
+`test_setChunksRevertsWhenLocked`), `App.sol:155-156` (`setVersion`'s assignment and its event, now
+`test_setVersionSetsAndEmits`) and `Distribution.sol:212` (`claim`'s long-reason bubble, now
+`test_claimBubblesLongReason` and `test_claimNamesFailureAtThirtyTwoBytes`). All three were
+survivors in the campaign below, which is the plan's expectation holding: the uncovered list and the
+survivor list pointed at the same lines.
+
+---
+
+## Mutation
+
+Whether the assertions bite — the third of decision 56's additions, and the one the other two
+cannot answer. Coverage says a line ran; a mutation campaign says that changing it makes a test go
+red. `make mutate` is the campaign, `audits/mutation/e770054/` is the record, and every mutant the
+suite did not catch has a row below: **92 rows for 92 survivors**, out of **847 compiling mutants**.
+
+**Score, per contract and overall**, in the tool's own `N caught of M`:
+
+| contract | caught of compiling | uncaught | compile failures | attempted |
+|:--|:--|:--|:--|:--|
+| `Distribution` | 529 of 584 | 55 | 277 | 861 |
+| `App` | 186 of 223 | 37 | 155 | 378 |
+| `DistributionFactory` | 40 of 40 | **0** | 40 | 80 |
+| **overall** | **755 of 847** | **92** | **472** | **1,319** |
+
+**There are two logs, because the tool drops a contract silently.** `slither-mutate` mutates one
+contract per `Mutating contract` section and takes that contract's own line range, so the second
+contract declared in a shared file is never reached. `DistributionFactory` lives in
+`src/Distribution.sol:432`, and the first run named all three contracts, listed all three under
+`Preparing to mutate contracts`, and emitted sections for two: its mutated lines stop at `:423`,
+with zero mutants at or after `:432`. `campaign-factory.log` beside it is the second invocation,
+naming the factory alone. `audits/README.md` § Provenance carries the commit, versions, host, wall
+times and the reason the first run is not the whole story.
+
+**No survivor is a real defect, so there is no § Stop.** Every `test` cell below is the suite having
+been silent about behaviour `src/` already gets right; no mutant exposes a promise the code fails to
+keep, and no `src/` byte moved in this task. The two shapes the plan flagged to read first
+(`TASK.md:224`) both came back clean: **#54's did not survive at all** — `propose` has no survivor
+on its validation — and **#22's is caught**, every compiling mutant across the factory's
+salt-prefix region (`:460`-`:489`) among the 40.
+
+**What the rows cost.** 29 survivors needed a test and got one, from **15 new tests**; 2 are
+`unreachable`; 61 are `equivalent`, of which **5 are pinned** by a test that passes on both the
+original and the mutant, because an equivalence argued from control flow is an opinion the campaign
+cannot check. 17 new tests in total, 124 in the suite against 107 at `e770054`.
+
+Four themes carry 24 of the 29: **`setVersion` was untested end to end** (3 rows), **`claim`'s
+decision-24 failure split was unpinned while `release`'s was pinned** (4), **`GRACE`'s length was
+pinned by nothing** (4 — the window could be rewritten to 14 seconds or 14 weeks and the suite
+stayed green), and **nine event emissions were never asserted** (9). The two worth reading on their
+own are `sum != BPS_TOTAL` relaxed to `sum <` — which would accept a beneficiary table summing above
+10,000 and leave `distribute` reverting for the clone's whole life — and `setChunks` after `lock()`,
+where three of the five one-way doors were pinned and two were not.
+
+**How to re-run one row.** Copy the survivor's file over its source and run the named test: it
+passes on the branch and fails on the mutant. All 29 were proved that way, and the 5 pinned
+equivalences the other way round — passing on both. `audits/mutation/e770054/patches_files.txt` is
+the same 92 changes as one unified diff if a hunk is easier to read than a whole file.
+
+A note for anyone matching a row against a survivor file: for a handful of `ROR` survivors the file
+the tool writes **duplicates the sub-expression it rewrote** — `:332` becomes
+`n < 0 || n > MAX_BENEFICIARIES || n > MAX_BENEFICIARIES`, where the log prints only
+`n == 0 || n > MAX_BENEFICIARIES ==> n < 0 || n > MAX_BENEFICIARIES`. The duplicate is idempotent
+inside an `||`, so the file and the log agree on behaviour; the rows below quote the log, as the
+plan asks.
+
+| mutator | file:line | mutation (as the log prints it) | test or reason |
+|:--|:--|:--|:--|
+| RR | `src/Distribution.sol:212` | `'_bubble(data)' ==> 'revert()'` | `test test_claimBubblesLongReason` |
+| RR | `src/Distribution.sol:386` | `'_bubble(data)' ==> 'revert()'` | `test test_distributeBubblesBalanceOfReason` |
+| RR | `src/App.sol:155` | `'version = v' ==> 'revert()'` | `test test_setVersionSetsAndEmits` |
+| RR | `src/App.sol:156` | `'emit VersionSet(v)' ==> 'revert()'` | `test test_setVersionSetsAndEmits` |
+| CR | `src/Distribution.sol:235` | `'emit Queued(hash, n, eta, action)' ==> '//emit Queued(hash, n, eta, action)'` | `test test_proposeEmitsQueued` |
+| CR | `src/Distribution.sol:254` | `'emit Applied(hash)' ==> '//emit Applied(hash)'` | `test test_applyQueuedEmitsApplied` |
+| CR | `src/Distribution.sol:297` | `'return;' ==> '//return;'` | `equivalent (pinned: test_renounceLeavesNoPendingOwner)` — without the `return`, `:299` re-assigns the `pendingOwner = address(0)` that `:295` wrote, because `owner` was zeroed at `:294` and `owner_` is itself zero |
+| CR | `src/Distribution.sol:355` | `'delete _pendingIndex[hash]' ==> '//delete _pendingIndex[hash]'` | `equivalent` — the orphaned entry is unreadable: both readers revert on `eta == 0` first, the caller deletes `queued[hash]` before `_remove`, and a hash never recurs because the nonce is in its preimage (`:224`) |
+| CR | `src/Distribution.sol:373` | `'delete _pendingIndex[hash]' ==> '//delete _pendingIndex[hash]'` | `equivalent` — the orphaned entry is unreadable: both readers revert on `eta == 0` first, the caller deletes `queued[hash]` before `_remove`, and a hash never recurs because the nonce is in its preimage (`:224`) |
+| CR | `src/App.sol:115` | `'emit ChunksSet(chunks.length, gzipped)' ==> '//emit ChunksSet(chunks.length, gzipped)'` | `test test_documentMutatorsEmitTheirCounts` |
+| CR | `src/App.sol:129` | `'emit ChunksSet(ptrs.length, gzipped_)' ==> '//emit ChunksSet(ptrs.length, gzipped_)'` | `test test_documentMutatorsEmitTheirCounts` |
+| CR | `src/App.sol:137` | `'emit WidgetChunksSet(widgetChunks.length)' ==> '//emit WidgetChunksSet(widgetChunks.length)'` | `test test_documentMutatorsEmitTheirCounts` |
+| CR | `src/App.sol:150` | `'emit WidgetChunksSet(ptrs.length)' ==> '//emit WidgetChunksSet(ptrs.length)'` | `test test_documentMutatorsEmitTheirCounts` |
+| CR | `src/App.sol:179` | `'emit AppLocked()' ==> '//emit AppLocked()'` | `test test_documentMutatorsEmitTheirCounts` |
+| SBR | `src/Distribution.sol:59` | `'uint256 private constant PUSH_GAS = 100_000' ==> 'uint256 private immutable PUSH_GAS = 100_000'` | `equivalent` — an inline-initialised `immutable` holds what the `constant` held; it changes deployed bytecode, which is m05-t02's attestation, not behaviour |
+| SBR | `src/Distribution.sol:59` | `'uint256 private constant PUSH_GAS = 100_000' ==> 'uint128 private constant PUSH_GAS = 100_000'` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| SBR | `src/Distribution.sol:60` | `'uint256 private constant BPS_TOTAL = 10_000' ==> 'uint128 private constant BPS_TOTAL = 10_000'` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| SBR | `src/Distribution.sol:65` | `'uint256 public constant GRACE = 14 days' ==> 'uint256 public constant GRACE = 14 seconds'` | `test test_graceWindowIsFourteenDays` |
+| SBR | `src/Distribution.sol:65` | `'uint256 public constant GRACE = 14 days' ==> 'uint256 public constant GRACE = 14 minutes'` | `test test_graceWindowIsFourteenDays` |
+| SBR | `src/Distribution.sol:65` | `'uint256 public constant GRACE = 14 days' ==> 'uint256 public constant GRACE = 14 hours'` | `test test_graceWindowIsFourteenDays` |
+| SBR | `src/Distribution.sol:65` | `'uint256 public constant GRACE = 14 days' ==> 'uint256 public constant GRACE = 14 weeks'` | `test test_graceWindowIsFourteenDays` |
+| SBR | `src/Distribution.sol:65` | `'uint256 public constant GRACE = 14 days' ==> 'uint256 public immutable GRACE = 14 days'` | `equivalent` — an inline-initialised `immutable` holds what the `constant` held; it changes deployed bytecode, which is m05-t02's attestation, not behaviour |
+| SBR | `src/Distribution.sol:65` | `'uint256 public constant GRACE = 14 days' ==> 'uint128 public constant GRACE = 14 days'` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| SBR | `src/Distribution.sol:72` | `'uint256 public constant MAX_BENEFICIARIES = 107' ==> 'uint128 public constant MAX_BENEFICIARIES = 107'` | `equivalent` — 107 fits, and mixed arithmetic promotes; the `public` getter's ABI return type narrows, which no caller in `test/` or `app/` reads as a width |
+| SBR | `src/Distribution.sol:72` | `'uint256 public constant MAX_BENEFICIARIES = 107' ==> 'uint256 public immutable MAX_BENEFICIARIES = 107'` | `equivalent` — an inline-initialised `immutable` holds what the `constant` held; it changes deployed bytecode, which is m05-t02's attestation, not behaviour |
+| SBR | `src/Distribution.sol:74` | `'bytes4 private constant BALANCE_OF = 0x70a08231' ==> 'bytes4 private immutable BALANCE_OF = 0x70a08231'` | `equivalent` — an inline-initialised `immutable` holds what the `constant` held; it changes deployed bytecode, which is m05-t02's attestation, not behaviour |
+| MIA | `src/Distribution.sol:143` | `'address(this).balance != 0' ==> 'true'` | `test test_unfundedCreateLogsNoReceived` |
+| ROR | `src/Distribution.sol:143` | `'address(this).balance != 0' ==> 'address(this).balance > 0'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| ROR | `src/Distribution.sol:143` | `'address(this).balance != 0' ==> 'address(this).balance >= 0'` | `test test_unfundedCreateLogsNoReceived` |
+| ROR | `src/Distribution.sol:156` | `'amount == 0' ==> 'amount <= 0'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| UOR | `src/Distribution.sol:160` | `'++i' ==> 'i++'` | `equivalent` — the result is discarded in a `for` increment, so the two forms differ in neither value nor control flow |
+| MIA | `src/Distribution.sol:179` | `'amount == 0' ==> 'false'` | `test test_releaseWithNoEscrowIsNothingToDo` |
+| ROR | `src/Distribution.sol:179` | `'amount == 0' ==> 'amount < 0'` | `test test_releaseWithNoEscrowIsNothingToDo` |
+| ROR | `src/Distribution.sol:179` | `'amount == 0' ==> 'amount <= 0'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| ROR | `src/Distribution.sol:201` | `'amount == 0' ==> 'amount <= 0'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| MIA | `src/Distribution.sol:211` | `'data.length <= 32' ==> 'true'` | `test test_claimBubblesLongReason` |
+| ROR | `src/Distribution.sol:211` | `'data.length <= 32' ==> 'data.length < 32'` | `test test_claimNamesFailureAtThirtyTwoBytes` |
+| ROR | `src/Distribution.sol:211` | `'data.length <= 32' ==> 'data.length != 32'` | `test test_claimNamesFailureAtThirtyTwoBytes` |
+| ROR | `src/Distribution.sol:226` | `'d == 0' ==> 'd <= 0'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| SBR | `src/Distribution.sol:227` | `'emit Queued(hash, n, block.timestamp, action)' ==> 'emit Queued(hash, n, 0, action)'` | `test test_proposeImmediateEmitsQueuedWithTimestamp` |
+| ROR | `src/Distribution.sol:247` | `'eta == 0 \|\| block.timestamp < eta' ==> 'eta <= 0 \|\| block.timestamp < eta'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| ROR | `src/Distribution.sol:266` | `'msg.sender != owner && (eta == 0 \|\| block.timestamp <= eta + GRACE)' ==> 'msg.sender != owner && (eta <= 0 \|\| block.timestamp <= eta + GRACE)'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| MIA | `src/Distribution.sol:267` | `'eta == 0' ==> 'false'` | `test test_ownerCancelOfUnknownHashIsNothingToDo` |
+| ROR | `src/Distribution.sol:267` | `'eta == 0' ==> 'eta < 0'` | `test test_ownerCancelOfUnknownHashIsNothingToDo` |
+| ROR | `src/Distribution.sol:267` | `'eta == 0' ==> 'eta <= 0'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| ROR | `src/Distribution.sol:332` | `'n == 0 \|\| n > MAX_BENEFICIARIES' ==> 'n < 0 \|\| n > MAX_BENEFICIARIES'` | `equivalent (pinned: test_tableValidation)` — with the `n == 0` arm gone an empty table runs the loop zero times, leaves `sum == 0` and reverts the same `BadTable()` at `:344` |
+| ROR | `src/Distribution.sol:332` | `'n == 0 \|\| n > MAX_BENEFICIARIES' ==> 'n <= 0 \|\| n > MAX_BENEFICIARIES'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| SBR | `src/Distribution.sol:335` | `'uint256 sum' ==> 'uint128 sum'` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| ROR | `src/Distribution.sol:337` | `'i < n' ==> 'i != n'` | `equivalent` — the counter starts at 0 and rises by exactly 1, so it meets the bound rather than passing it |
+| SBR | `src/Distribution.sol:337` | `'for (uint256 i; i < n; ++i) { Beneficiary calldata b = table_[i]; if (b.bps == 0 \|\| b.account <= prev) revert BadTable(); prev = b.account; sum …` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| SBR | `src/Distribution.sol:337` | `'uint256 i' ==> 'uint128 i'` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| UOR | `src/Distribution.sol:337` | `'++i' ==> 'i++'` | `equivalent` — the result is discarded in a `for` increment, so the two forms differ in neither value nor control flow |
+| ROR | `src/Distribution.sol:339` | `'b.bps == 0 \|\| b.account <= prev' ==> 'b.bps <= 0 \|\| b.account <= prev'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| ROR | `src/Distribution.sol:344` | `'sum != BPS_TOTAL' ==> 'sum < BPS_TOTAL'` | `test test_tableSummingAboveBpsTotalReverts` |
+| ROR | `src/Distribution.sol:352` | `'n > 0' ==> 'n != 0'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| MIA | `src/Distribution.sol:364` | `'i == 0' ==> 'false'` | `unreachable` — both callers require `queued[hash] != 0`, and `propose` writes `queued[hash]` and `_pendingIndex[hash]` together (`:232`-`:233`), so `i` is never 0 here |
+| ROR | `src/Distribution.sol:364` | `'i == 0' ==> 'i < 0'` | `unreachable` — both callers require `queued[hash] != 0`, and `propose` writes `queued[hash]` and `_pendingIndex[hash]` together (`:232`-`:233`), so `i` is never 0 here |
+| ROR | `src/Distribution.sol:364` | `'i == 0' ==> 'i <= 0'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| MIA | `src/Distribution.sol:367` | `'i != last' ==> 'true'` | `equivalent (pinned: test_removingTheLastPendingEntryKeepsTheQueue)` — `i` is a 1-based index so `i <= last` always holds, and at `i == last` the row the swap moves is the row being removed, so it is a self-assignment whose index write is deleted on the next line |
+| ROR | `src/Distribution.sol:367` | `'i != last' ==> 'i < last'` | `equivalent (pinned: test_removingTheLastPendingEntryKeepsTheQueue)` — `i` is a 1-based index so `i <= last` always holds, and at `i == last` the row the swap moves is the row being removed, so it is a self-assignment whose index write is deleted on the next line |
+| ROR | `src/Distribution.sol:367` | `'i != last' ==> 'i <= last'` | `equivalent (pinned: test_removingTheLastPendingEntryKeepsTheQueue)` — `i` is a 1-based index so `i <= last` always holds, and at `i == last` the row the swap moves is the row being removed, so it is a self-assignment whose index write is deleted on the next line |
+| SBR | `src/Distribution.sol:368` | `'Pending storage moved = _pending[last - 1]' ==> 'Pending memory moved = _pending[last - 1]'` | `equivalent` — `moved` is only read after the assignment and the `i != last` guard rules out aliasing, so the copy costs gas and nothing else |
+| ROR | `src/App.sol:102` | `'resource.length == 1 && _eq(resource[0], "widget.js") && widgetChunks.length != 0' ==> 'resource.length <= 1 && _eq(resource[0], "widget.js") && w…` | `equivalent` — `:95` has already returned for `length == 0`, so `<= 1` collapses to `== 1` on every reachable call |
+| ROR | `src/App.sol:102` | `'resource.length == 1 && _eq(resource[0], "widget.js") && widgetChunks.length != 0' ==> 'resource.length >= 1 && _eq(resource[0], "widget.js") && w…` | `test test_multiSegmentWidgetPathIs404` |
+| ROR | `src/App.sol:102` | `'resource.length == 1 && _eq(resource[0], "widget.js") && widgetChunks.length != 0' ==> 'resource.length == 1 && _eq(resource[0], "widget.js") && w…` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| MIA | `src/App.sol:121` | `'locked' ==> 'false'` | `test test_setChunksRevertsWhenLocked` |
+| ROR | `src/App.sol:122` | `'ptrs.length == 0' ==> 'ptrs.length <= 0'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| ROR | `src/App.sol:124` | `'i < ptrs.length' ==> 'i != ptrs.length'` | `equivalent` — the counter starts at 0 and rises by exactly 1, so it meets the bound rather than passing it |
+| SBR | `src/App.sol:124` | `'for (uint256 i; i < ptrs.length; ++i) { _requireChunk(ptrs[i]); chunks.push(ptrs[i]); }' ==> 'for (uint128 i; i < ptrs.length; ++i) { _requireChun…` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| SBR | `src/App.sol:124` | `'uint256 i' ==> 'uint128 i'` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| UOR | `src/App.sol:124` | `'++i' ==> 'i++'` | `equivalent` — the result is discarded in a `for` increment, so the two forms differ in neither value nor control flow |
+| ROR | `src/App.sol:144` | `'ptrs.length == 0' ==> 'ptrs.length <= 0'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| ROR | `src/App.sol:146` | `'i < ptrs.length' ==> 'i != ptrs.length'` | `equivalent` — the counter starts at 0 and rises by exactly 1, so it meets the bound rather than passing it |
+| SBR | `src/App.sol:146` | `'for (uint256 i; i < ptrs.length; ++i) { _requireChunk(ptrs[i]); widgetChunks.push(ptrs[i]); }' ==> 'for (uint128 i; i < ptrs.length; ++i) { _requi…` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| SBR | `src/App.sol:146` | `'uint256 i' ==> 'uint128 i'` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| UOR | `src/App.sol:146` | `'++i' ==> 'i++'` | `equivalent` — the result is discarded in a `for` increment, so the two forms differ in neither value nor control flow |
+| MIA | `src/App.sol:154` | `'locked' ==> 'true'` | `test test_setVersionSetsAndEmits` |
+| ROR | `src/App.sol:170` | `'n == 0' ==> 'n <= 0'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| ROR | `src/App.sol:171` | `'i < n' ==> 'i != n'` | `equivalent` — the counter starts at 0 and rises by exactly 1, so it meets the bound rather than passing it |
+| SBR | `src/App.sol:171` | `'for (uint256 i; i < n; ++i) { _requireChunk(chunks[i]); }' ==> 'for (uint128 i; i < n; ++i) { _requireChunk(chunks[i]); }'` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| SBR | `src/App.sol:171` | `'uint256 i' ==> 'uint128 i'` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| UOR | `src/App.sol:171` | `'++i' ==> 'i++'` | `equivalent` — the result is discarded in a `for` increment, so the two forms differ in neither value nor control flow |
+| ROR | `src/App.sol:175` | `'i < w' ==> 'i != w'` | `equivalent` — the counter starts at 0 and rises by exactly 1, so it meets the bound rather than passing it |
+| SBR | `src/App.sol:175` | `'for (uint256 i; i < w; ++i) { _requireChunk(widgetChunks[i]); }' ==> 'for (uint128 i; i < w; ++i) { _requireChunk(widgetChunks[i]); }'` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| SBR | `src/App.sol:175` | `'uint256 i' ==> 'uint128 i'` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| ROR | `src/App.sol:192` | `'i < n' ==> 'i != n'` | `equivalent` — the counter starts at 0 and rises by exactly 1, so it meets the bound rather than passing it |
+| SBR | `src/App.sol:192` | `'for (uint256 i; i < n; ++i) { out = bytes.concat(out, SSTORE2.read(list[i])); }' ==> 'for (uint128 i; i < n; ++i) { out = bytes.concat(out, SSTORE…` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| SBR | `src/App.sol:192` | `'uint256 i' ==> 'uint128 i'` | `equivalent` — the value and every bound on it are orders of magnitude below 2¹²⁸, and mixed arithmetic promotes |
+| UOR | `src/App.sol:192` | `'++i' ==> 'i++'` | `equivalent` — the result is discarded in a `for` increment, so the two forms differ in neither value nor control flow |
+| SBR | `src/App.sol:199` | `'uint256 n' ==> 'uint128 n'` | `equivalent` — `n` receives `extcodesize`, at most 24,576 |
+| ROR | `src/App.sol:207` | `'n == 0' ==> 'n <= 0'` | `equivalent` — on an unsigned operand this is the same predicate: `x <= 0`, `x < 1` and `x == 0` agree, as do `x != 0` and `x > 0` |
+| ROR | `src/App.sol:208` | `'first[0] != 0x00' ==> 'first[0] > 0x00'` | `equivalent` — a `bytes1` is compared as an unsigned byte, so `> 0x00` is `!= 0x00` |
+
 
 ## What the review did not cover
 

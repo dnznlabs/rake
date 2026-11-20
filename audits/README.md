@@ -194,13 +194,52 @@ skill             pashov/skills @ <SKILL_PIN>  · solidity-auditor VERSION <n> �
 leg 1             codex <version> · <model as the session header reported it> · effort high · 1 pass
 leg 2             claude <version> · <model> · 1 pass
 tokens            <per leg, if the harness reports them>
+coverage floor    <App lines/branches · Distribution lines/branches, from scripts/coverage-floor.sh>
+mutation score    <caught of compiling, from audits/mutation/<sha>/campaign.log>
 ```
 
 `upstream` is the VERSION on the skill repo's default branch, read by the runner, which has network
 the legs do not. The legs are told to skip the skill's own upstream check.
 
+The last two fields are decision 56's, and like every other field they are **read from the tree at
+the run's commit, never typed**: the floors come out of `scripts/coverage-floor.sh`, where the gate
+keeps them, and the score is the sum of the per-class summaries across **every `campaign*.log` in
+the newest campaign directory**, in `slither-mutate`'s own words. A non-compiling mutant is on
+neither side of that ratio. If either source is missing from the tree the field says so — a missing
+figure and a zero figure must not read alike. `scripts/audit.sh` is the only writer, so the next
+`make audit` picks them up; the run that added the fields did not itself run one. At `e770054` the
+field reads `755 of 847 caught (compiling mutants, from 2 log(s) in audits/mutation/e770054/)`.
+
 `code commit` carries a dirty flag because an audit of an uncommitted tree cannot be re-run by anyone
 else, and that fact belongs in the artifact rather than in someone's memory.
+
+### Why one campaign is more than one log
+
+`slither-mutate` mutates **one contract per `Mutating contract` section**, taking that contract's
+own line range, so the second contract declared in a shared file is never reached — listed under
+`Preparing to mutate contracts` and then skipped without a word. `DistributionFactory` is declared
+at `src/Distribution.sol:432`, and the run naming all three contracts sections only `Distribution`
+and `App`: its mutated lines stop at `:423`, with zero mutants at or after `:432`. So a campaign
+over `src/` is that invocation **plus** one naming the factory alone, and the score is the sum.
+`make mutate` runs both. Reading only `campaign.log` understates the campaign by a whole contract
+while looking complete — which is how the figure was wrong before it was right.
+
+### Which campaign is the record, and why
+
+Two full campaigns ran at `e770054` on 2026-11-19. **The second is the record** — 11,644 s,
+`715 caught of 807` over `Distribution` and `App` — and the reason is not that it came second.
+
+The first reported **905 compilation failures against the second's 432** from the same command on
+the same commit, and 2 uncaught against 92. A mutant that fails to compile leaves the denominator
+entirely, so inflating that count flatters the suite: the first campaign reads `334 of 336`, a
+99.4 % score produced by discarding three quarters of the population. A compile-failure count far
+above a comparable run is a contended box, not good news.
+
+**On running alone, the measured statement rather than the claim.** The recorded campaign overlapped
+other work on this tree until 12:21, so it did not run alone. What holds its figure up is the
+failures themselves: all 432 are mutation-induced solc errors — `7576` (undeclared identifier),
+`2314` (unexpected token), `9182` and `6933` (expected primary expression) dominating — and none is
+environmental. That is the thing worth asserting. "The box was idle" is not, and here it was false.
 
 ## Re-running one leg after a fix
 

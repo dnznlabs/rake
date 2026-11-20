@@ -549,3 +549,22 @@ contract BigToken {
         return true;
     }
 }
+
+/// @notice A token whose `balanceOf` itself reverts with a reason, so the bubble in `_balance` —
+/// which runs before anything is pushed — has something to carry.
+/// @dev Its own contract rather than another `Fail` arm on `RevertingToken`: that mock is shared by
+/// a dozen cases, and growing a shared mock moves the gas rows of tests that never asked for it.
+/// `transfer` is unreachable here, because `distribute` reads the balance before it pushes.
+contract BalanceRevertingToken {
+    /// @dev `Error(string)` wraps this to 100 bytes. Readable so a test asserts on the reason it
+    /// will actually be given rather than on a second copy of the literal.
+    string public constant REASON = "balanceOf is not for you";
+
+    function balanceOf(address) external pure returns (uint256) {
+        revert(REASON);
+    }
+
+    function transfer(address, uint256) external pure returns (bool) {
+        return true;
+    }
+}
