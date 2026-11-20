@@ -161,6 +161,20 @@ Read 2026-11-19 22:10–22:25 CST on branch `m05/t01-redeploy` at `7404007`, thr
 Plan step 12's check is that these are here, dated, before any transaction. **No transaction has
 been sent: Part B stops here, before plan step 13.**
 
+**Why the stop is here.** Step 13 is § One-way doors #1 — the testnet address set moves — and its
+own 1f check is `prediction equal to Part A's addresses`. A mismatch mid-run leaves a half-deployed
+set on one chain, which is a state to discover with attention available rather than unattended. That
+is the reason of record and it holds whatever the clock says. A second reason applied only to the
+evening of 2026-11-19 and is secondary: steps 14 and 15 are a build, six proposals, signatures and
+read-backs that would not have fitted the time left, so deploying then would have advanced step 13
+and nothing else, with a stop as the next thing regardless. Kept in that order deliberately — the
+architect's point, taken 2026-11-19 — because a reason that is only true of one evening should not be
+the recorded rationale for where an irreversible step stops.
+
+Branch pushed at `e271c62` before any send, so the step-14 ancestry and criterion 18's branch point
+are checkable by someone other than the engineer: `02d456a`, `3849cb2` and `7404007` are all
+ancestors of it, verified on both sides.
+
 | | Sepolia `11155111` | Base Sepolia `84532` |
 |:--|:--|:--|
 | `cast chain-id` | **11155111** = `$CHAIN_ID` | **84532** = `$CHAIN_ID` |
