@@ -16,17 +16,41 @@ engineer's wallet `0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d`, the Ops vault
 `0x71a4221974Fc2E95081AE513248918dF27CF7a4A`. `<receiver>` is the `RevertingReceiver` deployed on that
 chain, its address in [HANDOFF.md](HANDOFF.md) § The escrow receiver.
 
+> **Amended 2026-11-20 (m05-t01 step 16, decision 63).** This script is now driven against the
+> **redeployed** `App` `0x00a9F390A6010d045e0d34856048DdD6910d25BA`, not M04's
+> `0x00A90943…5BaE`, and the per-chain URLs below are updated with it. Two consequences for the
+> addresses above:
+>
+> - **The DNZN distribution moves.** `0x71a4221974Fc2E95081AE513248918dF27CF7a4A` was created by the
+>   **pre-#201 factory** and stays live under it; the redeployed factory predicts DNZN at
+>   **`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`**, which `cast codesize` reads as **0** on both
+>   chains as of 2026-11-20 17:2xZ — m05-t01 step 15's `create` has not been sent. **Until it lands,
+>   the landing's featured panel reads empty on the new `App`**, and row (c)'s route is a judgement
+>   call rather than a given: the old distribution is still readable by address, but its `Created`
+>   event sits on the old factory, so `changes` may not carry the `Created` row this script expects.
+>   Driving row (c) before step 15 is not advised; the disposition is on
+>   [#302](https://github.com/dnznlabs/rake/issues/302).
+> - **`<receiver>` is unaffected** — it is a plain deployment, not a factory clone.
+
 ## Sepolia — 11155111
 
-URL `https://0x00a90943f58b6ab7fde05aae01c13a80e6995bae.11155111.w3link.io/` · header reads `sepolia` ·
+URL `https://0x00a9f390a6010d045e0d34856048ddd6910d25ba.11155111.w3link.io/` · header reads `sepolia` ·
 explorer `https://sepolia.etherscan.io/tx/<hash>` · about **12 s** a block, so row (i)'s 60 s delay is
 about **five** blocks.
+
+> **Amended 2026-11-20:** the URL above is the redeployed `App`. **w3link does not serve it on this
+> chain yet** — `tools/gateway-check.sh` in hosted mode against it exits 2 with `status: 400` and no
+> ERC-5219 headers, measured 17:0xZ, while the same check **passes** on 84532. The chain itself is
+> correct: `chain-doc` reads `inflated sha256 59c24c98…dd2010` equal to the build. So **this chain is
+> driven on the project's own gateway build at m04-t02's pin**, per m04-t05 step 0's rule, and the
+> handoff names which gateway served it. Re-check the primary before the sitting; if it has started
+> resolving, use it and record that instead.
 
 | # | action | expected state | screenshot | hash |
 |:--|:--|:--|:--|:--|
 | probe | On the landing, in DevTools: `window.top === window`, `typeof window.ethereum`, `location.origin` | `true`, `object`, the four-label `https:` origin above | `shots/11155111/probe.png` | — |
-| (a) | Open the gateway URL | the landing, `RAKE` in the title, `sepolia` in the header, the featured widget reading the DNZN table through the wallet | `shots/11155111/a-landing.png` | — |
-| (b) | Press connect; approve the account in MetaMask | MetaMask asks for the account; the header shows the UAT wallet's short address. On another chain, the page's own switch control moves it and the `chainChanged` reload is expected | `shots/11155111/b-header.png` | — |
+| (a) | Open the gateway URL | the landing, `RAKE` in the title, `sepolia` in the header, the featured widget reading the DNZN table through the wallet. **Amended 2026-11-20 (m04-t16 bundle, [#273](https://github.com/dnznlabs/rake/issues/273)):** "through the wallet" is no longer the only path — with a wallet present it still reads through it, and **with no wallet the page now paints every route** through the chain's `PUBLIC_RPC` endpoint instead of stopping at "No wallet found", with the write controls hidden or disabled and one line saying a wallet is needed to act. **Drive both:** the normal window, and a second pass in an incognito window with no wallet, which is what #273 was filed against. **Also amended:** until m05-t01 step 15's `create` lands, the featured distribution `0xB611Ff19…0F4D5199` does not exist, so **the featured panel reads empty on both paths** and this row's DNZN-table expectation holds only after it | `shots/11155111/a-landing.png`, `shots/11155111/a-landing-nowallet.png` | — |
+| (b) | Press connect; approve the account in MetaMask | MetaMask asks for the account; the header shows the UAT wallet's short address. On another chain, the page's own switch control moves it and the `chainChanged` reload is expected. **Amended 2026-11-20 (m04-t16 bundle, [#274](https://github.com/dnznlabs/rake/issues/274)):** the button paints the short address **first** and then replaces it with the resolved ENS/WNS/GNS name when one returns, title still the full address, the same winner-alone rule as every other address on the page. On **this** chain a name is expected if the UAT wallet has one, because `resolveName` answers only on 1 and 11155111; the name is re-resolved on `accountsChanged`, so switching account and back is part of the row | `shots/11155111/b-header.png` | — |
 | (c) | Paste `count.js`, then open `#/distros/0x71a4221974Fc2E95081AE513248918dF27CF7a4A` | description `DNZN // FUND DISTRIBUTION`, the three-row table, the owner bar reading as the owner, `funds`/`changes`/`activity` painted, `changes` carrying `Created` and the `setDescription` queued/applied pair, `activity` the `create` deposit. The console object is the **first-load** figure | `shots/11155111/c-distro.png`, `shots/11155111/c-console-first.png` | — |
 | (d) | Reload on the landing, paste `count.js` again, open the same route | the same sections; the console object is the **second-load** figure, `firstLoad: false` | `shots/11155111/d-console-second.png` | — |
 | (e) | If a section reads `history before block N not loaded · load older`, press it once | `N` moves down or the line goes, and `window.__uat.eth_getLogs` rises — record the delta. No line shown: record `not shown — the scan reached the factory block within budget` | `shots/11155111/e-older.png` | — |
@@ -36,20 +60,20 @@ about **five** blocks.
 | (i) | Open `Queue a change`, queue a table change moving 1% between the two EOA rows as the owner; wait past the eta; press `apply`. Then queue a `setDescription` and press `cancel` on it | `changes` gains a `queued` row with an eta 60 s out and the apply control reads `anyone can apply once the delay passes`; after `apply`, `changes` gains `applied` and the table shows the new split; after `cancel`, `changes` gains `cancelled` | `shots/11155111/i-pending.png`, `shots/11155111/i-applied.png`, `shots/11155111/i-cancelled.png` | `propose` … · `applyQueued` … · `propose` … · `cancel` … |
 | (j) | `#/create` with the owner field set to the Ops vault: screenshot the owner note, then a two-row table (the UAT wallet, the engineer's wallet), delay `3600`. After `create`, press one drawer write | the owner note reads `not the connected wallet — a contract — it will have to propose and cancel through its own calls` and step 2 proceeds with **no** acknowledgement — [#172](https://github.com/dnznlabs/rake/issues/172) requires one only for a never-used address, so `probeOwner` gives a contract no class (`app/src/index.html:1482`) and the box is drawn only for a classed reading (`:1742`); the new page's owner bar reads `you are a signer on <vault>, which owns this distribution — every change below is calldata to submit through it`; the drawer's writes read `copy calldata for your vault`, and pressing one gives the clipboard or the textarea fallback with the bytes, no transaction | `shots/11155111/j-guard.png`, `shots/11155111/j-ownerbar.png`, `shots/11155111/j-calldata.png` | `create` … |
 | (k) | Open the dnzn.dev host page of m04-t04 AC (e) in the same browser, wallet on Sepolia | both mounts render the DNZN table — the one with `data-rpc` through publicnode, the one without through the wallet | `shots/11155111/k-host.png`, also filed as m04-t04's `shots/host-wallet.png` | — |
-| (l) | Open `#/docs`, then `#/docs#widget` | fourteen sections in the rail, Disclaimer first; the widget section carries the snippet with this chain's gateway URL | `shots/11155111/l-docs.png` | — |
+| (l) | Open `#/docs`, then `#/docs#widget` | fourteen sections in the rail, Disclaimer first; the widget section carries the snippet with this chain's gateway URL. **Amended 2026-11-20 (m05-t01 step 13a, decision 65, [#309](https://github.com/dnznlabs/rake/issues/309)):** § the widget now presents the **`data-rpc` snippet first** and the wallet form second, introduced as the alternative and still naming both failure states. The section count is unchanged at fourteen | `shots/11155111/l-docs.png` | — |
 | (m) | Disposition: one issue per row whose expected state did not match | with nothing open, the dated signoff line under `MILESTONE.md` § Phases 4 in Denizen's own words | — | — |
 
 ## Base Sepolia — 84532
 
-URL `https://0x00a90943f58b6ab7fde05aae01c13a80e6995bae.84532.w3link.io/` · header reads `base sepolia` ·
+URL `https://0x00a9f390a6010d045e0d34856048ddd6910d25ba.84532.w3link.io/` · header reads `base sepolia` ·
 explorer `https://sepolia.basescan.org/tx/<hash>` · about **0.2 s** a block, so row (i)'s 60 s delay is
 about **three hundred** blocks.
 
 | # | action | expected state | screenshot | hash |
 |:--|:--|:--|:--|:--|
 | probe | On the landing, in DevTools: `window.top === window`, `typeof window.ethereum`, `location.origin` | `true`, `object`, the four-label `https:` origin above | `shots/84532/probe.png` | — |
-| (a) | Open the gateway URL | the landing, `RAKE` in the title, `base sepolia` in the header, the featured widget reading the DNZN table through the wallet | `shots/84532/a-landing.png` | — |
-| (b) | Press connect; approve the account in MetaMask | MetaMask asks for the account; the header shows the UAT wallet's short address. On another chain, the page's own switch control moves it and the `chainChanged` reload is expected | `shots/84532/b-header.png` | — |
+| (a) | Open the gateway URL | the landing, `RAKE` in the title, `base sepolia` in the header, the featured widget reading the DNZN table through the wallet. **Amended 2026-11-20 (m04-t16 bundle, [#273](https://github.com/dnznlabs/rake/issues/273)):** with no wallet the page now paints every route through this chain's `PUBLIC_RPC` endpoint rather than stopping at "No wallet found", write controls hidden or disabled with one line saying a wallet is needed to act — **drive the incognito pass as well as the wallet one**. **Also amended:** the featured distribution `0xB611Ff19…0F4D5199` does not exist until m05-t01 step 15's `create` lands, so **the featured panel reads empty until then** | `shots/84532/a-landing.png`, `shots/84532/a-landing-nowallet.png` | — |
+| (b) | Press connect; approve the account in MetaMask | MetaMask asks for the account; the header shows the UAT wallet's short address. On another chain, the page's own switch control moves it and the `chainChanged` reload is expected. **Amended 2026-11-20 (m04-t16 bundle, [#274](https://github.com/dnznlabs/rake/issues/274)):** the button now resolves a name where it can, but `resolveName` answers only on chains 1 and 11155111, so **on Base Sepolia the short address alone is the correct and expected result** — a missing name here is not a defect and must not be filed as one | `shots/84532/b-header.png` | — |
 | (c) | Paste `count.js`, then open `#/distros/0x71a4221974Fc2E95081AE513248918dF27CF7a4A` | description `DNZN // FUND DISTRIBUTION`, the three-row table, the owner bar reading as the owner, `funds`/`changes`/`activity` painted, `changes` carrying `Created` and the `setDescription` queued/applied pair, `activity` the `create` deposit. The console object is the **first-load** figure | `shots/84532/c-distro.png`, `shots/84532/c-console-first.png` | — |
 | (d) | Reload on the landing, paste `count.js` again, open the same route | the same sections; the console object is the **second-load** figure, `firstLoad: false` | `shots/84532/d-console-second.png` | — |
 | (e) | If a section reads `history before block N not loaded · load older`, press it once | `N` moves down or the line goes, and `window.__uat.eth_getLogs` rises — record the delta. No line shown: record `not shown — the scan reached the factory block within budget` | `shots/84532/e-older.png` | — |
@@ -59,5 +83,5 @@ about **three hundred** blocks.
 | (i) | Open `Queue a change`, queue a table change moving 1% between the two EOA rows as the owner; wait past the eta; press `apply`. Then queue a `setDescription` and press `cancel` on it | `changes` gains a `queued` row with an eta 60 s out and the apply control reads `anyone can apply once the delay passes`; after `apply`, `changes` gains `applied` and the table shows the new split; after `cancel`, `changes` gains `cancelled` | `shots/84532/i-pending.png`, `shots/84532/i-applied.png`, `shots/84532/i-cancelled.png` | `propose` … · `applyQueued` … · `propose` … · `cancel` … |
 | (j) | `#/create` with the owner field set to the Ops vault: screenshot the owner note, then a two-row table (the UAT wallet, the engineer's wallet), delay `3600`. After `create`, press one drawer write | the owner note reads `not the connected wallet — a contract — it will have to propose and cancel through its own calls` and step 2 proceeds with **no** acknowledgement — [#172](https://github.com/dnznlabs/rake/issues/172) requires one only for a never-used address, so `probeOwner` gives a contract no class (`app/src/index.html:1482`) and the box is drawn only for a classed reading (`:1742`); the new page's owner bar reads `you are a signer on <vault>, which owns this distribution — every change below is calldata to submit through it`; the drawer's writes read `copy calldata for your vault`, and pressing one gives the clipboard or the textarea fallback with the bytes, no transaction | `shots/84532/j-guard.png`, `shots/84532/j-ownerbar.png`, `shots/84532/j-calldata.png` | `create` … |
 | (k) | Not run on this chain | the host page is Sepolia's by design (TASK.md step 3 (k)), so this row is Sepolia-only and carries no reading here | — | — |
-| (l) | Open `#/docs`, then `#/docs#widget` | fourteen sections in the rail, Disclaimer first; the widget section carries the snippet with this chain's gateway URL | `shots/84532/l-docs.png` | — |
+| (l) | Open `#/docs`, then `#/docs#widget` | fourteen sections in the rail, Disclaimer first; the widget section carries the snippet with this chain's gateway URL. **Amended 2026-11-20 (m05-t01 step 13a, decision 65, [#309](https://github.com/dnznlabs/rake/issues/309)):** § the widget now presents the **`data-rpc` snippet first** and the wallet form second. The section count is unchanged at fourteen | `shots/84532/l-docs.png` | — |
 | (m) | Disposition: one issue per row whose expected state did not match | with nothing open, the dated signoff line under `MILESTONE.md` § Phases 4 in Denizen's own words | — | — |
