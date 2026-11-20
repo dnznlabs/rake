@@ -1008,6 +1008,51 @@ when that run happens. Nothing in this task re-uploads to chase it.
 **Base Sepolia executed nothing** and is untouched: vault `nonce()` 16, `App` nonce 1. Its blocker is
 [#313](https://github.com/dnznlabs/rake/issues/313).
 
+### Step 16a:1 — Base Sepolia readings, 2026-11-20, before anything is sent there
+
+**Read twice on two independent endpoints** — `sepolia.base.org` at block timestamp **1795191942**
+and `base-sepolia-rpc.publicnode.com` at **1795191945** — because a single endpoint cannot
+distinguish chain state from its own view. Both agree on every value, and **every value matches the
+ones 16a records, so this is not a stop.**
+
+| 16a:1 reading | value | 16a records |
+|:--|:--|:--|
+| vault `nonce()` | **16** | 16 ✓ |
+| `cast nonce $APP` | **1** | 1 ✓ |
+| `threshold()` | **2** | — |
+| `ownerCount()` | **4** | — |
+| `delay()` | **900** | the 15 minutes the Product Owner confirmed ✓ |
+| `forwardEnabled(vault)` on `TimelockExecutor` `0x00000000a72A30AdBf38e14d36BCE2610ec3973F` | **true** | — |
+| `queued(0xdc193568…0a9cc2)` — nonce 13, live | **1795189927** | 1795189927 ✓ |
+| `queued(0x673590fb…4d1d5e)` — nonce 14, **live** | **0** | 0 ✓ |
+| `queued(0xe2deb8b2…ae957c2)` — nonce 14, **superseded** | **1795189939** | 1795189939 ✓ |
+| `queued(0xbb693f0b…23104e)` — nonce 15, live | **1795189952** | 1795189952 ✓ |
+
+**`forwardEnabled` needed its argument, and the answer corrects a note of mine rather than the
+runbook's.** It is a mapping on the executor keyed by the vault — `forwardEnabled(address)` — not a
+nullary getter; called without the argument it reverts, which is what my first attempt did and why
+the cancel issue was filed saying the value was unread. Read properly it is **true** on both
+endpoints, which matches `RUNBOOK.md:1544-1545`'s 2026-11-08 reading and contradicts
+`memory/machine-notes.md`, where I had recorded it as "currently false". The machine note is the
+stale one and has been corrected. It does not change the route: `:1539-1543` is explicit that
+`forward()` wants `ownerCount()` signatures for everything **except** `cancelQueued`, so the cancel
+goes with threshold — two of four — and a threshold set sent through `forward` for anything else
+would revert `InvalidSig` on the `sigs.length == required * 65` check.
+
+**Nothing has been executed on 84532**, piece 1 included, per 16a:2. The batch maturing in the
+meantime is harmless: executed early it reverts `CodelessChunk` and stays queued, which was verified
+by argument from `src/App.sol:198-209` rather than by trying it.
+
+**The `action` issue is [#313](https://github.com/dnznlabs/rake/issues/313)**, assigned to the
+Product Owner, carrying the cancel digest
+**`0xdc6a0aaedc09bf8ff1be67f6400b0a021c5063727b8b47835926a72cc1bca753`** —
+`getTransactionHash(vault, 0, cancelQueued(0xe2deb8b2…ae957c2), 16)` — with the commands to
+re-derive it and the `forward`-not-`execute` constraint stated. **16a:5 asks for both digests in one
+issue and it currently carries one:** 16a:4 requires the replacement proposal's nonce to be read
+*after* the cancel and never assumed, so its digest does not exist yet. On the architect's
+instruction the cancel ask was not held back for it; the second digest goes into #313 as a comment
+once the cancel's receipt is in and `nonce()` has been re-read.
+
 ## For close-out
 
 | | value |
