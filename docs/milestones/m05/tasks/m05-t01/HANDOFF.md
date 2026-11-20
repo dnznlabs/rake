@@ -681,6 +681,39 @@ proposal rows from m04-t08's step 7 and adding six more ahead of a ruling would 
 The build artefacts are untracked (`app/dist` is not in the index), so the tree is clean at the
 recorded head.
 
+### Step 14 — the amended hash check, reproduced on both chains
+
+**The amendment landed** as [#307](https://github.com/dnznlabs/rake/pull/307), merged
+2026-11-20 14:18:46Z; `main` is **`ff59ef2`** and this branch is rebased onto it, so `TASK.md` here
+is byte-identical to `main` again. The step's first check is now two comparisons per chain, and
+**both pass**. The architect's figures were re-derived here rather than accepted:
+
+| chain | `widget.js` `sha256` | m04-t16 § For the next upload | |
+|:--|:--|:--|:--|
+| 11155111 | `8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368` | same | **equal** ✓ |
+| 84532 | `8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368` | same | **equal** ✓ |
+
+| chain | `index.html` built (§ Uploads carries this) | substituted per step 14's command | m04-t16 expects | |
+|:--|:--|:--|:--|:--|
+| 11155111 | **`4279a0c9cf9de57e284ebddf0ad5bb8e546a14e384f79fb5bc78ae467b2cd0fc`** | `5b2981205e3f9c36e212793c3e09e66f632d4417248db8c6b5f50229bbd40832` | `5b298120…40832` | **equal** ✓ |
+| 84532 | **`1e5dbb710b397dbe7d2613deaad6b5849a802b385d20566c737342a4e611a05a`** | `b081be5202b06ad53b376c64fb5e878cd111b5ce1e79fced4be674d3c363290e` | `b081be52…3290e` | **equal** ✓ |
+
+**The occurrence check the step requires — each of the four re-pointed values appears exactly once
+in the built page — holds on both chains:** `factory` `0x00D19609…6d7f8E` ×1, `app`
+`0x00a9F390…0d25BA` ×1, `impl` `0xc4eD7EA2…fF8cB0A` ×1, and `factoryBlock` `0xb9c272` ×1 on
+11155111 / `0x3a5cbe0` ×1 on 84532. That is what makes the substitution total rather than
+best-effort: four single occurrences, so nothing else in the page can be absorbing a difference.
+
+**`$FACTORY_BLOCK` was taken from the chain, not from the plan.** Both values are step 2's own
+`cast receipt … blockNumber` on their chain, in lowercase hex: `0xb9c272` = 12,173,938 (Sepolia,
+recorded above) and `0x3a5cbe0` = 61,197,280 (Base Sepolia, recorded above). They agree with the
+architect's.
+
+**Build sizes are unmoved from m04-t16 on both chains** — `raw 150842 · gzip 47659` on 11155111 and
+`raw 150840 · gzip 47658` on 84532, `widget: raw 8509 · budget 10240 · 1731 left` on each — with the
+same one-byte gzip difference on 84532 noted earlier. So the only delta between this bundle and
+m04-t16's is the four deployment values, now demonstrated by hash rather than argued.
+
 ## For close-out
 
 | | value |
