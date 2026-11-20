@@ -569,6 +569,64 @@ of **6.95**, and a local figure is a correct prediction for an un-repriced chain
 under-estimate for a repriced one. That is the sharpest form of § Gates' caveat this task has
 measured.
 
+### Base Sepolia (84532) — step 5, explorer verification
+
+**No `--verifier-url` was needed**, as `:1090` predicts: forge 1.7.1-dev resolves 84532 to Basescan
+through the same Etherscan v2 key.
+
+**Which of the two each address was — and here they differ, which is why `:1093` asks.** The factory
+and the implementation returned `Pass - Verified`, so this run verified them. `App` returned
+`Contract [src/App.sol:App] "0x00a9F390A6010d045e0d34856048DdD6910d25BA" is already verified.
+Skipping verification.` and exit 0 — a pass for the criterion, but **this run cannot claim it**, and
+`getsourcecode` carries no timestamp to settle who did. The likely cause is benign and worth naming:
+the address and bytecode are identical to Sepolia's, which Etherscan v2 serves under one key across
+chains. Recorded rather than smoothed over, because "verified" and "verified by this run" are
+different facts and only one of them is evidence about this deploy.
+
+| `getsourcecode` `ContractName` | address | Etherscan |
+|:--|:--|:--|
+| **`DistributionFactory`** | `0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E` | `Pass - Verified` (this run) |
+| **`Distribution`** | `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A` | `Pass - Verified` (this run) |
+| **`App`** | `0x00a9F390A6010d045e0d34856048DdD6910d25BA` | **already verified** (not this run) |
+
+`#code` URLs: `https://sepolia.basescan.org/address/<address>#code` for each of the three.
+
+**Sourcify, key unset, all three exit 0, and the gate passes:** three **`exact_match`** lines, loop
+exit **0**, at the same three addresses.
+
+**OpenChain** is keyed by selector rather than by chain, so the upload recorded under Sepolia covers
+this chain too: **82 `Duplicated:`, 0 `Imported:`**, 2026-11-20.
+
+### Step 13 closes #288, and the two fixtures now agree
+
+§ Gates recorded that [#288](https://github.com/dnznlabs/rake/issues/288) closes on step 13 and that
+the two suites disagreed until it did: `test/ext.test.mjs:41` pinned Part A's **prediction** while
+`test/build.test.mjs:282-283` pinned the M04 **deployed** factory. They agree now because **landed
+equals predicted** — step 13's own 1f check, measured on both chains, not assumed.
+
+The fixture move this step owes (`TASK.md` step 13: "`test/build.test.mjs:282-285`'s Sepolia fixture
+moves to the new factory and block here"):
+
+| `test/build.test.mjs` | was | now |
+|:--|:--|:--|
+| `SEPOLIA.DISTRIBUTIONFACTORY` | `0x00D18B5b…71B` | **`0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`** |
+| `SEPOLIA.DISTRIBUTIONFACTORY_BLOCK` | `0xb88091` | **`0xb9c272`** (12,173,938) |
+| `SEPOLIA.APP` | `0x00A90943…5BaE` | **`0x00a9F390A6010d045e0d34856048DdD6910d25BA`** |
+| `DEPLOYED.factory` / `.impl` (`:402-405`) | `0x00D18B5b…71B` / `0x31dd18b4…a4b0` | **the landed pair** |
+
+**Two further sites had to move, and neither is in the lines the plan names** — worth stating because
+a reader following `:282-285` alone would leave the suite red:
+
+1. **`:402-405`'s `DEPLOYED`** is a second constant in the same file, used by the negative test at
+   `:449` that bends one hex digit of the factory address and requires the error to quote both the
+   bent value and the computed one. Left at the M04 pair it fails against the real broadcast log,
+   whose input now computes the new factory.
+2. **`:387`'s pinned prefix** in "a `--set` over a value the log already gave says so on stderr".
+   That test passes the log's own value deliberately, so only the address prefix in the expected
+   stderr moved, `0x00D18B5b` → `0x00D19609`; its intent is untouched.
+
+`node --test test/*.test.mjs`: **188 passed, 0 failed**.
+
 ## For close-out
 
 | | value |

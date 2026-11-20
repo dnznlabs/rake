@@ -279,10 +279,10 @@ test('every broadcast log in this working tree passes the assertion', () => {
 const SEPOLIA = {
   CHAIN_ID: '11155111',
   VERSION: '0.1alpha',
-  DISTRIBUTIONFACTORY: '0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B',
-  DISTRIBUTIONFACTORY_BLOCK: '0xb88091',
+  DISTRIBUTIONFACTORY: '0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E',
+  DISTRIBUTIONFACTORY_BLOCK: '0xb9c272',
   FEATURED_SALT: '0x68e0741d8d693e14bf56914567eaddc130b186ee000000000000000000000001',
-  APP: '0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE',
+  APP: '0x00a9F390A6010d045e0d34856048DdD6910d25BA',
 };
 
 test('the values a real build resolves pass every declared shape', () => {
@@ -384,7 +384,7 @@ test('a --set over a value the log already gave says so on stderr and still buil
   const r = buildRun(DNZN, `DISTRIBUTIONFACTORY=${SEPOLIA.DISTRIBUTIONFACTORY}`);
 
   assert.equal(r.status, 0);
-  assert.match(r.stderr, /--set DISTRIBUTIONFACTORY overrides the log's 0x00D18B5b/);
+  assert.match(r.stderr, /--set DISTRIBUTIONFACTORY overrides the log's 0x00D19609/);
 });
 
 test('build.mjs refuses a name two broadcast logs both create', () => {
@@ -400,8 +400,8 @@ test('build.mjs refuses a name two broadcast logs both create', () => {
 /* ---- the log's addresses recomputed rather than believed (A3, A4) --------------------------- */
 
 const DEPLOYED = {
-  factory: '0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B',
-  impl: '0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0',
+  factory: '0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E',
+  impl: '0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A',
 };
 
 /* The two chains whose `Deploy.s.sol` log is tracked, and so the only two whose addresses are a fact
