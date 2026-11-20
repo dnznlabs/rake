@@ -714,6 +714,64 @@ architect's.
 same one-byte gzip difference on 84532 noted earlier. So the only delta between this bundle and
 m04-t16's is the four deployment values, now demonstrated by hash rather than argued.
 
+### Step 14 — calldata, and the fork proof before any signature
+
+**Calldata generated per chain** with `tools/step4-calldata.mjs --chain $CHAIN_ID --rpc "$RPC"
+--out calldata`, at the generating commit **`9d3f94f`**. All three proposals fit the coordination
+service's 65,536-character cap on both chains, with the spare stated so a future `app/` growth has a
+budget rather than a surprise:
+
+| proposal | chars | spare |
+|:--|--:|--:|
+| `1-addChunk-0.hex` | 48,138 | 17,398 |
+| `2-addChunk-1.hex` | 47,498 | 18,038 |
+| `batch345.hex` | 19,018 | 46,518 |
+
+**One defect found before it could do damage, and it is a tooling defect rather than a plan one.**
+`tools/step4-calldata.mjs:67` hard-codes `--app`'s default to
+**`0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE`** — the **M04** `App` — and step 14's command as
+written omits `--app`. Run verbatim after step 13, it would have built the entire upload against the
+superseded contract, silently, because every later check in the step compares the calldata to the
+build rather than to the target address. The tool's own comment is sound reasoning on a stale value:
+`App` *is* one address on every chain (decision 35), so a default rather than a per-chain table is
+right — it is simply the previous deployment's. **Every file here was generated with
+`--app 0x00a9F390A6010d045e0d34856048DdD6910d25BA` passed explicitly.** The `--vault` default
+`0x00c0e887…F3790` is still correct and was left alone. This wants fixing before any mainnet cut,
+where the same default would point at a testnet address.
+
+**Cross-chain shape, which is its own check:** `3-addWidgetChunk.hex`, `4-setChunks.hex`,
+`5-setWidgetChunks.hex` and `batch345.hex` are **byte-identical across the two chains** (same
+`sha256`), while `1-addChunk-0.hex` and `2-addChunk-1.hex` differ — exactly the four-value delta in
+`index.html` and nothing more. The three SSTORE2 pointers are the same on both chains
+(`0x029E4004…`, `0x87eE9c5C…`, `0x295fF302…`), as they must be: they derive from `App`'s address and
+nonce, which match, while the bytes they will hold differ per chain. And the widget call's
+`bytes arg sha256` is **`8b6bbc88…bc368`**, equal to `app/dist/widget.js`'s own hash, so the argument
+is the built file rather than a re-encoding of it.
+
+**The fork proof passed on both chains — the upload will serve the right bytes, established before a
+signature exists.** Both chunks and the five-call batch executed on an anvil fork with the vault
+impersonated, and `chain-doc` then read the document back off the fork:
+
+| | Sepolia `11155111` | Base Sepolia `84532` |
+|:--|:--|:--|
+| live `cast estimate` call 1 / call 2 | **37,858,862** / **37,327,517** | **5,343,480** / **5,269,032** |
+| fork `gasUsed` call 1 / call 2 | 5,300,127 / 5,209,461 | 5,300,247 / 5,209,285 |
+| `batch345` fork estimate / `gasUsed` | 2,083,631 / **2,005,037** | 2,083,631 / **2,005,037** |
+| all five calls | **status 1** | **status 1** |
+| `chain-doc` `inflated sha256` | **`4279a0c9…cd0fc`** | **`1e5dbb71…1a05a`** |
+| `sha256sum app/dist/index.html` | `4279a0c9…cd0fc` — **equal** ✓ | `1e5dbb71…1a05a` — **equal** ✓ |
+| `inflated bytes` / build raw | 150,842 / 150,842 ✓ | 150,840 / 150,840 ✓ |
+| `chain-doc` `widget sha256` | `8b6bbc88…bc368` — **equal** ✓ | `8b6bbc88…bc368` — **equal** ✓ |
+| `widget status` / bytes | 200 / 8,509 | 200 / 8,509 |
+
+**The fork's own caveat, measured again here rather than quoted.** `:1018` says anvil prices code
+deposit at ~223 gas/byte — within 2% of Base Sepolia live and ~7× under Sepolia. Confirmed on this
+task's bytes: Base Sepolia's live call 1 of **5,343,480** against the fork's 5,300,127 is **0.8%**
+apart, while Sepolia's live **37,858,862** against the same fork figure is **7.14×**. So the fork
+figures above are authoritative for the batch (which creates no code) and for Base Sepolia, and the
+**live** estimates are the only valid ones for Sepolia's two chunk calls. Anvil was started on port
+8701 and killed by PID, never by pattern (`:1005`).
+
 ## For close-out
 
 | | value |
