@@ -772,6 +772,82 @@ figures above are authoritative for the batch (which creates no code) and for Ba
 **live** estimates are the only valid ones for Sepolia's two chunk calls. Anvil was started on port
 8701 and killed by PID, never by pattern (`:1005`).
 
+### Step 14 — the six proposals, written and read back
+
+**Preconditions, read live from the vault per chain and not from the service** (whose `nonce` and
+`owner_count` lag by design, `:4a`): `nonce()` **13**, `threshold()` **2**, `ownerCount()` **4**,
+`isOwner($ENGINEER)` **true**, and `cast nonce $APP` **1** on both chains — `App` is fresh, which is
+what step 14 asserts and what makes the batch's third-CREATE pointer arithmetic hold. The two
+`wallets` rows are per chain with different ids, as `:4a` warns: Sepolia
+`eea4803e-1228-496d-9d19-d3a56ab45364`, Base Sepolia `79632e21-9dc4-4c9a-b136-2627021f5c33`, both
+found only with the address lowercased.
+
+**Three proposals per chain, nonce order, value 0, each with exactly one `ecdsa` signature from
+`$ENGINEER`. Calldata generated at `9d3f94f` for `--app-nonce 1`.**
+
+| # | file | target | nonce | Sepolia digest | Base Sepolia digest |
+|--:|:--|:--|--:|:--|:--|
+| 1 | `1-addChunk-0.hex` | `$APP` | **13** | `0x9c0dbbd40da1f21e516edd6988c0bb0593bd9d706fa9f959c8b08056c20fa86e` | `0xdc19356867c174cf300a4428d7184551b284bdb6d8aa8510b60c1968a00a9cc2` |
+| 2 | `2-addChunk-1.hex` | `$APP` | **14** | `0x8dc6d8b42a4282980d3ee265633c154a5a04da524874a843c083ff567a8b9df0` | `0xe2deb8b268b8c0d951e6a21787d84c38b9413f4be24eeadeade318766ae957c2` |
+| 3 | `batch345.hex` | `$OWNER` (the vault) | **15** | `0x4c14791021a4da1bc6d64cd8c780e918fb980190c8c9fcff4dc0769e69cb84f0` | `0xbb693f0b6bb0e7226b57058f6fad95db3f415acc7ba9a1bd069ee8c9f723104e` |
+
+Every signature was verified locally with `cast wallet verify --address $ENGINEER --no-hash` before
+its POST — all six `Validation succeeded` — and the run stops before POSTing if one does not.
+
+**Verified by reading back through `tx_summary`, not by the POST's `200`** (`:4a`). All six rows:
+`status` `proposed`, `value` **0**, `threshold` **2**, **exactly one** signature and it is the
+engineer's `ecdsa`, `call_data` lengths **48,138 / 47,498 / 19,018** matching the committed files,
+`tx_hash` equal to the digest signed, and targets `0x00a9f390a6…` for 1 and 2 against
+`0x00c0e88778…` for 3. `sig_count` was not read (`:4a`: it reads `0` for signed and unsigned alike).
+
+**One departure from the runbook's own expectation, in the harmless direction.** `:4a` says to
+expect more rows than this upload proposed, because earlier uploads' rows linger — "six rows per
+chain today for three new proposals". The filter returned **exactly three per chain**, all dated
+2026-11-20T14:44Z. So nothing is lingering in `proposed`, `executing` or `queued` on either chain,
+and in particular **the two inert m04-t08 step-7 rows no longer appear on Sepolia**. Recorded as an
+observation rather than a claim about who cleared them; the pruning was not done here.
+
+## For Denizen — step 14's 4b checklist, per chain
+
+**What is waiting:** three proposals on **each** of Sepolia and Base Sepolia, at nonces **13, 14,
+15**, each already carrying the engineer's signature. Each needs **one more** signature to reach
+`threshold()` 2. Check them against a checkout of **`9d3f94f`**, the commit the calldata was
+generated at.
+
+Before signing each one (`:4b`):
+
+1. **Proposals 1 and 2 — target is `App` `0x00a9F390A6010d045e0d34856048DdD6910d25BA`, value 0.** A
+   proposal whose target is the vault is proposal 3 or not this upload. **Note the address: it is
+   the `App` step 13 deployed, not M04's `0x00A90943…5BaE`** — the two differ after the fourth
+   character, so read past the `0x00a9`.
+2. **The data is the committed file.** `sha256sum` of the proposal's data equals that of
+   `calldata/$CHAIN_ID/1-addChunk-0.hex` or `…2-addChunk-1.hex`.
+3. **It decodes to one `addChunk(bytes)`**, whose `bytes` argument's `sha256` is this handoff's
+   figure for that chunk.
+4. **The nonce and digest** are the table's row above for that chain.
+5. **Proposal 3 — target is the vault `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`, value 0**, and it
+   decodes to `batch(address[],uint256[],bytes[])` with three targets all `App`, three values all 0,
+   and the three `bytes` equal to `3-addWidgetChunk.hex`, `4-setChunks.hex`,
+   `5-setWidgetChunks.hex` **in that order**. `batch` is a vault self-call, which the review
+   checklist marks high risk — confirm it outside the channel that requested it.
+
+Then (`:4b`, `:4c`):
+
+- **Sign all three before submitting any.** A gap in the nonce sequence stalls the ones behind it.
+- **Submit back to back in nonce order 13, 14, 15.** The vault hashes against `nonce++`, so
+  submitting 14 before 13 is refused as `InvalidSig` — nothing lost but the gas.
+- **Then wait the `delay()` the chain answers, which is 900 s — 15 minutes, not one hour.** You
+  confirmed this setting on 2026-11-20 and `TASK.md` records it; 3,600 s stays the mainnet figure.
+  All three queue within seconds of each other, so one wait covers them.
+- **Nothing reaches `App` until `executeQueued`.** Until then the document is not on chain and the
+  dapp serves nothing new.
+
+**What is already proven, so the sitting does not need to re-establish it:** the five-call sequence
+executed end to end on a fork of each chain and `chain-doc` then read the document back with
+`inflated sha256` **equal to the build** on both — so the upload serves the right bytes. The fork
+establishes encoding, order and gas only; the authority readings are the live `isOwner`/`threshold`
+above.
+
 ## For close-out
 
 | | value |
