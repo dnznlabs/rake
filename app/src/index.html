@@ -36,8 +36,11 @@ const CONTRACTS = [['DistributionFactory', CFG.factory]];
 const CHAINS = { 1: 'mainnet', 10: 'op mainnet', 8453: 'base', 42161: 'arbitrum', 11155111: 'sepolia', 84532: 'base sepolia', 31337: 'anvil', 31338: 'anvil-b' };
 /* A dev chain has no explorer, so `ext()` prints plain text with the full value in the title. */
 const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.io', 8453: 'https://basescan.org', 42161: 'https://arbiscan.io', 11155111: 'https://sepolia.etherscan.io', 84532: 'https://sepolia.basescan.org' };
-/* What the widget snippet in #/docs puts in `data-rpc`. The embedding page's developer picks their own
-   endpoint; these are only known public ones, so the example works when pasted. */
+/* Two readers. It is what the widget snippet in #/docs puts in `data-rpc` — the embedding page's
+   developer picks their own endpoint; these are only known public ones, so the example works when
+   pasted — and it is this page's own read path when `discover` found no injected provider (#273), by
+   way of the read-provider helper below. A chain absent from this table has no read path without a
+   wallet, which is the one case `route()`'s no-provider notice is still reached on. */
 const PUBLIC_RPC = { 1: 'https://ethereum-rpc.publicnode.com', 10: 'https://mainnet.optimism.io', 8453: 'https://mainnet.base.org', 42161: 'https://arb1.arbitrum.io/rpc', 11155111: 'https://ethereum-sepolia-rpc.publicnode.com', 84532: 'https://sepolia.base.org', 31337: 'http://127.0.0.1:8545', 31338: 'http://127.0.0.1:8546' };
 const ZERO = '0x' + '0'.repeat(40);
 /*DEV*/
@@ -57,16 +60,33 @@ document.getElementById('flinks').innerHTML = iconLink(REPO, 'github', 'source o
 
 /* ---- provider ------------------------------------------------------------------------------ */
 let P = null, ACC = null, CHAIN = null;
-// The landing's widget reads through the wallet, as a host page's does without `data-rpc`; only the dev
-// build hands it an endpoint, the same `?rpc=` the page itself reads through.
+// True only when `discover` found an injected provider: the one thing `who()` reads to tell a visitor
+// with no wallet from a wallet that is there but not connected.
+let WALLET = false;
+// The endpoint the landing's widget is handed in `data-rpc`: the dev `?rpc=` override when there is
+// one, and otherwise empty, in which case the mount falls back to this chain's `PUBLIC_RPC` entry for
+// a visitor with no wallet and to the injected EIP-1193 global for one who has it. Reads never
+// require a wallet; writes always do.
 let WRPC = '';
-/*DEV*/
+// The page's read path when there is no wallet, and the transport behind the dev `?rpc=` override.
 const rpcProvider = url => ({
   request: async ({ method, params }) => {
     const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
-    const j = await r.json(); if (j.error) throw j.error; return j.result;
+    /* A public endpoint answers a rate limit or an outage with a status and often an HTML body, so the
+       body may not parse. The status rides at `data.httpStatus`, where `Model.isWrappedRefusal` reads
+       a 413 and `logs()` shrinks its window. `null` is a real result (an unmined receipt); only a
+       missing one is a failure. */
+    const j = await r.json().catch(() => null);
+    if (j && j.error) throw j.error;
+    if (!r.ok || !j || j.result === undefined) throw { message: r.ok ? 'the RPC endpoint sent no result' : `the RPC endpoint answered HTTP ${r.status}`, data: { httpStatus: r.status } };
+    return j.result;
   }
 });
+// Which transport reads the chain: the injected provider when there is one, else this chain's public
+// endpoint, else nothing. This is the seam #275's settings page reuses to insert a user RPC URL and a
+// route choice; none of that page is here.
+const readProvider = injected => { const u = PUBLIC_RPC[CFG.chainId]; return injected || (u ? rpcProvider(u) : null); };
+/*DEV*/
 /* A provider that refuses a wide `eth_getLogs` the way `sepolia.base.org` does, so #76's window
    shrink can be driven in a browser against anvil, which caps nothing: `?cap=200` answers the
    verbatim `-32614` refusal for any range wider than 200 blocks, and `?cap=…&prune=N` also refuses
@@ -104,8 +124,13 @@ async function discover() {
   dispatchEvent(new Event('eip6963:requestProvider'));
   await new Promise(r => setTimeout(r, 150));
   P = (found[0] && found[0].provider) || window.ethereum || null;
+  WALLET = !!P;
+  P = readProvider(P);
   if (!P) return;
-  try { const a = await P.request({ method: 'eth_accounts' }); ACC = a[0] || null; } catch (e) {}
+  /* Only a wallet has an account to report. A public endpoint has no notion of "your account" —
+     `eth_accounts` on a dev chain answers with its own unlocked keys, which would paint a connected
+     account for a visitor who has no wallet at all. */
+  if (WALLET) { try { const a = await P.request({ method: 'eth_accounts' }); ACC = a[0] || null; } catch (e) {} }
   if (P.on) { P.on('accountsChanged', a => { ACC = a[0] || null; who(); route(); }); P.on('chainChanged', () => location.reload()); }
 }
 async function connect() { const a = await P.request({ method: 'eth_requestAccounts' }); ACC = a[0] || null; who(); route(); }
@@ -519,6 +544,11 @@ async function resolveName(acc) {
   }
   return null;
 }
+/* The button is the one printed address that does not go through `ext`, so it gets its name here —
+   by the same resolver (decision 13's order), behind the same gate (R10, `Model.plainName`) and
+   under the same winner-alone rule. `ACC` is re-read after the `await`, so an account switched
+   mid-resolve keeps the newer account's text. */
+async function nameWho(acc) { const n = await resolveName(acc); if (n && Model.plainName(n) && same(ACC, acc)) document.getElementById('who').textContent = n; }
 /* Reverse display, in place. Every address the page printed went through `ext`, which marked it, so
    one pass after the paint replaces the ones that have a name without re-rendering anything and
    without any view having to know that names exist. On anvil `resolveName` returns before it asks.
@@ -580,13 +610,22 @@ function who() {
   const b = document.getElementById('who');
   b.textContent = ACC ? short(ACC) : 'connect';
   b.title = ACC || '';
-  b.onclick = !P ? null : ACC ? e => { e.stopPropagation(); toggle(wm); } : connect;
+  b.onclick = ACC ? e => { e.stopPropagation(); toggle(wm); } : WALLET ? connect : e => { e.stopPropagation(); toggle(nm); };
+  // Not awaited: the short address is on the button before any round trip, and `who()` stays
+  // synchronous for `accountsChanged`, `connect` and `disconnect`, which each already call it.
+  if (ACC) nameWho(ACC);
   if (!ACC) wm.hidden = true;
   const pill = document.getElementById('net'), wrong = wrongChain();
   document.getElementById('netname').textContent = CHAIN ? cname(CHAIN) : cname(CFG.chainId);
-  nm.innerHTML = `<div class="k">This app lives on ${cname(CFG.chainId)}. Reads and transactions go through your wallet, so it has to be on the same network.</div>`
-    + `<div class="k">wallet: ${CHAIN ? cname(CHAIN) : 'none'}</div>`
-    + (wrong ? `<div data-a="switch">switch wallet to ${cname(CFG.chainId)}</div>` : '');
+  /* Without a wallet `CHAIN` is the public endpoint's answer, so the switch is a wallet's alone. A
+     chain with no `PUBLIC_RPC` entry has no read path to name: `P` is null there. */
+  const pub = PUBLIC_RPC[CFG.chainId], read = WRPC || pub;
+  nm.innerHTML = (WALLET
+      ? `<div class="k">This app lives on ${cname(CFG.chainId)}. Reads and transactions go through your wallet, so it has to be on the same network.</div>`
+      : `<div class="k">no wallet found — open this page in a browser with a wallet to act.</div>`
+        + (read ? `<div class="k">reads go through ${new URL(read).host}</div>` : ''))
+    + `<div class="k">wallet: ${WALLET && CHAIN ? cname(CHAIN) : 'none'}</div>`
+    + (WALLET && wrong ? `<div data-a="switch">switch wallet to ${cname(CFG.chainId)}</div>` : '');
   pill.classList.toggle('warn', wrong);
   pill.title = wrong ? `expected ${cname(CFG.chainId)}` : '';
 }
@@ -1178,8 +1217,9 @@ async function landing() {
   if (!S.featured) return;
   const d = await loadDistro(S.featured);
   // The widget reads `window.ethereum` alone, so with no RPC and no such global it could only fail.
-  if (stale(t) || d.missing || d.foreign || !(WRPC || window.ethereum)) return;
-  fill('featured', `<div id="wdg" data-rake="${d.addr}" data-chain="${CFG.chainId}" data-link${WRPC ? ` data-rpc="${esc(WRPC)}"` : ''}></div>`);
+  const rpc = WRPC || (WALLET ? '' : PUBLIC_RPC[CFG.chainId] || '');
+  if (stale(t) || d.missing || d.foreign || !(rpc || window.ethereum)) return;
+  fill('featured', `<div id="wdg" data-rake="${d.addr}" data-chain="${CFG.chainId}" data-link${rpc ? ` data-rpc="${esc(rpc)}"` : ''}></div>`);
   window.RakeWidget.mount(document.getElementById('wdg'));
 }
 /* The full-width fee path: three sources into one distribution, four beneficiaries out. Drawn twice from one set of rows, wide and tall, because a 912-unit figure

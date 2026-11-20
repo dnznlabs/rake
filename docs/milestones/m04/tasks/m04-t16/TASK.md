@@ -9,8 +9,12 @@ reached only on a chain the page knows no public endpoint for
 ([#273](https://github.com/dnznlabs/rake/issues/273)); and the wallet button names the connected
 account the way the page names every other address — the short address first, the resolved name in
 its place when one returns, the full address in the title, re-run on every account change
-([#274](https://github.com/dnznlabs/rake/issues/274)). `app/src/index.html` and `test/*.mjs` only;
-nothing under `src/`, no `.gas-snapshot` change, no upload. Decision 61: this is the `app/` change
+([#274](https://github.com/dnznlabs/rake/issues/274)). `app/src/index.html`, `test/*.mjs` and
+`AGENTS.md` ~~`app/src/index.html` and `test/*.mjs` only~~;
+nothing under `src/`, no `.gas-snapshot` change, no upload.
+*(amended 2026-11-19 at the review of [#286](https://github.com/dnznlabs/rake/pull/286): `AGENTS.md`
+§ The dapp added, with the two comments above `PUBLIC_RPC` and `WRPC`, because the paragraph still
+described the wallet as the page's only network path. Docs beside the handoff, no new file.)* Decision 61: this is the `app/` change
 after m04-t15 that the mainnet bundle carries, and the settings page
 ([#275](https://github.com/dnznlabs/rake/issues/275)) is not here.
 
@@ -101,6 +105,13 @@ on purpose, and says so.
    one addition); `readProvider` → `2` (the declaration and the call in `discover`); `let WALLET`
    → `1`; `PUBLIC_RPC[CFG.chainId]` → `2` (baseline 1, the `#/docs` preview at `:2112`).
 
+   *Amended 2026-11-19 at the review of [#286](https://github.com/dnznlabs/rake/pull/286): the account is asked only of an injected
+   provider, never of the public endpoint. This hunk replaces `P` with `readProvider(P)` two lines
+   above `discover`'s `eth_accounts` call, so that call would otherwise ask the endpoint which
+   account is connected — meaningless on a public endpoint, which answers `[]`, and wrong on a dev
+   chain, which answers with its own unlocked keys and paints a connected account for a visitor who
+   has no wallet. The call is gated on `WALLET`.*
+
 3. **The header with no wallet, `who()` `:566-580`.** Today the button's click is `null` with no
    provider and `connect` otherwise (`:570`); with step 2 there is always a provider, and
    `connect` (`:111`) sends `eth_requestAccounts` to it, which a public endpoint refuses. Rewrite
@@ -172,11 +183,19 @@ on purpose, and says so.
      `anvil`; the featured distribution's `h1` and rows are painted and `#wdg` holds a mounted
      widget (the `rk-css` style present); `#give-go` is `disabled` with its title; a click on `#who`
      opens `#net-menu` and its text contains both step-3 lines, with the host `127.0.0.1:8545`.
-     Then `#/distros` (rows painted, `mine` and `owned` tabs `disabled`), the seed distribution's
+     Then `#/distros` (rows painted, `mine` `disabled` with its title) ~~`mine` and `owned` tabs
+     `disabled`~~, the seed distribution's
      page (`h1` its description, `funds`, `changes` and `activity` painted, every `[data-send]`
      button `disabled` and the count of them recorded, no `[data-copy]` write control), and
-     `#/create` (the `:1736` notice and nothing else). **Before the fix** the same four opens paint
-     one `.notice` reading `No wallet found` — record it as the red on `origin/main`'s own dev build.
+     `#/create` (the `:1736` notice and nothing else), and `#/docs`. **Before the fix** the same four
+     opens paint one `.notice` reading `No wallet found` — record it as the red on `origin/main`'s
+     own dev build.
+
+     *(amended 2026-11-19 at the review of [#286](https://github.com/dnznlabs/rake/pull/286): `#/docs` added to the list. `#give-go` is
+     not on the landing — at the branch point it is inside `docs()`'s `S.featured` block (`:2115`) —
+     so the check at `:173` is reached only by opening `#/docs`, which on `origin/main` renders
+     neither `#give-go` nor `#give-amt` because that block needs a provider. #273 excludes `#/docs`
+     from the routes that stop at the notice, and rightly: it renders either way.)*
    - (b) **No wallet, a public endpoint (#273).** `make dapp CHAIN_ID=11155111` (the Sepolia
      addresses in `broadcast/`, whichever deployment `main` carries at the branch point — M05-D1
      moves them, and this case reads whichever it finds), served the same way, opened at `#/` with
@@ -248,13 +267,22 @@ branch point and recorded in the handoff with the commit. Every grep is `grep -i
 3. **The provider ships.** `grep -c 'const rpcProvider' app/dist/index.html` → `1` after `make
    dapp-nodev CHAIN_ID=11155111` (baseline 0); `grep -c 'const capped' app/dist/index.html` → `0`;
    `test/nowallet.test.mjs` passes, and its strip literal equals `app/build.mjs:145`'s; `rpcProvider`
-   → `4` (baseline 3); `readProvider` → `2`; `let WALLET` → `1`; `PUBLIC_RPC[CFG.chainId]` → `2`
-   (baseline 1).
+   → `4` (baseline 3); `readProvider` → `2`; `let WALLET` → `1`; `PUBLIC_RPC[CFG.chainId]` → `4` ~~`2`~~
+   (baseline 1) *(amended 2026-11-19 at the review of [#286](https://github.com/dnznlabs/rake/pull/286): four sites — `readProvider`
+   from step 2 (`:76`), step 3's `reads go through` host (`:611`), step 4's landing `rpc` (`:1205`),
+   and the pre-existing `#/docs` preview (`:2209`). Step 2's local figure of `2` stands as a step
+   figure, correct at that point in the sequence.)*
 4. **Every route reads without a wallet (#273).** Step 6 (a) as recorded: four routes painted with
    rows on the dev chain with no query and no injected provider, every write control `disabled` or
    absent with its existing line, the network menu's two step-3 lines; step 6 (b) as recorded on
-   Sepolia through the public endpoint; `No wallet found` → `1`, unchanged; `a wallet to act` →
+   Sepolia through the public endpoint; `No wallet found` → `2` ~~`1`, unchanged~~, and
+   `grep -c -F 'No wallet found' app/src/index.html` → `1`; `a wallet to act` →
    `1`; `reads go through` → `1`; `connect a wallet` → `8`, unchanged.
+   *(amended 2026-11-19 at the review of [#286](https://github.com/dnznlabs/rake/pull/286): every grep in this plan is `grep -ic -F`,
+   case-insensitive, and step 3 prescribes the lowercase line `no wallet found — open this page in a
+   browser with a wallet to act.`, which matches the same pattern as `route()`'s notice. The
+   case-insensitive count is therefore `2` by the plan's own wording; the added case-sensitive check
+   is what proves `route()`'s own notice is untouched.)*
 5. **The connect button still connects.** `eth_requestAccounts` → `1`, unchanged; step 6 (e): with
    a stubbed wallet holding no account, a click on `#who` calls the stub's `eth_requestAccounts`
    (the stub counts it) and the enabled write set afterwards equals `main`'s for that account.
