@@ -462,13 +462,21 @@ Sepolia; **every `record:` line is committed before the next transaction** (`:22
     1. The engineer re-reads the four `queued()` values, both nonces, `threshold()`, `delay()` and
        `forwardEnabled` on 84532, dated, into the handoff. A reading that differs from the above
        is a stop.
-    2. Piece 1 — `executeQueued` of `1-addChunk-0.hex` at nonce 13 — is sent at its eta as step 16
-       has it. It is `App`'s first CREATE in every path, and once it has landed no order of the
-       remaining pieces can swap the page's halves.
-    3. **The cancel.** `cancelQueued(0xe2deb8b2…ae957c2)` as a vault self-call at the vault's live
+    2. **Nothing is executed on this chain before the cancel's receipt, piece 1 included.** With
+       piece 1 landed and the dead piece still queued, anyone executing the dead piece puts the old
+       chunk 1 at the address `4-setChunks.hex` names: nothing reverts and the old page is served,
+       caught only by 4d. With nothing landed, the same act swaps the halves and inflation fails
+       where it can be seen. The batch maturing meanwhile is harmless: executed early it reverts
+       `CodelessChunk` and stays queued.
+    3. **The cancel, first.** `cancelQueued(0xe2deb8b2…ae957c2)` as a vault self-call at the vault's live
        nonce through `TimelockExecutor.forward()`, which takes threshold signatures for
-       `cancelQueued` alone and takes effect at once (`RUNBOOK.md:1539-1543`). One signature from the engineer, one from the Product Owner.
-    4. **Chunk 1 again.** A new proposal at the vault's next nonce: target `App`, value 0, data the
+       `cancelQueued` alone and takes effect at once (`RUNBOOK.md:1539-1543`). One signature from the engineer, one from the Product Owner. It never
+       goes through `execute()`, where the same signatures would queue it for `delay()` and spend
+       the nonce; the signature set stays with the two owners until it is sent. The cancel consumes
+       a vault nonce.
+    3a. Piece 1 — `executeQueued` of `1-addChunk-0.hex` at nonce 13 — after the cancel's receipt
+       and its own eta, as step 16 has it.
+    4. **Chunk 1 again.** A new proposal at the vault's live `nonce()`, read after the cancel and never assumed: target `App`, value 0, data the
        committed `calldata/84532/2-addChunk-1.hex` unchanged (`sha256`
        `30cc12d04a5c37b9d8d9cc3f5f4f6b1720d46fbc6924f4f17e280a3f6c37e933`), digest from
        `getTransactionHash`, one signature each, queued for `delay()` by his submit.
@@ -478,8 +486,7 @@ Sepolia; **every `record:` line is committed before the next transaction** (`:22
     6. Then step 16 on this chain: the new chunk-1 piece as `App`'s second CREATE, then the batch
        already queued at nonce 15, each behind the gate `RUNBOOK.md` § 4c reads from the chain.
 
-    Until the cancel's receipt, the engineer sends neither the queued nonce-14 piece nor the batch
-    on this chain. A queued piece does not expire and anyone can execute a matured one: if
+    A queued piece does not expire and anyone can execute a matured one: if
     `cast nonce $APP` moves in a way these steps did not cause, stop and report. The repair is then
     a corrective `setChunks`, which is a new plan step and not this one.
 
