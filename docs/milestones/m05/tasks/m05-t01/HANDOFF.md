@@ -941,6 +941,73 @@ executed end to end on a fork of each chain and `chain-doc` then read the docume
 establishes encoding, order and gas only; the authority readings are the live `isOwner`/`threshold`
 above.
 
+### Step 16 — 4c and 4d on Sepolia (11155111): the upload is live and verified
+
+**Pre-send gates, read from the chain and not from the record.** The committed calldata at
+`f5e081b` reproduced all three queued digests exactly — `0x9c0dbbd4…0fa86e` at nonce 13,
+**`0x3f1b294e…125939`** at 14 (the `557a405` re-run) and `0x4c147910…cb84f0` at 15 — each with a
+non-zero `queued` eta, all matured. The dead `0x8dc6d8b4…8b9df0` read **0**, so the wrong piece was
+never executable on this chain. Pointer agreement held both ways: `setChunks` names
+`0x029E4004…`, `0x87eE9c5C…` and `setWidgetChunks` names `0x295fF302…`, which are exactly `App`'s
+CREATEs at nonces 1, 2 and 3 computed independently with `cast compute-address`.
+
+**Executed `1 → 2 → batch`, one at a time, waiting for each receipt, with `estimate + 30%` per send.**
+
+| piece | tx hash | `status` | `gasUsed` | estimate | block |
+|:--|:--|:--|--:|--:|--:|
+| 1 `addChunk` doc 0 | `0x3bc0b3c089e592445381f5a070ce9d4a4883bfa5180912b84effffc2040e8fea` | **true** | 37,591,184 | 38,202,006 | 12,176,209 |
+| 2 `addChunk` doc 1 | `0xf25b0128de45130661da12b4bae1b8cf02cfc2642e9c54b847665615ca0f75a5` | **true** | 37,060,412 | 38,048,346 | 12,176,211 |
+| batch (calls 3–5) | `0x194caf5e4a39e914d566b0f599ee690676799f2e5bfb1ecedf1fd2e798e7a8eb` | **true** | 13,762,835 | 14,608,000 | 12,176,213 |
+
+`effectiveGasPrice` 50,000,013 wei on all three. Every estimate came back above the gas used, by
+**1.6%**, **2.7%** and **6.1%** — inside the 2.62–7.62% band § Uploads records for the 2026-11-17
+upload, so the `+30%` margin was never close to binding. The batch was estimated **between** piece 2
+and itself, as `:838` requires, since `setChunks` cannot be estimated before its pointers exist.
+
+**The content gate was read from the chain between pieces, which is what proves the order held** —
+not the nonce, which cannot tell one chunk from another:
+
+| after | pointer | code bytes | SSTORE2 content vs committed calldata | payload `sha256` |
+|:--|:--|--:|:--|:--|
+| piece 1 | `0x029E4004a2Be5fd03db9aDCee825898Ef70D98F4` | 24,001 | **byte-equal** ✓ | `0e73ef88…82ce` |
+| piece 2 | `0x87eE9c5C1857f57C941A880be4BbC036471780A3` | 23,721 | **byte-equal** ✓ | `fcf702ae…5b3e` |
+
+That second payload hash is the **`557a405`** generation's figure, so Sepolia demonstrably carries
+the post-13a chunk 1 on chain rather than the superseded one. This is the check that would have
+caught a `2 before 1` swap, which reverts nowhere.
+
+**4d against the live chain — both equalities hold:**
+
+| reading | live chain | build at `f5e081b` | |
+|:--|:--|:--|:--|
+| `inflated sha256` | **`59c24c98a1bc60fa82be18acb290b4a5df29e406f00f22d643c969acffdd2010`** | same | **equal** ✓ |
+| `inflated bytes` | **151,232** | 151,232 | equal ✓ |
+| `widget sha256` | **`8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368`** | same, and m04-t16's | **equal** ✓ |
+| `widget` status / bytes | 200 / 8,509 | — | ✓ |
+| served payload | 64,305 bytes, `sha256 009003a2…` | — | recorded |
+| `cast nonce $APP` | **4** | the step's check names 4 | **equal** ✓ |
+| `locked()` | **false** | false, never sent | ✓ |
+
+**The hosted gateway fails on the new address, and by the runbook that is carried rather than
+fixed.** `make gateway-check` against
+`https://0x00a9f390a6010d045e0d34856048ddd6910d25ba.11155111.w3link.io/` exits **2** with
+`status: 400` on `GET /` and every expected ERC-5219 header absent
+(`web3-resolve-mode`, `web3-mode-auto-method`, `web3-contract-return-processing`), and no
+`web3urlgateway-cache-status` or `age` header at all. **The upload is sound regardless:** `:898-901`
+makes the chain the reference and says a gateway mismatch while `chain-doc` matches the build is a
+documented third-party condition, "not a failed upload", recorded and carried and **never
+re-uploaded**. `chain-doc` matched on both hashes above, off the live chain.
+
+The 400 with no headers reads as w3link not resolving this contract yet rather than serving stale
+bytes — a different failure from the pre-existing staleness row, which served an old document at the
+**M04** address. Consequence for the work that follows: step 16's wallet run must not be driven on
+this gateway for Sepolia while it answers 400, so m04-t05 step 0's rule applies and the project's
+own gateway build at the same pin is the fallback; the handoff names which gateway served each chain
+when that run happens. Nothing in this task re-uploads to chase it.
+
+**Base Sepolia executed nothing** and is untouched: vault `nonce()` 16, `App` nonce 1. Its blocker is
+[#313](https://github.com/dnznlabs/rake/issues/313).
+
 ## For close-out
 
 | | value |
