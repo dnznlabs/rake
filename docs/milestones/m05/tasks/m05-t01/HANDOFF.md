@@ -155,6 +155,59 @@ Part B's too: this table is Part A's half.
    state § One-way doors 2 describes and nothing here touches it; recorded because step 6's values
    were read *from* it while the thing being built uses the Ops vault as owner and 604800/86400.
 
+## Gates — plan step 12, per chain, before the first send
+
+Read 2026-11-19 22:10–22:25 CST on branch `m05/t01-redeploy` at `7404007`, through the devbox pin.
+Plan step 12's check is that these are here, dated, before any transaction. **No transaction has
+been sent: Part B stops here, before plan step 13.**
+
+| | Sepolia `11155111` | Base Sepolia `84532` |
+|:--|:--|:--|
+| `cast chain-id` | **11155111** = `$CHAIN_ID` | **84532** = `$CHAIN_ID` |
+| `cast code $FACTORY` `0x00D19609…6d7f8E` | **`0x`** | **`0x`** |
+| `cast code $APP` `0x00a9F390…0d25BA` | **`0x`** | **`0x`** |
+| `cast code $DISTRO` `0xB611Ff19…0F4D5199` | **`0x`** | **`0x`** |
+| `cast code $IMPL` `0xc4eD7EA2…fF8cB0A` | **`0x`** | **`0x`** |
+| `cast balance $ENGINEER` | **0.201987421704518312 ETH** | **0.034781705778474950 ETH** |
+| `cast balance $CREATOR` | **0.0100 ETH** | **0.0100 ETH** |
+| `cast base-fee` | **14 wei** | **5,000,000 wei** (0.005 gwei) |
+| `isOwner($ENGINEER)` | **true** | **true** |
+| `threshold()` | **2** | **2** |
+| `delay()` — read, not assumed | **900** | **900** |
+| `ownerCount()` | **4** | **4** |
+
+**No code at any of the four predicted addresses on either chain**, so the `#22` branch of
+`RUNBOOK.md:351-391` is not taken and nothing needs identifying before the deploys.
+
+**Funding is ample, with the arithmetic rather than the adjective.** Run A's measured gas is
+28,296,098 on Sepolia and 4,035,842 on Base Sepolia, Run B's 85,666,566 and 12,206,026
+(`RUNBOOK.md:1680`, § Uploads rows 3–4). At the base fees above that is **about 0.0000000016 ETH**
+on Sepolia against 0.2020 held, and **about 0.0000812 ETH** on Base Sepolia against 0.0348 — four
+and nearly three orders of magnitude of headroom. Nothing is under twice its figure, so § For
+Denizen's funding ask stays "none asked".
+
+**`delay()` is 900 s on both testnets, not the 3,600 the runbook's prose carries** (`:475`,
+`:643-645`), matching step 12's own 2026-11-19 reading; decision 58 records 3,600 on the mainnets.
+Recorded as a deviation for the Product Owner to confirm, not a stop: every "one hour" in Step 4 is
+"`delay()` seconds, read in 4c". § For Denizen already asks him to confirm or correct it.
+
+**One gate item is not met: `ETHERSCAN_API_KEY` is not set in this session**, and it is not on the
+box by design — M04's `MILESTONE.md:195-196` makes it the Product Owner's to hand to the engineer's
+session, "never committed", with the handoff naming only its last four characters. What it affects is
+narrow, and reading § Step 5 rather than assuming is what establishes that:
+
+- § Step 5 is titled **"explorer verification, named and not run"** and says "M04 executes these and
+  records the explorer links; **no key is needed to write them down**". The `forge verify-contract
+  --etherscan-api-key` block at `:1065-1074` is named, not run.
+- The one place a key is actually read is the Etherscan API `ContractName` read-back at `:1101`.
+- The Sourcify verifications at `:1112-1118` require it **unset**, and `:1107` says why: while it is
+  set, forge ignores `--verifier sourcify` and goes to Etherscan, which answers `already verified`
+  and exits 0 — so the Sourcify verification looks done when it never ran. M04's close-out records
+  that its step 5 verified on Sourcify with the key unset (`CLOSEOUT.md:91`).
+
+So it blocks neither plan step 13's deploys nor the Sourcify half of step 5; it is wanted for one
+read-back line, and the asking is in § For Denizen below rather than assumed from M04.
+
 ## For close-out
 
 | | value |
@@ -192,8 +245,22 @@ three rows ascending at 2,000 / 4,000 / 4,000 with decision 50's names and notes
 
 ## For Denizen
 
-**One question, and nothing else yet. No transaction, no signature and no funding are asked for in
-Part A.**
+**Part A asked one question and nothing else. Part B's step 12 adds one small item; the sittings
+come later, when step 14's proposals are read back and step 15's commands are in this handoff.**
+
+- **`ETHERSCAN_API_KEY` for plan step 13's step-5 read-back.** Not set in the engineer's session and
+  not on the box, by design: M04's `MILESTONE.md:195-196` makes it yours to hand over, never
+  committed, with only the last four characters named here. It is wanted for exactly one line — the
+  Etherscan API `ContractName` read-back at `RUNBOOK.md:1101` — because § Step 5 is "named and not
+  run" for the `verify-contract` block and the Sourcify verifications need the key **unset**
+  (`:1107`: while it is set, forge ignores `--verifier sourcify`, Etherscan answers `already
+  verified` and exits 0, so Sourcify looks done when it never ran). **It blocks nothing else:** the
+  deploys of step 13 and the Sourcify half of step 5 proceed without it. If you would rather not
+  hand one over, say so and the read-back is recorded as `not run — no key supplied`, which is a
+  recorded gap and not a failed step.
+- **Confirm or correct the Ops vault's testnet `delay()` of 900 s** — step 12 read **900** on both
+  chains, against the 3,600 the runbook's prose carries. A reading, not a decision; the deploy
+  proceeds on whatever the chain answers.
 
 - **Step 10 — which mainnets does the signing app list for the Ops vault?** The coordination service
   holds a `wallets` row for all four (1, 10, 8453, 42161) and for the stretch pair, read 2026-11-19.
