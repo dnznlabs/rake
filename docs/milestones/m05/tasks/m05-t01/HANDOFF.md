@@ -1263,10 +1263,41 @@ decision 50's 2,000 / 4,000 / 4,000. The chain now carries **2,000 / 4,000 / 4,0
 that resolved it was right and the distribution is correct at an address that can never be
 redeployed. Had the other set been used, `BadTable()` would not have caught it — both sum to 10,000.
 
-**Base Sepolia's `create` is still outstanding:** `cast codesize` at the same address reads **0**
-there. Because the calldata is byte-identical across the two chains, the command that produced this
-result is the one to repeat, and Sepolia verifying clean is positive evidence for it rather than
-merely an absence of trouble. `DISTRO` is one address on both chains by construction.
+**Base Sepolia's `create` landed too, later the same day, and verifies identically.** Read live on
+`sepolia.base.org`: `codesize` **45**, address **`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`**
+equal to `predict($DNZN_SALT)` on that chain's factory, `owner()` the Ops vault, `delay()` **86400**,
+`description()` `"DNZN // FUND DISTRIBUTION"`, and `snapshot()` returning the same three rows
+ascending at **2,000 / 4,000 / 4,000** with nonce 0 and no pending. **So M05 criterion 4 is met on
+both testnets**, at one `DISTRO` address across them, which is what decision 5 and the § 1 table
+require of every chain the factory reaches.
+
+### Criterion 18f — the host page regenerated
+
+`docs/milestones/m04/tasks/m04-t04/host/index.html` is regenerated against the redeployed `App` and
+the new DNZN distribution: the `src` on `:26` now names
+`0x00a9f390a6010d045e0d34856048ddd6910d25ba.11155111.w3link.io/widget.js`, and both `data-rake`
+attributes name `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`. The two mounts keep their purpose — the
+first names a public endpoint and reads without a wallet, the second names none and reads through the
+visitor's — so the page still exercises both paths from an origin we do not control.
+
+**All five of 18f's greps hit their stated targets**, measured on the file after the edit:
+
+| grep | result | 18f requires | baseline |
+|:--|--:|--:|--:|
+| `-ci '0x00a90943\|0x71a4221974'` | **0** | 0 | 3 |
+| `-ci '0x00a9f390'` | **1** | 1 | 0 |
+| `-ci '0xb611ff19'` | **2** | 2 | 0 |
+| `-ci 'w3link.io/widget.js'` | **1** | 1 | 1 |
+| `-c 'data-rake='` | **2** | 2 | 2 |
+
+The two `data-rake` attributes carry **one distinct value**, as 18f asks.
+
+**What is left on 18f is the Product Owner's**, and it is the publishing half: the page on the
+decision-41 host, its URL in this handoff, `curl -s <url> | grep -ci 'w3link.io/widget.js'` → 1 run
+against it, and one browser screenshot under `shots/` showing DNZN's table rendered with a wallet on
+Sepolia. [#303](https://github.com/dnznlabs/rake/issues/303) carries that ask. Per 18f's own last
+sentence, if the URL is not published when Part B's PR is ready the handoff records the ask and its
+date and the row stays open — nothing else in this task waits on it.
 
 ### Step 17 — the records, and M05 criterion 6's deviation audit
 
