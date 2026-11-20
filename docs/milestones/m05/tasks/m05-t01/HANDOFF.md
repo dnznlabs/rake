@@ -1053,6 +1053,73 @@ issue and it currently carries one:** 16a:4 requires the replacement proposal's 
 instruction the cancel ask was not held back for it; the second digest goes into #313 as a comment
 once the cancel's receipt is in and `nonce()` has been re-read.
 
+### Step 16a:3 and 3a — the cancel landed, and piece 1 after it
+
+**The cancel went through `forward()`, and the route had to be assembled by hand because the
+coordination service cannot carry it.** Three findings, each measured before anything was sent:
+
+1. **A co-signer's signature bytes are not readable.** `tx_summary?…select=signatures(signer,sig_type,signature)`
+   answers `{"code":"42501","message":"permission denied for table signatures"}`; the
+   `signer`/`sig_type` projection reads fine. So a two-slot `forward` bundle **cannot** be assembled
+   from signatures collected in the dapp.
+2. **The service has no field meaning "submit via `forward`".** Its submit path is `execute()`, which
+   for a cancel would queue it for `delay()` and spend a nonce — what 16a:3 forbids.
+3. **No `forward` tooling exists here.** rake has no `bin/`, and no `forward(` in `tools/`.
+
+**So the Product Owner's half arrived on chain instead**, which needs no signature transport:
+`approve(0xdc6a0aae…1bca753, true)` from `0x357836fF…902B`. Verified on both endpoints before
+assembly — `approved(Denizen, digest)` **true**, `approved(engineer, digest)` **false**, vault
+`nonce()` **16**, and the digest **re-derived identically** at that nonce, so nothing was stale.
+
+**The slot format comes from the source, not from a note** (`src/mods/TimelockExecutor.sol` of
+src-company/multisig). `forward` takes `threshold()` signatures when `target == multisig` and the
+selector is `cancelQueued`, and **bypasses `forwardEnabled` entirely on that branch** — the
+`require(forwardEnabled…)` sits only in the else. A `v == 0` slot carries the signer's address
+left-padded in its first 32 bytes and is validated by `msg.sender == signer ||
+approved(signer, hash)`; `signer > prev` makes the order strictly ascending. So the bundle is
+`0x357836fF…` as the `v == 0` slot first, then my ECDSA — 130 bytes for `required * 65`, asserted
+before the send. `forward` recomputes the hash itself from the **live** `nonce()`, which is why the
+digest binds send-time state.
+
+| step 16a:3 | reading |
+|:--|:--|
+| `forward` tx | **`0xdf7115763981c1cdfb8f360849d35e98c703c05a4faf70105456bee53656e0ca`** |
+| `status` | **true** |
+| `gasUsed` / estimate | **63,273** / 68,408 |
+| `blockNumber` / `effectiveGasPrice` | 61,354,535 / 5,500,000 wei |
+| **`queued(0xe2deb8b2…ae957c2)` after it** | **`0`**, on `sepolia.base.org` **and** `base-sepolia-rpc.publicnode.com` |
+| vault `nonce()` | 16 → **17** (the cancel consumed one) |
+| the two correct pieces | untouched — nonce 13 at 1795189927, nonce 15 at 1795189952 |
+
+The zero reading is the check, not `status 1`: a cancel that succeeded without clearing the entry is
+the failure worth ruling out, so it was read twice on independent endpoints.
+
+**16a:3a — piece 1, after the cancel's receipt and its own eta.**
+
+| | reading |
+|:--|:--|
+| tx | **`0xa64c1bb71fce706f4429b222a1d05eb2b22ea9069d8c395071312de810e1ba4d`** |
+| `status` / `gasUsed` / estimate | **true** / **5,330,644** / 5,555,532 |
+| `blockNumber` | 61,354,897 |
+| content gate — `0x029E4004…`'s code vs committed `1-addChunk-0.hex` | **byte-equal**, 24,001 bytes, payload `sha256 35b0fd7d…dd502` |
+| `App` nonce | 1 → **2** |
+
+**16a:4 — the replacement chunk 1 is proposed at the nonce read after the cancel.** Vault `nonce()`
+read live as **17**, never assumed. Digest
+**`0x8856c3cd84ca3c150662a16c5447e434ff9f2c97e002f007205fa13da40878ee`** over target `App`, value 0,
+the committed `calldata/84532/2-addChunk-1.hex` unchanged at `sha256`
+**`30cc12d04a5c37b9d8d9cc3f5f4f6b1720d46fbc6924f4f17e280a3f6c37e933`** — the figure 16a:4 itself
+names — 47,626 characters. Read back from `tx_summary`: nonce 17, `proposed`, `value` 0,
+`threshold` 2, exactly one `ecdsa` signature from `$ENGINEER`. It is an ordinary proposal, so it goes
+through the normal submit and queues for `delay()` 900 s; `forward` was only ever needed for the
+cancel.
+
+**Both asks are on [#313](https://github.com/dnznlabs/rake/issues/313)** — the cancel digest and now
+the replacement digest with its re-derivation — satisfying 16a:5's one-issue form, assigned to the
+Product Owner. What remains on 84532 is his signature, then the replacement as `App`'s second CREATE,
+then the batch already queued at nonce 15, then 4d against
+`59ef3a4e21d585e623f54861d54aa8fd8d10135691747d1f23ebb03dce20df28` with `cast nonce $APP` **4**.
+
 ## For close-out
 
 | | value |
