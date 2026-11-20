@@ -32,7 +32,7 @@ Part B's too: this table is Part A's half.
 | 10 | pass | The coordination service holds a `wallets` row for the Ops vault on **all eight** chain ids — 1, 10, 8453, 42161, 4326, 4663, 11155111, 84532 — read 2026-11-19, recorded in § 1's table as its `signing row` column. The question that is the Product Owner's is in § For Denizen. See Discovery 4 on `owner_count` |
 | 11 | pass, less CI | `git diff --stat origin/main -- src/ test/*.t.sol .gas-snapshot foundry.toml` prints **nothing**; the `*.t.sol` population it covers was enumerated first — `App.t.sol`, `ColdStipend.t.sol`, `DistributionFactory.t.sol`, `Distribution.t.sol`, `PushGas.t.sol`, `TableCap.t.sol`. After `forge build --force` (exit 0, 0 `warning[`, 0 `Warning (`): `forge test` **107 passed, 0 failed**; `forge snapshot --check` **exit 0**; `grep -c '' .gas-snapshot` **107**; `node --test test/*.test.mjs` **168 pass, 0 fail, 0 skipped** (167 plus the one new case); `forge fmt --check` exit 0; `forge lint` exit 0. `git status --porcelain` empty. **CI is not green yet because no PR is open** — see Deviation 11 |
 | 12 | not verifiable here | **No PR was opened**: the brief reserves that. The closing line to use is `Closes #207, #188, #197, #251`, and the four folds are complete in this branch with each step's check quoted above — AC 4 for #207, AC 5 for #188, AC 9 for #197, AC 3 for #251. Each issue was read and says what the plan claims it says (§ Discoveries has nothing against them). `gh pr view <n> --json closingIssuesReferences` is the reviewer's to run, and the task's own issue (#271) must **not** be in it |
-| 13–18, 18b–18f | Part B | Not started. The two testnets, gated on M04's close-out and on this PR's merge; step 14 additionally on m04-t15's merge. **Amended 2026-11-19:** M04's close-out merged ([#296](https://github.com/dnznlabs/rake/pull/296)) and decision 64 added criteria 18c–18f — M04 criteria 1, 3 and 5's transferred clauses — beside 18b |
+| 13–18, 18b–18f | Part B | Not started. The two testnets, gated on M04's close-out and on this PR's merge; step 14 additionally on m04-t15's merge. **Amended 2026-11-19:** M04's close-out merged ([#296](https://github.com/dnznlabs/rake/pull/296)) and decision 64 added criteria 18c–18f — M04 criteria 1, 3 and 5's transferred clauses — beside 18b. **Criterion 17's last clause is recorded as the architect's, not the engineer's, pending the Product Owner's ruling** — Discovery 7 and § For Denizen; it is the one row in Part B whose author this table does not yet settle |
 | 19 | Part B | Part B's PR closes #271 and its handoff carries all **twenty-three** rows (1–18, 18b–18f). Amended 2026-11-19: nineteen as written, plus decision 64's four |
 
 ## Deviations from the plan
@@ -154,6 +154,22 @@ Part B's too: this table is Part A's half.
    `owner()` `0x357836fFcB45307FA7ff2A574F505753c961902B`, `delay()` **3600**, `nonce` 2. That is the
    state § One-way doors 2 describes and nothing here touches it; recorded because step 6's values
    were read *from* it while the thing being built uses the Ops vault as owner and 604800/86400.
+7. **Criterion 17's last clause names the wrong author, and three sources had to be read to see it.**
+   The clause is "state-collection#74 carries **the engineer's** comment with the new address"
+   (`TASK.md:556`). Two other sources say the architect: the m04 draft's preamble ("this is the text
+   for the Product Owner to approve, then the architect posts it") and — decisive, because it is the
+   commitment made to the other team — #74's own **Done when**, read 2026-11-19 and quoted verbatim:
+   "Owner: Denizen, at M4's gate; **rake's architect updates this issue when the first public deploy
+   lands**." The issue is OPEN with **0 comments**. So the criterion is wrong as written and the fix
+   is an amendment, not a clause the engineer reinterprets; it is drafted for the Product Owner
+   alongside the architect's m05-t01b item, and nothing needs it before the comment posts, which is
+   after step 13 regardless. Until it is ruled, the clause is recorded as the architect's.
+   **The finding behind the contradiction is the dependency shape, not the author:** a criterion in
+   this repo cannot be satisfied by an artefact in another repo's issue tracker, because closure
+   then waits on a team that never agreed to the clause and on an author this repo cannot assign.
+   Worth carrying into how the remaining cross-repo gates are written. One wrinkle for whoever
+   drafts the amendment: #74's trigger is "the first **public** deploy", which a testnet redeploy
+   may or may not be — a question about *when*, separate from *who*, and not resolved here.
 
 ## Gates — plan step 12, per chain, before the first send
 
@@ -285,11 +301,12 @@ three rows ascending at 2,000 / 4,000 / 4,000 with decision 50's names and notes
 ## For Denizen
 
 **Part A asked one question and nothing else; Part B's step 12 added the three below, and all three
-were put to the Product Owner on 2026-11-19 and answered that evening.** They stand as the record of
-what was asked and what came back, not as open asks: the key is coming, state-collection#74 is
-cleared to post after step 13, and `delay()` came back as one hour against the chain's 900. The one
-live consequence is that the 4b checklist reads "`delay()` seconds" and neither figure. The sittings
-still come later, when step 14's proposals are read back and step 15's commands are in this handoff.
+were put to the Product Owner on 2026-11-19 and answered that evening.** They stand mostly as the
+record of what was asked and what came back: the key is coming, state-collection#74's comment is
+cleared, and `delay()` came back as one hour against the chain's 900. Two live items remain, both
+small — the 4b checklist reads "`delay()` seconds" and neither figure, and the #74 bullet now asks
+for a ruling it did not ask for before. The sittings still come later, when step 14's proposals are
+read back and step 15's commands are in this handoff.
 
 - **`ETHERSCAN_API_KEY` for plan step 13's step-5 read-back.** Not set in the engineer's session and
   not on the box, by design: M04's `MILESTONE.md:195-196` makes it yours to hand over, never
@@ -314,9 +331,15 @@ still come later, when step 14's proposals are read back and step 15's commands 
   Still unset for the Sourcify block per `:1107`.
 - **Asked, answered, and the answer disagrees with the chain: the Ops vault's testnet `delay()`.**
   The Product Owner's word on 2026-11-19 was that the testnet vault is one hour; the vault answers
-  **900** on both chains. Two readings now — step 12's and the architect's the same day, same vault
-  `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`, both 900 beside `threshold()` 2 and `ownerCount()`
-  4 — though through the same pinned toolchain, so that corroborates the value and not the method.
+  **900** on both chains. Four readings now, same vault `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`,
+  all **900** — step 12's and the architect's the same day beside `threshold()` 2 and `ownerCount()`
+  4, then two through endpoints neither of us had used, `1rpc.io/sepolia` and
+  `base-sepolia-rpc.publicnode.com`. That closes the common-mode caveat on the axis that could
+  misreport state; strictly it is still one `cast`, so the toolchain is uncorroborated, and a fifth
+  reading is not worth holding step 13 for. Two probes refused outright and are worth knowing for
+  any plan that names a fallback RPC: `sepolia.drpc.org` answers `chain is not available on free
+  plan` even for `chain-id`, and `base-sepolia.drpc.org` 408s on the `eth_call` while answering
+  `chain-id` fine.
   The 3,600 is the mainnet figure (decision 58) and what the runbook's prose carries at `:475` and
   `:643-645`, the likeliest source of the recollection. **So the 4b checklist hard-codes neither
   number:** per step 12's instruction it reads "`delay()` seconds, read in 4c", with 900 given as a
@@ -330,11 +353,15 @@ still come later, when step 14's proposals are read back and step 15's commands 
   address it must carry is the one step 13 lands: the m04 draft at `docs/milestones/m04/CLOSEOUT.md`
   § For state-collection#74 names the pre-redeploy `0x6aC98EDA…` and the then-predicted
   `0xB611Ff19…`, so the posted text is that draft with the landed address substituted. The
-  substitution happens at posting, in this task's record — m04's close-out is merged and out of
-  scope, so it is not edited. It posts from the engineer's own GitHub account, verified as `elanikk`
-  in this session, which is what criterion 17's "the engineer's comment" requires. Worth naming
-  because the m04 draft's own preamble has the architect posting it, while `TASK.md:556` says the
-  engineer's; the criterion is the authority, and the architect confirmed that reading 2026-11-19.
+  substitution happens at posting — m04's close-out is merged and out of scope, so it is not edited.
+  **The architect posts it, not the engineer, which makes criterion 17's last clause wrong as
+  written and an amendment yours to rule on.** #74's own "Done when" gives the job to the architect
+  in terms, and it is the commitment made to that team; the full reading and the two sources that
+  agree with it are Discovery 7, along with the thing worth more than the authorship question — a
+  criterion here cannot be closed by an artefact in another repo's tracker. So the engineer's part
+  is to put the landed distribution address in this handoff at step 13 and nothing further. Pending
+  your ruling the clause is recorded as the architect's; the amendment reaches you with his
+  m05-t01b item, and nothing waits on it, since the comment cannot post before step 13 anyway.
 
 - **Step 10 — which mainnets does the signing app list for the Ops vault?** The coordination service
   holds a `wallets` row for all four (1, 10, 8453, 42161) and for the stretch pair, read 2026-11-19.
