@@ -37,6 +37,42 @@ Part B's too: this table is Part A's half.
 
 ## Deviations from the plan
 
+0. **Step 13a's superseded proposals — and there are two of them, not six.** Plan step 13a says
+   step 14's proposals "at `215a208` were built without this commit and are superseded" and asks for
+   their six digests listed here as never to be signed. Measured after re-running step 14 on top of
+   13a (`557a405`), **only one of the three proposals per chain actually moved.** The two that are
+   never to be signed:
+
+   | chain | nonce | **superseded digest — never sign** | calldata chars |
+   |:--|--:|:--|--:|
+   | Sepolia `11155111` | 14 | `0x8dc6d8b42a4282980d3ee265633c154a5a04da524874a843c083ff567a8b9df0` | 47,498 |
+   | Base Sepolia `84532` | 14 | `0xe2deb8b268b8c0d951e6a21787d84c38b9413f4be24eeadeade318766ae957c2` | 47,498 |
+
+   **The other four rows are not superseded; they are the same rows.** Re-posting proposals 1 and 3
+   returned the **same digest and the same row id** on each chain — `288f7bed-dfe2-44aa-a1c9-6e33b067d59f`
+   and `0822627b-7f9b-4fe7-ab13-f4bdded4f617` on Sepolia, `fd2c2058-1540-4d75-a34f-b03b7948f887` and
+   `1c3a4598-fc4d-4530-80dc-e2e746430593` on Base Sepolia — so the service is idempotent on the
+   digest and nothing was duplicated.
+
+   **Why only chunk 1 moved, mechanically rather than by luck.** The document is deflated and then
+   cut at 24,000 payload bytes. Step 13a's edit is in `#/docs` § the widget, late in the page, so the
+   deflate stream's first 24,000 bytes are untouched: `1-addChunk-0.hex` stays byte-identical
+   (`sha256 1af961fc…` on Sepolia, `cfe71f73…` on Base Sepolia, both unchanged) while chunk 1 grows
+   from 23,748 to 23,812 calldata bytes, tracking the gzip's 47,659 → 47,720. `batch345.hex` is
+   unchanged too (`d5730cfd…` on both) because it names pointer **addresses**, which depend on
+   `App`'s nonce and not on the bytes. **This is a property of where the edit landed, not a rule:**
+   an edit earlier in the page would have moved chunk 0 and both digests.
+
+   **The coordination service offers no way to withdraw the two dead rows, as found.** There is no
+   cancel or retire route — `POST /proposals/cancel`, `/cancel` and `/proposals/retire` all answer
+   **404**, and the documented surface is `POST /proposals` plus `POST /signature`. `cancelQueued`
+   does not apply: it cancels a tx already **queued** on chain, and none of these was ever submitted
+   (vault `nonce()` is still 13 on both chains). So **both nonce-14 rows stay visible beside the
+   live one**, and the only discriminators are the digest and the calldata length — 47,626 chars
+   live against 47,498 dead. That is the whole reason the 4b checklist below leads with the digest.
+   A signature on the dead row would not be unsafe, but it would upload the page without decision
+   65's change and criterion 18g row 6 would then fail on a served page.
+
 1. **Branch name.** The tree was prepared as `m05/t01-part-a`; `TASK.md:53` names `m05/t01-remine`
    for Part A. Renamed to the plan's name before the first commit. TASK.md wins over the brief.
 2. **Baseline commit.** TASK.md's line numbers are `main` at `78b5eb7`; this branch is cut at
@@ -807,12 +843,69 @@ chain today for three new proposals". The filter returned **exactly three per ch
 and in particular **the two inert m04-t08 step-7 rows no longer appear on Sepolia**. Recorded as an
 observation rather than a claim about who cleared them; the pruning was not done here.
 
+### Step 13a, and step 14 re-run on top of it
+
+**Step 13a is `424c12d`, one commit, two files.** Its own check: `git diff --stat HEAD~1 HEAD` names
+`app/src/index.html` and `test/docs.test.mjs` and nothing else, and `node --test test/docs.test.mjs`
+exits **0** with the new case named in its output — *the docs widget section leads with the data-rpc
+snippet and offers the wallet form second* — 12 of 12 passing there, **189** across the suite
+(188 before).
+
+**Criterion 18g rows 1–5.** (1) With a `PUBLIC_RPC` entry the first `pre.snip` carries `data-rpc`
+and the second does not; the test asserts the order from the source, as the rest of that file does.
+(2) The wallet form stays, introduced with "To read through the visitor's wallet instead, omit
+`data-rpc`", and still names both failure states — no wallet, and a wallet on another chain.
+(3) With no `PUBLIC_RPC` entry the wallet form is shown alone and the prose says the chain has no
+known public endpoint, so the omission is explained rather than silent. (4) The endpoint prose is
+kept: the endpoint is the host's to choose, and the one shown is a public one included so the
+example works as pasted. (5) `app/src/widget.js` is untouched — `sha256sum app/dist/widget.js` is
+**`8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368`** on both chains, equal to
+m04-t16's figure, and `widget: raw 8509 · budget 10240 · 1731 left` is unmoved. Row 6 is after step
+16. Closes [#309](https://github.com/dnznlabs/rake/issues/309).
+
+**The amended step 14 comparison, as `TASK.md` at `ef2ad20` now frames it.** The `index.html`
+equality with m04-t16 stays as the row recorded at `2df6b8e`, before 13a existed. The page actually
+uploaded carries 13a, so its substituted hash is a new figure, and what separates it from m04-t16's
+page is step 13a's commit alone: **`git diff --stat 3849cb2..HEAD -- app/` names
+`app/src/index.html` and no other file**, and that file's diff is the one `424c12d` carries.
+
+| chain | built `index.html` (§ Uploads) | substituted `index.html` | `widget.js` |
+|:--|:--|:--|:--|
+| 11155111 | **`59c24c98a1bc60fa82be18acb290b4a5df29e406f00f22d643c969acffdd2010`** | **`743270df1e09bc508ca24d05494e0c01d7899d16a36b796b0c32ae1293a8de49`** | `8b6bbc88…bc368` — **equal to m04-t16** ✓ |
+| 84532 | **`59ef3a4e21d585e623f54861d54aa8fd8d10135691747d1f23ebb03dce20df28`** | **`5b754b075b66656d65d2f9608b336713283b84c6e5d472087146553d108aa1ed`** | `8b6bbc88…bc368` — **equal to m04-t16** ✓ |
+
+Each of the four re-pointed values still occurs exactly once in the built page on both chains.
+Builds are `raw 151232 · gzip 47720` on 11155111 and `raw 151230 · gzip 47720` on 84532.
+
+**The fork proof was re-run on the new bundle and passes on both chains:** all five calls `status 1`,
+and `chain-doc` read back `inflated sha256` **`59c24c98…dd2010`** on Sepolia and
+**`59ef3a4e…20df28`** on Base Sepolia, each equal to that chain's build, at 151,232 and 151,230
+bytes, with the widget hash equal on both.
+
+**Calldata regenerated at `557a405`**, again with `--app` passed explicitly. Sizes against the
+65,536-character cap: `1-addChunk-0.hex` 48,138 (17,398 spare), `2-addChunk-1.hex` **47,626**
+(17,910 spare), `batch345.hex` 19,018 (46,518 spare).
+
 ## For Denizen — step 14's 4b checklist, per chain
 
-**What is waiting:** three proposals on **each** of Sepolia and Base Sepolia, at nonces **13, 14,
-15**, each already carrying the engineer's signature. Each needs **one more** signature to reach
-`threshold()` 2. Check them against a checkout of **`9d3f94f`**, the commit the calldata was
-generated at.
+**Read the digest first. There are four rows per chain, not three, and two of them sit at nonce 14.**
+Step 13a changed one chunk, so one proposal per chain was replaced and its predecessor cannot be
+withdrawn from the coordination service (§ Deviations 0). The live set is below; the two rows never
+to be signed are **`0x8dc6d8b4…8b9df0`** on Sepolia and **`0xe2deb8b2…e957c2`** on Base Sepolia, both
+at nonce 14, both 47,498 calldata characters against the live row's 47,626.
+
+| # | file | target | nonce | Sepolia digest — **sign these** | Base Sepolia digest — **sign these** |
+|--:|:--|:--|--:|:--|:--|
+| 1 | `1-addChunk-0.hex` | `App` | **13** | `0x9c0dbbd40da1f21e516edd6988c0bb0593bd9d706fa9f959c8b08056c20fa86e` | `0xdc19356867c174cf300a4428d7184551b284bdb6d8aa8510b60c1968a00a9cc2` |
+| 2 | `2-addChunk-1.hex` | `App` | **14** | `0x3f1b294e00e57125031374130ed7efb0ee7fa5c5c3716e964997e36690125939` | `0x673590fb892c778f278603ecadaea8ee8815eb362c714b564ad8f8087a4d1d5e` |
+| 3 | `batch345.hex` | the vault | **15** | `0x4c14791021a4da1bc6d64cd8c780e918fb980190c8c9fcff4dc0769e69cb84f0` | `0xbb693f0b6bb0e7226b57058f6fad95db3f415acc7ba9a1bd069ee8c9f723104e` |
+
+Proposals 1 and 3 are the **same rows** as before 13a, not re-proposals: the service returned their
+original ids unchanged, because their calldata is byte-identical.
+
+**What is waiting:** three live proposals on **each** chain, each already carrying the engineer's
+signature and needing **one more** to reach `threshold()` 2. Check them against a checkout of
+**`557a405`**, the commit the calldata was generated at.
 
 Before signing each one (`:4b`):
 
