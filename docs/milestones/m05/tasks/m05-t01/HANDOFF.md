@@ -1185,6 +1185,63 @@ quoted strings before, so the issues tell him to stop if the preview mangles it 
 four or more rows. The raw calldata is offered third and with the reason — choosing the function by
 name shows each argument decoded, and hex does not.
 
+### Step 16 — 4c and 4d on Base Sepolia (84532): the upload is live and verified
+
+**Pre-send, read live, all as 16a expects:** block timestamp 1795194352 — past the nonce-17 eta of
+1795194279 — vault `nonce()` **18**, `cast nonce $APP` **2**, `queued` non-zero for both the
+replacement (`0x8856c3cd…78ee`) and the batch (`0xbb693f0b…23104e`), and
+**`queued(0xe2deb8b2…ae957c2)` still `0`** so the superseded piece stayed cancelled. The replacement's
+digest re-derived from the committed calldata to `0x8856c3cd…78ee`, unchanged.
+
+**Executed in the order the cancel existed to make possible** — the replacement first so chunk 1
+lands as `App`'s second CREATE, then the batch:
+
+| piece | nonce | tx hash | `status` | `gasUsed` | estimate |
+|:--|--:|:--|:--|--:|--:|
+| chunk 1, the replacement | **17** | `0xf9c0d4b6cb7e945fe147f851e76caca1ab84facb579dfb9bb42848680d1c862f` | **true** | 5,253,026 | 5,477,606 |
+| batch (calls 3–5) | **15** | `0x841bce0e69342957be1e9bbe04a3fff25ef466616008e72c839b589486a08524` | **true** | 2,018,895 | 2,168,777 |
+
+With chunk 0 at `0xa64c1bb7…10e1ba4d` from 16a:3a, that is the full three-piece upload on this chain.
+`App` nonce moved 2 → 3 → **4**.
+
+**Content gate between pieces, read from the chain:** the doc-1 pointer
+`0x87eE9c5C1857f57C941A880be4BbC036471780A3` holds **23,721 bytes** byte-equal to the committed
+`2-addChunk-1.hex`, payload `sha256`
+**`3c1c245d45527834ed0720a5b94862514075b7c46ba8b6ab1104461a4c35e59b`** — the post-13a figure. So the
+chain now demonstrably carries the `557a405` chunk on both testnets, and the superseded bytes were
+never written anywhere.
+
+**4d against the live chain — both equalities hold:**
+
+| reading | live chain | build at `0449b26` | |
+|:--|:--|:--|:--|
+| `inflated sha256` | **`59ef3a4e21d585e623f54861d54aa8fd8d10135691747d1f23ebb03dce20df28`** | same | **equal** ✓ |
+| `inflated bytes` | **151,230** | 151,230 | equal ✓ |
+| `widget sha256` | **`8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368`** | same, and m04-t16's | **equal** ✓ |
+| `widget` status / bytes | 200 / 8,509 | — | ✓ |
+| served payload | 64,305 bytes, `sha256 847bb75b…` | — | recorded |
+| `cast nonce $APP` | **4** | the step's check names 4 | **equal** ✓ |
+| `locked()` | **false** | false, never sent | ✓ |
+
+**The hosted gateway passes here, which is the asymmetry worth recording.** `make gateway-check`
+against `https://0x00a9f390a6010d045e0d34856048ddd6910d25ba.84532.w3link.io/` exits **0** with every
+assertion green: `body minus block vs html()` **equal**, `/widget.js` 200 at
+`application/javascript; charset=utf-8` and `cmp`-identical to `app/dist/widget.js` at 8,509 bytes,
+`/nope` 404, and `web3urlgateway-cache-status: miss` so it is a live read rather than a stale hit.
+
+**So w3link resolves the new `App` on 84532 and not on 11155111**, where the same check answers 400
+with no ERC-5219 headers. Same contract address, same bytes, same day — the difference is the
+gateway's own per-chain resolution, which is exactly why `:898-901` makes this a third-party
+condition recorded and carried rather than a defect to chase. **Consequence for the wallet run:**
+Base Sepolia can be driven on w3link; Sepolia needs the project's own gateway build at the same pin
+until w3link catches up, and the handoff names which served each chain.
+
+**Both testnets now carry the M05 document set**, at one address each for factory, implementation and
+`App`, with the post-13a page and the m04-t16 widget. What remains on each chain is step 15's
+`create`, which is the Product Owner's with the Creator keystore (§ For Denizen above,
+[#300](https://github.com/dnznlabs/rake/issues/300) and
+[#304](https://github.com/dnznlabs/rake/issues/304)).
+
 ## For close-out
 
 | | value |
