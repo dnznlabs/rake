@@ -453,6 +453,41 @@ the node's `cast estimate` of 11,405,803 — so a limit set at the node's figure
 second time. With step 2's +58,514 that is two for two on the same side, which makes "the node's
 estimate is a floor, not a target" a measured rule on this chain rather than a precaution.
 
+### Sepolia (11155111) — step 5, explorer verification
+
+**Etherscan, run one at a time per `:1086`.** All three exit **0** with `Response: OK` /
+`Details: Pass - Verified` / `Contract successfully verified`. **All three were verified by this
+run**, not already verified — the runbook asks which of the two each address was, and none reported
+`is already verified. Skipping verification.`, which is what a pre-existing verification prints.
+
+One reading that looks like a failure and is not: each log also contains `Response: NOTOK` with
+`Details: Pending in queue`. That is the intermediate poll of `--watch`, not an outcome; the final
+response in every log is `OK`. Worth naming because grepping a verify log for `NOTOK` — which is how
+the rate-limit failure at `:1086` is detected — matches the queue message too.
+
+| `getsourcecode` `ContractName` | address |
+|:--|:--|
+| **`DistributionFactory`** | `0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E` |
+| **`Distribution`** | `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A` |
+| **`App`** | `0x00a9F390A6010d045e0d34856048DdD6910d25BA` |
+
+`#code` URLs: `https://sepolia.etherscan.io/address/<address>#code` for each of the three.
+
+**Sourcify, with `ETHERSCAN_API_KEY` unset for all three verifies per `:1107`.** Each exits 0, and
+the gate — the asserting loop, not the operator's eye (#207) — prints **three `exact_match` lines**
+and **exits 0**:
+
+| address | `match` |
+|:--|:--|
+| `0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E` | **`exact_match`** |
+| `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A` | **`exact_match`** |
+| `0x00a9F390A6010d045e0d34856048DdD6910d25BA` | **`exact_match`** |
+
+**OpenChain signatures, 2026-11-20:** `cast upload-signature` over
+`Distribution.json`, `DistributionFactory.json` and `App.json` returns **82 `Duplicated:`** and
+**0 `Imported:`** — all 82 of this ABI's signatures were already present, which is the expected
+reading for an unchanged ABI on a new deployment and confirms no ABI moved under #201's re-pin.
+
 ## For close-out
 
 | | value |
