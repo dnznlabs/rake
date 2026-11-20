@@ -370,6 +370,20 @@ Sepolia; **every `record:` line is committed before the next transaction** (`:22
     equal; `owner()` the Ops vault, `version()` `v0.1`, `locked()` `false`; the Sourcify loop exits
     0 with three `exact_match`; `getsourcecode` names the three contracts.
 
+13a. **The snippet order, before the bundle is built** ([#309](https://github.com/dnznlabs/rake/issues/309),
+    decision 65; added 2026-11-20, after step 14 had first been run). One commit on this branch
+    touching `app/src/index.html` and `test/docs.test.mjs` and nothing else: in `#/docs` § the
+    widget the `data-rpc` snippet is presented first and the wallet form second, as criterion 18g
+    states. `app/src/widget.js` and what `tag()` emits do not change. Step 14's six proposals at
+    `215a208` were built without this commit and are superseded: on 2026-11-20 each carried the
+    engineer's signature alone and none was submitted. The handoff lists their six digests under
+    § Deviations as never to be signed, and says what the coordination service allowed to be done
+    with them, as found. Step 14 is then run again from its first `make`.
+
+    Check: `git diff --stat <13a's parent> <13a's commit>` names those two files only;
+    `node --test test/docs.test.mjs` exits 0 with the new case named in its output; criterion 18g's
+    rows 1–5 in the handoff.
+
 14. **Run B 4a on both chains, then stop — gated on m04-t15's and m04-t16's task PRs being on
     `main`.** Before the first `make`, `git merge-base --is-ancestor <m04-t16's merge commit> HEAD`
     exits 0 (m04-t16 branches after m04-t15's merge, so one check covers both) and the branch is cut
@@ -400,7 +414,14 @@ Sepolia; **every `record:` line is committed before the next transaction** (`:22
     equal m04-t16's outright, which step 13 makes impossible, because `app/build.mjs` writes
     `factory`, `factoryBlock`, `app` and `impl` into the page from the broadcast logs. Run by the
     architect at `2aac1fc` that day: both chains reproduce m04-t16's two figures through the
-    command above, and the two builds differ in those four values only.) Then
+    command above, and the two builds differ in those four values only.) **Amended again 2026-11-20
+    (decision 65):** that comparison is the one recorded at `2df6b8e`, before step 13a existed, and
+    it stands as that row. The bundle uploaded is built at or after step 13a's commit, so
+    `widget.js` still equals m04-t16's figure outright and the substituted `index.html` no longer
+    can. Its substituted `sha256` per chain is recorded as the new figure, and what separates it
+    from m04-t16's page is step 13a's commit alone:
+    `git diff --stat <m04-t16's merge commit> HEAD -- app/` names `app/src/index.html` and no other
+    file, and that file's diff is the one step 13a's commit carries. Then
     `tools/step4-calldata.mjs --chain $CHAIN_ID --rpc "$RPC" --out calldata` (`App` is fresh, so the
     tool reads nonce 1); every file under 65,536 characters; the fork estimate of § Gas
     (`:884-897`) with `chain-doc`'s `inflated sha256` equal to the build **before any signature**;
@@ -410,9 +431,10 @@ Sepolia; **every `record:` line is committed before the next transaction** (`:22
     stop. Commit and push before messaging.
 
     Check: m04-t15's and m04-t16's merge commits named in § Gates and ancestors of the branch;
-    per chain, `widget.js`'s `sha256` and the substituted `index.html`'s `sha256` equal m04-t16's
-    handoff § For the next upload, each quoted beside its figure, with the built `index.html`
-    `sha256` beside them; six rows read back,
+    per chain, `widget.js`'s `sha256` equals m04-t16's handoff § For the next upload, quoted beside
+    its figure; the substituted `index.html`'s `sha256` equal to m04-t16's stays as the row
+    recorded at `2df6b8e`, and the rebuilt page's substituted and built `sha256` are recorded
+    beside the `git diff --stat` of step 14 naming `app/src/index.html` alone; six rows read back,
     each with exactly one `ecdsa` signature from `$ENGINEER`; the commit of the calldata named in
     § Uploads' new rows (filled as "proposed" until 4c).
 
@@ -592,7 +614,7 @@ an address. Baselines are `main` at `78b5eb7`, 2026-11-19.
     handoff § For the next upload, and `app/dist/index.html` equals its figure there once step 13's
     four values (`factory`, `factoryBlock`, `app`, `impl`) are put back to the M04 set by step 14's
     command; § Uploads rows 5 and 6 carry the built hashes (amended 2026-11-20: the page embeds the
-    addresses step 13 re-points, so its built hash cannot equal m04-t16's). No proposal of step 14 is dated before the later merge. If either was not merged when
+    addresses step 13 re-points, so its built hash cannot equal m04-t16's; amended again that day for decision 65: the page uploaded also carries step 13a's commit, so the `index.html` equality is shown at `2df6b8e`, before that commit, and after it the handoff shows `git diff --stat <m04-t16's merge commit> <Part B's head> -- app/` naming `app/src/index.html` alone). No proposal of step 14 that is signed by the Product Owner is dated before step 13a's commit, and none before the later merge. If either was not merged when
     steps 12–13 were done, the handoff records the wait and its dates; a bundle built from an older `app/`
     fails this criterion whatever its hashes.
 18b. **M04 criterion 6's wallet run, on the redeployed testnets** (decision 63): `shots/11155111/`
@@ -646,6 +668,19 @@ an address. Baselines are `main` at `78b5eb7`, 2026-11-19.
     under `shots/` showing DNZN's table rendered from the page with a wallet on Sepolia. If the URL
     is not published when Part B's PR is ready, the handoff records the ask and its date and the row
     stays open; nothing else in this task waits on it.
+18g. **The snippet order** ([#309](https://github.com/dnznlabs/rake/issues/309), decision 65; plan
+    step 13a). (1) With a `PUBLIC_RPC` entry for the bundle's chain, the first `pre.snip` of
+    `#/docs` § the widget carries `data-rpc` and the second does not; a `test/docs.test.mjs` case
+    asserts the order. (2) The wallet form stays, introduced as the alternative, and still names
+    both failure states: no wallet, and a wallet on another chain. (3) With no `PUBLIC_RPC` entry
+    for the chain, the wallet form is shown alone and the prose says the chain has no known public
+    endpoint. (4) The prose still says the endpoint is the host's to choose and that the one shown
+    is a public one, included so the example works as pasted. (5) `app/src/widget.js` is not
+    edited: `sha256sum app/dist/widget.js` equals m04-t16's figure, as step 14 already requires.
+    (6) After step 16, per chain: the first snippet copied from the served `#/docs`, pasted
+    unchanged into a page served from an origin that is not ours and opened in a browser profile
+    with no wallet, renders the distribution; one screenshot per chain beside this file. Closes
+    #309.
 19. **Part B's PR closes this task's issue**, and `HANDOFF.md` has one row per criterion above —
     twenty-three rows.
 
