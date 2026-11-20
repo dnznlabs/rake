@@ -627,6 +627,60 @@ a reader following `:282-285` alone would leave the suite red:
 
 `node --test test/*.test.mjs`: **188 passed, 0 failed**.
 
+## Step 14 — its gate is met, and its first check cannot pass as written
+
+**The gate is satisfied, verified independently against `origin/main` at `aecedbe` rather than from
+§ Gates' earlier table:** m04-t15 [#277](https://github.com/dnznlabs/rake/pull/277) `02d456a` and
+m04-t16 [#286](https://github.com/dnznlabs/rake/pull/286) `3849cb2` are both **MERGED**, and
+`git merge-base --is-ancestor` exits **0** for each against this branch's head. So step 14 is not
+waiting on either PR.
+
+**It is blocked on its own first check, which step 13 made unsatisfiable by construction.** Step 14
+requires the `sha256` of `app/dist/index.html` and `app/dist/widget.js` per chain to **equal**
+m04-t16's § For the next upload figures "before anything else runs", and calls a mismatch a stop.
+Measured at `c7cfe5c`:
+
+| chain | file | m04-t16 § For the next upload | built here, 2026-11-20 | |
+|:--|:--|:--|:--|:--|
+| 11155111 | `widget.js` | `8b6bbc88…bc368` | **`8b6bbc88…bc368`** | **equal** ✓ |
+| 84532 | `widget.js` | `8b6bbc88…bc368` | **`8b6bbc88…bc368`** | **equal** ✓ |
+| 11155111 | `index.html` | `5b298120…40832` | **`4279a0c9cf9de57e284ebddf0ad5bb8e546a14e384f79fb5bc78ae467b2cd0fc`** | **differs** |
+| 84532 | `index.html` | `b081be52…३290e` | **`1e5dbb710b397dbe7d2613deaad6b5849a802b385d20566c737342a4e611a05a`** | **differs** |
+
+**Neither cause the plan names applies, and both were tested rather than assumed.** Step 14 says a
+mismatch means "either `app/` moved after m04-t16 or the build is not reproducible, and both are
+findings, not something to re-hash past":
+
+- **`app/` has not moved.** `git diff --stat 3849cb2..HEAD -- app/` is **empty**.
+- **The build is reproducible.** `make dapp-nodev CHAIN_ID=11155111` run twice in succession gives
+  the identical `index.html` sha256 `4279a0c9…cd0fc` both times.
+
+**The actual cause is a third one the plan does not enumerate: step 13 changes an input the bundle
+embeds.** `make dapp-nodev` reads the factory and its block from the committed broadcast logs — the
+same dependency step 13's own row relies on — so re-pointing the factory necessarily re-writes
+`index.html`. The built bundle contains **`0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`** and the M04
+factory `0x00D18B5b…71B` appears nowhere in it, which is the intended outcome of the redeploy and
+the reason the hash moved.
+
+**The corroboration that this is an address substitution and not a content change:** the raw sizes
+are unchanged, because an address is a fixed-length string. `dapp: raw 150842 · gzip 47659` on
+11155111 is byte-for-byte m04-t16's figure, and `widget: raw 8509 · budget 10240 · 1731 left` is
+unmoved on both chains. Only 84532's gzip differs, by **one byte** (47658 against 47657) — a
+compression artefact of different address bytes at the same length, not a payload change.
+
+**So the check is right about `widget.js` and wrong about `index.html`,** and it is wrong in a way
+that makes step 14 unrunnable on any chain where step 13 has executed — which is every chain step 14
+serves. It needs an amendment from the architect: either the equality is restricted to `widget.js`
+and the figures that are genuinely invariant, or `index.html`'s expected hash is re-baselined from a
+post-step-13 build and recorded here as the new reference. **The engineer does not pick between
+those** — it changes what a criterion asserts.
+
+**Nothing of step 14 was sent.** No bundle was uploaded, `tools/step4-calldata.mjs` was not run, and
+**no proposal exists on either chain** — deliberately, since the vault already carries two inert
+proposal rows from m04-t08's step 7 and adding six more ahead of a ruling would repeat that cost.
+The build artefacts are untracked (`app/dist` is not in the index), so the tree is clean at the
+recorded head.
+
 ## For close-out
 
 | | value |
