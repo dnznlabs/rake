@@ -1,6 +1,11 @@
 # M04 — Testnets
 
-Status: in progress · scoped 2026-11-07 · updated 2026-11-18 (t04 scoped; t11 from #215 and t12 added; t08 2026-11-08, t09 2026-11-12, t10 2026-11-17; t10 done, t11 approved, t12 issue opened, #209 closed, all 2026-11-17; t12 held out of Run B, 2026-11-18; t13 scoped from t04's front-end rollup, 2026-11-17; t05 and t14 scoped 2026-11-18; t13 done, t05 steps 0–2 done, t14 done, 2026-11-18; t15 scoped 2026-11-19; t16 scoped 2026-11-19; t12 closed before mainnet, decision 62, 2026-11-19; t05 step 3 superseded, the wallet run moves to m05-t01, decision 63, 2026-11-19; close-out criteria 1–8 re-run at `2f93d26`, [CLOSEOUT.md](CLOSEOUT.md), carried issues relabelled, 2026-11-19)
+Status: **done 2026-11-19** — closed on [CLOSEOUT.md](CLOSEOUT.md)'s merge
+([#296](https://github.com/dnznlabs/rake/pull/296), `eec7164`) by decision 64, with criteria 1, 3
+and 5's unmet clauses transferred to [m05-t01](../m05/tasks/m05-t01/TASK.md) Part B as its criteria
+18c–18f, beside criterion 6's wallet run (decision 63, its criterion 18b); criterion 8's comment on
+state-collection#74 stays drafted in `CLOSEOUT.md` § For state-collection#74, awaiting the Product
+Owner's word · scoped 2026-11-07 · updated 2026-11-18 (t04 scoped; t11 from #215 and t12 added; t08 2026-11-08, t09 2026-11-12, t10 2026-11-17; t10 done, t11 approved, t12 issue opened, #209 closed, all 2026-11-17; t12 held out of Run B, 2026-11-18; t13 scoped from t04's front-end rollup, 2026-11-17; t05 and t14 scoped 2026-11-18; t13 done, t05 steps 0–2 done, t14 done, 2026-11-18; t15 scoped 2026-11-19; t16 scoped 2026-11-19; t12 closed before mainnet, decision 62, 2026-11-19; t05 step 3 superseded, the wallet run moves to m05-t01, decision 63, 2026-11-19; close-out criteria 1–8 re-run at `2f93d26`, [CLOSEOUT.md](CLOSEOUT.md), carried issues relabelled, 2026-11-19)
 
 `RUNBOOK.md` executed for real, twice — Sepolia (11155111) and Base Sepolia (84532) — so that the
 factory, the implementation, `App` and DNZN's own distribution sit at the addresses M03 predicted
@@ -39,6 +44,19 @@ than quote. "Both chains" means Sepolia and Base Sepolia, every time.
    the distribution's `owner()` are both the Ops vault; `App.locked()` is `false`; the distribution's
    `delay()` and `snapshot().table` are what decision M04-D2 ruled. Every transaction hash and
    `gasUsed` is in the deploy task's handoff, read from the chain, not from the broadcast log (#140).
+   **Amended 2026-11-19 (decision 64):** two clauses are **transferred** to
+   [m05-t01](../m05/tasks/m05-t01/TASK.md) Part B and verified there, not met in M04. (i) *The
+   artifact comparison* — m05-t01 criterion 18c repeats it against `main` after the redeploy;
+   against `main`'s `0.8.38` bytes the M04 chain differs by 1,088 of 1,320 factory bytes and 6,475
+   of 7,155 `App` bytes, and against a build of `08b3304` (solc `0.8.34`, the bytes the chain
+   carries) by 60 factory bytes, all three inside the `immutableReferences` spans, and 0 `App` bytes
+   ([CLOSEOUT.md](CLOSEOUT.md) criterion 1), so the wording above is stale and the deployment is
+   not. (ii) *DNZN's distribution* — m05-t01 criterion 18d verifies it at the re-mined factory, where
+   `predict($DNZN_SALT)` is `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`;
+   `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` is the right prediction for the M04 factory and will
+   never hold code, because decision 54 gives the `create` to the Creator key in that Part B. What
+   M04 proves on this criterion is the code at the three contracts on both chains, `implementation()`,
+   `App`'s `owner()`, `locked()` and `version()`, and the receipts — plus those two transfers.
 2. **Verified on the explorer.** For each of the three contracts on each chain, the explorer's
    `getsourcecode` answer names the contract (`DistributionFactory`, `Distribution`, `App`) and the
    six links are in the handoff; `forge verify-contract … --watch` exited 0 for all six, with `App`'s
@@ -57,7 +75,16 @@ than quote. "Both chains" means Sepolia and Base Sepolia, every time.
    equal to `app/dist/widget.js`. *Amended 2026-11-07 at t02's rehearsal: the first wording asked
    for byte equality of `/` with `html()`, which no gateway built from that code can give.* The gateway host form is decision 19's; if the hosted gateway's chain list
    differs from its README (both testnets are listed there, read 2026-11-07), the task says which
-   gateway it used and why, and criterion 5's snippet names that one.
+   gateway it used and why, and criterion 5's snippet names that one. **Amended 2026-11-19
+   (decision 64):** the chain document and **both** hosted gateway checks are **transferred** to
+   [m05-t01](../m05/tasks/m05-t01/TASK.md) Part B as its criterion 18e, run after the Run B upload
+   m05-t01 step 14 proposes has executed (its step 16) — decision 63's words, and both are m05-t01's
+   plan steps, which run 0–18, not its acceptance criteria — on the redeployed testnets, and not met in
+   M04 against the M04 upload. What M04 proves is the chain half on both chains — `chain-doc`'s
+   `inflated sha256` and `widget sha256` equal to `3751211`'s bundle per chain — and
+   `make gateway-check` passing on Base Sepolia; Sepolia's w3link endpoint serves the 2026-11-17
+   document, [#242](https://github.com/dnznlabs/rake/issues/242)'s third-party condition, which is
+   why the hosted half moves rather than being waived ([CLOSEOUT.md](CLOSEOUT.md) criterion 3).
 4. **The history survives a capped provider.** `test/model.test.mjs` holds tests that the log
    reader splits a range into windows, reads a provider's cap out of its error text (measured
    2026-11-07: `exceed maximum block range: 50000` on publicnode's Sepolia, `eth_getLogs is
@@ -73,7 +100,15 @@ than quote. "Both chains" means Sepolia and Base Sepolia, every time.
    Sepolia (`src="https://0x00a90943….11155111.w3link.io/widget.js"`, `data-rake` the DNZN
    distribution) and nothing else of ours; `curl -s <url> | grep -c 'w3link.io/widget.js'` → 1, and
    a browser screenshot in the handoff shows the DNZN table rendered from it, both with `data-rpc`
-   and, with a wallet on Sepolia, without.
+   and, with a wallet on Sepolia, without. **Amended 2026-11-19 (decision 64):** the published URL
+   and its screenshot are **transferred** to [m05-t01](../m05/tasks/m05-t01/TASK.md) Part B as its
+   criterion 18f — the page is regenerated against the redeployed `App` and DNZN addresses,
+   published once by the Product Owner (decision 41 makes publishing his step) and its URL recorded
+   in that task's handoff. The tracked page's snippet names the M04 `App` and the `0x71a4…7a4A`
+   distribution, both retired by the redeploy, so publishing it now buys a page stale within days.
+   What M04 proves is the tracked file at `tasks/m04-t04/host/index.html` — one
+   `w3link.io/widget.js` reference, two `data-rake` attributes of one distinct value, nothing else
+   of ours — and the headless screenshot ([CLOSEOUT.md](CLOSEOUT.md) criterion 5).
 6. **Denizen has used it from a wallet and signed off, in writing.** From a browser wallet on each
    chain, in a session driven by the UAT script (m04-t05): the dapp loaded through the gateway URL
    of criterion 3 — not `localhost`, not `?rpc=` — connects the wallet (the delivered document has a
