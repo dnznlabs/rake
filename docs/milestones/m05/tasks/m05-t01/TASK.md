@@ -31,7 +31,9 @@ milestone's default, option (1), applies and this plan runs on it.
 **M04's close-out must merge before any transaction in Part B is sent.** M05's milestone gate
 (`MILESTONE.md:16-26`): m04-t05's figures, #227's ship-or-close ruling, the post-UAT `app/` task
 and `docs/milestones/m04/CLOSEOUT.md` all land first, because the bundle Part B uploads is the one
-the mainnets get. **Part A has no chain in it and starts on this plan's merge** — mining, the runbook
+the mainnets get. Amended 2026-11-19: m04-t05's figures are no longer waited on — its step 3,
+Denizen's wallet run, is this task's after step 16 (decision 63), and its measurement was withdrawn
+with t12 (decision 62); #227 is ruled closed. **Part A has no chain in it and starts on this plan's merge** — mining, the runbook
 amendment, the tool change and the anvil rehearsal read nothing that M04's remaining tasks can
 change. Part B also waits for Part A's PR to merge: Part B deploys from the salts Part A commits.
 
@@ -408,6 +410,27 @@ Sepolia; **every `record:` line is committed before the next transaction** (`:22
     → 4; the four distribution read-backs equal the exports; six `executeQueued` and two `create`
     receipts `status 1` with `gasUsed`, read from the chain.
 
+    **Then, before step 17 — the wallet run, both chains (M04 criterion 6, moved here by decision
+    63, after step 14's proposals have executed in 4c and the `create` has landed).** First the
+    engineer re-runs the three baselines of [m04-t05 TASK.md](../../../m04/tasks/m04-t05/TASK.md) step 0 against the redeployed `App` —
+    the gate's nonce and § Uploads row, `chain-doc`'s two hashes equal to this step's build, and
+    `tools/gateway-check.sh` in hosted mode per chain — and rewords the rows of
+    [m04-t05 UAT.md](../../../m04/tasks/m04-t05/UAT.md) the m04-t16 bundle changes: row (a)'s
+    "through the wallet" and every row written for the no-wallet path (#273, #274), each
+    amendment dated in the file. Then Denizen drives both lists in Chrome with MetaMask through
+    the README § Opening the App gateway URL at the new `App` address — never `localhost`, never
+    `?rpc=` — with the three origin-probe expressions on the landing first; one screenshot per row
+    under `shots/<chainId>/` beside this file, every transaction hash in this task's handoff in a
+    per-chain table. A chain whose hosted `gateway-check` fails is not driven on that gateway:
+    m04-t05 step 0's rule applies, the project's own gateway build at the same pin is the
+    fallback, and the handoff names which gateway served each chain. The wallet-path measurement
+    (m04-t05 step 4) is not re-added (decision 62).
+
+    Check: the two hash tables full on both chains, `status 1` on every row that sends; a row that
+    cannot reach its expected state is an issue, scoped per item, and nothing under `app/` changes
+    in this task. Acceptance: the signoff line of M04 criterion 6, dated and in Denizen's words,
+    written in this handoff.
+
 17. **The records.** `RUNBOOK.md` § Executed on testnets gains a dated paragraph and two new
     § Record tables for this deploy (the M04 tables stay, headed superseded with the date and
     #202); § Uploads rows 5 and 6; § 0's four addresses and DNZN's confirmed against the chain.
@@ -533,6 +556,12 @@ an address. Baselines are `main` at `78b5eb7`, 2026-11-19.
     hashes. No proposal of step 14 is dated before the later merge. If either was not merged when
     steps 12–13 were done, the handoff records the wait and its dates; a bundle built from an older `app/`
     fails this criterion whatever its hashes.
+18b. **M04 criterion 6's wallet run, on the redeployed testnets** (decision 63): `shots/11155111/`
+    and `shots/84532/` beside this file hold one PNG per `UAT.md` row driven, the handoff's two
+    per-chain hash tables are full with every sending row `status 1`, each chain's serving gateway
+    is named with its `gateway-check` result, and the signoff line of M04 criterion 6 is in this
+    handoff, dated and in Denizen's words. Any row that could not reach its expected state is an
+    issue linked from the handoff.
 19. **Part B's PR closes this task's issue**, and `HANDOFF.md` has one row per criterion above —
     nineteen rows.
 

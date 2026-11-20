@@ -668,6 +668,26 @@ passing, which § For Denizen turns into a question only if it is still failing 
 **for step 3** — step 2 no longer waits on it and has now run, per the rake#248 amendment — and
 m04-t04 AC (e)'s URL, which decision 41 already assigns to the Product Owner.
 
+## Step 3
+
+**Step 3 did not run, and does not run on this bundle.** Decision 63 (`docs/ROADMAP.md`,
+2026-11-19) moves Denizen's wallet run to M05: it executes as a step of m05-t01 after step 16, on
+the m04-t16 bundle the redeployed testnets serve, with `UAT.md` as its script and M04 criterion 6's
+signoff line in that handoff. The document this task's steps 0–2 read predates m04-t15 and m04-t16
+by design (no Run C), so a wallet run on it would be evidence about a bundle that never ships; the
+measurement of step 4 was withdrawn with t12 (decision 62). The two findings step 2's path surfaced,
+[#273](https://github.com/dnznlabs/rake/issues/273) and
+[#274](https://github.com/dnznlabs/rake/issues/274), are m04-t16's. § For Denizen below is the
+record of what step 3 would have asked and is not live.
+
+Step 0's document and gateway bullets, re-run by the engineer at `6634c28` — read 2026-11-19,
+re-run rather than quote:
+
+| Chain | `chain-doc` `inflated sha256` = Run B pinned hash | w3link `gateway-check` |
+|:------|:--------------------------------------------------|:-----------------------|
+| Sepolia · 11155111 | yes, `b1fc3b96…`; widget `8b6bbc88…` | **fail** — the endpoint serves a stale document (61,181 bytes against `html()`'s 62,265; widget 8,132 against 8,509; `cache-status: miss`, stale since at least 15:20Z); [#242](https://github.com/dnznlabs/rake/issues/242)'s third-party condition |
+| Base Sepolia · 84532 | yes, `6f0225bb…`; widget `8b6bbc88…` | pass |
+
 ## For Denizen
 
 1. **Your run on Sepolia is the one that waits; the engineer's has run.** Sepolia's hosted
