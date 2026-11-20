@@ -1,6 +1,6 @@
 # M04 — Testnets
 
-Status: in progress · scoped 2026-11-07 · updated 2026-11-18 (t04 scoped; t11 from #215 and t12 added; t08 2026-11-08, t09 2026-11-12, t10 2026-11-17; t10 done, t11 approved, t12 issue opened, #209 closed, all 2026-11-17; t12 held out of Run B, 2026-11-18; t13 scoped from t04's front-end rollup, 2026-11-17; t05 and t14 scoped 2026-11-18; t13 done, t05 steps 0–2 done, t14 done, 2026-11-18; t15 scoped 2026-11-19; t16 scoped 2026-11-19; t12 closed before mainnet, decision 62, 2026-11-19; t05 step 3 superseded, the wallet run moves to m05-t01, decision 63, 2026-11-19)
+Status: in progress · scoped 2026-11-07 · updated 2026-11-18 (t04 scoped; t11 from #215 and t12 added; t08 2026-11-08, t09 2026-11-12, t10 2026-11-17; t10 done, t11 approved, t12 issue opened, #209 closed, all 2026-11-17; t12 held out of Run B, 2026-11-18; t13 scoped from t04's front-end rollup, 2026-11-17; t05 and t14 scoped 2026-11-18; t13 done, t05 steps 0–2 done, t14 done, 2026-11-18; t15 scoped 2026-11-19; t16 scoped 2026-11-19; t12 closed before mainnet, decision 62, 2026-11-19; t05 step 3 superseded, the wallet run moves to m05-t01, decision 63, 2026-11-19; close-out criteria 1–8 re-run at `2f93d26`, [CLOSEOUT.md](CLOSEOUT.md), carried issues relabelled, 2026-11-19)
 
 `RUNBOOK.md` executed for real, twice — Sepolia (11155111) and Base Sepolia (84532) — so that the
 factory, the implementation, `App` and DNZN's own distribution sit at the addresses M03 predicted
@@ -241,7 +241,16 @@ start by about a day, t07 moves nothing. Re-estimate when t03 reports.
 
 ## Carried issues at close-out
 
-Filled at close-out. The queue today, 2026-11-07, every item labelled `m04`:
+**Close-out run 2026-11-19 against `main` at `2f93d26` ([CLOSEOUT.md](CLOSEOUT.md)).** Five
+`carried` issues were still labelled `m04` and open: #243, #241, #174, #165, #127. Each was
+relabelled with its reason the same evening, one comment per issue, and the query
+`gh issue list --label carried --label m04 --state open` printed nothing afterwards; no issue was
+closed. The dispositions are in the rows below (bold, dated) and in `CLOSEOUT.md` § Carried issues.
+The milestone does not close on that run: criteria 1 (the DNZN address, and the artifact comparison
+against `main`'s `0.8.38` bytes), 3 (Sepolia's hosted gateway, #242), 5 (no published URL) and 8
+(the state-collection#74 comment) each have a clause not met, named plainly there.
+
+The queue on 2026-11-07, every item labelled `m04`:
 
 | Issue | Where it lands |
 |:------|:---------------|
@@ -251,14 +260,14 @@ Filled at close-out. The queue today, 2026-11-07, every item labelled `m04`:
 | [#209](https://github.com/dnznlabs/rake/issues/209) FUND rename on the testnets | Denizen's `apply` from his EOA; closed on a `description()` read, any time before close-out. **Closed 2026-11-17** on the `description()` read: both chains `DNZN // FUND DISTRIBUTION`, `pendingCount()` 0; the Base Sepolia `apply` was sent outside the dapp, which gated it on the history read (#215, m04-t11). |
 | [#207](https://github.com/dnznlabs/rake/issues/207) Step 5 read-back gate | M05. |
 | [#110](https://github.com/dnznlabs/rake/issues/110) the chromium note | t01. |
-| [#127](https://github.com/dnznlabs/rake/issues/127) native-balance alias (F12) | t03's per-chain check before the first deploy, as the runbook already requires; neither testnet is known to carry such a token, and the task records the check's answer. Stays open into M05 for the mainnets unless the task closes it with a per-chain table for all eight. |
+| [#127](https://github.com/dnznlabs/rake/issues/127) native-balance alias (F12) | t03's per-chain check before the first deploy, as the runbook already requires; neither testnet is known to carry such a token, and the task records the check's answer. Stays open into M05 for the mainnets unless the task closes it with a per-chain table for all eight. **Close-out 2026-11-19: `m04` → `m05`.** Both testnets read `none` in t03 (`RUNBOOK.md` § Record); m05-t02 and m05-t03 re-run the assertion per mainnet and t03 closes it with the six-row table. |
 | [#140](https://github.com/dnznlabs/rake/issues/140) `run-latest.json` pairing | t01 (the assertion); t03 reads every figure from the chain. |
 | [#148](https://github.com/dnznlabs/rake/issues/148), [#149](https://github.com/dnznlabs/rake/issues/149) t09's dapp nits | t01. |
 | [#137](https://github.com/dnznlabs/rake/issues/137) | Closed by t09; listed because it was labelled `m04` before that. Nothing to do. |
-| [#165](https://github.com/dnznlabs/rake/issues/165) window budget | ~~t05's UAT script states the load-older cost on Base Sepolia; stays open into M05 if the figure is acceptable as documented.~~ ~~Decision 52 (2026-11-17): t12 closes it against the measured second-load count, or re-scopes it in one line.~~ ~~Held 2026-11-18 with #227: open against t05, whose UAT records the per-load count through MetaMask's RPC; the ship-or-close decision on t12 closes it either way.~~ **Carried post-mainnet (decision 62, 2026-11-19):** t12 closed, #227 unmerged with the branch kept; #165 and [#221](https://github.com/dnznlabs/rake/issues/221) labelled `carried`, out of `m04`, reassessed after M05's mainnet upload with a per-load figure from a chain that costs something. Not M04's at close-out. |
+| [#165](https://github.com/dnznlabs/rake/issues/165) window budget | ~~t05's UAT script states the load-older cost on Base Sepolia; stays open into M05 if the figure is acceptable as documented.~~ ~~Decision 52 (2026-11-17): t12 closes it against the measured second-load count, or re-scopes it in one line.~~ ~~Held 2026-11-18 with #227: open against t05, whose UAT records the per-load count through MetaMask's RPC; the ship-or-close decision on t12 closes it either way.~~ **Carried post-mainnet (decision 62, 2026-11-19):** t12 closed, #227 unmerged with the branch kept; #165 and [#221](https://github.com/dnznlabs/rake/issues/221) labelled `carried`, out of `m04`, reassessed after M05's mainnet upload with a per-load figure from a chain that costs something. Not M04's at close-out. **Close-out 2026-11-19: `m04` label removed, no milestone label**, per decision 62. |
 | [#172](https://github.com/dnznlabs/rake/issues/172) born-renounced sentence, test, create-screen owner guard | Decision 43 opened it; widened 2026-11-08 with the dapp guard (owner field ≠ connected wallet → say what it is, acknowledge before step 2). No `src/`. **It changes the bundle, so it lands before t03's step 4 (`make dapp-nodev` / `make chunks`) or it is a re-upload** — the engineer does it first. Merged as #177 before any upload, so no re-upload. |
-| [#174](https://github.com/dnznlabs/rake/issues/174) cold-implementation stipend | Docs and a test in M04 (t03's runbook or #172's PR, whichever is open); the `src/` comment waits for `src/` to reopen. |
-| [#243](https://github.com/dnznlabs/rake/issues/243) first paint and refresh, [#241](https://github.com/dnznlabs/rake/issues/241) the rejecting heir read | t15 (added 2026-11-19); the bundle rides m05-t01's Run B. The R9 and R19 wording rows ride the same task under decision 57 ([#258](https://github.com/dnznlabs/rake/issues/258)). |
+| [#174](https://github.com/dnznlabs/rake/issues/174) cold-implementation stipend | Docs and a test in M04 (t03's runbook or #172's PR, whichever is open); the `src/` comment waits for `src/` to reopen. **Close-out 2026-11-19: `m04` label removed, no milestone label.** The `#/docs` and `SECURITY.md` sentences and `test/ColdStipend.t.sol` landed in #177 (`7681d35`); the `src/` comment is item 3, and no scheduled milestone reopens `src/` — M05 moves nothing under it — so the issue stays `carried` until one does. |
+| [#243](https://github.com/dnznlabs/rake/issues/243) first paint and refresh, [#241](https://github.com/dnznlabs/rake/issues/241) the rejecting heir read | t15 (added 2026-11-19); the bundle rides m05-t01's Run B. The R9 and R19 wording rows ride the same task under decision 57 ([#258](https://github.com/dnznlabs/rake/issues/258)). **Close-out 2026-11-19: both `m04` → `m05`.** Fixed in t15 ([#277](https://github.com/dnznlabs/rake/pull/277), `02d456a`), not uploaded; they close on m05-t01 step 14's upload, at its 4d read. |
 
 ## One-way doors
 
