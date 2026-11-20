@@ -41,10 +41,17 @@ about **five** blocks.
 > **Amended 2026-11-20:** the URL above is the redeployed `App`. **w3link does not serve it on this
 > chain yet** — `tools/gateway-check.sh` in hosted mode against it exits 2 with `status: 400` and no
 > ERC-5219 headers, measured 17:0xZ, while the same check **passes** on 84532. The chain itself is
-> correct: `chain-doc` reads `inflated sha256 59c24c98…dd2010` equal to the build. So **this chain is
-> driven on the project's own gateway build at m04-t02's pin**, per m04-t05 step 0's rule, and the
-> handoff names which gateway served it. Re-check the primary before the sitting; if it has started
-> resolving, use it and record that instead.
+> correct: `chain-doc` reads `inflated sha256 59c24c98…dd2010` equal to the build, so this is the
+> third-party condition step 0 describes and **not** a failed upload.
+>
+> **What that means for who drives what, read off step 0 rather than improvised.** Step 0 reserves
+> the project's own gateway build for **the engineer's** run (step 2). **The Product Owner's run
+> (step 3) keeps the primary**, and if the primary has not passed **within a day of the upload** the
+> handoff says so and asks him whether to run this chain through the project's gateway or wait. The
+> upload landed 2026-11-20 ≈ 17:00Z, so that day has not elapsed: **re-check the primary before the
+> sitting**, drive this chain on it if it has started resolving, and if it is still 400 at the
+> sitting the choice is his, not a default. Base Sepolia is unaffected and can be driven on w3link
+> now. Whichever gateway serves each chain is named in the handoff.
 
 | # | action | expected state | screenshot | hash |
 |:--|:--|:--|:--|:--|
