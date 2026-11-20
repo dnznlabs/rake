@@ -56,7 +56,8 @@ than quote. "Both chains" means Sepolia and Base Sepolia, every time.
    `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` is the right prediction for the M04 factory and will
    never hold code, because decision 54 gives the `create` to the Creator key in that Part B. What
    M04 proves on this criterion is the code at the three contracts on both chains, `implementation()`,
-   `App`'s `owner()`, `locked()` and `version()`, and the receipts — plus those two transfers.
+   `App`'s `owner()`, `locked()` and `version()`, and the receipts — everything above **less** clauses
+   (i) and (ii), which M04 does not prove and Part B does.
 2. **Verified on the explorer.** For each of the three contracts on each chain, the explorer's
    `getsourcecode` answer names the contract (`DistributionFactory`, `Distribution`, `App`) and the
    six links are in the handoff; `forge verify-contract … --watch` exited 0 for all six, with `App`'s
