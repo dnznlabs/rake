@@ -358,6 +358,37 @@ total of 28,296,098, so the funding arithmetic there holds unchanged with 0.2020
 fee. Both estimates are far inside the 200,000,000 block limit, and the node's figures — not
 `forge script`'s own cancun-priced simulation — are the ones this chain will charge.
 
+### Sepolia (11155111) — step 2, the factory
+
+**Sent.** `forge script scripts/forge/Deploy.s.sol --rpc-url "$RPC" --broadcast -g 650 $SIGNER`,
+`ONCHAIN EXECUTION COMPLETE & SUCCESSFUL`, forge exit 0.
+
+| step 2 | reading | required |
+|:--|:--|:--|
+| tx hash | **`0xf9da99cd04279a55a58c7be1431b3877d4547c6f5e7451f675f32922be4109bc`** | `cast receipt` ✓ |
+| `status` | **true** | success ✓ |
+| `gasUsed` | **16,797,162** | `cast receipt`, not `run-latest.json` (#140) ✓ |
+| `blockNumber` | **12,173,938** | recorded |
+| `effectiveGasPrice` | **6,250,004 wei** | recorded |
+| logged `DistributionFactory` | **`0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`** | **= 1f's prediction** ✓ |
+| `implementation` logged, and `implementation()` read back | **`0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`** | agree ✓ |
+| runtime length | **1,319 bytes** (2,640 chars), artifact **equal** | same length ✓ |
+| differing bytes | **60** | — |
+| differing bytes **outside** the declared spans | **0** | none ✓ |
+| spans | `{"48267":[{274,32},{864,32},{939,32}]}`, each holding `IMPL` left-padded to 32 | all three ✓ |
+
+**The gas limit had to be raised explicitly, and the figure the runbook tells you to raise it to is
+itself short.** Step 1e's rule is to compare the node's estimate with the dry run's and raise the
+limit when the node's is larger. On Sepolia at this base: the dry run printed **3,482,636** (not
+m04-t03's 3,482,636-era 3,287,625 — the bytes moved under #201) and the node's `cast estimate` read
+**16,738,648**, a factor of 4.81, so the broadcast carried `-g 650`, giving a limit of about
+22,637,134. **The transaction then used 16,797,162 — 58,514 gas *more* than the node's own
+estimate.** A limit set exactly at the node's figure, which is the literal reading of step 1e, would
+have failed for gas and burned most of it: a gas failure creates nothing and is not a #22 collision,
+but it is not free. So the rule wants a margin over the node's estimate rather than equality with
+it, and `-g` is the flag that applies it (`forge script` on 1.7.1-dev offers `-g/--gas-estimate-multiplier`
+as a percentage; it has no `--gas-limit`). Recommend amending step 1e to say so.
+
 ## For close-out
 
 | | value |
