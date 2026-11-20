@@ -1057,6 +1057,26 @@ convention. Numbered 45 because 44 is taken by
     redeploy, for a page stale within days; (c) a new M04 upload to catch the document up — already
     rejected by m04-t15 § The upload and m04-t16 criterion 9.
 
+65. **The widget snippet in `#/docs` leads with the `data-rpc` form; the widget gets no built-in
+    endpoint.** Ruled by Denizen on 2026-11-20 (Telegram), raised as
+    [#309](https://github.com/dnznlabs/rake/issues/309). The snippet a host pastes first is the one
+    that reads through an RPC endpoint, so the embed works for a visitor with no wallet or with a
+    wallet on another chain; the wallet form follows as the alternative, with its failure states
+    still named. The endpoint stays the host's explicit choice: the example carries the chain's
+    `PUBLIC_RPC` entry so that it works as pasted, as the second snippet does today, and
+    `widget.js` does not change and never falls back to an endpoint of ours. It lands in m05-t04,
+    which already edits this section and already uploads on every live chain, so it adds no upload.
+    Decisions 19, 53 and 59 stand: this is the order of two snippets, not the `src` host form, the
+    trust boundary or the mirror, and the mirror changes nothing here, because `src` is resolved
+    from the page's own address and `data-rpc` from the bundle's chain. **Why:** the read is public
+    chain state and needs no wallet, and the form shown first failed on the test host for a wallet
+    on another chain. **Rejected:** (a) a fallback inside the widget to a built-in public endpoint
+    when no wallet answers, offered to him and refused, since a contract-served script would then
+    call a third party the host never chose; (b) a task of its own before m05-t02, so that the first
+    mainnet document already leads with `data-rpc` — the mainnets would then carry a bundle the
+    testnet wallet run never saw, or the testnets take a second upload and two more sittings, for a
+    page nobody outside the team can read before M06.
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
