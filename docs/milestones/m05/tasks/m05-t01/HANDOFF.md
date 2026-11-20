@@ -176,6 +176,30 @@ been sent: Part B stops here, before plan step 13.**
 | `delay()` — read, not assumed | **900** | **900** |
 | `ownerCount()` | **4** | **4** |
 
+**Step 14's own gate is two PRs, and both are ancestors of this branch.** `TASK.md:45` and `:372`
+read "m04-t15's **and m04-t16's** task PRs merged to `main`"; [#271](https://github.com/dnznlabs/rake/issues/271)'s
+issue text names only m04-t15, so the issue undercounts it and the authority is the task file.
+Checked rather than assumed, with step 14's own form:
+
+| gate PR | merge commit | `git merge-base --is-ancestor <sha> HEAD` |
+|:--|:--|:--|
+| m04-t15 [#277](https://github.com/dnznlabs/rake/pull/277) | `02d456a` | **0** |
+| m04-t16 [#286](https://github.com/dnznlabs/rake/pull/286) | `3849cb2` | **0** |
+
+Criterion 18 wants both merge commits named, which is why they are here and not only in step 14's
+own row later. `main` is `7404007` with **zero open PRs**, so no M04 record amendment is in flight
+behind this branch.
+
+**[#288](https://github.com/dnznlabs/rake/issues/288) closes on step 13, and the two fixtures
+disagree until it does.** `test/ext.test.mjs:41` already pins `factory:
+'0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E'` — Part A's *prediction* — while
+`test/build.test.mjs:283-284` still pins the deployed `DISTRIBUTIONFACTORY:
+'0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B'` at `DISTRIBUTIONFACTORY_BLOCK: '0xb88091'`, the M04
+factory. Step 13 moves the build fixture to the **landed** factory, and the two sites agree only if
+landed equals predicted — which is step 13's own 1f check, not an assumption. The equality is stated
+in step 13's row with both `file:line` sites when it is measured, and #288 closes on it; #271's
+closes-list omits #288, so the PR's closing line carries it explicitly.
+
 **No code at any of the four predicted addresses on either chain**, so the `#22` branch of
 `RUNBOOK.md:351-391` is not taken and nothing needs identifying before the deploys.
 
