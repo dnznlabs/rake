@@ -163,7 +163,11 @@ Part B's too: this table is Part A's half.
    lands**." The issue is OPEN with **0 comments**. So the criterion is wrong as written and the fix
    is an amendment, not a clause the engineer reinterprets; it is drafted for the Product Owner
    alongside the architect's m05-t01b item, and nothing needs it before the comment posts, which is
-   after step 13 regardless. Until it is ruled, the clause is recorded as the architect's.
+   after step 13 regardless. **Ruled 2026-11-20: the amendment landed at `aecedbe`
+   ([#299](https://github.com/dnznlabs/rake/pull/299)) before this run's first send, and it carries
+   all three defects named here — author, trigger and closure shape. Criterion 17 is now met by this
+   handoff carrying the landed address, never by `state-collection` accepting a comment, and the
+   comment itself is the architect's.**
    **The finding behind the contradiction is the dependency shape, not the author:** a criterion in
    this repo cannot be satisfied by an artefact in another repo's issue tracker, because closure
    then waits on a team that never agreed to the clause and on an author this repo cannot assign.
@@ -288,6 +292,72 @@ rather than assuming is what establishes that:
 So it blocks neither plan step 13's deploys nor the Sourcify half of step 5; it is wanted for one
 read-back line, and the asking is in § For Denizen below rather than assumed from M04.
 
+## Step 13 — Run A on the testnets
+
+**Authority and base.** The Product Owner lifted the step-13 stop in the FOCUS topic on 2026-11-20
+at 01:36 CST ("yes - go on 13"), answering the go/no-go question this handoff's § Deviations records
+the stop against. Before the first command the branch was rebased from `7404007` onto **`aecedbe`**,
+so `TASK.md` here is byte-identical to `main`: head **`b77827f`**, 8 ahead, 0 behind, tree clean.
+The only amendment in that base is criterion 17 (#299), and its effect on this run is subtractive —
+it removes the cross-repo comment from the engineer's scope; nothing in Part B's steps or the other
+criteria moved, checked by diffing `TASK.md` across `7404007..aecedbe`.
+
+**Every command in this step ran inside `devbox run --`, and that is load-bearing rather than
+habit.** 1a asserts forge `1.7.1-dev`; the host's forge is **1.8.1**, whose `cast create2` prints
+`address↹salt` instead of the address alone, so 1f's documented `| tail -1` would have silently
+yielded a two-field string and poisoned every address derived from it. The runbook's form is correct
+for the pinned toolchain and wrong for the host one.
+
+### Sepolia (11155111) — step 1, preflight, nothing broadcast
+
+| 1 | reading | required |
+|:--|:--|:--|
+| `cast chain-id` | **11155111** | `= $CHAIN_ID` ✓ |
+| 1a `forge --version` | **forge Version: 1.7.1-dev** | pinned ✓ |
+| 1a `node --version` | **v24.12.0** | recorded |
+| 1a `git status --porcelain \| wc -l` | **0** | 0 ✓ |
+| 1a `git rev-parse HEAD` | **`b77827f271736258bcaa584051ea3e680de6785d`** | recorded |
+| 1b `forge build --force` | **exit 0**, `Compiling 42 files with Solc 0.8.38` | 0, non-empty ✓ |
+| 1b `grep -c 'warning\['` / `'Warning ('` | **0** / **0** | 0 ✓ |
+| 1b `forge test` | **124 passed, 0 failed, 0 skipped**, exit 0 | all pass ✓ |
+| 1b `forge snapshot --check` | **exit 0** | 0 ✓ |
+| 1c proxy code | **69 bytes** | 69 ✓ |
+| 1c proxy keccak | **`0x2fa86add0aed31f33a762c9d88e807c475bd51d0f52bd0955754b2608f7e4989`** | § 1's value ✓ |
+| 1d `tx.origin` in `src/` | **nothing** | empty ✓ |
+| 1d `msg.sender` in `App.sol` | **nothing** | empty ✓ |
+| 1e `cast call --create` runtime | **1,319 bytes** | 1,319 ✓ |
+| 1e `cast estimate` factory | **16,738,648** | recorded |
+| 1e `cast estimate` `App` | **11,405,803** | recorded |
+| 1e `cast block latest --field gasLimit` | **200,000,000** | estimates fit ✓ |
+| 1e `cast base-fee` | **16 wei** | re-read ✓ |
+| 1g `cast code $FACTORY` | **`0x`** | `0x` ✓ |
+| 1g `cast code $APP` | **`0x`** | `0x` ✓ |
+
+**1f, the check the whole step exists for — prediction equals Part A on both addresses:**
+
+| 1f | predicted here, 2026-11-20 | Part A / § Gates |
+|:--|:--|:--|
+| `FACTORY` | **`0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`** | equal ✓ |
+| `APP` | **`0x00a9F390A6010d045e0d34856048DdD6910d25BA`** | equal ✓ |
+| factory init-code hash | **`0x9778c35879aa3214905a41c9519ae6c704dc5d00333806ac56ed6e7fbd2d8945`** | `TASK.md:20-22` ✓ |
+| `App` init-code hash | **`0xa8bbb83700d29d4b2e4b871c680f31165f42c0eb9234071a7948ce79f9fe33a3`** | `TASK.md:20-22` ✓ |
+
+So step 13's stop rule — "1f's prediction equal to Part A's addresses", else send nothing — is met on
+Sepolia, and step 2 is cleared on this chain.
+
+**One measurement-form note, so a later reader does not read a passing gate as a failed one.**
+`RUNBOOK.md:365` gives 1c as `cast code $PROXY \| wc -c` “must be 141 chars”; that 141 counts the
+trailing newline `wc` sees. Measured with `printf '%s'` the same code is **140** characters, which is
+`0x` plus 138 hex digits = **69 bytes**, the figure the gate is actually about, and the keccak matches
+§ 1 exactly. The byte count is right; only the character convention differs.
+
+**1e against the prior reading.** The factory estimate is **16,738,648** against 16,730,843 on
+2026-11-08 (`RUNBOOK.md:1e`), a drift of 7,805 gas on a chain whose pricing moved under #201; the
+`App` estimate of **11,405,803** and the sum of **28,144,451** sit against § Gates' recorded Run A
+total of 28,296,098, so the funding arithmetic there holds unchanged with 0.2020 ETH at a 16 wei base
+fee. Both estimates are far inside the 200,000,000 block limit, and the node's figures — not
+`forge script`'s own cancun-priced simulation — are the ones this chain will charge.
+
 ## For close-out
 
 | | value |
@@ -356,7 +426,12 @@ read back and step 15's commands are in this handoff.
   repo and is read without being echoed, so no transcript carries the value; the protected secret
   store is not the route, because it was measured that day not to reach the shell the commands run
   in. Still unset for the Sourcify block per `:1107`.
-- **Asked, answered, and the answer disagrees with the chain: the Ops vault's testnet `delay()`.**
+- **Asked, answered, disagreed, and now settled in the chain's favour: the Ops vault's testnet
+  `delay()`.** **Resolved 2026-11-20, and it is no longer a deviation.** `TASK.md` § For Denizen at
+  `aecedbe` (#299) records the Product Owner's confirmation: he set the testnet vaults to **15
+  minutes** on both chains, and 3,600 s stays the mainnet figure. So the four readings of 900 were
+  the intended setting rather than a discrepancy to carry, and nothing is recorded against him here.
+  The history below is kept because it is why the 4b checklist hard-codes no number.
   The Product Owner's word on 2026-11-19 was that the testnet vault is one hour; the vault answers
   **900** on both chains. Four readings now, same vault `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`,
   all **900** — step 12's and the architect's the same day beside `threshold()` 2 and `ownerCount()`
@@ -374,9 +449,16 @@ read back and step 15's commands are in this handoff.
   than discovered at 4c. A recollection does not overturn a reading, and the engineer does not
   resolve it either way; an override is a ruling and the architect records it. Waiting on the wrong
   clock is the failure mode.
-- **The state-collection#74 comment: cleared to post, and it still waits for step 13.** Criterion
-  17's last clause is "state-collection#74 carries the engineer's comment with the new address", and
-  your OK landed 2026-11-19. It is **not posted** and cannot be until the redeploy, because the
+- **The state-collection#74 comment: ruled, and it is not the engineer's to post.** **Settled
+  2026-11-20 — the amendment landed at `aecedbe` ([#299](https://github.com/dnznlabs/rake/pull/299))
+  before this run's first send**, and it carries all three defects Discovery 7 named: criterion 17
+  now reads "state-collection#74 carries the new prediction, posted by the architect", gives the
+  engineer's part as "the landed `$DISTRO` in this handoff", and states that the clause "is met by
+  the handoff carrying the address, **never** by another repository accepting a comment". So the
+  engineer posts nothing to another repo in this task, and criterion 17's closure does not wait on
+  `state-collection` at all. Nothing below is an open ask; it is kept as the reasoning the amendment
+  ratified. Criterion 17's last clause read "state-collection#74 carries the engineer's comment with
+  the new address", and your OK landed 2026-11-19. It is **not posted** and cannot be until the redeploy, because the
   address it must carry is the one step 13 lands: the m04 draft at `docs/milestones/m04/CLOSEOUT.md`
   § For state-collection#74 names the pre-redeploy `0x6aC98EDA…` and the then-predicted
   `0xB611Ff19…`, so the posted text is that draft with the landed address substituted. The
