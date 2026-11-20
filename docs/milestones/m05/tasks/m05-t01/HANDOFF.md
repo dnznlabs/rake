@@ -389,6 +389,51 @@ but it is not free. So the rule wants a margin over the node's estimate rather t
 it, and `-g` is the flag that applies it (`forge script` on 1.7.1-dev offers `-g/--gas-estimate-multiplier`
 as a percentage; it has no `--gas-limit`). Recommend amending step 1e to say so.
 
+### Sepolia (11155111) — step 3, `App`: one failed attempt, then the deploy
+
+**The first attempt failed for gas and created nothing.** Recorded before the retry was sent, per
+§ 2's rule, because a transaction that sent something must be written down before the next one.
+
+| failed attempt | reading |
+|:--|:--|
+| tx hash | **`0x2be31dbb7a2d5f0a6a6e141c8842548b4eddf0fe66362411068cc049b3c86639`** |
+| `status` | **false** |
+| `gasUsed` | **11,075,750** burned |
+| gas **limit as sent** | **11,432,739** |
+| `blockNumber` / `effectiveGasPrice` | 12,173,945 / **50,000,017 wei** |
+| `nonce` | 27, consumed |
+| `cast code $APP` after it | **`0x`** — nothing created, not a #22 collision |
+
+**The defect is in how `-g` is sized, and step 1e as written does not prevent it.** `forge script`
+applies `--gas-estimate-multiplier` to **its own per-transaction estimate**, not to the
+`Estimated total gas used for script` line the dry run prints. Those are different numbers: the dry
+run printed **2,286,547** for `DeployApp.s.sol`, while the per-transaction estimate was
+**1,758,883** — and 1,758,883 × 6.5 = **11,432,739**, the limit as sent, to the gas. The multiplier
+was chosen against the printed script total, so the limit landed ~23% below where it was aimed and
+**under the node's `cast estimate` of 11,405,803 once the 63/64 forwarding rule takes its share**.
+The inner `CREATE2` was handed about 11.23M against ~11.41M needed, burned all of it, and the outer
+frame kept the 1/64 that makes `gasUsed` read just under the limit rather than equal to it — which
+is why this looks like a revert-with-gas-to-spare and is not one.
+
+**Step 2 survived the same mistake by luck of proportion**, not by being sized correctly: its
+per-transaction estimate happened to sit high enough relative to its need that ×6.5 cleared the
+node's figure.
+
+**`cast run` on the failed hash is actively misleading here and should not be used as the
+post-mortem.** Replayed locally it prints `Transaction successfully executed. Gas used: 1655420`
+and a clean trace returning 7,154 bytes of code — because the replay prices creation under
+`foundry.toml`'s cancun rules, roughly 7× cheaper than Sepolia charges post-#201. The trace proves
+the constructor is correct and proves nothing about the gas. § Gates' standing caveat — a local
+rehearsal must never be the instrument for a publish estimate — extends to post-mortems of a failed
+publish.
+
+**What the retry uses.** The requirement is that the create *receive* ≥ 11,405,803, so the tx limit
+must clear `11,405,803 × 64/63 + intrinsic` ≈ 11.61M, plus a margin for the
+**step-2 lesson that actual can exceed the node's estimate** (there, by 58,514). `-g 900` gives
+1,758,883 × 9 = **15,829,947**, about 36% over the node's figure and far inside the 200,000,000
+block limit. Recommend step 1e be amended to name the per-transaction estimate as the multiplicand
+and to require a margin over the node's estimate rather than equality with it.
+
 ## For close-out
 
 | | value |
