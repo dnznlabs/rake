@@ -167,9 +167,27 @@ Part B's too: this table is Part A's half.
    **The finding behind the contradiction is the dependency shape, not the author:** a criterion in
    this repo cannot be satisfied by an artefact in another repo's issue tracker, because closure
    then waits on a team that never agreed to the clause and on an author this repo cannot assign.
-   Worth carrying into how the remaining cross-repo gates are written. One wrinkle for whoever
-   drafts the amendment: #74's trigger is "the first **public** deploy", which a testnet redeploy
-   may or may not be — a question about *when*, separate from *who*, and not resolved here.
+   Worth carrying into how the remaining cross-repo gates are written.
+   **The trigger was a second defect and is resolved: #74 takes two updates, not one at a disputed
+   time** (architect's ruling 2026-11-19). Textually the testnets are public — #74's "What it is not
+   yet" opens "A contract on any public chain. rake M04 executes the runbook on Sepolia and Base
+   Sepolia; the mainnets are rake M05", drawing its contrast against the "two anvils" it measured on.
+   But the gate the issue serves consumes a **mainnet** address: `state-collection`'s
+   `docs/milestones/m4/MILESTONE.md` at `eec081a` is titled "M4 — Mainnet", its criterion 1 is a
+   go/no-go that "names the **mainnet** `payee`", and its § Needs the human adds "its readiness
+   blocks mainnet" — so #74's "at M4's gate" is a mainnet gate by their own title, and a testnet
+   address cannot answer what they are holding open. Hence the split, which is also what
+   `docs/milestones/m05/MILESTONE.md:317` already says this task owes — #74 "told the new
+   **prediction**", not a landed address:
+   1. **This task, after step 13:** the correction. Their recorded `0x6aC98EDA…` is wrong, the new
+      prediction is `0xB611Ff19…`, and #74's own invariant — the address "does not move between now
+      and then unless rake changes a `src/` byte" — broke with **no `src/` change**, because #201's
+      solc pin moved every init-code hash. Owed independently of any deploy, since their record is
+      wrong today; the landed testnet address is corroboration that the new prediction is real,
+      which is why it posts after step 13 and not before.
+   2. **m05-t02/t03, at the mainnet deploy:** the update their gate actually consumes — a mainnet
+      address with non-empty `cast code` and `owner()` the Ops vault. Not this task's to deliver, and
+      a later reader should not come back to t01 for it.
 
 ## Gates — plan step 12, per chain, before the first send
 
@@ -369,8 +387,13 @@ read back and step 15's commands are in this handoff.
   agree with it are Discovery 7, along with the thing worth more than the authorship question — a
   criterion here cannot be closed by an artefact in another repo's tracker. So the engineer's part
   is to put the landed distribution address in this handoff at step 13 and nothing further. Pending
-  your ruling the clause is recorded as the architect's; the amendment reaches you with his
-  m05-t01b item, and nothing waits on it, since the comment cannot post before step 13 anyway.
+  your ruling the clause is recorded as the architect's; the amendment reaches you with his m05-t01b
+  item, and nothing waits on it, since the comment cannot post before step 13 anyway. **It is one
+  amendment covering three defects in the one clause**, each found by reading a source rather than
+  by argument: its **author** (the architect, by #74's "Done when"), its **trigger** (two updates —
+  the prediction correction here, the landed mainnet address at t02/t03 — because their M4 is the
+  mainnet gate), and its **closure shape** (the clause is met by this handoff carrying the address,
+  never by another repo accepting a comment). Discovery 7 has the citations for all three.
 
 - **Step 10 — which mainnets does the signing app list for the Ops vault?** The coordination service
   holds a `wallets` row for all four (1, 10, 8453, 42161) and for the stretch pair, read 2026-11-19.
