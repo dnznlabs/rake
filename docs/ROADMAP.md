@@ -1064,18 +1064,21 @@ convention. Numbered 45 because 44 is taken by
     wallet on another chain; the wallet form follows as the alternative, with its failure states
     still named. The endpoint stays the host's explicit choice: the example carries the chain's
     `PUBLIC_RPC` entry so that it works as pasted, as the second snippet does today, and
-    `widget.js` does not change and never falls back to an endpoint of ours. It lands in m05-t04,
-    which already edits this section and already uploads on every live chain, so it adds no upload.
+    `widget.js` does not change and never falls back to an endpoint of ours. It lands in m05-t01 as
+    plan step 13a, before step 14's upload is signed: the testnet document had not been uploaded
+    when this was ruled, so the change costs a rebuild and six regenerated proposals, no extra
+    upload and no extra sitting, and the testnet wallet run and every mainnet document carry it.
     Decisions 19, 53 and 59 stand: this is the order of two snippets, not the `src` host form, the
     trust boundary or the mirror, and the mirror changes nothing here, because `src` is resolved
     from the page's own address and `data-rpc` from the bundle's chain. **Why:** the read is public
     chain state and needs no wallet, and the form shown first failed on the test host for a wallet
     on another chain. **Rejected:** (a) a fallback inside the widget to a built-in public endpoint
     when no wallet answers, offered to him and refused, since a contract-served script would then
-    call a third party the host never chose; (b) a task of its own before m05-t02, so that the first
-    mainnet document already leads with `data-rpc` — the mainnets would then carry a bundle the
-    testnet wallet run never saw, or the testnets take a second upload and two more sittings, for a
-    page nobody outside the team can read before M06.
+    call a third party the host never chose; (b) m05-t04, the architect's first proposal: Base and every
+    mainnet landing before t04 would have led with the wallet form, and the wallet run would have
+    accepted a page that was then changed. It rested on the testnet upload having happened, which
+    it had not: on 2026-11-20 step 14's six proposals carried the engineer's signature alone, and
+    Denizen said so.
 
 ## Findings carried forward
 
