@@ -488,6 +488,62 @@ and **exits 0**:
 **0 `Imported:`** — all 82 of this ABI's signatures were already present, which is the expected
 reading for an unchanged ABI on a new deployment and confirms no ABI moved under #201's re-pin.
 
+### Base Sepolia (84532) — step 1, preflight
+
+Same branch, same toolchain, same commands. Differences from Sepolia only:
+
+| 1 | reading | required |
+|:--|:--|:--|
+| `cast chain-id` | **84532** | `= $CHAIN_ID` ✓ |
+| 1c proxy | **69 bytes**, keccak `0x2fa86add…f7e4989` | § 1's value ✓ |
+| 1e runtime | **1,319 bytes** | 1,319 ✓ |
+| 1e `cast estimate` factory | **2,396,446** | recorded |
+| 1e `cast estimate` `App` | **1,666,007** | recorded |
+| 1e block `gasLimit` | **120,000,000** | estimates fit ✓ |
+| 1e `cast base-fee` | **5,000,000 wei** (0.005 gwei) | re-read ✓ |
+| 1g `cast code` at `FACTORY` / `APP` | **`0x`** / **`0x`** | `0x` ✓ |
+
+**1f predicts the same two addresses as Sepolia** — `FACTORY
+0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`, `APP 0x00a9F390A6010d045e0d34856048DdD6910d25BA`, both
+init-code hashes identical — which is what CREATE2 through the same proxy at the same salts is for,
+and both equal Part A. **The repricing is the whole difference between the chains:** the factory
+estimate is 2,396,446 here against Sepolia's 16,738,648, a factor of **6.98**, which is #201's
+code-deposit repricing measured a third time on this task's own bytes.
+
+### Base Sepolia (84532) — step 2, the factory, after one submission the node refused
+
+**The first submission was rejected by the node and never broadcast.** `-g 900` — the multiplier
+Sepolia's step 3 needed — asked for a limit of **24,110,559** here (forge's per-transaction estimate
+on this chain is 2,678,951), and the RPC answered
+`error code -32003: gas limit too high` after 4 attempts. **Nothing was sent:** no transaction hash,
+no nonce consumed, no gas burned, `cast code` still `0x` at both addresses. This is a cheaper failure
+than Sepolia's step 3 and a different one — refused at submission rather than reverted on chain.
+
+**So the multiplier is per chain, and the two chains want opposite corrections.** Sepolia needs a
+large multiplier because the node charges ~7× forge's cancun pricing for a code deposit; Base
+Sepolia *refuses* that same multiplier because it enforces a per-transaction gas cap well below its
+120,000,000 block limit, and its node estimate (2,396,446) is already **below** forge's own
+(2,678,951). A single `-g` for a run that spans both chains cannot be correct. `-g 200` here gives
+5,357,902 — 2.2× the node's figure and comfortably under the cap.
+
+| step 2 | reading | required |
+|:--|:--|:--|
+| tx hash | **`0x73e4e918a1420edfa63adcf2ba1435474aef43da98423635d9360652cc61a0ca`** | `cast receipt` ✓ |
+| `status` | **true** | success ✓ |
+| `gasUsed` | **2,381,290** | `cast receipt` (#140) ✓ |
+| gas limit as sent | **5,357,902** | fits the cap ✓ |
+| `blockNumber` / `effectiveGasPrice` | **61,197,280** / 6,000,000 wei | recorded |
+| logged `DistributionFactory` | **`0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`** | **= 1f's prediction** ✓ |
+| `implementation` logged and read back | **`0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`** | agree, and **equal to Sepolia's** ✓ |
+| runtime length | **1,319 bytes**, artifact equal | same length ✓ |
+| differing bytes / outside the spans | **60** / **0** | none outside ✓ |
+| spans | all three hold `IMPL` left-padded to 32 | ✓ |
+
+**Here the node's estimate was not a floor.** `gasUsed` of **2,381,290** came in **15,156 below**
+the estimate of 2,396,446 — the opposite sign to both Sepolia sends. So "the estimate under-reports"
+is a property of the repriced chain, not of `cast estimate`, and the safe rule is a margin in both
+directions rather than a correction factor.
+
 ## For close-out
 
 | | value |
