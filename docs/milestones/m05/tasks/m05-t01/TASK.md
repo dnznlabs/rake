@@ -443,7 +443,7 @@ Sepolia; **every `record:` line is committed before the next transaction** (`:22
     rows; § Contracts' three addresses become Part A's; § Deployment Status carries one live row per
     testnet with the new explorer and Sourcify links and one row per testnet marked
     **superseded, pre-#201 bytes** keeping the old links, as `RUNBOOK.md:44` requires; `:17`'s "No
-    mainnet deployment exists" stays — that is m05-t02's line. A comment on
+    mainnet deployment exists" stays — that is m05-t02's line. The architect's comment on
     [state-collection#74](https://github.com/dnznlabs/state-collection/issues/74) with the new
     predicted address, the chains where `cast codesize` is 45 today, and the sentence that its body's
     `0x6aC98EDA…` is superseded. Every deviation Part B met is a `RUNBOOK.md` change in this PR or
@@ -467,7 +467,8 @@ the handoff.
   order (4c.1), then run step 15's `create` from the Creator keystore. Four signatures.
 - **Base Sepolia, the same sitting or the next:** the same four.
 - **Confirm or correct the Ops vault's testnet `delay()` of 900 s** (step 12) — a reading, not a
-  decision; the deploy proceeds on whatever the chain answers.
+  decision; the deploy proceeds on whatever the chain answers. **Confirmed 2026-11-20:** Denizen set
+  it to 15 minutes on both testnets; 3,600 s stays the mainnet figure.
 - **Answer step 10:** which of Ethereum, OP Mainnet, Base and Arbitrum One the signing app lists
   for the Ops vault. Recorded in § 1's table; no transaction depends on it in this task.
 - **Funding:** none asked. The engineer's key and the Creator key hold enough for both testnets at
@@ -553,7 +554,14 @@ an address. Baselines are `main` at `78b5eb7`, 2026-11-19.
     `DISTRO` one address on both chains.
 17. **The public record.** `grep -ci superseded README.md` ≥ 2 (baseline 0); § Contracts carries the
     new three addresses; `grep -ci 'No mainnet deployment' README.md` → 1 (unchanged);
-    state-collection#74 carries the engineer's comment with the new address.
+    state-collection#74 carries the new prediction, posted by the architect. The engineer's part is
+    the landed `$DISTRO` in this handoff; the comment is the architect's, per #74's own "Done when"
+    ("rake's architect updates this issue when the first public deploy lands"). The landed
+    **mainnet** address is a second update at m05-t02, not this task's: #74's owner line is
+    "Denizen, at M4's gate", and that milestone is titled `# M4 — Mainnet` (`state-collection`
+    `docs/milestones/m4/MILESTONE.md:1` at `eec081a`). **This clause is met by the handoff carrying
+    the address, never by another repository accepting a comment** (amended 2026-11-20 on the
+    Product Owner's word).
 18. **The bundle is m04-t16's, on top of m04-t15's.** The handoff § Gates names both task PRs and
     their merge commits, and `git merge-base --is-ancestor <m04-t16's commit> <Part B's head>` exits
     0; the `sha256` of `app/dist/index.html` and `app/dist/widget.js` per chain in the handoff equal
