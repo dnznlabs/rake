@@ -544,6 +544,31 @@ the estimate of 2,396,446 — the opposite sign to both Sepolia sends. So "the e
 is a property of the repriced chain, not of `cast estimate`, and the safe rule is a margin in both
 directions rather than a correction factor.
 
+### Base Sepolia (84532) — step 3, `App`
+
+**Sent first time with `-g 200`**, forge exit 0, `ONCHAIN EXECUTION COMPLETE & SUCCESSFUL`.
+
+| step 3 | reading | required |
+|:--|:--|:--|
+| tx hash | **`0xe8f0c7066102ea9e27ee89b52b442faa9cd704deec453b40a74af4e85c47f414`** | `cast receipt` ✓ |
+| `status` | **true** | success ✓ |
+| `gasUsed` | **1,655,420** | `cast receipt` (#140) ✓ |
+| `blockNumber` / `effectiveGasPrice` | **61,197,481** / 6,000,000 wei | recorded |
+| logged `App` | **`0x00a9F390A6010d045e0d34856048DdD6910d25BA`** | **= 1f's prediction**, and equal to Sepolia's ✓ |
+| `owner()` | **`0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`** | the Ops vault ✓ |
+| `version()` | **`"v0.1"`** | `= $APP_VERSION` ✓ |
+| `locked()` | **false** | false, and never sent ✓ |
+| runtime vs artifact | **`cmp` EQUAL**, 7,154 bytes | equal outright ✓ |
+
+**This number closes the argument about local rehearsals, by coincidence worth keeping.** Base
+Sepolia charged **1,655,420** gas — *exactly* the `Gas used: 1655420` that `cast run` printed when it
+replayed Sepolia's **failed** step 3 locally. The replay was right about the gas and wrong about the
+chain: it priced the deposit under `foundry.toml`'s cancun rules, which is what Base Sepolia applies
+and what Sepolia no longer does. So the same bytes cost 1,655,420 here and 11,505,124 there, a factor
+of **6.95**, and a local figure is a correct prediction for an un-repriced chain and a 7×
+under-estimate for a repriced one. That is the sharpest form of § Gates' caveat this task has
+measured.
+
 ## For close-out
 
 | | value |
