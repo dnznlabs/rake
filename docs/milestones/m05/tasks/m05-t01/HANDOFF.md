@@ -279,12 +279,27 @@ come later, when step 14's proposals are read back and step 15's commands are in
   run" for the `verify-contract` block and the Sourcify verifications need the key **unset**
   (`:1107`: while it is set, forge ignores `--verifier sourcify`, Etherscan answers `already
   verified` and exits 0, so Sourcify looks done when it never ran). **It blocks nothing else:** the
-  deploys of step 13 and the Sourcify half of step 5 proceed without it. If you would rather not
-  hand one over, say so and the read-back is recorded as `not run — no key supplied`, which is a
-  recorded gap and not a failed step.
+  deploys of step 13 and the Sourcify half of step 5 proceed without it. **But declining is not a
+  row that gets softened — it is a criterion amendment.** Criterion 14 names the read-back in terms:
+  "the asserting loop exits 0 with `exact_match` ×3 per chain; **`getsourcecode` names the three
+  contracts**; OpenChain all `Duplicated:`". Measured here keyless against the M04 factory, which is
+  verified: `{"status":"0","message":"NOTOK","result":"Missing/Invalid API Key"}`. So without a key
+  criterion 14 cannot pass as written, and the engineer does not get to annotate it — the architect
+  amends the criterion by a decision record first, and the table is filled against the amended
+  wording. Architect's correction, 2026-11-19, and it is right: an earlier draft of this section said
+  the row would read `not run — no key supplied`, which would have let a named criterion quietly
+  become a note.
 - **Confirm or correct the Ops vault's testnet `delay()` of 900 s** — step 12 read **900** on both
   chains, against the 3,600 the runbook's prose carries. A reading, not a decision; the deploy
-  proceeds on whatever the chain answers.
+  proceeds on whatever the chain answers. One consequence to expect at your sitting: step 12 turns
+  every "one hour" in Step 4 into "`delay()` seconds, read in 4c", so the 4b checklist handed to you
+  at step 14 will say **900 seconds**, not an hour. Waiting on the wrong clock is the failure mode.
+- **Your OK to post the state-collection#74 comment, and it waits for step 13.** Criterion 17's last
+  clause is "state-collection#74 carries the engineer's comment with the new address". The text is
+  drafted and **not posted** — `docs/milestones/m04/CLOSEOUT.md:124-126`, "the issue has 0 comments;
+  this is the text for the Product Owner to approve". It is cross-repo and it needs the address step
+  13 lands, so it cannot be posted before the redeploy whatever you decide tonight. Flagged here with
+  the key so one sitting covers both rather than two messages.
 
 - **Step 10 — which mainnets does the signing app list for the Ops vault?** The coordination service
   holds a `wallets` row for all four (1, 10, 8453, 42161) and for the stretch pair, read 2026-11-19.
