@@ -434,6 +434,25 @@ must clear `11,405,803 × 64/63 + intrinsic` ≈ 11.61M, plus a margin for the
 block limit. Recommend step 1e be amended to name the per-transaction estimate as the multiplicand
 and to require a margin over the node's estimate rather than equality with it.
 
+**The retry succeeded.** `-g 900`, forge exit 0, `ONCHAIN EXECUTION COMPLETE & SUCCESSFUL`.
+
+| step 3 | reading | required |
+|:--|:--|:--|
+| tx hash | **`0xa3748d963f39e1a7c6747d832103ec8f7b1d22613f6a8fa6e5da0783f7bb3261`** | `cast receipt` ✓ |
+| `status` | **true** | success ✓ |
+| `gasUsed` | **11,505,124** | `cast receipt`, not `run-latest.json` (#140) ✓ |
+| `blockNumber` / `effectiveGasPrice` | **12,173,956** / 50,000,017 wei | recorded |
+| logged `App` | **`0x00a9F390A6010d045e0d34856048DdD6910d25BA`** | **= 1f's prediction** ✓ |
+| `owner()` | **`0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`** | `= $OWNER`, the Ops vault ✓ |
+| `version()` | **`"v0.1"`** | `= $APP_VERSION` ✓ |
+| `locked()` | **false** | false, and never sent ✓ |
+| runtime vs `forge inspect App deployedBytecode` | **`cmp` EQUAL**, 14,310 chars = **7,154 bytes** | equal outright ✓ |
+
+**The margin was load-bearing, measured twice now.** `gasUsed` of **11,505,124** is **99,321 above**
+the node's `cast estimate` of 11,405,803 — so a limit set at the node's figure would have failed a
+second time. With step 2's +58,514 that is two for two on the same side, which makes "the node's
+estimate is a floor, not a target" a measured rule on this chain rather than a precaution.
+
 ## For close-out
 
 | | value |
