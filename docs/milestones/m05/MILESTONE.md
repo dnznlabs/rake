@@ -376,6 +376,7 @@ issues whose body names this milestone:
 | [#75](https://github.com/dnznlabs/rake/issues/75) token list | Not M05's: every contract-side option is a new version (decision 5). Relabelled at close-out with that reason. |
 | [#235](https://github.com/dnznlabs/rake/issues/235) build hardening (m04-t14), [#243](https://github.com/dnznlabs/rake/issues/243), [#241](https://github.com/dnznlabs/rake/issues/241) | M04's, every one gated on "before M05 builds the mainnet document": they close in M04 or are re-scoped there before t01 builds the bundle it uploads. Listed so the gate is visible from this side. |
 | [#227](https://github.com/dnznlabs/rake/pull/227) the log cache (m04-t12), [#221](https://github.com/dnznlabs/rake/issues/221), [#165](https://github.com/dnznlabs/rake/issues/165) | Closed before mainnet by decision 62 (2026-11-19): #227 unmerged, branch kept; #221 and #165 carried post-mainnet, reassessed after this milestone's mainnet upload with a per-load figure from a chain that costs something. Not a gate on anything here. |
+| [#309](https://github.com/dnznlabs/rake/issues/309) snippet order | t01, decision 65: `#/docs` leads with the `data-rpc` form. Plan step 13a, before step 14's upload is signed, so the testnet wallet run and every mainnet document carry it; criterion 18g. |
 | state-collection#74 | The architect posts each update: the new prediction at t01, the landed mainnet address at t02; close-out names the live chains. |
 
 ## One-way doors
