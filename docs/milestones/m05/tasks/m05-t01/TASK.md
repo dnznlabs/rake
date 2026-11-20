@@ -449,6 +449,45 @@ Sepolia; **every `record:` line is committed before the next transaction** (`:22
     Check: two commands in § For Denizen that differ only in `RPC` and `CHAIN_ID`; `DISTRO` in
     each equals Part A's prediction.
 
+16a. **Base Sepolia only: replace the queued nonce-14 piece** (added 2026-11-20, after the sitting).
+    On 84532 the proposal submitted at vault nonce 14 was the superseded one. Read by the architect
+    that day with `queued(bytes32)` on the Ops vault: `0xe2deb8b268b8c0d951e6a21787d84c38b9413f4be24eeadeade318766ae957c2`
+    (step 13a's § Deviations row, never to be signed) → `1795189939`; the live
+    `0x673590fb892c778f278603ecadaea8ee8815eb362c714b564ad8f8087a4d1d5e` → `0`; nonces 13 and 15
+    queued with the live digests; vault `nonce()` 16, `cast nonce $APP` 1. Sepolia's three queued
+    digests are the live ones and step 16 runs there as written. Nonce 14 is consumed, so the live
+    chunk-1 proposal cannot be submitted as signed, and the three pieces now queued on 84532 would
+    serve the page as it was before step 13a. In this order:
+
+    1. The engineer re-reads the four `queued()` values, both nonces, `threshold()`, `delay()` and
+       `forwardEnabled` on 84532, dated, into the handoff. A reading that differs from the above
+       is a stop.
+    2. Piece 1 — `executeQueued` of `1-addChunk-0.hex` at nonce 13 — is sent at its eta as step 16
+       has it. It is `App`'s first CREATE in every path, and once it has landed no order of the
+       remaining pieces can swap the page's halves.
+    3. **The cancel.** `cancelQueued(0xe2deb8b2…ae957c2)` as a vault self-call at the vault's live
+       nonce through `TimelockExecutor.forward()`, which takes threshold signatures for
+       `cancelQueued` alone and takes effect at once (`RUNBOOK.md:1539-1543`). One signature from the engineer, one from the Product Owner.
+    4. **Chunk 1 again.** A new proposal at the vault's next nonce: target `App`, value 0, data the
+       committed `calldata/84532/2-addChunk-1.hex` unchanged (`sha256`
+       `30cc12d04a5c37b9d8d9cc3f5f4f6b1720d46fbc6924f4f17e280a3f6c37e933`), digest from
+       `getTransactionHash`, one signature each, queued for `delay()` by his submit.
+    5. Both asks reach the Product Owner as one `action` issue for this chain in the 4b checklist's
+       form, with both digests and how to re-derive each. The cancel is a vault self-call: it is
+       confirmed with him outside the channel that asked for it.
+    6. Then step 16 on this chain: the new chunk-1 piece as `App`'s second CREATE, then the batch
+       already queued at nonce 15, each behind the gate `RUNBOOK.md` § 4c reads from the chain.
+
+    Until the cancel's receipt, the engineer sends neither the queued nonce-14 piece nor the batch
+    on this chain. A queued piece does not expire and anyone can execute a matured one: if
+    `cast nonce $APP` moves in a way these steps did not cause, stop and report. The repair is then
+    a corrective `setChunks`, which is a new plan step and not this one.
+
+    Check: the `forward` receipt `status 1` and `queued(0xe2deb8b2…ae957c2)` → `0` after it; the new
+    proposal's nonce and digest in the handoff, with the `action` issue's number; § Deviations
+    carries the sitting's reading and this step; step 16's Check on 84532 unchanged, its
+    `inflated sha256` equal to the build at step 14's second run.
+
 16. **4c and 4d, after the Product Owner's sitting.** After the three co-signs and submits per
     chain and `delay()` seconds from the third submit: `executeQueued` 1 → 2 → batch, the content
     gate of `:701-706` read between pieces, estimate + 30% per send; then `chain-doc` and
@@ -459,7 +498,8 @@ Sepolia; **every `record:` line is committed before the next transaction** (`:22
 
     Check: `inflated sha256` and `widget sha256` equal the build on both chains; `cast nonce $APP`
     → 4; the four distribution read-backs equal the exports; six `executeQueued` and two `create`
-    receipts `status 1` with `gasUsed`, read from the chain.
+    receipts `status 1` with `gasUsed`, read from the chain. On 84532 one `forward` receipt
+    beside them (step 16a).
 
     **Then, before step 17 — the wallet run, both chains (M04 criterion 6, moved here by decision
     63, after step 14's proposals have executed in 4c and the `create` has landed).** First the
