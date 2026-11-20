@@ -1,5 +1,7 @@
 # m04-t12 — The finalized-log cache
 
+**Status: closed before mainnet by [decision 62](../../../../ROADMAP.md) (Denizen, 2026-11-19, Telegram 20:15 CST).** [#227](https://github.com/dnznlabs/rake/pull/227) closed unmerged, branch `m04/t12-log-cache` kept at `ad556ff`; [#221](https://github.com/dnznlabs/rake/issues/221) and [#165](https://github.com/dnznlabs/rake/issues/165) carried as a post-mainnet consideration. The plan below is kept as written.
+
 Milestone: [M04](../../MILESTONE.md) · Phase: 1 — The dapp that ships
 
 When this is done, a distribution page opened for the second time on the same device re-reads only

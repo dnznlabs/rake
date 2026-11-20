@@ -16,9 +16,9 @@ folded into the runbook before it runs where ETH costs money and `App`'s address
 **Gate: M04 is not closed, and this milestone does not start until it is.** Read 2026-11-18: m04-t05
 (the UAT and the wallet-path measurement) is running; m04-t14 (build hardening, #235) is scoped and
 not merged, and its own text says it must merge before M05 builds the mainnet document; m04-t12
-([#227](https://github.com/dnznlabs/rake/pull/227)) is held by Denizen's ruling of 2026-11-18 with
-its ship-or-close decision due after t05's figures and before the mainnet document (decision 52's
-addendum); the post-UAT `app/` task carrying [#243](https://github.com/dnznlabs/rake/issues/243),
+([#227](https://github.com/dnznlabs/rake/pull/227)) was held by Denizen's ruling of 2026-11-18 and
+is **closed before mainnet by decision 62 (2026-11-19)** — #227 unmerged, branch kept, #221 and
+#165 carried post-mainnet, so it no longer gates this milestone; the post-UAT `app/` task carrying [#243](https://github.com/dnznlabs/rake/issues/243),
 [#241](https://github.com/dnznlabs/rake/issues/241) and decision 53's `#/docs` paragraph is not yet
 scoped; and M04's Phase 5 close-out (`CLOSEOUT.md`, the carried-issues table, the comment on
 state-collection#74) has not been written. Phase 1 below can be *scoped* while those finish, because
@@ -147,8 +147,9 @@ Re-run rather than quote.
 - **Chains beyond `RUNBOOK.md` § 1's table.** A new chain is a new § 1 row with its proxy, alias and
   gateway readings first, not a variable.
 - **A second `App` version or any dapp change that is not a document upload.** `app/` changes land
-  through Run B as uploads; the post-UAT `app/` task and #227's ship decision are M04's and close
-  before Phase 2 builds the mainnet document.
+  through Run B as uploads; the post-UAT `app/` task is M04's and closes before Phase 2 builds the
+  mainnet document; #227 (the log cache) is closed before mainnet by decision 62 and carried
+  post-mainnet, so no ship decision on it is pending here.
 
 ## Needs from the Product Owner
 
@@ -301,7 +302,7 @@ reader-verifiable additions to the self-review that decision 56 puts before the 
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m05-t01 | **Re-mine, amend, redeploy.** Decision 37's mining run against `main`'s init-code hashes (M05-D1; `0x00d1…`/`0x00a9…`, m03-t10's commands), `RUNBOOK.md` § 0 rewritten with the new salts and addresses and the stale block removed; the Step 5 read-back loop made an assertion ([#207](https://github.com/dnznlabs/rake/issues/207)); a per-chain chunk gas term — `cast estimate --create` of the factory on each of the six mainnets (step 1e) read into a table beside § 1, and `tools/step4-calldata.mjs`/`scripts/forge/Chunks.s.sol:13`'s `MAX_CHUNK` given a per-chain size where a 24,000-byte chunk would not clear the chain's block limit with margin ([#188](https://github.com/dnznlabs/rake/issues/188); Ethereum's limit read 60,000,000 and OP Mainnet's and Base's 40,000,000 on 2026-11-18, against a 37.8 M-gas chunk at Sepolia's pricing); the base-fee stop rule restored or its citation corrected (criterion 6); § 0's step-6 block filled with decisions 50 and 51's values and M05-D2's key; the signing app's and coordination service's mainnet chain support read and recorded. Then Run A steps 1–5, Run B and step 6 on Sepolia and Base Sepolia at the new addresses, § Executed on testnets amended, README § Contracts marking the M04 rows superseded, state-collection#74 told the new prediction. Closes #207, #188 | not started — scoped after M04's t14 merges and #227's decision is ruled, so the bundle this redeploy uploads is the one mainnet gets |
+| m05-t01 | **Re-mine, amend, redeploy.** Decision 37's mining run against `main`'s init-code hashes (M05-D1; `0x00d1…`/`0x00a9…`, m03-t10's commands), `RUNBOOK.md` § 0 rewritten with the new salts and addresses and the stale block removed; the Step 5 read-back loop made an assertion ([#207](https://github.com/dnznlabs/rake/issues/207)); a per-chain chunk gas term — `cast estimate --create` of the factory on each of the six mainnets (step 1e) read into a table beside § 1, and `tools/step4-calldata.mjs`/`scripts/forge/Chunks.s.sol:13`'s `MAX_CHUNK` given a per-chain size where a 24,000-byte chunk would not clear the chain's block limit with margin ([#188](https://github.com/dnznlabs/rake/issues/188); Ethereum's limit read 60,000,000 and OP Mainnet's and Base's 40,000,000 on 2026-11-18, against a 37.8 M-gas chunk at Sepolia's pricing); the base-fee stop rule restored or its citation corrected (criterion 6); § 0's step-6 block filled with decisions 50 and 51's values and M05-D2's key; the signing app's and coordination service's mainnet chain support read and recorded. Then Run A steps 1–5, Run B and step 6 on Sepolia and Base Sepolia at the new addresses, § Executed on testnets amended, README § Contracts marking the M04 rows superseded, state-collection#74 told the new prediction. Closes #207, #188 | not started — scoped after M04's t14 merges and #227's decision is ruled (ruled 2026-11-19, decision 62: closed, not shipped), so the bundle this redeploy uploads is the one mainnet gets |
 | m05-t01b | **Threat model, coverage floor, mutation run** (decision 56, [#262](https://github.com/dnznlabs/rake/issues/262)). `docs/THREAT_MODEL.md` listing actors, token classes, chains and what each assumption's test is, each row naming a test `forge test --list` returns, diffed against the Solodit checklist and two Pashov fee-distribution reports; a `forge coverage --ir-minimum` summary committed with a CI floor one point under the measured figure; `slither-mutate` over `src/` with `forge test`, results committed per commit, every survivor given a test or a one-line reason. The next `audits/<date>/AUDIT.md` provenance block names the coverage floor and the mutation score beside the leg versions. § Out of scope's first line holds: a survivor whose only remedy is under `src/` is recorded with its reason, not fixed | not started |
 
 ### Phase 2 — The first mainnet
@@ -361,7 +362,8 @@ issues whose body names this milestone:
 | [#127](https://github.com/dnznlabs/rake/issues/127) native-balance alias (F12) | t02 and t03 re-run the `transfer` assertion per chain before each deploy; t03 closes it with the six-row table. |
 | [#167](https://github.com/dnznlabs/rake/issues/167) paid review quotes | Ruled 2026-11-18, option 3, decision 55: no paid review, no quote request. Closes on the transcription's merge. |
 | [#75](https://github.com/dnznlabs/rake/issues/75) token list | Not M05's: every contract-side option is a new version (decision 5). Relabelled at close-out with that reason. |
-| [#235](https://github.com/dnznlabs/rake/issues/235) build hardening (m04-t14), [#227](https://github.com/dnznlabs/rake/pull/227) the log cache (m04-t12), [#243](https://github.com/dnznlabs/rake/issues/243), [#241](https://github.com/dnznlabs/rake/issues/241), [#165](https://github.com/dnznlabs/rake/issues/165) | M04's, every one gated on "before M05 builds the mainnet document": they close in M04 or are re-scoped there before t01 builds the bundle it uploads. Listed so the gate is visible from this side. |
+| [#235](https://github.com/dnznlabs/rake/issues/235) build hardening (m04-t14), [#243](https://github.com/dnznlabs/rake/issues/243), [#241](https://github.com/dnznlabs/rake/issues/241) | M04's, every one gated on "before M05 builds the mainnet document": they close in M04 or are re-scoped there before t01 builds the bundle it uploads. Listed so the gate is visible from this side. |
+| [#227](https://github.com/dnznlabs/rake/pull/227) the log cache (m04-t12), [#221](https://github.com/dnznlabs/rake/issues/221), [#165](https://github.com/dnznlabs/rake/issues/165) | Closed before mainnet by decision 62 (2026-11-19): #227 unmerged, branch kept; #221 and #165 carried post-mainnet, reassessed after this milestone's mainnet upload with a per-load figure from a chain that costs something. Not a gate on anything here. |
 | state-collection#74 | t01 updates the predicted address; close-out names the live chains. |
 
 ## One-way doors

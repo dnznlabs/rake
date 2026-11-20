@@ -779,7 +779,8 @@ convention. Numbered 45 because 44 is taken by
     first load and stays 3 as the chain grows. Closes
     [#165](https://github.com/dnznlabs/rake/issues/165) against the per-load figure m04-t12 measures,
     rather than by a block-target budget; m04-t12 must merge before M05 uploads the mainnet document,
-    or every mainnet chain pays a chunk re-upload for it. **Rejected:** (2) leave the scan as is and
+    or every mainnet chain pays a chunk re-upload for it (**superseded by decision 62 on the gate**:
+    t12 is closed before mainnet, see the second addendum below). **Rejected:** (2) leave the scan as is and
     close #165 with a block-target budget — still the full scan on every load, and the only option
     that gets dearer with time; (3) a `createdBlock` on the clone so the scan starts at the right
     block — still rescans the whole lifetime every load, and touches clone storage, which is frozen
@@ -797,6 +798,12 @@ convention. Numbered 45 because 44 is taken by
     Decide after t05 records the per-load count and wall time through MetaMask's RPC, and before
     M05 builds the mainnet document, which was always the gate that mattered: ship it as amended,
     or close #165 by option 2 with the figure recorded. #165 reopens against t05 until then.
+    **Addendum 2026-11-19 (closed, decision 62):** the ship-or-close deadline above is withdrawn.
+    m04-t12 is closed before mainnet, #227 unmerged with its branch kept, and #221 and #165 are
+    carried as a post-mainnet consideration; neither the gate "before M05 builds the mainnet
+    document" nor the line "m04-t12 must merge before M05 uploads the mainnet document" is live.
+    The ruled shape of this decision (option 1, the finalized-log cache) stands as the design if
+    the figure ever justifies it.
 
 53. **The gateway the visitor chose is the trust boundary for the hosted dapp; `web3://` direct is
     preferred and gateways are a convenience.** Ruled by Denizen on 2026-11-18 (GitHub,
@@ -963,6 +970,26 @@ convention. Numbered 45 because 44 is taken by
     m04-t15's § The upload stands. Rejected: fixing #273 and #274 after mainnet, at one vault
     proposal round per chain for two fixes an unbuilt bundle carries for nothing — a visitor with
     no wallet is the reader the mainnet document most needs to serve.
+
+62. **m04-t12, the finalized-log cache, is closed before mainnet: [#227](https://github.com/dnznlabs/rake/pull/227)
+    stays unmerged with its branch kept, and [#221](https://github.com/dnznlabs/rake/issues/221)
+    and [#165](https://github.com/dnznlabs/rake/issues/165) are carried as a post-mainnet
+    consideration, reassessed after M05's mainnet upload with a per-load figure from a chain that
+    costs something.** Ruled by Denizen on 2026-11-19 (Telegram, 20:15 CST), as "premature
+    optimization". **Why:** the remedy was sized from the public fallback RPC while wallet users
+    read through their wallet's RPC (decision 61 rests on the same fact), and it adds persistent
+    client state before mainnet for a cost nobody has measured in the field; the 120-request
+    figure in decision 52 is a ceiling computed from the window budget, not a count read from a
+    user's wallet. Done on GitHub the same evening (read 2026-11-19): #227 closed unmerged, branch
+    `m04/t12-log-cache` kept at `ad556ff` with the architect's approval at `c830f5d` on record;
+    #221 relabelled `carried`, out of `m04`, unassigned; #165 commented and stays carried. The
+    earliest home for the cache is the optional M07, after mainnet; nothing in M04, M05 or M06
+    waits on it. **Supersedes** decision 52's addendum of 2026-11-18, whose ship-or-close deadline
+    ("before M05 builds the mainnet document") is withdrawn, and 52's line "m04-t12 must merge
+    before M05 uploads the mainnet document"; 52's ruled shape stands as the design. **Rejected:**
+    shipping as amended at `ad556ff` — still on the shelf, the branch is kept for it; closing #165
+    by 52's option 2 (a block-target budget) — not taken either, since no per-load figure from a
+    paid chain is recorded and the option would fix the budget without one.
 
 ## Findings carried forward
 
