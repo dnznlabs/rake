@@ -1242,6 +1242,32 @@ until w3link catches up, and the handoff names which served each chain.
 [#300](https://github.com/dnznlabs/rake/issues/300) and
 [#304](https://github.com/dnznlabs/rake/issues/304)).
 
+### Step 15 and M05 criterion 4 — Sepolia's `create` has landed and verifies clean
+
+**The Product Owner sent it on Sepolia some time before 2026-11-20 17:5xZ**, and every reading
+criterion 4 names is correct. Read live on `ethereum-sepolia-rpc.publicnode.com`:
+
+| M05 criterion 4 | reading | required |
+|:--|:--|:--|
+| `cast codesize $DISTRO` | **45** | 45 ✓ |
+| address | **`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`** | equals `predict($DNZN_SALT)` on the new factory, read back the same ✓ |
+| `owner()` | **`0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`** | the Ops vault ✓ |
+| `delay()` | **86400** | 86400 on both testnets, decision 42 ✓ |
+| `description()` | **`"DNZN // FUND DISTRIBUTION"`** | decision 51 ✓ |
+| `snapshot()` table | **`(0x00b6E7D1…, 2000, "treasury", …), (0x00c0e887…, 4000, "ops", …), (0x357836fF…, 4000, "creator", …)`** | three rows ascending, 2,000 / 4,000 / 4,000 ✓ |
+| `snapshot()` nonce / pending | **0** / **empty** | a fresh distribution ✓ |
+
+**This settles the bps question in the only way that counts.** § For Denizen records that the
+architect's brief for step 15 named decision 42's 1,000 / 3,000 / 6,000 and that the authority was
+decision 50's 2,000 / 4,000 / 4,000. The chain now carries **2,000 / 4,000 / 4,000**, so the reading
+that resolved it was right and the distribution is correct at an address that can never be
+redeployed. Had the other set been used, `BadTable()` would not have caught it — both sum to 10,000.
+
+**Base Sepolia's `create` is still outstanding:** `cast codesize` at the same address reads **0**
+there. Because the calldata is byte-identical across the two chains, the command that produced this
+result is the one to repeat, and Sepolia verifying clean is positive evidence for it rather than
+merely an absence of trouble. `DISTRO` is one address on both chains by construction.
+
 ## For close-out
 
 | | value |
