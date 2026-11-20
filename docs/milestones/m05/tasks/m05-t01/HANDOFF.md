@@ -1120,6 +1120,71 @@ Product Owner. What remains on 84532 is his signature, then the replacement as `
 then the batch already queued at nonce 15, then 4d against
 `59ef3a4e21d585e623f54861d54aa8fd8d10135691747d1f23ebb03dce20df28` with `cast nonce $APP` **4**.
 
+## For Denizen — step 15, DNZN's `create`, the two commands
+
+**The two differ only in `RPC` and `CHAIN_ID`**, which is step 15's own check. Everything else —
+owner, delay, description, table and salt — is identical on both testnets, so the calldata is
+**byte-identical** across them: 1,188 bytes, selector `0xf0f469ff`.
+
+```sh
+# Sepolia
+export RPC=https://ethereum-sepolia-rpc.publicnode.com CHAIN_ID=11155111
+# Base Sepolia
+export RPC=https://sepolia.base.org               CHAIN_ID=84532
+
+# identical on both
+export FACTORY=0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E
+export OWNER=0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790
+export CREATOR=0x68e0741D8d693e14BF56914567eADdC130b186eE
+export SENDER="--account dnzn-creator --password-file <file> --from $CREATOR"
+export DNZN_SALT=${CREATOR}000000000000000000000001
+export DNZN_DELAY=86400
+export DNZN_DESCRIPTION="DNZN // FUND DISTRIBUTION"
+export DNZN_TABLE='[(0x00b6E7D12EdE9Ca4A74fE69be758aAB1ee02cFb9,2000,"treasury","long-term growth, future projects"),(0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790,4000,"ops","infrastructure, services, tokens"),(0x357836fFcB45307FA7ff2A574F505753c961902B,4000,"creator","founding engineer, product vision")]'
+
+cast code 0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199 --rpc-url "$RPC"   # must print 0x
+
+cast send $FACTORY 'create(address,uint32,string,(address,uint96,string,string)[],bytes32)' \
+  $OWNER $DNZN_DELAY "$DNZN_DESCRIPTION" "$DNZN_TABLE" $DNZN_SALT \
+  --rpc-url "$RPC" $SENDER
+```
+
+**The sender must be the Creator key, and this is enforced in the contract rather than by
+convention.** `create` computes `uint256(salt) >> 96` and reverts `SaltDoesNotStartWith()` unless it
+equals `uint160(msg.sender)` (`src/Distribution.sol:459-467`). Demonstrated both ways on both chains
+rather than asserted: simulated from `$CREATOR` it returns
+**`0xb611ff193da8fa9391c0a3daa29c3c9a0f4d5199`**, and simulated from the Product Owner's usual owner
+address `0x357836fF…902B` it reverts **`0x0c4549ef`**. This is the whole reason step 15 is his with
+the Creator keystore and not a vault action.
+
+**The table is decision 50's 2,000 / 4,000 / 4,000, and the question was live enough to be worth
+settling in writing.** The architect's brief for this step named decision 42's **1,000 / 3,000 /
+6,000**; `RUNBOOK.md:1881-1885` says in terms that the table is "decision 50's 2,000 / 4,000 / 4,000
+over Treasury, Ops and the Creator, **not** decision 42's 1,000 / 3,000 / 6,000", and the block above
+it is labelled M04's record "kept as read, not corrected". **Corroborated against the chain rather
+than settled on the document's word:** the live Sepolia distribution
+`0x71a4221974Fc2E95081AE513248918dF27CF7a4A` answers `description()` `DNZN // FUND DISTRIBUTION` and
+`snapshot()` with exactly `(0x00b6E7D1…, 2000, "treasury", …), (0x00c0e887…, 4000, "ops", …),
+(0x357836fF…, 4000, "creator", …)`. Both sets sum to 10,000, so neither would trip `BadTable()` —
+the sum is not a discriminator here, which is exactly why this had to be read rather than reasoned.
+The addresses are already strictly ascending as `_set` requires.
+
+**Pre-flight, read live on both chains before the commands were written:** `predict($DNZN_SALT)` on
+the **new** factory returns `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199` on each — equal to Part A's
+prediction — and `cast code` there prints `0x`. Estimates from the Creator: **2,241,718** on Sepolia
+and **480,533** on Base Sepolia, against 0.01 ETH held on each.
+
+**He has no `cast` installed** — established when he did the step-16a cancel through Etherscan's
+Write as Proxy — so [#300](https://github.com/dnznlabs/rake/issues/300) and
+[#304](https://github.com/dnznlabs/rake/issues/304) each carry three forms for their chain: the
+`cast send` above, an Etherscan **Write Contract** breakdown field by field (the factory is verified
+on both explorers from step 5, and it is not a proxy, so it is the ordinary Write tab), and the raw
+calldata last. **The Etherscan `table_` field carries a real risk that is named rather than hidden:**
+two of the three notes contain commas, and Etherscan's tuple parser has split on commas inside
+quoted strings before, so the issues tell him to stop if the preview mangles it or the table reads as
+four or more rows. The raw calldata is offered third and with the reason — choosing the function by
+name shows each argument decoded, and hex does not.
+
 ## For close-out
 
 | | value |
