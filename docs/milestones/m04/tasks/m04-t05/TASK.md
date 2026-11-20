@@ -2,6 +2,13 @@
 
 Milestone: [M04](../../MILESTONE.md) · Phase: 4 — Accepted from a wallet
 
+**Status (2026-11-19):** steps 0–2 done ([#252](https://github.com/dnznlabs/rake/pull/252)) and
+stand. **Step 3 is superseded by decision 63** (`docs/ROADMAP.md`): Denizen's wallet run executes in
+M05, as a step of [m05-t01](../../../m05/tasks/m05-t01/TASK.md) after its step 16, on the m04-t16
+bundle the redeployed testnets serve, with `UAT.md` below as its script and the criterion 6 signoff
+in that handoff. Step 4, the measurement, was withdrawn with t12 (decision 62). The text below is
+the plan as scoped and is not amended.
+
 When this is done, criterion 6 has a script — one ordered list per chain, Sepolia (11155111) and Base
 Sepolia (84532), each step naming the action, the expected state, the screenshot and the hash — that the
 engineer has run once in headless chromium with an injected provider against Sepolia, so it is known

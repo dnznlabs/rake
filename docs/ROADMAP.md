@@ -991,6 +991,33 @@ convention. Numbered 45 because 44 is taken by
     by 52's option 2 (a block-target budget) — not taken either, since no per-load figure from a
     paid chain is recorded and the option would fix the budget without one.
 
+63. **m04-t05 step 3, Denizen's wallet run on both testnets, is superseded: criterion 6's wallet run
+    moves to M05 Part B, after the Run B upload m05-t01 step 14 proposes has executed (its step
+    16) with the m04-t16 bundle on the redeployed testnets, and M04 closes with steps 0–2 done.** Ruled by Denizen on 2026-11-19 (Telegram,
+    20:32 CST), on the architect's recommendation (option (c) on
+    [#245](https://github.com/dnznlabs/rake/issues/245)). M04 closes with m04-t05's steps 0–2 done,
+    the two no-wallet findings ([#273](https://github.com/dnznlabs/rake/issues/273),
+    [#274](https://github.com/dnznlabs/rake/issues/274)) filed and fixed in m04-t16, and the
+    wallet-path measurement withdrawn with t12 (decision 62). The wallet run itself is a step of
+    [m05-t01](milestones/m05/tasks/m05-t01/TASK.md) after its step 16, driven by m04-t05's `UAT.md`
+    on the t16 bundle, and the signoff line of M04 criterion 6 is written in that handoff. **Why:**
+    the deployed M04 bundle predates m04-t15 and m04-t16 by design (no Run C, m04-t15 § The upload
+    and m04-t16 criterion 9), so a wallet UAT on it is evidence about a bundle that never ships; the
+    measurement's consumer, decision 52's ship decision, is gone with decision 62; and the gate was
+    circular — Part B waited on M04's close-out, close-out on step 3, step 3 on Part B's upload.
+    Also on record (read 2026-11-19, the engineer's step 0 re-run at `6634c28`): `chain-doc` on both
+    chains equals the Run B pinned hashes (`b1fc3b96…` Sepolia, `6f0225bb…` Base Sepolia, widget
+    `8b6bbc88…`), so step 0's document bullet passes on both; w3link's Sepolia endpoint serves a
+    stale document (61,181 bytes against `html()`'s 62,265; widget 8,132 against 8,509;
+    `cache-status: miss`, stale since at least 15:20Z), [#242](https://github.com/dnznlabs/rake/issues/242)'s
+    third-party condition, so step 0's hosted-gateway bullet fails on Sepolia and passes on Base
+    Sepolia. **Supersedes** m04-t05 TASK.md step 3 as an M04 step, and M04 criterion 6's "from a
+    browser wallet on each chain" as an M04 condition; decision 61's "m05-t01's step 14 waits for
+    its merge" stands. **Rejected:** (b) drive step 3 now against the deployed bundle with the two
+    known rows marked superseded — proves wallet connect from the real w3link origin on Base Sepolia
+    today, and nothing that the M05 run does not prove later; (a) a new M04 upload (a Run C) —
+    already rejected by m04-t15 § The upload and m04-t16 criterion 9.
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that

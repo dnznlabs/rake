@@ -1,6 +1,6 @@
 # M04 — Testnets
 
-Status: in progress · scoped 2026-11-07 · updated 2026-11-18 (t04 scoped; t11 from #215 and t12 added; t08 2026-11-08, t09 2026-11-12, t10 2026-11-17; t10 done, t11 approved, t12 issue opened, #209 closed, all 2026-11-17; t12 held out of Run B, 2026-11-18; t13 scoped from t04's front-end rollup, 2026-11-17; t05 and t14 scoped 2026-11-18; t13 done, t05 steps 0–2 done, t14 done, 2026-11-18; t15 scoped 2026-11-19; t16 scoped 2026-11-19; t12 closed before mainnet, decision 62, 2026-11-19)
+Status: in progress · scoped 2026-11-07 · updated 2026-11-18 (t04 scoped; t11 from #215 and t12 added; t08 2026-11-08, t09 2026-11-12, t10 2026-11-17; t10 done, t11 approved, t12 issue opened, #209 closed, all 2026-11-17; t12 held out of Run B, 2026-11-18; t13 scoped from t04's front-end rollup, 2026-11-17; t05 and t14 scoped 2026-11-18; t13 done, t05 steps 0–2 done, t14 done, 2026-11-18; t15 scoped 2026-11-19; t16 scoped 2026-11-19; t12 closed before mainnet, decision 62, 2026-11-19; t05 step 3 superseded, the wallet run moves to m05-t01, decision 63, 2026-11-19)
 
 `RUNBOOK.md` executed for real, twice — Sepolia (11155111) and Base Sepolia (84532) — so that the
 factory, the implementation, `App` and DNZN's own distribution sit at the addresses M03 predicted
@@ -83,7 +83,13 @@ than quote. "Both chains" means Sepolia and Base Sepolia, every time.
    `release` or `claim` on an escrowed row; and reads DNZN's distribution, whose owner is the vault,
    with the propose control showing calldata (decision 7). Every transaction hash is in the UAT
    handoff. The signoff is a dated line under § Phases 4 in this file, written by Denizen; the
-   milestone is not done while it is absent.
+   milestone is not done while it is absent. **Amended 2026-11-19 (decision 63):** the wallet run
+   executes in M05 Part B, after the Run B upload m05-t01 step 14 proposes has executed (its step 16) with the
+   m04-t16 bundle on the redeployed testnets, driven by m04-t05's `UAT.md`, and the signoff line is written in that task's handoff;
+   this criterion is met for M04 by steps 0–2 of m04-t05 (the script, the engineer's headless
+   Sepolia run, the two no-wallet findings filed as #273 and #274 and fixed in m04-t16) plus that
+   transfer. The deployed M04 bundle predates m04-t15 and m04-t16 by design, so a wallet run on it
+   would be evidence about a bundle that never ships.
 7. **The runbook is amended by what happened, not annotated.** Every deviation the deploy task's
    handoff lists is either a change to `RUNBOOK.md` in that PR or a one-line reason it is not;
    `git log --oneline -- RUNBOOK.md` since this milestone's first commit shows the amendments, and
@@ -161,7 +167,9 @@ than quote. "Both chains" means Sepolia and Base Sepolia, every time.
   (a second decision); default if unanswered by M04's close-out: request at M05's scoping and let
   M05's estimate absorb the weeks. Blocks nothing in M04.
 - **The UAT session and the signoff line** (criterion 6), with a wallet that holds a little testnet
-  ETH on both chains and is not the Creator key.
+  ETH on both chains and is not the Creator key. **Moved to M05 by decision 63 (2026-11-19):** the
+  session runs after m05-t01 step 16 on the redeployed testnets, and the signoff goes in that
+  handoff.
 
 ## Phases
 
@@ -217,9 +225,9 @@ Denizen's session, scripted so the evidence is a list of hashes and not a feelin
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m04-t05 | The UAT script for criterion 6 — one ordered list per chain with the expected state after each step, the gateway URL to open, the wallet to use and what to screenshot; run first by the engineer in headless chromium with an injected provider against Sepolia so the script is known to be executable; then Denizen's run, its hashes and screenshots filed in the handoff by whoever holds them, and the signoff line below. Anything he finds is an issue, scoped per item: `app/` fixes land as m04-t09 if they change what criterion 3 hashes, and are re-uploaded once through m04-t08's vault procedure | scoped 2026-11-18 ([TASK.md](tasks/m04-t05/TASK.md)); steps 0–2 done 2026-11-18 ([#252](https://github.com/dnznlabs/rake/pull/252) merged; Sepolia read through the project's own gateway build per [#248](https://github.com/dnznlabs/rake/pull/248), row (j) amended in [#250](https://github.com/dnznlabs/rake/pull/250)); step 3, Denizen's wallet run on both chains, open ([#245](https://github.com/dnznlabs/rake/issues/245)) |
+| m04-t05 | The UAT script for criterion 6 — one ordered list per chain with the expected state after each step, the gateway URL to open, the wallet to use and what to screenshot; run first by the engineer in headless chromium with an injected provider against Sepolia so the script is known to be executable; then Denizen's run, its hashes and screenshots filed in the handoff by whoever holds them, and the signoff line below. Anything he finds is an issue, scoped per item: `app/` fixes land as m04-t09 if they change what criterion 3 hashes, and are re-uploaded once through m04-t08's vault procedure | scoped 2026-11-18 ([TASK.md](tasks/m04-t05/TASK.md)); steps 0–2 done 2026-11-18 ([#252](https://github.com/dnznlabs/rake/pull/252) merged; Sepolia read through the project's own gateway build per [#248](https://github.com/dnznlabs/rake/pull/248), row (j) amended in [#250](https://github.com/dnznlabs/rake/pull/250)); **step 3 superseded by decision 63 (2026-11-19)**, the wallet run moves to m05-t01 after its step 16 (step 14's upload executed), on the m04-t16 bundle; step 4, the wallet-path measurement, withdrawn with t12 (decision 62); [#245](https://github.com/dnznlabs/rake/issues/245) closed with this record |
 
-**Signoff:** _not yet — a dated line by Denizen goes here._
+**Signoff:** _written in m05-t01's handoff, after the wallet run on the redeployed testnets (decision 63, 2026-11-19); M04's criterion 6 is met by steps 0–2 of m04-t05 plus that transfer._
 
 ### Phase 5 — Close-out
 
