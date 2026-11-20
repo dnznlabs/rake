@@ -756,11 +756,18 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
    order: `execute` hashes against `nonce++` (`src/Multisig.sol:136` of src-company/multisig at
    `62eb905`), so proposal 2's signatures, made over the digest at *N* + 1, are `InvalidSig` while the
    nonce is still *N*. Submit 2 before 1 and it is refused; nothing is lost but the gas.
-2. **Wait one hour, not three.** Each submit queues its digest at its own
+2. **Wait one `delay()`, not three.** Each submit queues its digest at its own
    `eta = block.timestamp + _delay` (`:165-166`), and the three submits are seconds apart, so the
-   three 3,600 s windows run **concurrently**: one wait of 3,600 s from the third submit, then three
-   `executeQueued` in a row. "Three timelocks" is the natural misreading and it is wrong; the delay
-   is per proposal, not cumulative.
+   three windows run **concurrently**: one wait of `delay()` seconds from the third submit, then
+   three `executeQueued` in a row. "Three timelocks" is the natural misreading and it is wrong; the
+   delay is per proposal, not cumulative.
+
+   **Read `delay()`; do not type an hour.** This step said "one hour" and "3,600 s" throughout until
+   2026-11-20, which is the mainnet figure (decision 58) and **wrong on the testnets**: the Ops vault
+   answers **900 s — 15 minutes** on both 11155111 and 84532, read four times on 2026-11-18 and again
+   on 11-20, and the Product Owner confirmed he set it there. m05-t01 Part B waited 900 s on each
+   chain. Step 12 already requires the value to be read rather than assumed; this corrects the prose
+   that contradicted it.
 3. **`executeQueued()` three times** (anyone), **in the order 1 → 2 → batch**, each after the one
    before it has succeeded. **The vault does not enforce this order; the operator does.** `queued` is
    keyed by digest, not by nonce (`mapping(bytes32 txHash => uint256) public queued;`, `:29`), and

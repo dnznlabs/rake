@@ -1268,6 +1268,44 @@ there. Because the calldata is byte-identical across the two chains, the command
 result is the one to repeat, and Sepolia verifying clean is positive evidence for it rather than
 merely an absence of trouble. `DISTRO` is one address on both chains by construction.
 
+### Step 17 — the records, and M05 criterion 6's deviation audit
+
+**Written** (`1e328a7`, `1cd4683`). `RUNBOOK.md` § Executed on testnets opens with a dated 2026-11-20
+paragraph naming the live set and its `codesize` figures, followed by **two new § Record tables** for
+this deploy; the two M04 tables are kept unchanged and headed **superseded 2026-11-20, pre-#201
+bytes**. **§ Uploads rows 5 and 6** carry this upload with `App` nonce **1**, the three pointers, the
+vault nonces (13/14/15 and 13/**17**/15), both `sha256` pairs, the six `executeQueued` hashes and the
+gas totals **88,414,431** and **12,602,565** — a ratio of **7.02×** for byte-identical payloads, #201's
+repricing measured a fourth time. Row 6's note explains the nonce-17 jump so a later reader does not
+read it as a gap.
+
+`README.md`: § Contracts' addresses are the redeployed set, `:27`'s "They have changed" is now a
+one-sentence pointer at the superseded rows, § Deployment Status carries **one live and one
+superseded row per testnet** with both link sets, the `codesize` sentence gives the live
+**1,319 / 9,277 / 7,154** against the superseded 1,320 / 7,155 as the cheapest way to tell them
+apart, and the Sourcify paragraph names solc `0.8.38` for the live set and `0.8.34` for the
+superseded. `:17`'s "No mainnet deployment exists" is untouched — that is m05-t02's line.
+
+**Step 17's own checks:** `grep -ci superseded README.md` → **6** (≥ 2 required, 0 before);
+`grep -c 0x00D18B5b README.md` → **2**, and both are the superseded rows (3 before).
+
+**Not this task's:** the `state-collection#74` comment is the **architect's**, by criterion 17 as
+amended in [#299](https://github.com/dnznlabs/rake/pull/299).
+
+**M05 criterion 6 — every deviation Part B met is a `RUNBOOK.md` change here or a one-line reason it
+is not:**
+
+| deviation | disposition |
+|:--|:--|
+| The testnet `delay()` is 900 s, not the 3,600 the prose carried | **RUNBOOK change**: 4c.2 now reads "Wait one `delay()`, not three" and says in terms that 3,600 is the mainnet figure and wrong on the testnets |
+| `forge script` applies `-g` to its per-transaction estimate, so a step-3 send failed for gas | **Reason it is not here:** scoped as [#308](https://github.com/dnznlabs/rake/issues/308) (`carried`, `m05`), which must close before any mainnet send |
+| `tools/step4-calldata.mjs` defaults `--app` to the retired M04 `App` | **Reason it is not here:** scoped as [#311](https://github.com/dnznlabs/rake/issues/311) (`carried`, `m05`) |
+| The `-g` multiplier must differ per chain — Base Sepolia refuses Sepolia's with `-32003` | **RUNBOOK change**: recorded in the new § Record — M05, Base Sepolia table as the refused submission, with the cap-below-block-limit reason |
+| Base Sepolia's nonce-14 proposal was the superseded chunk and needed a `forward()` cancel | **RUNBOOK change**: § Uploads row 6's note and the Base Sepolia § Record row "why nonce 17" |
+| The hosted gateway resolves 84532 and answers 400 on 11155111 | **RUNBOOK change**: a row in each new § Record table; `:898-901` already rules it a third-party condition, so no procedure changes |
+| `App` reported *already verified* on Base Sepolia rather than `Pass - Verified` | **RUNBOOK change**: the Base Sepolia § Record step-5 row names which of the two each address was, as `:1093` asks |
+| `index.html`'s hash cannot equal m04-t16's after step 13a | **Reason it is not here:** it is a `TASK.md` matter, amended by [#307](https://github.com/dnznlabs/rake/pull/307) and [#310](https://github.com/dnznlabs/rake/pull/310); the runbook does not assert that equality |
+
 ## For close-out
 
 | | value |
