@@ -246,10 +246,17 @@ Recorded as a deviation, not a stop: every "one hour" in Step 4 is "`delay()` se
 Put to the Product Owner and answered on 2026-11-19 — he recalls one hour — so § For Denizen records
 the disagreement and the reading it leaves standing, rather than an open ask.
 
-**One gate item is not met: `ETHERSCAN_API_KEY` is not set in this session**, and it is not on the
-box by design — M04's `MILESTONE.md:195-196` makes it the Product Owner's to hand to the engineer's
-session, "never committed", with the handoff naming only its last four characters. What it affects is
-narrow, and reading § Step 5 rather than assuming is what establishes that:
+**One gate item was not met at the 22:10–22:25 reading: `ETHERSCAN_API_KEY` was not set in this
+session**, and it was not on the box by design — M04's `MILESTONE.md:195-196` makes it the Product
+Owner's to hand to the engineer's session, "never committed", with the handoff naming only its last
+four characters. **Supplied and proved at 22:57 CST the same evening, key `…9SKI`**, so the item is
+met and criterion 14 needs no amendment; the reading below is left as it stood rather than rewritten.
+It is a v2 key, which is what `:1101` calls: the unified endpoint answered `status` **1**, `message`
+**OK**, `ContractName` **App** for `0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE` on `chainid`
+**11155111** *and* **84532** — one key across both chains. Attributable to the key, because the
+paired control is the same URL and address with the parameter dropped: `{"status":"0","message":
+"NOTOK","result":"Missing/Invalid API Key"}` on both. What it affects is narrow, and reading § Step 5
+rather than assuming is what establishes that:
 
 - § Step 5 is titled **"explorer verification, named and not run"** and says "M04 executes these and
   records the explorer links; **no key is needed to write them down**". The `forge verify-contract
@@ -302,8 +309,9 @@ three rows ascending at 2,000 / 4,000 / 4,000 with decision 50's names and notes
 
 **Part A asked one question and nothing else; Part B's step 12 added the three below, and all three
 were put to the Product Owner on 2026-11-19 and answered that evening.** They stand mostly as the
-record of what was asked and what came back: the key is coming, state-collection#74's comment is
-cleared, and `delay()` came back as one hour against the chain's 900. Two live items remain, both
+record of what was asked and what came back: the key is in and proved (`…9SKI`),
+state-collection#74's comment is cleared, and `delay()` came back as one hour against the chain's
+900. Two live items remain, both
 small — the 4b checklist reads "`delay()` seconds" and neither figure, and the #74 bullet now asks
 for a ruling it did not ask for before. The sittings still come later, when step 14's proposals are
 read back and step 15's commands are in this handoff.
@@ -324,11 +332,12 @@ read back and step 15's commands are in this handoff.
   amends the criterion by a decision record first, and the table is filled against the amended
   wording. Architect's correction, 2026-11-19, and it is right: an earlier draft of this section said
   the row would read `not run — no key supplied`, which would have let a named criterion quietly
-  become a note. **Answered the same day — he is supplying it — so criterion 14 stands as written
-  and nothing is amended.** It is handed to the engineer's session as a mode-600 file outside the
-  repo and read without being echoed, so no transcript carries the value; the protected secret store
-  is not the route, because it was measured that day not to reach the shell the commands run in.
-  Still unset for the Sourcify block per `:1107`.
+  become a note. **Supplied 2026-11-19 and proved against the live endpoint — key `…9SKI` — so
+  criterion 14 stands as written and nothing is amended.** It is a v2 key, one across both chains;
+  the two readings and the keyless control are in § Gates. It sits as a mode-600 file outside the
+  repo and is read without being echoed, so no transcript carries the value; the protected secret
+  store is not the route, because it was measured that day not to reach the shell the commands run
+  in. Still unset for the Sourcify block per `:1107`.
 - **Asked, answered, and the answer disagrees with the chain: the Ops vault's testnet `delay()`.**
   The Product Owner's word on 2026-11-19 was that the testnet vault is one hour; the vault answers
   **900** on both chains. Four readings now, same vault `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`,
