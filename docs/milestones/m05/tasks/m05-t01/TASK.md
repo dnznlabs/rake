@@ -47,8 +47,9 @@ post-UAT `app/` bundle (#243, #241, R9, R19, R18, then #273 and #274) takes no R
 `App`; it rides this task's Run B on the redeployed testnets
 ([m04-t15 TASK.md](../../../m04/tasks/m04-t15/TASK.md) § The upload, its criterion 12;
 [m04-t16 TASK.md](../../../m04/tasks/m04-t16/TASK.md) § The upload, its criterion 9). So the bundle
-step 14 builds is the one m04-t16 shipped on top of m04-t15, and the hashes it uploads are the ones
-m04-t16's handoff § For the next upload records. Run A (step 13) does not wait on either — nothing
+step 14 builds is the one m04-t16 shipped on top of m04-t15: `widget.js` at the hash m04-t16's
+handoff § For the next upload records, and `index.html` at that figure's bytes with the four
+deployment values step 13 re-points and nothing else (amended 2026-11-20, step 14). Run A (step 13) does not wait on either — nothing
 in Run A reads `app/`. If either is not merged when steps 12–13 are done, step 14 waits; the handoff
 says so, and nothing is built or proposed from an older `app/` in the meantime.
 
@@ -374,11 +375,32 @@ Sepolia; **every `record:` line is committed before the next transaction** (`:22
     exits 0 (m04-t16 branches after m04-t15's merge, so one check covers both) and the branch is cut
     from `main` at or after it; if either is not merged, this step waits, the handoff says so under
     § Gates with the date, and no bundle is built from an older `app/` — there is no fallback bundle
-    (§ Gate). Then `make dapp-nodev CHAIN_ID=$CHAIN_ID`, and the `sha256` of `app/dist/index.html`
-    and `app/dist/widget.js` per chain equal the figures in
-    [m04-t16 HANDOFF.md](../../../m04/tasks/m04-t16/HANDOFF.md) § For the next upload before
-    anything else runs (a mismatch is a stop: either `app/` moved after m04-t16 or the build is not
-    reproducible, and both are findings, not something to re-hash past). Then
+    (§ Gate). Then `make dapp-nodev CHAIN_ID=$CHAIN_ID`, and before anything else runs, per chain,
+    two comparisons against
+    [m04-t16 HANDOFF.md](../../../m04/tasks/m04-t16/HANDOFF.md) § For the next upload. The `sha256`
+    of `app/dist/widget.js` equals its figure outright. `app/dist/index.html` equals its figure once
+    the four values step 13 re-pointed are put back to the M04 set:
+
+    ```bash
+    sed -e "s/$FACTORY/0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B/g" \
+        -e "s/$APP/0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE/g" \
+        -e "s/$IMPL/0x31dd18b4c3EcE3F123c285bdB045331364Cfa4b0/g" \
+        -e "s/factoryBlock: '$FACTORY_BLOCK'/factoryBlock: '$M04_BLOCK'/" \
+        app/dist/index.html | sha256sum
+    ```
+
+    `$FACTORY`, `$APP` and `$IMPL` are step 13's landed addresses as the bundle spells them
+    (EIP-55); `$FACTORY_BLOCK` is `cast receipt <step 2's hash> blockNumber` on that chain in
+    lowercase hex with `0x`; `$M04_BLOCK` is `0xb88091` on 11155111 and `0x358f46e` on 84532. Each
+    of the four new values occurs once in the built file (`grep -o … | wc -l` → 1 each). A mismatch
+    on either file is a stop: `app/` moved after m04-t16, the build is not reproducible, or
+    something beyond those four values changed, and each is a finding, not something to re-hash
+    past. The built `index.html` `sha256` per chain is recorded beside the comparison; it is the
+    hash § Uploads carries. (Amended 2026-11-20: this step first required `index.html`'s hash to
+    equal m04-t16's outright, which step 13 makes impossible, because `app/build.mjs` writes
+    `factory`, `factoryBlock`, `app` and `impl` into the page from the broadcast logs. Run by the
+    architect at `2aac1fc` that day: both chains reproduce m04-t16's two figures through the
+    command above, and the two builds differ in those four values only.) Then
     `tools/step4-calldata.mjs --chain $CHAIN_ID --rpc "$RPC" --out calldata` (`App` is fresh, so the
     tool reads nonce 1); every file under 65,536 characters; the fork estimate of § Gas
     (`:884-897`) with `chain-doc`'s `inflated sha256` equal to the build **before any signature**;
@@ -387,8 +409,10 @@ Sepolia; **every `record:` line is committed before the next transaction** (`:22
     generating commit, then write the 4b checklist per chain in `HANDOFF.md` § For Denizen and
     stop. Commit and push before messaging.
 
-    Check: m04-t15's and m04-t16's merge commits named in § Gates and ancestors of the branch; the
-    two `sha256` per chain equal m04-t16's handoff § For the next upload, quoted beside them; six rows read back,
+    Check: m04-t15's and m04-t16's merge commits named in § Gates and ancestors of the branch;
+    per chain, `widget.js`'s `sha256` and the substituted `index.html`'s `sha256` equal m04-t16's
+    handoff § For the next upload, each quoted beside its figure, with the built `index.html`
+    `sha256` beside them; six rows read back,
     each with exactly one `ecdsa` signature from `$ENGINEER`; the commit of the calldata named in
     § Uploads' new rows (filled as "proposed" until 4c).
 
@@ -564,9 +588,11 @@ an address. Baselines are `main` at `78b5eb7`, 2026-11-19.
     Product Owner's word).
 18. **The bundle is m04-t16's, on top of m04-t15's.** The handoff § Gates names both task PRs and
     their merge commits, and `git merge-base --is-ancestor <m04-t16's commit> <Part B's head>` exits
-    0; the `sha256` of `app/dist/index.html` and `app/dist/widget.js` per chain in the handoff equal
-    the figures in m04-t16's handoff § For the next upload, and § Uploads rows 5 and 6 carry those
-    hashes. No proposal of step 14 is dated before the later merge. If either was not merged when
+    0; per chain in the handoff, the `sha256` of `app/dist/widget.js` equals the figure in m04-t16's
+    handoff § For the next upload, and `app/dist/index.html` equals its figure there once step 13's
+    four values (`factory`, `factoryBlock`, `app`, `impl`) are put back to the M04 set by step 14's
+    command; § Uploads rows 5 and 6 carry the built hashes (amended 2026-11-20: the page embeds the
+    addresses step 13 re-points, so its built hash cannot equal m04-t16's). No proposal of step 14 is dated before the later merge. If either was not merged when
     steps 12–13 were done, the handoff records the wait and its dates; a bundle built from an older `app/`
     fails this criterion whatever its hashes.
 18b. **M04 criterion 6's wallet run, on the redeployed testnets** (decision 63): `shots/11155111/`
