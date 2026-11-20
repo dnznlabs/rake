@@ -226,8 +226,9 @@ Denizen's funding ask stays "none asked".
 
 **`delay()` is 900 s on both testnets, not the 3,600 the runbook's prose carries** (`:475`,
 `:643-645`), matching step 12's own 2026-11-19 reading; decision 58 records 3,600 on the mainnets.
-Recorded as a deviation for the Product Owner to confirm, not a stop: every "one hour" in Step 4 is
-"`delay()` seconds, read in 4c". § For Denizen already asks him to confirm or correct it.
+Recorded as a deviation, not a stop: every "one hour" in Step 4 is "`delay()` seconds, read in 4c".
+Put to the Product Owner and answered on 2026-11-19 — he recalls one hour — so § For Denizen records
+the disagreement and the reading it leaves standing, rather than an open ask.
 
 **One gate item is not met: `ETHERSCAN_API_KEY` is not set in this session**, and it is not on the
 box by design — M04's `MILESTONE.md:195-196` makes it the Product Owner's to hand to the engineer's
@@ -283,8 +284,12 @@ three rows ascending at 2,000 / 4,000 / 4,000 with decision 50's names and notes
 
 ## For Denizen
 
-**Part A asked one question and nothing else. Part B's step 12 adds one small item; the sittings
-come later, when step 14's proposals are read back and step 15's commands are in this handoff.**
+**Part A asked one question and nothing else; Part B's step 12 added the three below, and all three
+were put to the Product Owner on 2026-11-19 and answered that evening.** They stand as the record of
+what was asked and what came back, not as open asks: the key is coming, state-collection#74 is
+cleared to post after step 13, and `delay()` came back as one hour against the chain's 900. The one
+live consequence is that the 4b checklist reads "`delay()` seconds" and neither figure. The sittings
+still come later, when step 14's proposals are read back and step 15's commands are in this handoff.
 
 - **`ETHERSCAN_API_KEY` for plan step 13's step-5 read-back.** Not set in the engineer's session and
   not on the box, by design: M04's `MILESTONE.md:195-196` makes it yours to hand over, never
@@ -302,18 +307,34 @@ come later, when step 14's proposals are read back and step 15's commands are in
   amends the criterion by a decision record first, and the table is filled against the amended
   wording. Architect's correction, 2026-11-19, and it is right: an earlier draft of this section said
   the row would read `not run — no key supplied`, which would have let a named criterion quietly
-  become a note.
-- **Confirm or correct the Ops vault's testnet `delay()` of 900 s** — step 12 read **900** on both
-  chains, against the 3,600 the runbook's prose carries. A reading, not a decision; the deploy
-  proceeds on whatever the chain answers. One consequence to expect at your sitting: step 12 turns
-  every "one hour" in Step 4 into "`delay()` seconds, read in 4c", so the 4b checklist handed to you
-  at step 14 will say **900 seconds**, not an hour. Waiting on the wrong clock is the failure mode.
-- **Your OK to post the state-collection#74 comment, and it waits for step 13.** Criterion 17's last
-  clause is "state-collection#74 carries the engineer's comment with the new address". The text is
-  drafted and **not posted** — `docs/milestones/m04/CLOSEOUT.md:124-126`, "the issue has 0 comments;
-  this is the text for the Product Owner to approve". It is cross-repo and it needs the address step
-  13 lands, so it cannot be posted before the redeploy whatever you decide tonight. Flagged here with
-  the key so one sitting covers both rather than two messages.
+  become a note. **Answered the same day — he is supplying it — so criterion 14 stands as written
+  and nothing is amended.** It is handed to the engineer's session as a mode-600 file outside the
+  repo and read without being echoed, so no transcript carries the value; the protected secret store
+  is not the route, because it was measured that day not to reach the shell the commands run in.
+  Still unset for the Sourcify block per `:1107`.
+- **Asked, answered, and the answer disagrees with the chain: the Ops vault's testnet `delay()`.**
+  The Product Owner's word on 2026-11-19 was that the testnet vault is one hour; the vault answers
+  **900** on both chains. Two readings now — step 12's and the architect's the same day, same vault
+  `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`, both 900 beside `threshold()` 2 and `ownerCount()`
+  4 — though through the same pinned toolchain, so that corroborates the value and not the method.
+  The 3,600 is the mainnet figure (decision 58) and what the runbook's prose carries at `:475` and
+  `:643-645`, the likeliest source of the recollection. **So the 4b checklist hard-codes neither
+  number:** per step 12's instruction it reads "`delay()` seconds, read in 4c", with 900 given as a
+  dated reading and this disagreement named on its face, so it is seen before the sitting rather
+  than discovered at 4c. A recollection does not overturn a reading, and the engineer does not
+  resolve it either way; an override is a ruling and the architect records it. Waiting on the wrong
+  clock is the failure mode.
+- **The state-collection#74 comment: cleared to post, and it still waits for step 13.** Criterion
+  17's last clause is "state-collection#74 carries the engineer's comment with the new address", and
+  your OK landed 2026-11-19. It is **not posted** and cannot be until the redeploy, because the
+  address it must carry is the one step 13 lands: the m04 draft at `docs/milestones/m04/CLOSEOUT.md`
+  § For state-collection#74 names the pre-redeploy `0x6aC98EDA…` and the then-predicted
+  `0xB611Ff19…`, so the posted text is that draft with the landed address substituted. The
+  substitution happens at posting, in this task's record — m04's close-out is merged and out of
+  scope, so it is not edited. It posts from the engineer's own GitHub account, verified as `elanikk`
+  in this session, which is what criterion 17's "the engineer's comment" requires. Worth naming
+  because the m04 draft's own preamble has the architect posting it, while `TASK.md:556` says the
+  engineer's; the criterion is the authority, and the architect confirmed that reading 2026-11-19.
 
 - **Step 10 — which mainnets does the signing app list for the Ops vault?** The coordination service
   holds a `wallets` row for all four (1, 10, 8453, 42161) and for the stretch pair, read 2026-11-19.
