@@ -16,8 +16,8 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 | [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | done 2026-10-11 — t01 (#6), t02 (#11), t03 (#14) and the decision-10 follow-up (#24) merged; every criterion re-run and passing on `main` at `c292106` |
 | [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain, and Denizen has ironed out the experience against it | done 2026-10-26 — t01 (#33), t02 (#40), t03 (#52), t04 (#60), t05 (#65), t06 done; Phase 5 signed off by Denizen in [#73](https://github.com/dnznlabs/rake/pull/73) |
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | **done 2026-11-07** — ten tasks (t01–t10), three two-leg reviews (`audits/2026-10-30`, `10-31`, `11-06`), 14 `SECURITY.md` rows, decisions 20–40; `src/` final at `3ad48ec` ([#153](https://github.com/dnznlabs/rake/pull/153)), `FACTORY_SALT`/`APP_SALT` mined against it (decision 37: `0x00D18B5b…`, `0x00A90943…`), `RUNBOOK.md` rehearsed on two anvils with the real Creator key; DNZN's predicted address `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`; criteria 1–8 re-run in [CLOSEOUT.md](milestones/m03/CLOSEOUT.md) |
-| [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | in progress — scoped 2026-11-07: seven tasks in four phases (Phase 1 done the same day: the dapp's carried items #164 and the `web3://` gateway in the dev stack #163, the ERC-5219 surface's first real consumer; then Slither as a third audit leg gating the deploy, invariant tests beside it, the runbook for real, then the gateway and a host page, then a scripted wallet session with a signoff line); two decisions open ([#156](https://github.com/dnznlabs/rake/issues/156) the test host, [#157](https://github.com/dnznlabs/rake/issues/157) DNZN's testnet table); needs testnet ETH on two keys and an Etherscan API key |
-| [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; the DNZN fund distribution live at its Sepolia address with the Sepolia table, the Ops vault as owner and a 7-day delay (decision 50); dapp mirrored and widget embedded in one DNZN app | not started — scoped 2026-11-18: six tasks in four phases plus a close-out (re-mine the salts against `main`'s post-[#201](https://github.com/dnznlabs/rake/pull/201) bytes and redeploy both testnets to match, with the threat model, coverage floor and mutation run of decision 56 beside it, then Base alone, then OP Mainnet, Arbitrum One and Ethereum with the stretch row beside them, then the mirror and the embed); four decisions opened (M05-D1 the stale salts, M05-D2 the step-6 key and salt, M05-D3 the paid-review go/no-go, M05-D4 the mirror and the host app; D2–D4 ruled as decisions 54, 55 and 59, D4's app name still open); gated on M04's close-out; needs mainnet ETH on three keys, twelve vault co-signatures and four `create`s |
+| [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | **done 2026-11-19** — sixteen tasks (t01–t16; t12 closed unmerged by decision 62), criteria 1–8 re-run at `2f93d26` in [CLOSEOUT.md](milestones/m04/CLOSEOUT.md), closed on that close-out's merge ([#296](https://github.com/dnznlabs/rake/pull/296), `eec7164`) by decision 64, with criteria 1, 3 and 5's unmet clauses transferred to m05-t01 Part B beside criterion 6's wallet run (decision 63) and criterion 8's state-collection#74 comment drafted and awaiting the Product Owner's word. Scoped 2026-11-07: seven tasks in four phases (Phase 1 done the same day: the dapp's carried items #164 and the `web3://` gateway in the dev stack #163, the ERC-5219 surface's first real consumer; then Slither as a third audit leg gating the deploy, invariant tests beside it, the runbook for real, then the gateway and a host page, then a scripted wallet session with a signoff line); two decisions open ([#156](https://github.com/dnznlabs/rake/issues/156) the test host, [#157](https://github.com/dnznlabs/rake/issues/157) DNZN's testnet table, both ruled); needed testnet ETH on two keys and an Etherscan API key |
+| [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; the DNZN fund distribution live at its Sepolia address with the Sepolia table, the Ops vault as owner and a 7-day delay (decision 50); dapp mirrored and widget embedded in one DNZN app | not started — scoped 2026-11-18: six tasks in four phases plus a close-out (re-mine the salts against `main`'s post-[#201](https://github.com/dnznlabs/rake/pull/201) bytes and redeploy both testnets to match, with the threat model, coverage floor and mutation run of decision 56 beside it, then Base alone, then OP Mainnet, Arbitrum One and Ethereum with the stretch row beside them, then the mirror and the embed); four decisions opened (M05-D1 the stale salts, M05-D2 the step-6 key and salt, M05-D3 the paid-review go/no-go, M05-D4 the mirror and the host app; D2–D4 ruled as decisions 54, 55 and 59, D4's app name still open); M04's close-out gate met on its merge, 2026-11-19 (decision 64), which also puts four M04 clauses in m05-t01 Part B as criteria 18c–18f; needs mainnet ETH on three keys, twelve vault co-signatures and four `create`s |
 | [M06 — Going public](milestones/m06/MILESTONE.md) | `dnznlabs/rake` is public, as a new repository whose history is one signed commit from the mainnet tag; the private repository is renamed `rake.buildarchive`, archived and never published. Four phases: the labelling of outside issues and comments installed and proven on this repo; a staging tree from the tag with the build-out record removed (milestones, tasks, handoffs, review runs, dev-chain broadcasts), the roadmap reset to the mainnet row, `SECURITY.md` carrying no findings, and every document audited for a reader who has only the repo; a fresh review of the staging tree that must come back clean; then Denizen renames, archives, creates and flips | not started — gated on M05's close-out; scoped when M05 closes (decision 60) |
 | [M07 — Owner integrations](milestones/m07/MILESTONE.md) | Optional, after mainnet. When the connected wallet is a member of the owner rather than the owner, route `propose`/`cancel` into the multisig vault's or Majeur DAO's own submit flow instead of copy-calldata. UI only; no contract change | not started |
 
@@ -1017,6 +1017,45 @@ convention. Numbered 45 because 44 is taken by
     known rows marked superseded — proves wallet connect from the real w3link origin on Base Sepolia
     today, and nothing that the M05 run does not prove later; (a) a new M04 upload (a Run C) —
     already rejected by m04-t15 § The upload and m04-t16 criterion 9.
+64. **M04 closes on its close-out's merge, with four unmet clauses transferred to m05-t01 Part B and
+    verified there, each as its own criterion.** Ruled by Denizen on 2026-11-19 (Telegram, 21:29
+    CST) by merging [#296](https://github.com/dnznlabs/rake/pull/296), the M04 close-out, at
+    `eec7164e1db4aa84dfe9b787a1f5eca70fc25598`, on the architect's recommendation
+    ([#296 comment](https://github.com/dnznlabs/rake/pull/296#issuecomment-7028983680)): asked what
+    decision was needed, he merged, and the merge is the ruling. The four clauses, each added as its
+    own m05-t01 acceptance criterion naming the M04 criterion it came from (criteria 18c–18f):
+    **criterion 1's artifact comparison**, repeated against `main` after the redeploy (18c) — against
+    `main`'s `0.8.38` bytes the M04 chain differs by 1,088 of 1,320 factory bytes and 6,475 of 7,155
+    `App` bytes, and against a build of `08b3304` by 60 factory bytes, all inside the three
+    `immutableReferences` spans, and 0 `App` bytes (`CLOSEOUT.md` criterion 1), so the wording is
+    stale and not the deployment; **criterion 1's DNZN address** at the new factory (18d) —
+    `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`, never `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`,
+    which is the right prediction for the M04 factory and will never hold code, because decision 54
+    gives the `create` to the Creator key in Part B; **criterion 3's chain document and both hosted
+    gateway checks** (18e), "after the Run B upload m05-t01 step 14 proposes has executed (its step
+    16)" in decision 63's words — those two are m05-t01's **plan** steps, which run 0–18, not its
+    acceptance criteria, which run 1–19 with 18b–18f beside them — the chain half passes on both
+    chains today, and Sepolia's w3link endpoint serves the
+    2026-11-17 document, [#242](https://github.com/dnznlabs/rake/issues/242)'s third-party
+    condition; **criterion 5's host page** regenerated against the new addresses (18f), published
+    once by the Product Owner with its URL in that handoff, since the tracked page's snippet names
+    the M04 `App` and the `0x71a4…7a4A` distribution, both retired by the redeploy. **Criterion 6 is
+    recorded as transferred, not as a pass** — it moved in decision 63 and is verified as m05-t01
+    criterion 18b. Criterion 8's comment on
+    [state-collection#74](https://github.com/dnznlabs/state-collection/issues/74) is drafted and
+    unposted in `CLOSEOUT.md` § For state-collection#74, awaiting the Product Owner's word; the
+    recommendation on record is to post it now rather than after the redeploy, and m05-t01 plan step 17
+    carries the same comment with the readings. **M04 closes now, not when Part B verifies them** —
+    the other way round is the circularity decision 63 removed, since Part B is gated on this
+    close-out. **Why:** every one of the four is satisfiable only on the redeployed testnets, and
+    m05-t01 Part B is the task that redeploys them; holding M04 open changes no byte and blocks the
+    work that closes the clauses. **Supersedes** the stale wording of M04 criteria 1, 3 and 5 as M04
+    conditions — each amended in place as transferred, the original text kept, the way a superseded
+    decision is marked rather than deleted. **Rejected:** (a) hold M04 open until Part B lands —
+    M04 would then close on M05's work, which makes the milestone boundary meaningless and stalls
+    Part B behind itself; (b) publish the criterion 5 page now — a second publication after the
+    redeploy, for a page stale within days; (c) a new M04 upload to catch the document up — already
+    rejected by m04-t15 § The upload and m04-t16 criterion 9.
 
 ## Findings carried forward
 

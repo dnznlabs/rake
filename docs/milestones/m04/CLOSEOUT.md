@@ -16,6 +16,12 @@ none of the four is softened below: criterion 1's artifact comparison and its DN
 state-collection#74. Each is either a consequence of a ruling already on record (decision 54,
 M05-D1, decision 63) or waits on one action of the Product Owner's; § Open at close-out names them.
 
+**Amended 2026-11-19 (decision 64).** M04 closed on this file's merge
+([#296](https://github.com/dnznlabs/rake/pull/296), `eec7164`), not on a later run: the four clauses
+above are transferred to m05-t01 Part B as its criteria 18c–18f and verified there, criterion 6
+stays transferred by decision 63, and criterion 8's comment stays drafted. No figure in this file
+changes; the sentence above describes this run, and the ruling is what the run is for.
+
 ## Results
 
 | # | Criterion | Result | Evidence |
@@ -132,11 +138,19 @@ addresses and Denizen publishes it once; costs one more M04 criterion met by tra
 measurement. (2) Denizen publishes the current file now; costs a page that goes stale within days
 and a second publication after the redeploy. *Recommendation:* (1). *Default and deadline:* (1) if
 unanswered when this close-out PR merges; blocks nothing in M05, since the URL is read at m05-t01's
-wallet run. *Record:* `ROADMAP.md` § Decisions.
+wallet run. *Record:* `ROADMAP.md` § Decisions. ***Ruled 2026-11-19 — option (1), as part of
+decision 64***, by Denizen merging this file: criterion 5 is transferred to m05-t01 Part B as its
+criterion 18f, the page regenerated against the new addresses and published once by the Product
+Owner, its URL in that handoff.
 
 **Criterion 1's DNZN address and criterion 3's Sepolia gateway** are consequences of rulings on
 record (decision 54 and M05-D1; #242's third-party condition) and are met, if at all, by m05-t01
 Part B on the redeployed testnets. **Criterion 8's state-collection comment** waits on the OK above.
+**Ruled 2026-11-19 (decision 64):** M04 closed on this file's merge, with criterion 1's artifact
+comparison and DNZN address, criterion 3's document and both hosted gateway checks, and criterion
+5's host page transferred to m05-t01 Part B as its criteria 18c–18f and verified there; criterion 6
+stays transferred by decision 63 (its criterion 18b), and criterion 8's comment above stays drafted
+and unposted, awaiting the Product Owner's word.
 
 ## Handed to M05
 

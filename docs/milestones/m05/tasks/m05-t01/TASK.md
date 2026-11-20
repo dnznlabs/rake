@@ -33,7 +33,12 @@ milestone's default, option (1), applies and this plan runs on it.
 and `docs/milestones/m04/CLOSEOUT.md` all land first, because the bundle Part B uploads is the one
 the mainnets get. Amended 2026-11-19: m04-t05's figures are no longer waited on — its step 3,
 Denizen's wallet run, is this task's after step 16 (decision 63), and its measurement was withdrawn
-with t12 (decision 62); #227 is ruled closed. **Part A has no chain in it and starts on this plan's merge** — mining, the runbook
+with t12 (decision 62); #227 is ruled closed. **Met 2026-11-19: `CLOSEOUT.md` merged as
+[#296](https://github.com/dnznlabs/rake/pull/296) at `eec7164`, which closed M04 (decision 64) and
+transferred four of its clauses here as criteria 18c–18f** — M04 criterion 1's artifact comparison
+and DNZN address, criterion 3's document and both hosted gateway checks, and criterion 5's host page
+— beside criterion 6's wallet run already moved by decision 63 (criterion 18b). This task does not
+hold M04 open: M04 closed on that merge, and Part B verifies the four. **Part A has no chain in it and starts on this plan's merge** — mining, the runbook
 amendment, the tool change and the anvil rehearsal read nothing that M04's remaining tasks can
 change. Part B also waits for Part A's PR to merge: Part B deploys from the salts Part A commits.
 
@@ -562,8 +567,53 @@ an address. Baselines are `main` at `78b5eb7`, 2026-11-19.
     is named with its `gateway-check` result, and the signoff line of M04 criterion 6 is in this
     handoff, dated and in Denizen's words. Any row that could not reach its expected state is an
     issue linked from the handoff.
+18c. **M04 criterion 1's artifact comparison, repeated against `main`** (decision 64, transferred
+    from [M04 criterion 1](../../../m04/MILESTONE.md)): at this task's head, per chain,
+    `forge inspect DistributionFactory deployedBytecode` and `forge inspect App deployedBytecode`
+    against `cast code $FACTORY` and `cast code $APP --rpc-url "$RPC"` — **0** differing factory
+    bytes outside the three `immutableReferences` spans and **0** differing `App` bytes, the
+    `cmp` of criterion 13 run against the artifact `main` builds rather than a `0.8.34` worktree,
+    with the three span offsets and the byte counts in the handoff. The M04 figures this replaces
+    ([m04/CLOSEOUT.md](../../../m04/CLOSEOUT.md) criterion 1, read 2026-11-19 at `2f93d26`): 1,088
+    of 1,320 factory bytes and 6,475 of 7,155 `App` bytes differing against `main`, 60 and 0
+    against a build of `08b3304`. A non-zero count here is a stop, not a note: it means the chain
+    is not `main`'s bytes.
+18d. **M04 criterion 1's DNZN address, at the new factory** (decision 64, transferred from
+    [M04 criterion 1](../../../m04/MILESTONE.md)): per chain,
+    `cast call $FACTORY "predict(bytes32)(address)" $DNZN_SALT --rpc-url "$RPC"` prints
+    `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199` and `cast codesize $DISTRO --rpc-url "$RPC"` prints
+    **45** at that address, on both chains, after plan step 16's `create` — the clause M04 could not meet,
+    where `predict` answered `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` with codesize 0 on both
+    (decision 54 gives the `create` to the Creator key here). The handoff carries both readings per
+    chain beside the `create` receipt.
+18e. **M04 criterion 3's document and both hosted gateway checks, after the upload** (decision 64,
+    transferred from [M04 criterion 3](../../../m04/MILESTONE.md)): after the Run B upload **plan
+    step 14** proposes has executed (**plan step 16**'s 4c — the plan runs 0–18, these criteria
+    1–19), per chain, `make chain-doc`'s `inflated sha256` and
+    `widget sha256` equal `sha256sum app/dist/index.html` and `sha256sum app/dist/widget.js` of
+    step 14's build, **and** `tools/gateway-check.sh` in hosted mode against
+    `https://<app, lowercase>.<chainId>.w3link.io` exits 0 on **both** chains, with the served body
+    less the injected block equal to `cast call $APP "html()(string)"` and the served `/widget.js`
+    equal to the chain's. The M04 run had Base Sepolia passing and Sepolia failing two assertions on
+    a stale endpoint ([#242](https://github.com/dnznlabs/rake/issues/242)); a hosted failure here is
+    recorded with the served and expected byte counts and carried as that issue, never re-uploaded
+    (`RUNBOOK.md:782-789`), and the chain-half equality is the criterion that must hold.
+18f. **M04 criterion 5's host page, regenerated and published once** (decision 64, transferred from
+    [M04 criterion 5](../../../m04/MILESTONE.md)): `docs/milestones/m04/tasks/m04-t04/host/index.html`
+    regenerated in this task against the new `App` and the new DNZN distribution. Measured on that
+    file at `eec7164`, with `-i` on every address pattern:
+    `grep -ci '0x00a90943\|0x71a4221974'` → **0** (baseline **3** — the `src` on `:26` and the two
+    `data-rake` attributes on `:28` and `:34`); `grep -ci '0x00a9f390'` → **1** (baseline 0);
+    `grep -ci '0xb611ff19'` → **2** (baseline 0); `grep -ci 'w3link.io/widget.js'` → **1**
+    (baseline 1, unchanged) and `grep -c 'data-rake='` → **2** (baseline 2, unchanged), one distinct
+    value. Then published by the Product Owner on the
+    decision-41 host (publishing is his step), with the URL in this handoff and
+    `curl -s <url> | grep -ci 'w3link.io/widget.js'` → 1 run against it, plus one browser screenshot
+    under `shots/` showing DNZN's table rendered from the page with a wallet on Sepolia. If the URL
+    is not published when Part B's PR is ready, the handoff records the ask and its date and the row
+    stays open; nothing else in this task waits on it.
 19. **Part B's PR closes this task's issue**, and `HANDOFF.md` has one row per criterion above —
-    nineteen rows.
+    twenty-three rows.
 
 ## Out of scope
 
