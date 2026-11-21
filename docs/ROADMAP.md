@@ -1139,6 +1139,13 @@ convention. Numbered 45 because 44 is taken by
     launch); WalletConnect inside the document; a static host of ours for its code, in favour of
     the shared contract he proposed.
 
+68. **While rake is testnet-only, `rake.dnzn.dev/` lands on Sepolia.** Ruled by Denizen on
+    2026-11-21 (Telegram, 17:22 CST), on seeing the deployed site. m05-t04 was planned and accepted
+    with Base Sepolia as the default chain; the default becomes `11155111`, and both testnets stay
+    served under their own prefixes. Unchanged: the first mainnet chain added takes `/` (gw44
+    decision 11, and `RUNBOOK.md` § The gateway), and which mainnet holds it once all four are
+    live is still m05-t04's open question, with Base as its default. Built as m05-t04a.
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
