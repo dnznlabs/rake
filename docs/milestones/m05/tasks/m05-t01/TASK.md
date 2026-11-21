@@ -664,7 +664,9 @@ an address. Baselines are `main` at `78b5eb7`, 2026-11-19.
     addresses step 13 re-points, so its built hash cannot equal m04-t16's; amended again that day for decision 65: the page uploaded also carries step 13a's commit, so the `index.html` equality is shown at `2df6b8e`, before that commit, and after it the handoff shows `git diff --stat <m04-t16's merge commit> <Part B's head> -- app/` naming `app/src/index.html` alone). No proposal of step 14 that is signed by the Product Owner is dated before step 13a's commit, and none before the later merge. If either was not merged when
     steps 12–13 were done, the handoff records the wait and its dates; a bundle built from an older `app/`
     fails this criterion whatever its hashes.
-18b. **M04 criterion 6's wallet run, on the redeployed testnets** (decision 63): `shots/11155111/`
+18b. *Transferred to [m05-t01c](../m05-t01c/TASK.md) step 9 on 2026-11-21 (decision 67): the
+    document changes after this task, so the wallet run is taken once, on the document mainnet
+    receives. This task's PR does not wait for it. As written until then:* **M04 criterion 6's wallet run, on the redeployed testnets** (decision 63): `shots/11155111/`
     and `shots/84532/` beside this file hold one PNG per `UAT.md` row driven, the handoff's two
     per-chain hash tables are full with every sending row `status 1`, each chain's serving gateway
     is named with its `gateway-check` result, and the signoff line of M04 criterion 6 is in this
