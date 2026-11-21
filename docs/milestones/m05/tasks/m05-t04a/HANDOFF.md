@@ -1,6 +1,6 @@
 # m05-t04a — handoff
 
-PR: #TBD · Branch: `feat/m05-t04a-sepolia-default`, `docs/m05-t04a-handoff` · 2026-11-21
+PR: #337 · Branch: `feat/m05-t04a-sepolia-default`, `docs/m05-t04a-handoff` · 2026-11-21
 
 `https://rake.dnzn.dev/` ends on `/11155111/`. Both testnets stay served under their own prefixes, the first mainnet chain still takes `/` when one is added, and nothing under `src/`, `test/` or `app/` changed. **One deploying run was spent, which is the budget.**
 
