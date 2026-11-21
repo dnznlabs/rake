@@ -998,6 +998,42 @@ makes the chain the reference and says a gateway mismatch while `chain-doc` matc
 documented third-party condition, "not a failed upload", recorded and carried and **never
 re-uploaded**. `chain-doc` matched on both hashes above, off the live chain.
 
+**Our own build of the same software serves Sepolia correctly, so the fault is w3link's deployment
+and not ours.** This was the weakest claim in the handoff — the project's own gateway is named as
+Sepolia's fallback in two places and nothing had run it — so it was measured, 2026-11-20, against
+`tools/gateway.sh`'s pin **`c5826718855a9ece2b71abfee2f4e548a83b9d16`** (`temp skip qkcl2 (#117)`)
+of `ethstorage/web3url-gateway`, started with `GATEWAY_CHAIN_ID=11155111
+GATEWAY_RPC=https://ethereum-sepolia-rpc.publicnode.com GATEWAY_PORT=8799` — the invocation
+`tools/gateway.sh`'s own header documents — and checked through `gateway-check`'s hosted mode at
+`http://0x00a9f390a6010d045e0d34856048ddd6910d25ba.11155111.w3.localhost:8799`:
+
+| | our build, pin `c5826718` | w3link, same `App` and chain |
+|:--|:--|:--|
+| `GET /` status · type | **200** · `text/html; charset=utf-8` | **400** · absent |
+| `web3-resolve-mode` | **`resourceRequest`** | absent |
+| `web3-mode-auto-method` | **`request`** | absent |
+| `web3-contract-return-processing` | **`decodeErc5219Request`** | absent |
+| served · injected block · body minus block | 72,177 · 7,872 · **64,305** | — |
+| `html()` bytes, read over RPC | **64,305** — **equal** ✓ | — |
+| `GET /widget.js` | **200**, `application/javascript; charset=utf-8`, 8,509 bytes, **`cmp`-identical** to `app/dist/widget.js` | — |
+| `GET /nope` | **404** ✓ | — |
+| cache headers | `web3urlgateway-cache-status: miss`, no `age` — a live read | no `web3urlgateway-cache-status`, no `age` |
+
+`gateway-check: all assertions passed`, exit **0**, both paths. The gateway's own log shows it
+resolving `…/` and `…/widget.js` to `web3://0x00a9f390…:11155111/` and answering from the chain.
+
+**What that settles.** Same contract, same chain, same public RPC, same hour: the software behind
+w3link serves this `App` when we run it, and w3link's hosted instance answers 400 with no ERC-5219
+headers. So the 400 is not a property of `App`, of the document, or of the pinned gateway code — it
+is w3link's deployment, which is what `:898-901` already classes as a third-party condition.
+**Sepolia therefore has a demonstrated fallback rather than a nominated one**, which is what the
+wallet run needs if the primary is still 400 at the sitting; m04-t05 step 0 reserves that fallback
+for the engineer's run and leaves the Product Owner's choice to him.
+
+Nothing was installed and nothing tracked changed: the build writes only into `cache/`, which
+`.gitignore` covers, and `git status --porcelain` is empty after it. The server was stopped after the
+check — nothing is left listening on 8799.
+
 The 400 with no headers reads as w3link not resolving this contract yet rather than serving stale
 bytes — a different failure from the pre-existing staleness row, which served an old document at the
 **M04** address. Consequence for the work that follows: step 16's wallet run must not be driven on
