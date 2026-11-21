@@ -27,11 +27,10 @@ permissions:
   # wait rather than the deploy. Required from gw44 `45f9bde` onwards.
   actions: read
 
-# `pages`, so a deploy here cannot overlap another; never cancelled, because a half-finished deploy
-# would leave the site serving a mixture of two builds.
-concurrency:
-  group: pages
-  cancel-in-progress: false
+# No `concurrency` here on purpose. The called workflow declares `group: pages` itself, which is what
+# serialises deploys; a caller that names the **same** group deadlocks the call and the run fails at
+# startup with zero jobs and no log to read (run 44958052197, and run 44958698883 with this block
+# removed, which created its job). A caller that wants its own group must use a different name.
 
 jobs:
   deploy:
