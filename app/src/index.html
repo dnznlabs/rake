@@ -56,7 +56,7 @@ const ICON = {
 };
 const iconLink = (href, icon, label, text) => `<a class="ico" href="${href}" target="_blank" rel="noopener noreferrer" aria-label="${label}">${ICON[icon]}${text ? `<span>${text}</span>` : ''}</a>`;
 document.getElementById('ver').textContent = `dnzn labs · ${CFG.version}`;
-document.getElementById('flinks').innerHTML = iconLink(REPO, 'github', 'source on GitHub') + iconLink(SITE, 'robot', 'dnzn.dev');
+document.getElementById('flinks').innerHTML = '<a href="https://eip.tools/eip/8244" target="_blank" rel="noopener noreferrer">ERC-8244</a><span class="fsep" aria-hidden="true"></span>' + iconLink(REPO, 'github', 'source on GitHub') + iconLink(SITE, 'robot', 'dnzn.dev');
 
 /* ---- provider ------------------------------------------------------------------------------ */
 let P = null, ACC = null, CHAIN = null;
