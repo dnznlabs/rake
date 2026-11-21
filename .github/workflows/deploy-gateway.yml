@@ -41,7 +41,10 @@ jobs:
       config: deploy/gw44.json
       chains: deploy/chains.json
       embeds: widget.js
-      verify-only: ${{ inputs.verify-only }}
+      # `inputs['verify-only']`, not `inputs.verify-only`: in an expression `-` is subtraction and
+      # `.` is property de-reference, so the dotted form parses as `inputs.verify - only` and the run
+      # fails before any job with "a workflow file issue" and no logs (run 44958052197).
+      verify-only: ${{ inputs['verify-only'] }}
       # The three lines the build printed locally on 2026-11-21 from this repository's two
       # configuration files, at the pinned commit. Any difference fails the run before anything is
       # deployed; whitespace is normalised on both sides, so these are the build's own lines.
