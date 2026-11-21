@@ -1,9 +1,13 @@
 name: ci
 
+# Not on a change that touches only Markdown or docs/: nothing the suite tests can have moved, and a
+# plan or a status row should not cost a full run. A change that touches anything else runs as before.
 on:
   push:
     branches: [main]
+    paths-ignore: ["**.md", "docs/**"]
   pull_request:
+    paths-ignore: ["**.md", "docs/**"]
 
 # One run per change. A push to a branch with an open pull request used to start two identical runs,
 # one per event; branches now run through their pull request only. A newer push to a pull request
