@@ -1,0 +1,53 @@
+# Deploys rake's gateway at https://rake.dnzn.dev by calling `dnznlabs/gw44`'s reusable workflow,
+# which builds three static files that read rake's `App` from each configured chain in the visitor's
+# own browser. The guide is `docs/DEPLOY.md` in that repository, read at the pinned commit.
+#
+# Dispatch only, from `main`, and never on a push or a schedule: a deploy replaces the site the
+# milestone's checks are measured against, so it is a decision rather than a consequence.
+#
+# The gw44 commit is pinned **twice** — in `uses:`, so the workflow is pinned, and in `gw44-ref`, so
+# the source it builds is. They must be the same commit and nothing inside the called workflow can
+# check that: `uses:` is resolved before the job starts and is not readable from inside it.
+name: deploy-gateway
+
+on:
+  workflow_dispatch:
+    inputs:
+      verify-only:
+        description: Build and check, deploy nothing. The way to exercise the whole path without replacing the live site.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  # Not for the deploy: the called workflow lists this run's artifacts to wait for the one it just
+  # uploaded, and a called workflow's token is capped by this grant, so withholding it breaks the
+  # wait rather than the deploy. Required from gw44 `45f9bde` onwards.
+  actions: read
+
+# `pages`, so a deploy here cannot overlap another; never cancelled, because a half-finished deploy
+# would leave the site serving a mixture of two builds.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    uses: dnznlabs/gw44/.github/workflows/deploy-pages.yml@3ee50fe2de7073f8dac66898e83f961bc88b8b8b
+    with:
+      gw44-ref: 3ee50fe2de7073f8dac66898e83f961bc88b8b8b
+      config: deploy/gw44.json
+      chains: deploy/chains.json
+      embeds: widget.js
+      verify-only: ${{ inputs.verify-only }}
+      # The three lines the build printed locally on 2026-11-21 from this repository's two
+      # configuration files, at the pinned commit. Any difference fails the run before anything is
+      # deployed; whitespace is normalised on both sides, so these are the build's own lines.
+      expect: |
+        9a1eb6992ed0d1119d44f32d5cd4a6b26a326f882d857ff65a67b341d5a60497     9296  404.html
+        2187c75c2cdc86751289bf742a897a80c30faab808e60ed4b64ec2d0e95f7d6e     7814  gw44-sw.js
+        9a1eb6992ed0d1119d44f32d5cd4a6b26a326f882d857ff65a67b341d5a60497     9296  index.html
+    secrets:
+      gw44-read-key: ${{ secrets.GW44_READ_KEY }}
