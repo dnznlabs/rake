@@ -1242,7 +1242,8 @@ step, once their chain's `App` exists.
 1. **`deploy/gw44.json`** — add the chain id and its `App` address to `contracts`. **The first
    mainnet chain added becomes `default`** (gw44 decision 11: a testnet may share the origin while
    the mainnet owner controls it, but `/` belongs to a mainnet chain once one is live). Until then
-   the default is `84532`.
+   the default is `11155111`, Sepolia, by the Product Owner's ruling of 2026-11-21 on seeing the
+   deployed site.
 2. **`deploy/chains.json`** — add **at least two** endpoints for it, `https:` only and **no API key
    in any URL**: the file is compiled into the deployable, where anyone can read it. Ask each one
    before trusting it, and record the answers in the task's handoff with the date:

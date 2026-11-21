@@ -1112,6 +1112,40 @@ convention. Numbered 45 because 44 is taken by
     (two official URLs and a second repository for the second Pages site); the mirror alone (one
     chain's bundle at the official URL).
 
+67. **Connect gets a wallet picker and, on a phone, "Open in <wallet>" links before the first
+    mainnet upload; WalletConnect follows after launch, from a shared on-chain library.** Ruled by
+    Denizen on 2026-11-21 (Telegram, 16:37–17:04 CST), closing
+    [#318](https://github.com/dnznlabs/rake/issues/318). Three things, in two steps. In the
+    document mainnet first receives: a picker listing every wallet extension that announces itself,
+    where today the app takes the first one (`app/src/index.html:126`); and, only on a phone where
+    no wallet is found, a short list of links that open the page in a wallet app's own browser,
+    where the injected path already works. Desktop behaviour is otherwise unchanged, and a desktop
+    with no extension reads the message it reads today. After launch, in a later upload: a
+    WalletConnect entry in the same picker, for a phone visitor who stays in their browser and for
+    a wallet with no extension and no browser of its own (his case: a Tangem card), with the client
+    code read on demand from a contract shared by every DNZN app and not carried in this document.
+    That library, and whether an app pins it by hash or follows its latest version, is scoped under
+    [design-base#4](https://github.com/dnznlabs/design-base/issues/4). **Why:** the smallest
+    WalletConnect client measured 142 to 154 KB gzipped against a 45.5 KB document (#318), so
+    inside the document it would be paid on every chain at every upload; the picker and the links
+    are a few hundred bytes and need no library, relay or project id. **Accepted with it:** until
+    the later upload a WalletConnect-only wallet cannot act on rake, and a phone visitor finishes
+    in the wallet's browser. No link format has been tried by us; the task that builds them tries
+    each on iOS and Android first, and a wallet whose link does not work is left off the list.
+    **Cost to the schedule:** the contract deploys are not held; the first mainnet document upload
+    waits for this change, which also goes to both testnets first so that the document mainnet
+    receives is one a wallet has been run against. **Rejected:** WalletConnect in the first upload
+    (about three to four days, an estimate, ahead of launch, for a case he does not need at
+    launch); WalletConnect inside the document; a static host of ours for its code, in favour of
+    the shared contract he proposed.
+
+68. **While rake is testnet-only, `rake.dnzn.dev/` lands on Sepolia.** Ruled by Denizen on
+    2026-11-21 (Telegram, 17:22 CST), on seeing the deployed site. m05-t04 was planned and accepted
+    with Base Sepolia as the default chain; the default becomes `11155111`, and both testnets stay
+    served under their own prefixes. Unchanged: the first mainnet chain added takes `/` (gw44
+    decision 11, and `RUNBOOK.md` § The gateway), and which mainnet holds it once all four are
+    live is still m05-t04's open question, with Base as its default. Built as m05-t04a.
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
