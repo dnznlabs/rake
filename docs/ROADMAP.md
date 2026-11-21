@@ -1097,8 +1097,14 @@ convention. Numbered 45 because 44 is taken by
     copy that differs is refused by the browser. Reading the widget from the chain on a host page
     with no copy at all is gw44's loader (gw44 M03). Accepted with it: the site depends on public RPC
     endpoints where a mirror would not, and the widget's path is `/<chain id>/widget.js`, not the
-    `/widget.js` decision 59 named. Testnet deployments are not served from this hostname (gw44
-    decision 11). m05-t04 is rescoped under this decision before it is planned: M05 criterion 5's
+    `/widget.js` decision 59 named. *Amended 2026-11-21:* the hostname serves Sepolia and Base
+    Sepolia as well, and serves them first. gw44's decision 11 as amended that day
+    ([gw44#118](https://github.com/dnznlabs/gw44/pull/118)) allows a testnet contract on a
+    project's origin when the mainnet owner controls it, and `App` on both testnets is owned by the
+    Ops vault, which read the same four owners and threshold on all six chains (its delay is 900
+    seconds on the testnets and 3600 on the mainnets, accepted as it stands). `/` lands on a
+    mainnet chain from the first one deployed. As first ruled, testnet deployments were not served
+    from this hostname. m05-t04 is rescoped under this decision before it is planned: M05 criterion 5's
     `curl` of the document no longer measures anything, since `curl` sees the gateway's shell, and
     the `#/docs` snippet's host changes. The deploy is gw44's reusable workflow (gw44 M02), so
     m05-t04 waits on gw44 m02-t02 as well as on the chain list. Still open from M05-D4: the DNZN

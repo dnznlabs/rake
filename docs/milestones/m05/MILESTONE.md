@@ -7,7 +7,8 @@ Mainnet (10)** so that `DistributionFactory`, its implementation and `App` sit a
 four, the same address the two testnets carry; DNZN's fund distribution live on each of them with the
 Sepolia description and table, **the Ops vault as owner and a seven-day delay** (decisions 50 and
 51); the document uploaded through the Ops vault (decisions 44 and 47) and read through a gateway;
-the dapp mirrored under dnzn.dev and the widget embedded in one DNZN app (decisions 12 and 41);
+the dapp served at `rake.dnzn.dev` by a gw44 gateway and the widget embedded in one DNZN app
+(decisions 12, 41 and 66);
 MegaETH (4326) and Robinhood Chain (4663) as a stretch row that passes or is recorded as not reached
 without holding the close-out (decision 4). It comes now because M04 is the last cheap place to find
 what the runbook gets wrong, and it comes **after** M04 closes because every deviation M04 met is
@@ -108,14 +109,18 @@ Re-run rather than quote.
    the old factory, the new one is created by m05-t01 at the new address with decision 42's testnet
    delay. One `distribute` has run on Base, from a deposit Denizen made, with the hash in m05-t02's
    handoff — the first real transfer through the contract.
-5. **Mirrored and embedded.** *To be rewritten at m05-t04's scoping: decision 66 (2026-11-20)
-   replaces the static mirror with a gw44 gateway at the same hostname, so the `curl` comparison
-   below no longer measures the document and the snippet's host changes. As written until then:* `curl -s <mirror URL> | sha256sum` equals the `inflated sha256` of
-   the chain the mirror names, and the page carries the same `0.1alpha` header the gateway copy does;
-   a page in the DNZN app M05-D4 names contains the two-line snippet `#/docs` § the widget gives for
-   that chain and `curl -s <url> | grep -c 'w3link.io/widget.js'` prints 1, with a browser screenshot
-   in the handoff showing DNZN's table rendered from it on a mainnet. Decision 53's boundary is stated
-   on the mirror page in the same words `#/docs` uses.
+5. **Served under dnzn.dev and embedded.** Rewritten 2026-11-21 under decision 66 as amended.
+   `https://rake.dnzn.dev`, deployed from this repository by gw44's reusable workflow at a pinned
+   commit, serves `App` on every chain rake is live on, the four mainnets and the two testnets,
+   each under `/<chain id>/`, and `/` ends on a mainnet chain. From a gw44 checkout at the pinned
+   commit, `make check-site` passes its nine cases in Chromium, Firefox and WebKit against that
+   URL, and `make verify` prints `ok` for the root and `widget.js` on every chain with rake's
+   address on its first line. A page in the DNZN app M05-D4 names carries the snippet `#/docs`
+   § the widget gives, a `<script src>` to `https://rake.dnzn.dev/<chain id>/widget.js` with the
+   `integrity` attribute the deploy printed, with a browser screenshot in the handoff showing
+   DNZN's table rendered from it on a mainnet. Decision 53's boundary is stated in `#/docs`. The
+   first clause is met on the two testnets by m05-t04, on each mainnet by the task that deploys
+   it, and the embed by m05-t04b.
 6. **The runbook is amended by what happened, not annotated.** Every deviation a deploy task's
    handoff lists is a `RUNBOOK.md` change in that PR or a one-line reason it is not; § Executed on
    testnets gains a sibling § Executed on mainnets with every chain's addresses, hashes, gas and base
@@ -285,9 +290,11 @@ form; the numbers here are the milestone's and the record is `ROADMAP.md` § Dec
   session and never committed.
 - ~~**Quotes for the paid review, now** (#167's default), and the spend decision when one arrives.~~
   Withdrawn by M05-D3 (decision 55): no paid review, no quote request.
-- **The Pages site and its DNS for `rake.dnzn.dev`, and the widget embedded** under M05-D4 (decision
-  59), on Denizen's side — the publish itself is the repo's make target — with the URLs in m05-t04's
-  handoff; and the Base signoff line under Phase 2 after the first real `distribute`.
+- **Pages on this repository for `rake.dnzn.dev`** (GitHub Actions as the source, the custom
+  domain, HTTPS enforced), **the `GW44_READ_KEY` secret here and organisation access on
+  `dnznlabs/gw44`'s Actions settings**, filed as one `action` issue when m05-t04's plan merges and
+  needed by its step 5; the DNS record is in place (read 2026-11-21). **And the widget embedded**
+  under M05-D4, on Denizen's side, at m05-t04b; and the Base signoff line under Phase 2 after the first real `distribute`.
 - **A branch protection rule on `main`**: `ROADMAP.md` § Not on the roadmap says "revisit at M05's
   go/no-go". A plan question for Denizen at M05-D3; it changes nothing in the criteria.
 
@@ -296,8 +303,8 @@ form; the numbers here are the milestone's and the record is `ROADMAP.md` § Dec
 In order. Phase 1 must merge before Phase 2 proposes anything, because Phase 2 spends on an address
 Phase 1 fixes. Phase 2 before Phase 3 because the first mainnet is where a runbook surprise is
 cheapest; Phase 3 follows Phase 2 on Base's handoff alone, no review result in between (M05-D3,
-decision 55). Phase 4 needs a mainnet document to mirror, so
-it follows Phase 2 and can run beside Phase 3. The stretch row is Phase 3's second task and gates
+decision 55). Phase 4's gateway (m05-t04) needs no mainnet and runs
+beside Phases 1 to 3; its embed (m05-t04b) needs the chain list final, so it follows Phase 3. The stretch row is Phase 3's second task and gates
 nothing.
 
 **One chain first, then three; not four in one task.** Recommended: Base is the first mainnet
@@ -344,13 +351,17 @@ MegaETH and Robinhood Chain as a second task that passes or is recorded.
 | m05-t03 | **OP Mainnet (10), Arbitrum One (42161), Ethereum (1)**, in that order, each the same list as m05-t02 with Base's handoff as the comparison: the OP `LegacyERC20ETH` `transfer` assertion re-run before chain 10's deploy (`RUNBOOK.md:167-223`), Ethereum's step 1e read against Sepolia's 7× before step 2 and its base fee against the stop rule before every send, Arbitrum's `gasUsed` recorded with its L1 component named. Three README rows, three § Uploads rows, three `create`s by hand. Closes #127 with the per-chain table of all six mainnets' readings | not started — gated on m05-t02's review; M05-D3 ruled 2026-11-18 (decision 55) |
 | m05-t05 | **MegaETH (4326) and Robinhood Chain (4663), the stretch row** (decision 4). First measurements, no key: a gateway that resolves either chain (w3link.io answered nothing for both on 2026-11-18), an explorer `forge verify-contract` can reach, step 1e's pricing. If both pass, the m05-t02 list on each; if either fails, the finding is recorded in this file beside criterion 3 and the row closes as not reached. The milestone closes either way | not started — after m05-t03; optional by decision 4 |
 
-### Phase 4 — Mirrored and embedded
+### Phase 4 — Served under dnzn.dev and embedded
 
-The dapp under dnzn.dev and the widget inside a DNZN product, as decisions 12 and 41 said M05 would.
+The dapp at `rake.dnzn.dev` and the widget inside a DNZN product, as decisions 12, 41 and 66 say.
+The gateway no longer waits for a mainnet: it is deployed on the two testnets first (decision 66
+as amended 2026-11-21), and **m05-t02 and m05-t03 each end by adding their chain to it**, through
+the `RUNBOOK.md` section m05-t04 writes. The first mainnet added becomes the chain `/` lands on.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m05-t04 | *Rescoped under decision 66 before it is planned (a gw44 gateway at `rake.dnzn.dev`, deployed by gw44's workflow; waits on gw44 m02-t02). As written until then:* **The mirror and the embed** (M05-D4, decision 59). The chain's `app/dist/index.html` published at `rake.dnzn.dev` on GitHub Pages by a make target of the shape `make deploy-ghpages-mirror` (the chain is the Ethereum default until this task's scoping says otherwise; which repository serves the Pages site is its first scoping question), byte-equal to `html()` on that chain, with decision 53's paragraph in `#/docs`' words, and `app/dist/widget.js` served at `/widget.js`, the path it has on chain; the `#/docs` snippet's chain list and gateway host checked against what criterion 3 measured and amended if the host form differs; the widget snippet placed in the DNZN app named at this task's scoping, with the screenshot of criterion 5; README § Release Info's "deployed to Sepolia and Base Sepolia only" sentence rewritten, `0.1alpha` kept (decisions 45 and 48). `app/` changes, if any, ride one Run B upload on every live chain, so this task waits for the chain list to be final | not started — after m05-t02; beside m05-t03 |
+| [m05-t04](tasks/m05-t04/TASK.md) | **The gateway, on the two testnets.** `deploy/gw44.json`, `deploy/chains.json` and a dispatch-only workflow calling gw44's `deploy-pages.yml` at a pinned commit; `rake.dnzn.dev` serving `App` on Sepolia and Base Sepolia with static `widget.js` copies; gw44's `check-site` and `verify` passing against it; `RUNBOOK.md` § The gateway, which later tasks follow to add a chain; one README row | not started — planned 2026-11-21; runs beside Phases 1–3, gated only on the Product Owner's Pages action |
+| m05-t04b | **The embed.** The `#/docs` snippet's host changed to `rake.dnzn.dev/<chain id>/widget.js` with its `integrity` attribute, checked against what the deploy printed; the widget placed in the DNZN app named at this task's scoping, with the screenshot of criterion 5; README § Release Info's "deployed to Sepolia and Base Sepolia only" sentence rewritten, `0.1alpha` kept (decisions 45 and 48). `app/` changes ride one Run B upload on every live chain, so this task waits for the chain list to be final | not started — after m05-t03; not yet planned |
 
 ### Phase 5 — Close-out
 
@@ -359,7 +370,7 @@ issues at close-out, comments on state-collection#74 with the live chains and th
 `lock()` decision issue with a proposed watch period, notes the date decision 45's 90-day clock
 starts, and hands M07 nothing it needs. No task.
 
-**Estimate, labelled as one:** six tasks, one optional; three to five weeks of calendar time, of
+**Estimate, labelled as one:** seven tasks, one optional; three to five weeks of calendar time, of
 which m05-t01 is about one week (two testnet signing rounds and two `create`s by hand), m05-t01b
 under two days of agent time beside it (decision 56's figure, unmeasured), Phase 2 a
 few days after the go, and the rest is Denizen's signing sessions — twelve co-signatures and four
