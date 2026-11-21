@@ -85,7 +85,9 @@ does not count. If the third deploying run fails, stop and report with the run i
 
 ## Acceptance criteria
 
-- `https://rake.dnzn.dev/` ends on `/84532/` showing the application, and `/11155111/` shows it,
+- **Superseded 2026-11-21 by [m05-t04a](../m05-t04a/TASK.md), on the Product Owner's ruling that
+  `/` lands on Sepolia while rake is testnet-only. Met as written by this task's deploy; the
+  original text follows.** `https://rake.dnzn.dev/` ends on `/84532/` showing the application, and `/11155111/` shows it,
   in Chromium, Firefox and WebKit: step 7's `check-site`, nine of nine in each.
 - Step 7's `make verify` prints `ok` for the root and `widget.js` on both chains against
   `https://rake.dnzn.dev`, with rake's address on its first line.
