@@ -1,6 +1,6 @@
 # m05-t04 — handoff
 
-PR: #TBD · Branches: `feat/m05-t04-gateway`, `fix/m05-t04-concurrency`, `docs/m05-t04-runbook`, `docs/m05-t04-handoff` · 2026-11-21
+PR: #329 · Branches: `feat/m05-t04-gateway`, `fix/m05-t04-concurrency`, `docs/m05-t04-runbook`, `docs/m05-t04-handoff` · 2026-11-21
 
 `https://rake.dnzn.dev` serves rake's `App` from the chain on Sepolia and Base Sepolia through a pinned build of `dnznlabs/gw44`, deployed from this repository by one dispatch-only workflow, with a static copy of each chain's `widget.js` beside it. `/` lands on `/84532/` until a mainnet chain is added, which `RUNBOOK.md` § The gateway makes five edits and one dispatch. **One deploying run was spent of the three the plan allows.**
 
