@@ -15,8 +15,8 @@ branch head. Part B is not started and is gated as § Gate says.
 
 ## Acceptance criteria
 
-Criteria 13–18 are Part B's and are listed so that none reads as silently passed. Criterion 19 is
-Part B's too: this table is Part A's half.
+Criteria 13–19 are Part B's and were filled in when Part B executed; **18b is not met and says so**,
+and 18f's publish and 18e's hosted half on Sepolia are carried rather than passed.
 
 | AC | Result | Evidence |
 |:---|:-------|:---------|
@@ -32,8 +32,19 @@ Part B's too: this table is Part A's half.
 | 10 | pass | The coordination service holds a `wallets` row for the Ops vault on **all eight** chain ids — 1, 10, 8453, 42161, 4326, 4663, 11155111, 84532 — read 2026-11-19, recorded in § 1's table as its `signing row` column. The question that is the Product Owner's is in § For Denizen. See Discovery 4 on `owner_count` |
 | 11 | pass, less CI | `git diff --stat origin/main -- src/ test/*.t.sol .gas-snapshot foundry.toml` prints **nothing**; the `*.t.sol` population it covers was enumerated first — `App.t.sol`, `ColdStipend.t.sol`, `DistributionFactory.t.sol`, `Distribution.t.sol`, `PushGas.t.sol`, `TableCap.t.sol`. After `forge build --force` (exit 0, 0 `warning[`, 0 `Warning (`): `forge test` **107 passed, 0 failed**; `forge snapshot --check` **exit 0**; `grep -c '' .gas-snapshot` **107**; `node --test test/*.test.mjs` **168 pass, 0 fail, 0 skipped** (167 plus the one new case); `forge fmt --check` exit 0; `forge lint` exit 0. `git status --porcelain` empty. **CI is not green yet because no PR is open** — see Deviation 11 |
 | 12 | not verifiable here | **No PR was opened**: the brief reserves that. The closing line to use is `Closes #207, #188, #197, #251`, and the four folds are complete in this branch with each step's check quoted above — AC 4 for #207, AC 5 for #188, AC 9 for #197, AC 3 for #251. Each issue was read and says what the plan claims it says (§ Discoveries has nothing against them). `gh pr view <n> --json closingIssuesReferences` is the reviewer's to run, and the task's own issue (#271) must **not** be in it |
-| 13–18, 18b–18f | Part B | Not started. The two testnets, gated on M04's close-out and on this PR's merge; step 14 additionally on m04-t15's merge. **Amended 2026-11-19:** M04's close-out merged ([#296](https://github.com/dnznlabs/rake/pull/296)) and decision 64 added criteria 18c–18f — M04 criteria 1, 3 and 5's transferred clauses — beside 18b. **Criterion 17's last clause is recorded as the architect's, not the engineer's, pending the Product Owner's ruling** — Discovery 7 and § For Denizen; it is the one row in Part B whose author this table does not yet settle |
-| 19 | Part B | Part B's PR closes #271 and its handoff carries all **twenty-three** rows (1–18, 18b–18f). Amended 2026-11-19: nineteen as written, plus decision 64's four |
+| 13 | pass | Run A's steps 1–3 and 5 on both chains: § Step 13 closes #288 and the two fixtures now agree, § For close-out's tables and § Record. The immutable-span comparison is re-run at 18c below, against the artifact `main` builds |
+| 14 | pass | § Step 14 — the amended hash check, § Step 14 — calldata and the fork proof before any signature, § Step 14 — the six proposals written and read back, and § Step 13a with step 14 re-run on top of it |
+| 15 | pass | § Step 15 and M05 criterion 4 — Sepolia's `create` has landed and verifies clean, and the Base Sepolia `create` beside it. Re-read for 18d on 2026-11-21: `predict` and `codesize` agree on both chains |
+| 16 | pass | § Step 16 — 4c and 4d on Sepolia (11155111) and § Step 16 — 4c and 4d on Base Sepolia (84532), with § Step 16a:1's readings and § Step 16a:3's cancel and re-send between them |
+| 17 | pass | § Step 17 — the records, and M05 criterion 6's deviation audit |
+| 18 | pass | This table, § Gates, § What it cost, § For Denizen and § Discoveries are present, and this PR says `Closes #271` |
+| 18b | **not met** | The wallet run on the redeployed testnets needs the Product Owner's own reading and signoff line, and he has not made it: [#302](https://github.com/dnznlabs/rake/issues/302), filed 2026-11-20, still open 2026-11-21. `shots/11155111/` and `shots/84532/` are therefore absent. **This row is not softened** — the criterion is unmet, and the PR should not merge on the strength of the others until it is met or the plan moves it |
+| 18c | pass, both chains | § Criterion 18c below. Factory **1,319 bytes** on both sides, **60 differing bytes, every one inside the three declared spans, 0 outside**, each span holding `IMPL` left-padded to 32 bytes; `App` **7,154 bytes equal outright**. Measured 2026-11-21 against the artifact `main` builds, which is the clause M04 could not meet |
+| 18d | pass, both chains | § Criterion 18d below. `predict($DNZN_SALT)` prints `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199` and `cast codesize` prints **45** at that address, on Sepolia and on Base Sepolia |
+| 18e | **chain half pass; the hosted half passes on one chain and is carried on the other** | § Criterion 18e below. Chain half on both chains: `inflated sha256` and `widget sha256` equal that chain's build, re-read 2026-11-21 with the values step 16 recorded. Hosted: Base Sepolia **exit 0, ten assertions ok**; Sepolia **exit 1, five failed**, serving 149 B at `/` and 110 B at `/widget.js` against 72,177 B and 8,509 B on Base Sepolia — recorded and carried as [#242](https://github.com/dnznlabs/rake/issues/242) under the criterion's own rule, and **not** re-uploaded |
+| 18f | pass for the page; **the publish is pending** | § Criterion 18f — the host page regenerated, plus the Base Sepolia amendment in `5fadcdd`: all nine of the criterion's readings match. Publishing is the Product Owner's step — [#303](https://github.com/dnznlabs/rake/issues/303), handed back 2026-11-21 with the nine readings and three hosted URL statuses — and the row stays open until the URL exists, as the criterion provides |
+| 18g | pass, rows 1–6 | § Step 13a's criterion 18g rows 1–5, and row 6 in § Deviations, where decision 65's change would otherwise have failed on a served page |
+| 19 | pass | This PR closes #271 and this table carries one row per criterion — **twenty-three**: 1–18 and 18b–18g |
 
 ## Deviations from the plan
 
@@ -1334,6 +1345,86 @@ against it, and one browser screenshot under `shots/` showing DNZN's table rende
 Sepolia. [#303](https://github.com/dnznlabs/rake/issues/303) carries that ask. Per 18f's own last
 sentence, if the URL is not published when Part B's PR is ready the handoff records the ask and its
 date and the row stays open — nothing else in this task waits on it.
+
+### Criterion 18c — the artifact comparison, against `main`'s own build
+
+`forge build` at this branch's head with `main` merged, then per chain `cast code` against
+`forge inspect <contract> deployedBytecode`, compared as bytes. The three immutable spans are read
+from the artifact rather than from `forge inspect`, which carries no such field in 1.7.1-dev:
+
+```
+jq -r '.deployedBytecode.immutableReferences' out/Distribution.sol/DistributionFactory.json
+48267: offset 274 length 32, offset 864 length 32, offset 939 length 32
+```
+
+| | Sepolia (11155111) | Base Sepolia (84532) |
+|:--|:--|:--|
+| factory, artifact and chain, byte length | **1,319 / 1,319** | **1,319 / 1,319** |
+| factory, differing bytes | **60** | **60** |
+| of those, inside the three spans | **60** | **60** |
+| **outside the spans** | **0** | **0** |
+| each span holds `IMPL` left-padded to 32 bytes | yes, all three | yes, all three |
+| `App`, artifact and chain | **7,154 / 7,154 bytes, equal outright** | **7,154 / 7,154, equal outright** |
+
+**Why 60 and not 96.** The three spans are 32 bytes each, but `IMPL`
+(`0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`) is 20 bytes left-padded with twelve zero bytes, and
+those twelve match the artifact's own padding. So 3 × 20 bytes differ and 3 × 12 agree.
+
+**What this replaces.** M04's close-out read 1,088 of 1,320 factory bytes and 6,475 of 7,155 `App`
+bytes differing against `main`, and 60 and 0 only against a build of `08b3304`
+([m04/CLOSEOUT.md](../../../m04/CLOSEOUT.md) criterion 1). The figures above are **60 and 0 against
+`main`'s own artifact**, which is the clause M04 could not meet. The byte totals differ from M04's by
+one because these are lengths of the decoded runtime, not of the `0x`-prefixed hex.
+
+### Criterion 18d — DNZN's address at the new factory
+
+Per chain, with `FACTORY` `0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E` and
+`DNZN_SALT` `0x68e0741D8d693e14BF56914567eADdC130b186eE000000000000000000000001`:
+
+| | Sepolia (11155111) | Base Sepolia (84532) |
+|:--|:--|:--|
+| `predict(bytes32)(address)` | **`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`** | **the same address** |
+| `cast codesize $DISTRO` | **45** | **45** |
+
+Read 2026-11-21, after step 16's `create` on each chain. The clause M04 could not meet is the pair
+together: there `predict` answered `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` with codesize **0** on
+both chains. The `create` receipts are in § Step 15 and in § Record.
+
+### Criterion 18e — the document on chain, and the hosted gateway on each
+
+**The chain half, which the criterion says must hold, holds on both chains.** `chain-doc` read back,
+2026-11-21, with the values step 16 recorded when the uploads executed:
+
+| | Sepolia (11155111) | Base Sepolia (84532) |
+|:--|:--|:--|
+| `inflated sha256` | **`59c24c98a1bc60fa82be18acb290b4a5df29e406f00f22d643c969acffdd2010`** | **`59ef3a4e21d585e623f54861d54aa8fd8d10135691747d1f23ebb03dce20df28`** |
+| `inflated bytes` | 151,232 | 151,230 |
+| equal to that chain's `app/dist/index.html` | yes, § Step 16 | yes, § Step 16 |
+| `widget sha256` | **`8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368`** | the same |
+| equal to `app/dist/widget.js` | yes | yes |
+
+The two documents differ from each other by two bytes because step 13 re-points four deployment
+values per chain; each is equal to **its own** chain's build, which is what the criterion asks. A
+reader comparing one chain's document against a worktree `app/dist` built for the other will see a
+difference that is not a fault — I did exactly that first.
+
+**The hosted half passes on Base Sepolia and fails on Sepolia**, which is M04's shape and is carried,
+not re-uploaded. `tools/gateway-check.sh` in hosted mode against `https://<app>.<chain>.w3link.io`:
+
+| | Sepolia (11155111) | Base Sepolia (84532) |
+|:--|:--|:--|
+| exit | **1** | **0** |
+| assertions | **5 failed**, named: `status` 400 where 200 was expected, `content-type` empty where `text/html…` was, and `web3-resolve-mode`, `web3-mode-auto-method` and `web3-contract-return-processing` all empty where `resourceRequest`, `request` and `decodeErc5219Request` were | **10 ok**, `all assertions passed` |
+| `/` | **400**, 149 B served | **200**, 72,177 B |
+| `/widget.js` | **400**, 110 B served | **200**, 8,509 B, `cmp` identical to `app/dist/widget.js` |
+
+So the hosted gateway answers nothing for this contract on Sepolia while answering correctly on Base
+Sepolia, for the same contract address and the same uploaded document. **The fault is that
+deployment's, not ours:** this project's own build of a gateway serves Sepolia correctly — measured
+in m05-t04, where `rake.dnzn.dev/11155111/` renders the application and `make verify` compares the
+served bytes with the chain's and passes. Carried as
+[#242](https://github.com/dnznlabs/rake/issues/242); M04 recorded two failing assertions where this
+run records five.
 
 ### Step 17 — the records, and M05 criterion 6's deviation audit
 
