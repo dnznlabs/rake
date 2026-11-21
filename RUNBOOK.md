@@ -1561,7 +1561,7 @@ vault-owned and still serves its own document.
 | | 4d | `inflated sha256` · `widget sha256` · `App` nonce | `59c24c98…cffdd2010` · `8b6bbc88…108bc368`, both equal to the build · **4** |
 | | 4d | hosted gateway | **fails**: `status: 400`, no ERC-5219 headers. Third-party condition, carried, never re-uploaded — the chain is the reference |
 | 4 | 5 | explorer · Sourcify | all three `Pass - Verified` **by this run** · three `exact_match`, asserting loop exit 0 · OpenChain 82 `Duplicated:` |
-| 5 | 6 | DNZN `create` | **landed**, `0xB611Ff19…0F4D5199` · `codesize` 45 · `owner()` the Ops vault · `delay()` 86400 · table 2,000 / 4,000 / 4,000 ascending |
+| 5 | 6 | DNZN `create` | **landed**, `0xB611Ff19…0F4D5199` · `codesize` **45** · `owner()` the Ops vault `0x00c0e887…F3790` · `delay()` **86400** · `nonce()` 0 · `snapshot()` table treasury **2,000** / ops **4,000** / creator **4,000**, ascending, description `DNZN // FUND DISTRIBUTION`. Sent by Denizen from the Creator keystore; #300's pre-flight estimated **2,241,718** gas. The transaction hash is not recorded here, for the reason given in Base Sepolia's row. Re-read live on 2026-11-21 |
 
 ### § Record — M05, Base Sepolia (84532), 2026-11-20
 
@@ -1579,7 +1579,7 @@ vault-owned and still serves its own document.
 | | 4d | `inflated sha256` · `widget sha256` · `App` nonce | `59ef3a4e…ce20df28` · `8b6bbc88…108bc368`, both equal to the build · **4** |
 | | 4d | hosted gateway | **passes**, exit 0 — body-minus-block equal to `html()`, `/widget.js` 200 and `cmp`-identical at 8,509 bytes, `/nope` 404, cache-status `miss` |
 | 4 | 5 | explorer · Sourcify | factory and implementation `Pass - Verified` by this run; **`App` reported *already verified***, so that one is not attributable here · three `exact_match`, loop exit 0 |
-| 5 | 6 | DNZN `create` | **not yet sent** — `codesize` at `0xB611Ff19…0F4D5199` reads `0`. The calldata is byte-identical to Sepolia's, which verified clean |
+| 5 | 6 | DNZN `create` | **landed**, `0xB611Ff19…0F4D5199` · `codesize` **45** · `owner()` the Ops vault `0x00c0e887…F3790` · `delay()` **86400** · `nonce()` 0 · `snapshot()` table treasury **2,000** / ops **4,000** / creator **4,000**, ascending, description `DNZN // FUND DISTRIBUTION` — identical to Sepolia's reading. Sent by Denizen from the Creator keystore after #304's pre-flight, which estimated **480,533** gas. **The transaction hash is not recorded here**: it is his send, it is not in #304, and the factory's `Created` event is outside the `eth_getLogs` range this endpoint serves, so recovering it is a lookup on the explorer rather than a figure I measured. Row read live on 2026-11-21 |
 
 Steps 1, 2, 3 and 5 were executed on **Sepolia (11155111)** and then **Base Sepolia (84532)** in
 m04-t03, with Elanik's agent wallet `0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d`. **Step 4 was not
