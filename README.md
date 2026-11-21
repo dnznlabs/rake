@@ -54,6 +54,9 @@ Source is published in both places a client might look, at solc `0.8.34`: the ex
 |:---|:---|:---|
 | A `web3://`-capable browser or extension | `web3://0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE:11155111/` | `web3://0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE:84532/` |
 | Any browser, through the w3link gateway | [`…11155111.w3link.io`](https://0x00a90943f58b6ab7fde05aae01c13a80e6995bae.11155111.w3link.io/) | [`…84532.w3link.io`](https://0x00a90943f58b6ab7fde05aae01c13a80e6995bae.84532.w3link.io/) |
+| DNZN's own gateway, on `dnzn.dev` | [`rake.dnzn.dev/11155111/`](https://rake.dnzn.dev/11155111/) | [`rake.dnzn.dev/84532/`](https://rake.dnzn.dev/84532/) |
+
+The third row is this project's own deployment of [gw44](https://github.com/dnznlabs/gw44) reading the same contract on the same chains: three static files on a domain DNZN controls, with the contract read in your browser rather than by a server.
 
 The widget is the same URL plus `/widget.js`. The gateway form is `https://<app address>.<chain id>.w3link.io/`, lowercase address, and it is a third-party service reading the same contract — nothing about the document depends on it. `make gateway` runs a gateway locally against the dev chain instead ([AGENTS.md](AGENTS.md) § The dapp).
 
