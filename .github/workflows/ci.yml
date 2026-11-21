@@ -1,8 +1,21 @@
 name: ci
 
+# Not on a change that touches only Markdown: nothing the suite tests can have moved, and a plan or a
+# status row should not cost a full run. A change that touches any other file, under docs/ included,
+# runs as before.
 on:
   push:
+    branches: [main]
+    paths-ignore: ["**.md"]
   pull_request:
+    paths-ignore: ["**.md"]
+
+# One run per change. A push to a branch with an open pull request used to start two identical runs,
+# one per event; branches now run through their pull request only. A newer push to a pull request
+# cancels the run it supersedes; runs on main are never cancelled.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

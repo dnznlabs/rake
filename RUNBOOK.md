@@ -1228,6 +1228,82 @@ the authority for the rest.
 
 Fill in anything still blank in § Record before closing the session.
 
+## The gateway
+
+`https://rake.dnzn.dev` serves `App` from the chain through a pinned build of `dnznlabs/gw44`,
+deployed from this repository by `.github/workflows/deploy-gateway.yml`. Nothing is server-side: the
+deployable is three static files, and a visitor's own browser reads the contract over the endpoints
+named below. The guide for every step here is `docs/DEPLOY.md` in that repository, read at the commit
+the workflow pins.
+
+**Adding a chain is five edits and one dispatch.** m05-t02 and m05-t03 run this section as their last
+step, once their chain's `App` exists.
+
+1. **`deploy/gw44.json`** — add the chain id and its `App` address to `contracts`. **The first
+   mainnet chain added becomes `default`** (gw44 decision 11: a testnet may share the origin while
+   the mainnet owner controls it, but `/` belongs to a mainnet chain once one is live). Until then
+   the default is `84532`.
+2. **`deploy/chains.json`** — add **at least two** endpoints for it, `https:` only and **no API key
+   in any URL**: the file is compiled into the deployable, where anyone can read it. Ask each one
+   before trusting it, and record the answers in the task's handoff with the date:
+
+   ```bash
+   curl -sS -X POST -H 'content-type: application/json' \
+     --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' <endpoint>
+   ```
+
+   The result is hex: `0xaa36a7` is 11155111, `0x14a34` is 84532. An endpoint that answers another
+   chain's id, or an HTML error page, is not an endpoint.
+3. **Build it locally before spending a run**, from a gw44 checkout at the commit the workflow pins
+   — a worktree or a clone of its own, not a checkout something else is using:
+
+   ```bash
+   devbox run -- make build CONFIG=<rake>/deploy/gw44.json GW44_CHAINS=<rake>/deploy/chains.json \
+     GW44_OUT=/tmp/gateway-out
+   devbox run -- make get URL="https://anything.invalid/<new chain>/" CONFIG=<rake>/deploy/gw44.json \
+     GW44_CHAINS=<rake>/deploy/chains.json
+   ```
+
+   The build prints three `sha256  bytes  name` lines. `make get` must answer **200** with
+   `text/html; charset=utf-8` for the new chain; `404 0 B` with `application/octet-stream` means the
+   contract answered 404 for that path, and `404 47 B` with `text/plain` means nothing answered at
+   that address on that chain — usually the wrong address or the wrong chain id.
+4. **`expect` in the workflow** — replace the three lines with the three the build just printed.
+   Whitespace is normalised on both sides, so paste the build's own lines. A mismatch fails the run
+   **before** anything is deployed, which is the point of it.
+5. **Dispatch it**, from `main` only — the `github-pages` environment on this repository admits no
+   other branch, and it gates the whole job, so even a verify-only run fails from a branch:
+
+   ```bash
+   gh workflow run deploy-gateway.yml --repo dnznlabs/rake --ref main -f verify-only=true   # first
+   gh workflow run deploy-gateway.yml --repo dnznlabs/rake --ref main                        # then deploy
+   ```
+
+   The run names which of its three attempts deployed and prints an `integrity` snippet per chain for
+   the published `widget.js` copies.
+
+**Then check it, from the same gw44 checkout, with the new chain in both commands:**
+
+```bash
+devbox run -- make check-site URL=https://rake.dnzn.dev SITE_CONFIG=<rake>/deploy/gw44.json \
+  EMBED="<chain>/widget.js=sha384-…" ENGINES="chromium firefox webkit"
+devbox run -- env VERIFY_SITE=https://rake.dnzn.dev VERIFY_ADDRESS=<App> \
+  VERIFY_CHAINS="11155111 84532 <new chain>" GW44_CHAINS=<rake>/deploy/chains.json make verify
+```
+
+`check-site` is nine cases per engine. `make verify` reads the contract through the endpoints and
+compares what the site serves byte for byte; **read its first line**, which names the address and the
+chains it actually checked, before reading its result.
+
+**Two things the caller must not do**, both learned by doing them:
+
+- **No `concurrency` block.** The called workflow declares the group `pages` itself; a caller naming
+  the same group deadlocks the call and the run fails at startup with **zero jobs and no log to
+  read** (runs 44958052197 and 44958698883 are the pair that showed it). A caller that wants its own
+  group must choose a different name.
+- **No push or schedule trigger.** A deploy replaces the site the milestone's checks are measured
+  against, so it stays a decision: `workflow_dispatch` only.
+
 ## Record
 
 Filled in as the steps execute, not reconstructed afterwards. One table per chain. A row with a

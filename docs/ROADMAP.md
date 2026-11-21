@@ -919,7 +919,8 @@ convention. Numbered 45 because 44 is taken by
     (six proposal-and-co-sign rounds for no deploy the vault needs); option (3), 3-of-4 on all eight
     (every future proposal would need three signatures, and the question is not rake's).
 
-59. **The mirror is `rake.dnzn.dev`, served by GitHub Pages from a make target, with `/widget.js` at
+59. *Superseded by 66 on 2026-11-20; kept as ruled.* **The mirror is `rake.dnzn.dev`, served by
+    GitHub Pages from a make target, with `/widget.js` at
     the same path it has on chain; the DNZN app that embeds the widget is still unnamed.** M05-D4,
     ruled in part by Denizen on 2026-11-19 (GitHub,
     [#256](https://github.com/dnznlabs/rake/issues/256), 06:28 UTC). The URL is "rake.dnzn.dev"; the
@@ -1079,6 +1080,37 @@ convention. Numbered 45 because 44 is taken by
     accepted a page that was then changed. It rested on the testnet upload having happened, which
     it had not: on 2026-11-20 step 14's six proposals carried the engineer's signature alone, and
     Denizen said so.
+
+
+66. **`rake.dnzn.dev` is a gw44 gateway reading the dapp from the chain, with static copies of
+    `widget.js` beside it; decision 59's static mirror is superseded.** Ruled by Denizen on 2026-11-20
+    (Telegram, 23:11 CST; [gw44#44](https://github.com/dnznlabs/gw44/issues/44), option 1). The
+    hostname and the host stand: `rake.dnzn.dev`, on GitHub Pages, deployed from this repository.
+    What it serves changes. Instead of one chain's built document copied to the site, it serves a
+    pinned build of `dnznlabs/gw44` that reads `App.html()` and `App.request()` in the visitor's
+    browser on every mainnet chain rake is deployed to, each under `/<chain id>/`, with `/` going to
+    the default chain. The deploy also publishes each chain's `widget.js` as a plain file at
+    `/<chain id>/widget.js`, checked against the chain's hash, so a host page embeds it with a
+    `<script src>` and no third-party gateway. Decision 12 stands: the widget is an on-chain
+    document and `App` is its source. The file is a copy of it, as the gateway snippet's bytes are
+    today, and the `#/docs` snippet pins it to the chain's bytes with an `integrity` attribute, so a
+    copy that differs is refused by the browser. Reading the widget from the chain on a host page
+    with no copy at all is gw44's loader (gw44 M03). Accepted with it: the site depends on public RPC
+    endpoints where a mirror would not, and the widget's path is `/<chain id>/widget.js`, not the
+    `/widget.js` decision 59 named. *Amended 2026-11-21:* the hostname serves Sepolia and Base
+    Sepolia as well, and serves them first. gw44's decision 11 as amended that day
+    ([gw44#118](https://github.com/dnznlabs/gw44/pull/118)) allows a testnet contract on a
+    project's origin when the mainnet owner controls it, and `App` on both testnets is owned by the
+    Ops vault, which read the same four owners and threshold on all six chains (its delay is 900
+    seconds on the testnets and 3600 on the mainnets, accepted as it stands). `/` lands on a
+    mainnet chain from the first one deployed. As first ruled, testnet deployments were not served
+    from this hostname. m05-t04 is rescoped under this decision before it is planned: M05 criterion 5's
+    `curl` of the document no longer measures anything, since `curl` sees the gateway's shell, and
+    the `#/docs` snippet's host changes. The deploy is gw44's reusable workflow (gw44 M02), so
+    m05-t04 waits on gw44 m02-t02 as well as on the chain list. Still open from M05-D4: the DNZN
+    app that embeds the widget. Rejected: the mirror at this hostname and the gateway at another
+    (two official URLs and a second repository for the second Pages site); the mirror alone (one
+    chain's bundle at the official URL).
 
 ## Findings carried forward
 
