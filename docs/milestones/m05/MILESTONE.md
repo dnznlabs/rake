@@ -108,7 +108,9 @@ Re-run rather than quote.
    the old factory, the new one is created by m05-t01 at the new address with decision 42's testnet
    delay. One `distribute` has run on Base, from a deposit Denizen made, with the hash in m05-t02's
    handoff — the first real transfer through the contract.
-5. **Mirrored and embedded.** `curl -s <mirror URL> | sha256sum` equals the `inflated sha256` of
+5. **Mirrored and embedded.** *To be rewritten at m05-t04's scoping: decision 66 (2026-11-20)
+   replaces the static mirror with a gw44 gateway at the same hostname, so the `curl` comparison
+   below no longer measures the document and the snippet's host changes. As written until then:* `curl -s <mirror URL> | sha256sum` equals the `inflated sha256` of
    the chain the mirror names, and the page carries the same `0.1alpha` header the gateway copy does;
    a page in the DNZN app M05-D4 names contains the two-line snippet `#/docs` § the widget gives for
    that chain and `curl -s <url> | grep -c 'w3link.io/widget.js'` prints 1, with a browser screenshot
@@ -229,7 +231,9 @@ form; the numbers here are the milestone's and the record is `ROADMAP.md` § Dec
   written go, Phase 3 on the review's dispositions in `SECURITY.md` or his written waiver. Blocks
   m05-t02. *Record:* `ROADMAP.md` § Decisions as an amendment to decision 20; the accepted quote is
   its own decision.
-- **M05-D4, where the mirror lives and which DNZN app embeds the widget.** **Ruled in part
+- **M05-D4, where the mirror lives and which DNZN app embeds the widget.** *Decision 66
+  (2026-11-20) supersedes decision 59 below: `rake.dnzn.dev` serves a gw44 gateway with static
+  widget copies, not a mirror. The app that embeds the widget is still open.* **Ruled in part
   2026-11-19 ([#256](https://github.com/dnznlabs/rake/issues/256)), decision 59: the mirror is
   `rake.dnzn.dev` on GitHub Pages, published by a make target of the shape
   `make deploy-ghpages-mirror`, with `/widget.js` at the path it has on chain; the chain is the
@@ -346,7 +350,7 @@ The dapp under dnzn.dev and the widget inside a DNZN product, as decisions 12 an
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m05-t04 | **The mirror and the embed** (M05-D4, decision 59). The chain's `app/dist/index.html` published at `rake.dnzn.dev` on GitHub Pages by a make target of the shape `make deploy-ghpages-mirror` (the chain is the Ethereum default until this task's scoping says otherwise; which repository serves the Pages site is its first scoping question), byte-equal to `html()` on that chain, with decision 53's paragraph in `#/docs`' words, and `app/dist/widget.js` served at `/widget.js`, the path it has on chain; the `#/docs` snippet's chain list and gateway host checked against what criterion 3 measured and amended if the host form differs; the widget snippet placed in the DNZN app named at this task's scoping, with the screenshot of criterion 5; README § Release Info's "deployed to Sepolia and Base Sepolia only" sentence rewritten, `0.1alpha` kept (decisions 45 and 48). `app/` changes, if any, ride one Run B upload on every live chain, so this task waits for the chain list to be final | not started — after m05-t02; beside m05-t03 |
+| m05-t04 | *Rescoped under decision 66 before it is planned (a gw44 gateway at `rake.dnzn.dev`, deployed by gw44's workflow; waits on gw44 m02-t02). As written until then:* **The mirror and the embed** (M05-D4, decision 59). The chain's `app/dist/index.html` published at `rake.dnzn.dev` on GitHub Pages by a make target of the shape `make deploy-ghpages-mirror` (the chain is the Ethereum default until this task's scoping says otherwise; which repository serves the Pages site is its first scoping question), byte-equal to `html()` on that chain, with decision 53's paragraph in `#/docs`' words, and `app/dist/widget.js` served at `/widget.js`, the path it has on chain; the `#/docs` snippet's chain list and gateway host checked against what criterion 3 measured and amended if the host form differs; the widget snippet placed in the DNZN app named at this task's scoping, with the screenshot of criterion 5; README § Release Info's "deployed to Sepolia and Base Sepolia only" sentence rewritten, `0.1alpha` kept (decisions 45 and 48). `app/` changes, if any, ride one Run B upload on every live chain, so this task waits for the chain list to be final | not started — after m05-t02; beside m05-t03 |
 
 ### Phase 5 — Close-out
 
