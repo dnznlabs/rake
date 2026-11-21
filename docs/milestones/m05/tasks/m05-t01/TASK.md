@@ -712,13 +712,14 @@ an address. Baselines are `main` at `78b5eb7`, 2026-11-19.
     value. **Amended 2026-11-21: the page names Base Sepolia, not Sepolia.** The hosted gateway
     answers 400 for the redeployed `App` on Sepolia and 200 on Base Sepolia (read by the architect
     that day: `/` and `/widget.js` both 400 on `11155111`, 200 with 72,177 and 8,509 bytes on
-    `84532`), and the project's own build of the same gateway serves Sepolia correctly, so the
+    `84532`), and the project's own build of the same gateway serves Sepolia correctly (the engineer's
+    measurement, in this task's handoff), so the
     fault is the hosted deployment's and nobody here can clear it. A page whose `src` is Sepolia's
     hosted URL loads no script and renders nothing. So the regenerated page takes its `src` from
     `https://<app, lowercase>.84532.w3link.io/widget.js`, both mounts carry `data-chain="84532"`,
     and the `data-rpc` mount carries Base Sepolia's `PUBLIC_RPC` entry; the distribution is at the
     same address on both chains. Beside the figures above: `grep -c '84532.w3link.io/widget.js'`
-    → **1**, `grep -c 'data-chain="84532"'` → **2**, `grep -c '11155111'` → **0**. Sepolia's
+    → **1**, `grep -c 'data-chain="84532"'` → **2**, `grep -c 'data-chain="11155111"\|11155111.w3link'` → **0**. Sepolia's
     hosted 400 is recorded and carried under criterion 18e's rule. Then published by the Product Owner on the
     decision-41 host (publishing is his step), with the URL in this handoff and
     `curl -s <url> | grep -ci 'w3link.io/widget.js'` → 1 run against it, plus one browser screenshot
