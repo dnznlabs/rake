@@ -1091,7 +1091,11 @@ convention. Numbered 45 because 44 is taken by
     browser on every mainnet chain rake is deployed to, each under `/<chain id>/`, with `/` going to
     the default chain. The deploy also publishes each chain's `widget.js` as a plain file at
     `/<chain id>/widget.js`, checked against the chain's hash, so a host page embeds it with a
-    `<script src>` and no third-party gateway. Accepted with it: the site depends on public RPC
+    `<script src>` and no third-party gateway. Decision 12 stands: the widget is an on-chain
+    document and `App` is its source. The file is a copy of it, as the gateway snippet's bytes are
+    today, and the `#/docs` snippet pins it to the chain's bytes with an `integrity` attribute, so a
+    copy that differs is refused by the browser. Reading the widget from the chain on a host page
+    with no copy at all is gw44's loader (gw44 M03). Accepted with it: the site depends on public RPC
     endpoints where a mirror would not, and the widget's path is `/<chain id>/widget.js`, not the
     `/widget.js` decision 59 named. Testnet deployments are not served from this hostname (gw44
     decision 11). m05-t04 is rescoped under this decision before it is planned: M05 criterion 5's
