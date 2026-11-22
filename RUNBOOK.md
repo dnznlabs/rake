@@ -633,6 +633,57 @@ grep -o "App 0x[0-9a-fA-F]*" <<<"$(devbox run -- node tools/step4-calldata.mjs -
 # and the proposal targets: 1 and 2 are plain calls to $APP, the batch targets $OWNER (§ 4a's table)
 ```
 
+**And check the address set *inside* the document, which is a different question**
+([#357](https://github.com/dnznlabs/rake/issues/357)). The target check above asks whether `App` is
+real; this asks whether the page `App` would serve points at contracts that exist. `app/build.mjs`
+substitutes `__DISTRIBUTIONFACTORY__`, `__APP__` and `__DISTRIBUTION__` from the committed
+`broadcast/<Script>/<chain id>/run-latest.json` logs, so a build made while those logs are behind the
+chain is well-formed, byte-reproducible, passes every check in this section **and serves a dapp
+pointed at a retired factory** — which on m05-t01c it did, because the redeploy's logs were still on
+an unmerged branch. The symptom is the featured panel going empty, because the featured distribution
+is computed from the baked factory and implementation and nothing exists at the address a retired
+factory yields:
+
+```sh
+CFG=$(grep -o "const CFG = {[^}]*}" app/dist/index.html)
+FACTORY_IN=$(sed -E "s/.*factory: '([^']*)'.*/\1/" <<<"$CFG")
+APP_IN=$(sed -E "s/.*app: '([^']*)'.*/\1/" <<<"$CFG")
+IMPL_IN=$(sed -E "s/.*impl: '([^']*)'.*/\1/" <<<"$CFG")
+SALT_IN=$(sed -E "s/.*featuredSalt: '([^']*)'.*/\1/" <<<"$CFG")
+
+test "${APP_IN,,}" = "${APP,,}" || echo "the document names another App than the one being uploaded to"
+for a in $FACTORY_IN $APP_IN $IMPL_IN; do
+  cast codesize $a --rpc-url "$RPC"                    # three non-zero readings, or stop
+done
+
+# The featured distribution, the page's own computation (`app/src/index.html` predictLocal):
+INIT=0x602d5f8160095f39f35f5f365f5f37365f73${IMPL_IN:2}5af43d5f5f3e6029573d5ffd5b3d5ff3
+DISTRO_IN=$(cast create2 --deployer $FACTORY_IN --salt $SALT_IN --init-code-hash $(cast keccak $INIT) | tail -1)
+cast codesize $DISTRO_IN --rpc-url "$RPC"              # non-zero: the panel will have something to show
+cast call $FACTORY_IN "predict(bytes32)(address)" $SALT_IN --rpc-url "$RPC"   # must equal $DISTRO_IN
+```
+
+`record:` the three readings and `$DISTRO_IN`. The last two lines are the pair the page itself
+compares before it will render the panel, so a disagreement here is the page's `featuredLie` state
+ahead of time. **A zero in any of them is a stop, not a note:** the fix is to land the deployment's
+`broadcast/` logs and rebuild, never to upload and correct afterwards — an upload spends three
+proposals and a sitting.
+
+**Which line does the work, measured rather than assumed.** Run against m05-t01c's two trees on
+2026-11-21, both built under `devbox run` for chain 11155111:
+
+| | the redeploy's logs | `main`'s logs, behind the chain |
+|:--|:--|:--|
+| `$APP_IN` equals `$APP` | yes | **no — prints the warning** |
+| factory · `App` · impl `codesize` | 1,319 · 7,154 · 9,277 | 1,320 · 7,155 · 9,271 |
+| `$DISTRO_IN` | `0xB611Ff19…5199`, `codesize` **45** | `0x6aC98EDA…3F9f`, `codesize` **0** |
+
+So **the three `codesize` readings alone do not catch it** — a retired set is still deployed and still
+answers with code, which is what made this defect survive review. The two lines that discriminate are
+`$APP_IN` against `$APP` and `$DISTRO_IN`'s `codesize`. Keep all five anyway: the first three are what
+tell a wrong *chain* from a wrong *generation*, and a build for the wrong chain reads zero on all
+three.
+
 `dapp-nodev`, never `dapp`: a dev bundle on chain reads through its `?rpc=` override and never
 reaches a wallet (`mk/30-onchain.mk`). Routine uploads write **`calldata/$CHAIN_ID/`** at the
 repository root, overwritten per upload, and are committed — git history is the archive, and § Uploads
