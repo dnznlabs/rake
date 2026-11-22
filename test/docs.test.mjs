@@ -85,14 +85,14 @@ for (const heading of ['### Functions', '### Events', '### Errors', '## Distribu
   });
 }
 
-test('the rail and the headings are the same fourteen sections, in one order', () => {
+test('the rail and the headings are the same fifteen sections, in one order', () => {
   const m = PAGE.match(/const SECTIONS\s*=\s*(\[[\s\S]*?\]);/);
   assert.ok(m, 'SECTIONS is not an array literal in app/src/index.html');
   const sections = new Function(`return ${m[1]}`)();
 
   const ids = [...PAGE.matchAll(/id="s-([a-z]+)"/g)].map(m => m[1]);
 
-  assert.equal(sections.length, 14);
+  assert.equal(sections.length, 15);
   assert.deepEqual(ids, sections.map(s => s[0]));
   assert.ok(ids.includes('widget'), 'the owner bar\'s widget link points at #/docs#widget');
   /* ROADMAP decision 45: the Disclaimer is the *first* section, in the rail and in the article, so a

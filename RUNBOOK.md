@@ -613,7 +613,24 @@ calldata that is well-formed, byte-reproducible and points at the wrong three co
 
 ```sh
 devbox run -- make dapp-nodev CHAIN_ID=$CHAIN_ID
-devbox run -- node tools/step4-calldata.mjs --chain $CHAIN_ID --rpc "$RPC" --out calldata
+devbox run -- node tools/step4-calldata.mjs --chain $CHAIN_ID --app $APP --rpc "$RPC" --out calldata
+```
+
+**`--app $APP` is not optional, and `$APP` is § 0's — read from `README` § Contracts, never recalled**
+([#311](https://github.com/dnznlabs/rake/issues/311)). The tool used to default the address, and the
+default outlived the deployment it named: m05-t01 redeployed `App`, and on m05-t01c the whole upload
+was generated and committed against the retired `0x00A90943…5BaE` before review caught it. Nothing in
+the checks below could see it — every one of them compares the calldata to the *build*, and a
+well-formed upload aimed at the wrong contract passes all of them, executes without a revert if that
+contract is still vault-owned, and is first contradicted by § 4d's `chain-doc`, two sittings later.
+The tool now exits 2 without `--app`, and with `--rpc` it refuses an address holding no code.
+
+**So check the target, not only the bytes**, before proposing — the one check § 4a did not have:
+
+```sh
+cast codesize $APP --rpc-url "$RPC"                    # non-zero: the App exists on this chain
+grep -o "App 0x[0-9a-fA-F]*" <<<"$(devbox run -- node tools/step4-calldata.mjs --chain $CHAIN_ID --app $APP --app-nonce $N --out /tmp/check)"
+# and the proposal targets: 1 and 2 are plain calls to $APP, the batch targets $OWNER (§ 4a's table)
 ```
 
 `dapp-nodev`, never `dapp`: a dev bundle on chain reads through its `?rpc=` override and never
@@ -657,12 +674,32 @@ chains; the deleted `batch.hex` was 109,962 characters, **44,426 over the cap**.
 own digest, `getTransactionHash(<target>, 0, <file>, <nonce>)` on the vault, with the proposal's own
 target: `$APP` for 1 and 2, `$OWNER` for 3.
 
-`batch345.hex` keeps the setters atomic with the widget chunk: calls 4 and 5 validate their pointers
-through `_requireChunk` (§ The five calls), so the widget pointer is created and consumed inside one
-transaction, and the two setters either both land or neither does. That works only because the
-widget chunk is the **third** CREATE: `addWidgetChunk` inside the batch deploys at `App` nonce 3, the
-address `5-setWidgetChunks.hex` names, and that is where the nonce stands only after proposals 1 and
-2 have each executed once, in that order (4c's gates). The document pointers are created by
+**Three proposals whatever the document's size (amended 2026-11-21, m05-t01c step 6).** The table
+above records a two-chunk document, which is the shape the committed calldata has. The rule, which
+is what to follow when the count differs:
+
+- **Proposals 1 and 2 are always document chunks 0 and 1**, plain calls to `$APP`, same file names.
+- **Every document chunk after the second rides inside the batch**, ahead of `addWidgetChunk`, so
+  the batch is `addChunk`…, `addWidgetChunk`, `setChunks`, `setWidgetChunks` — in that order, which
+  is the order `App` must create the pointers in. The batch file is named for the call numbers it
+  carries: `batch345.hex` for two document chunks, `batch3456.hex` for three.
+- **The pointers follow call order from `cast nonce $APP`.** With three document chunks, chunk 2's
+  pointer is the CREATE at *N* + 2 and the widget's at *N* + 3.
+- **A fourth document chunk is a stop**, not a fourth proposal: it changes the proposal arithmetic
+  and the gas per piece, so it is a plan question. `tools/step4-calldata.mjs` refuses it.
+- Measured for the three-chunk document of m05-t01c, against `App`
+  `0x00a9F390A6010d045e0d34856048DdD6910d25BA` at its nonce **4** on both testnets: proposals 1 and
+  2 are 48,138 characters each and the batch is **22,474** against the 65,536 cap, 43,062 spare. The
+  two-chunk batch it replaces was 19,018. A size quoted here means nothing without the `App` and the
+  nonce it was cut for — the pointers are that contract's CREATE addresses.
+
+`batch345.hex` keeps the setters atomic with the widget chunk: the setter calls validate their
+pointers through `_requireChunk` (§ The five calls, and their order), so the widget pointer is created and
+consumed inside one transaction, and the two setters either both land or neither does. That works
+because the widget chunk is the **last** CREATE of the upload: `addWidgetChunk` inside the batch
+deploys at the `App` nonce after the document's chunks, the address `*-setWidgetChunks.hex` names,
+and that is where the nonce stands only after proposals 1 and 2 have each executed once, in that
+order (4c's gates). The document pointers are created by
 proposals 1 and 2, which is why the batch executes last and why 1 precedes 2 (4c). `batch` is
 `onlySelf`, so the vault is its target and it calls `App` as its owner.
 
@@ -800,10 +837,14 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
 
    ```sh
    # the two document pointers, in order, and the widget pointer
-   cast calldata-decode 'setChunks(address[],bool)'   "$(cat calldata/$CHAIN_ID/4-setChunks.hex)"
-   cast calldata-decode 'setWidgetChunks(address[])'  "$(cat calldata/$CHAIN_ID/5-setWidgetChunks.hex)"
-   # the same three, independently, from the nonce — the two must agree
-   for i in $N $((N+1)) $((N+2)); do cast compute-address $APP --nonce $i; done
+   cast calldata-decode 'setChunks(address[],bool)'   "$(cat calldata/$CHAIN_ID/*-setChunks.hex)"
+   cast calldata-decode 'setWidgetChunks(address[])'  "$(cat calldata/$CHAIN_ID/*-setWidgetChunks.hex)"
+   # the same pointers, independently, from the nonce — the two must agree.
+   # CHUNKS is the number of add*Chunk calls in this upload: document chunks plus the widget's one
+   # (3 for a two-chunk document, 4 for a three-chunk one). The glob above keeps the file numbers
+   # out of the command, because they shift with the chunk count.
+   CHUNKS=$(ls calldata/$CHAIN_ID/*-add*Chunk*.hex | wc -l)
+   for i in $(seq $N $((N + CHUNKS - 1))); do cast compute-address $APP --nonce $i; done
    ```
 
    Those two routes agreeing is itself a check: the first reads what the setters will be told, the
@@ -815,7 +856,12 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
    | piece 1 | *N* | nothing yet — both document pointers print `0x` |
    | piece 2 | *N* + 1 | doc 0 (the `CREATE` at *N*) |
    | the batch | *N* + 2 | doc 0 **and** doc 1 (the `CREATE` at *N* + 1) |
-   | (after the batch) | *N* + 3 | widget (the `CREATE` at *N* + 2) — step 4d's check |
+   | (after the batch) | *N* + `CHUNKS` | every pointer — step 4d's check |
+
+   The table is read for a two-chunk document, where `CHUNKS` is 3 and the last row is *N* + 3. The
+   first three rows do not move with the count: chunks 0 and 1 are always the two plain proposals,
+   and everything else is inside the batch. What moves is the last row and what the batch creates —
+   with a three-chunk document the batch creates doc 2 **and** the widget, so `CHUNKS` is 4.
 
    Neither the nonce nor a non-empty `cast code` is the gate against the swap: after piece 2
    executed first, the nonce reads *N* + 1 *and* the doc-0 pointer holds code — chunk 1's. Only the
@@ -883,6 +929,10 @@ The equality to check is the one `docs/milestones/m03/tasks/m03-t03/HANDOFF.md` 
 `record:` the chunk pointers, `inflated sha256`, `widget sha256`, both byte counts, and the three
 submit and three `executeQueued` transaction hashes.
 
+**The nonce after an upload is *N* plus the number of chunks uploaded**, document and widget
+together — 3 for a two-chunk document, 4 for a three-chunk one — not a constant. `cast nonce $APP`
+is the reading; `ls calldata/$CHAIN_ID/*-add*Chunk*.hex | wc -l` is what it should have moved by.
+
 **Then prove it through the gateway, because nothing above does.** `chain-doc` reads the ERC-5219
 path with our own reader, so it establishes what the chain holds and nothing at all about what a
 visitor receives — a gateway can serve a document two uploads old while every reading above is
@@ -920,7 +970,37 @@ that key is both signer and owner, so it works there and reverts `Unauthorized` 
 chain. It stays for `make deploy`; it is never the public-chain route. That collapse is also why no
 rehearsal caught this — a dev chain cannot tell the two roles apart.
 
+#### What the upload does to the network menu
+
+**The upload is what enables the chain in the dapp, on every chain (decision 69).** A page on any
+other chain asks this chain's `App` for `chunkCount()` when its network menu or `#/docs` opens, and
+once 4c has executed it answers above zero, so those pages stop showing this chain as "pending
+deployment" and link to it. Nothing is uploaded anywhere else for that. The
+read the dapp makes, by hand:
+
+```sh
+cast call $APP "chunkCount()(uint256)" --rpc-url "$RPC"   # above 0 once the document is up
+```
+
+- **Run § The gateway next, without a gap.** On `rake.dnzn.dev` the link the other chains now show
+  is `/<chain id>/`, and the gateway serves that path only once the chain is in `deploy/gw44.json`.
+  Between this step and that dispatch the link leads to a chain the gateway has no contract for.
+- **`ENABLED` is housekeeping, not a step.** `ENABLED` in `app/src/index.html` is the set of chains
+  a bundle links to with no read. When a bundle is next cut for any other reason, add every chain
+  whose document is up, so that bundle's visitors ask about fewer chains. Never cut or upload a
+  bundle for this alone: the menu is already right without it.
+- **There is no way to upload and stay off the menu.** A chain that must not be offered yet does
+  not get its document yet.
+
 #### The five calls, and their order
+
+**The committed `calldata/` is the last cut, not a mirror of `main`.** It is regenerated at step 4a
+from the head the proposals are built from, so any `app/` commit merged after that cut leaves these
+files describing a document `main` no longer builds — measured on 2026-11-22, when three merges and a
+direct commit moved the document and the committed chunks still decoded to the previous payload.
+**Never propose from the files as committed**: re-cut at the proposing head and compare, which § 4a
+and § 4d already require. The same applies to the widget: it has its own chunk and its own hash, and
+both move whenever `app/src/widget.js` does.
 
 `tools/step4-calldata.mjs` writes them to **`calldata/$CHAIN_ID/`** at the repository root — § 4a's
 `--out calldata`, which is the live path for every routine upload; only m04-t08's first upload kept
@@ -928,6 +1008,30 @@ its calldata under its own task directory, which is where the tool's own default
 It splits `app/dist/index.html.gz` at `MAX_CHUNK = 24_000` bytes exactly as `Chunks.s.sol:_upload`
 does, and wraps calls 3–5 into `batch345.hex`. They are committed, so what the product owner signs is
 reviewable before it is signed and re-derivable after:
+
+**Cut the calldata through the pinned toolchain, and check which `node` you have.** The payload is
+`gzipSync`'s output, and `app/build.mjs` says it is "deterministic per zlib build, not across them".
+Measured 2026-11-21 on one byte-identical document (`sha256 268afd4b…`): **48,551** bytes under
+devbox's node v24.12.0 (zlib 1.3.1) and **48,810** under this machine's node v24.21.0
+(zlib 1.3.2.1-motley). The raw document is the same either way — so § 4d's `inflated sha256` check
+still passes — but the chunk bytes, their hashes and the chunk *count* are not, so calldata cut under
+the wrong one will not match what is committed.
+
+The trap is that `devbox run` does not always give you the pinned node:
+
+| command | `which node` |
+|:--|:--|
+| `devbox run -- bash <script>.sh` | `.devbox/nix/profile/default/bin/node` — **pinned, use this** |
+| `devbox run -- make dapp-nodev …` | pinned |
+| `devbox run -- bash -c '…'` | `/usr/bin/node` — the system one |
+
+So run the generation from a **script file** or as a direct `make`/`node` argument, never through
+`bash -c`, and record the node and zlib versions with the sizes.
+
+**"Five" is this upload's count, not the rule (amended 2026-11-21, m05-t01c step 6).** A document of
+three chunks has six calls and a `batch3456.hex`; the heading keeps its name because m04-t08's and
+m04-t10's records cite it. The rule is § 4a's: chunks 0 and 1 are the two plain proposals, everything
+after them is one batch in call order, and a fourth document chunk is a stop.
 
 | # | call | file | proposed as |
 |--:|:--|:--|:--|
@@ -1015,8 +1119,11 @@ cast rpc anvil_setBalance $OWNER 0xDE0B6B3A7640000 --rpc-url http://127.0.0.1:87
 for f in 1-addChunk-0 2-addChunk-1; do
   cast send --from $OWNER --unlocked $APP "$(cat calldata/$CHAIN_ID/$f.hex)" --rpc-url http://127.0.0.1:8701
 done
-cast estimate --from $OWNER $OWNER "$(cat calldata/$CHAIN_ID/batch345.hex)" --rpc-url http://127.0.0.1:8701
-cast send --from $OWNER --unlocked $OWNER "$(cat calldata/$CHAIN_ID/batch345.hex)" --rpc-url http://127.0.0.1:8701
+# The batch file is named for the calls it carries — batch345.hex for a two-chunk document,
+# batch3456.hex for a three-chunk one (§ 4a). The glob keeps this command true for either.
+BATCH=$(ls calldata/$CHAIN_ID/batch*.hex)
+cast estimate --from $OWNER $OWNER "$(cat $BATCH)" --rpc-url http://127.0.0.1:8701
+cast send --from $OWNER --unlocked $OWNER "$(cat $BATCH)" --rpc-url http://127.0.0.1:8701
 node tools/chain-doc.mjs --app $APP --rpc http://127.0.0.1:8701 --chain $CHAIN_ID
 ```
 
@@ -1373,7 +1480,9 @@ receipt is `status 1`. The two hash columns were
 written from a fork at 4a, before the proposals were signed, and **4d re-read both from the chain
 after execution and they are unchanged** — so, as in rows 1 and 2, the column now carries a live
 `chain-doc` reading rather than a prediction. The pointers landed at the three predicted addresses and
-`cast nonce $APP` reads `10` on both chains. This upload carries
+`cast nonce` reads `10` on both chains **for the `App` of that upload, `0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE`** — named
+rather than written as `$APP`, because m05-t01 redeployed `App` and `$APP` now means
+`0x00a9F390…25BA`, whose nonce is its own (#311). This upload carries
 m04-t11, m04-t04 and m04-t13; #227 (m04-t12) is held out by ruling and #235's R18 waits for a later
 upload. The generating commit is `3751211` and the bundle under `app/` and `src/` is byte-identical to
 the `06fbaab` the plan scoped — `git diff --stat 06fbaab 3751211 -- app/ src/` is empty, the one

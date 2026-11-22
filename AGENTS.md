@@ -128,6 +128,16 @@
   read path without a wallet, and is the one case `route()`'s "No wallet found" notice is reached on.
   The build inlines `eth.js` (keccak and the ABI subset), `model.js`, `widget.js`, `theme.css` and
   `layout.html` into it.
+- A bundle is built for one chain, so changing network means opening another URL, never
+  `wallet_switchEthereumChain`. The network menu lists every chain in `NETWORKS`. Chains in
+  `ENABLED` link to the same route there, built by the first `Model.GATEWAYS` rewriter (`model.js`, tested in `test/model.test.mjs`) that recognises the
+  current URL (gw44's `/<id>/` path, then the chain label after the app's address in the host), falling back to `GATEWAY_HOME`.
+  The other chains are greyed out under "pending deployment" until `liveCheck` finds a document
+  on one: a single `chunkCount()` read per chain outside `ENABLED`, once per page load, when the
+  menu or `#/docs` first opens, with a yes kept in `rake.live`. So uploading a chain's document is
+  what enables it, on every chain's menu, with no upload elsewhere; `ENABLED` is only the set that
+  needs no read, and once it is complete nothing is asked. A new gateway, such as an ENS one, is one more entry in `GATEWAYS`. The `#/docs` contracts
+  table follows the same answer, greying the rest.
 - `app/src/model.js` is everything that needs no DOM and no provider: `pct`, `countdown`,
   `decodePending`, `supersededBy`, `salt` and the `snapshot()` type string `SNAPSHOT_T`. It is tested
   under node in `test/model.test.mjs` and inlined unchanged, so it reads an ambient `Eth` rather than
@@ -203,7 +213,7 @@
 - `#/docs` is the long page, and it matches by prefix so it paints before the wallet checks; the rail's
   links are `#/docs#<section>` and `docScroll` reaches `id="s-<section>"` once `docs()` has painted.
   It is written for the owner of a distribution (ROADMAP decision 17), not for a developer: the
-  contract's surface is `docs/REFERENCE.md`, which the page's last section links. The tables there are
+  contract's surface is `docs/REFERENCE.md`, which the page's `developers` section links. The tables there are
   data — `test/docs.test.mjs` fails when the struct block and `src/Distribution.sol` disagree by one
   character, or when a function the selector fixture names is missing from the function table, and
   M02 criterion 6's script diffs the three `Distribution` tables against `forge inspect`. A claim about

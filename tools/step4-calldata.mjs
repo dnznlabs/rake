@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 /* Emit step 4's five calldatas, in execution order, for the Ops vault, and the batch that carries them.
 
-   node tools/step4-calldata.mjs --chain 11155111 --rpc "$RPC" --out calldata
-   node tools/step4-calldata.mjs --chain 31337 --app-nonce 1 --out /tmp/rehearsal   # offline
+   node tools/step4-calldata.mjs --chain 11155111 --app "$APP" --rpc "$RPC" --out calldata
+   node tools/step4-calldata.mjs --chain 31337 --app "$APP" --app-nonce 1 --out /tmp/rehearsal  # offline
 
-   One of `--rpc` or `--app-nonce` is required: the pointers are `App`'s CREATE addresses, so a
-   wrong nonce yields calldata that is reproducible and points at the wrong contracts.
+   `--app` is required, and one of `--rpc` or `--app-nonce` with it: the pointers are `App`'s CREATE
+   addresses, so a wrong nonce yields calldata that is reproducible and points at the wrong
+   contracts, and a retired address yields an upload that is correct and lands where nothing serves
+   it ([#311](https://github.com/dnznlabs/rake/issues/311)).
 
    Step 4 is an Ops-vault action (decision 44, #178): `App`'s chunk setters are `onlyOwner` and the
    owner is the vault, so the engineer proposes the bytes and the product owner signs them. These files
@@ -24,11 +26,20 @@
    every `add*Chunk` must land before the setter that names its pointer.
 
    **Three proposals carry step 4, not one** (decision 47, ruled 2026-11-16): call 1 plain, call 2
-   plain, then `batch345.hex` over calls 3, 4 and 5. A single `batch` over all five was the route
+   plain, then one batch over everything after them — `batch345.hex` for a two-chunk document.
+
+   **A document of more than two chunks keeps that count** (amended step 6, 2026-11-21): document
+   chunks 0 and 1 stay proposals 1 and 2, and every later document chunk is an `addChunk` *inside*
+   the batch, ahead of `addWidgetChunk`. So the batch is `addChunk`…, `addWidgetChunk`, `setChunks`,
+   `setWidgetChunks`, the file is named for the call numbers it carries (`batch3456.hex` for three
+   document chunks), and an upload of any size is three signatures per chain rather than one per
+   chunk. The alternative — a fourth proposal — buys nothing while the batch is far under the cap.
+
+   A single `batch` over all five calls was the route
    until it turned out to be unproposable — the coordination API caps a proposal's calldata at 65,536
    characters and that batch was 109,962 — so the upload is split at the boundary where splitting
-   costs least. `batch345.hex` targets the vault, not `App`, because `batch` is `onlySelf`; it runs
-   its three sequentially and atomically, which is what keeps the widget chunk and the two setters
+   costs least. The batch file targets the vault, not `App`, because `batch` is `onlySelf`; it runs
+   its calls sequentially and atomically, which is what keeps the widget chunk and the two setters
    that name its pointer in one transaction. Calls 1 and 2 are proposed as plain calls to `App`.
 
    **The ordering is now the operator's, and it protects correctness and not merely liveness.** The
@@ -41,8 +52,8 @@
    shape makes it a procedure. RUNBOOK § Step 4 names the hazard and the repair.
 
    The numbered files stay as the review copy: files 1 and 2 are proposals in their own right, and
-   3, 4 and 5 are the elements of the `bytes[]` a reviewer gets back from `cast decode-calldata` on
-   `batch345.hex`.
+   every file after them is an element of the `bytes[]` a reviewer gets back from
+   `cast decode-calldata` on the batch file, in that order.
 
    ABI encoding comes from `cast calldata` rather than from a hand-rolled encoder here, the same way
    `tools/abi-vectors.sh` generates the codec's fixtures: the oracle is never the thing under test. */
@@ -59,14 +70,23 @@ const arg = (name, fallback) => {
 
 const chain = arg('chain');
 if (!chain) {
-  console.error('usage: node tools/step4-calldata.mjs --chain <id> (--rpc <url> | --app-nonce <n>) [--app 0x…] [--vault 0x…] [--out <dir>] [--max-chunk <bytes>]');
+  console.error('usage: node tools/step4-calldata.mjs --chain <id> --app 0x… (--rpc <url> | --app-nonce <n>) [--vault 0x…] [--out <dir>] [--max-chunk <bytes>]');
   process.exit(2);
 }
-/* `App` is the same address on every chain of RUNBOOK § 1 (decision 35), so this is a default and
-   not a per-chain table. */
-const app = arg('app', '0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE');
+/* **No default for `--app`** ([#311](https://github.com/dnznlabs/rake/issues/311)). It used to
+   default to `0x00A90943…5BaE`, the `App` that m05-t01's redeploy retired, and `App` being one
+   address on every chain (decision 35) made that look safe — but a *retired* address is as silent as
+   a wrong nonce and worse: every check in RUNBOOK § 4a compares the calldata to the build, and none
+   compares the target to the deployed `App`, so the whole upload is well-formed, reproducible and
+   aimed at a contract nothing serves. It was caught in review on m05-t01c after the calldata had
+   been generated and committed against the old address. So it is required, like the nonce, and with
+   `--rpc` the code at it is read below. */
+const app = arg('app');
 const vault = arg('vault', '0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790'); // RUNBOOK § 0 OWNER, one value on every chain
-const outDir = join(arg('out', 'docs/milestones/m04/tasks/m04-t08/calldata'), chain);
+/* `calldata/<chain>` at the repository root, which RUNBOOK § The five calls calls the live path for
+   every routine upload. It used to default into m04-t08's own directory — a finished task's record,
+   which a later upload would have quietly rewritten (#311). */
+const outDir = join(arg('out', 'calldata'), chain);
 
 /* Every argument is validated here, before the first file or chain read, so that a refusal is the
    same in a clean checkout as in a built one. Validating after the reads below makes a missing
@@ -75,6 +95,18 @@ const outDir = join(arg('out', 'docs/milestones/m04/tasks/m04-t08/calldata'), ch
    that a wrong nonce is silent. The nonce's own rationale is at `appNonce` below, where it is used. */
 const rpc = arg('rpc');
 const nonceFlag = arg('app-nonce');
+if (app === undefined) {
+  console.error(
+    'step4-calldata: refusing to guess which `App` this upload targets — pass --app 0x…\n' +
+    '  the address is per deployment, not per chain: `deploy/gw44.json` names the one the gateway\n' +
+    '  reads, and a retired `App` produces a well-formed upload that nothing serves (#311).',
+  );
+  process.exit(2);
+}
+if (!/^0x[0-9a-fA-F]{40}$/.test(String(app))) {
+  console.error(`step4-calldata: --app must be a 20-byte hex address, got ${JSON.stringify(app)}`);
+  process.exit(2);
+}
 if (nonceFlag === undefined && rpc === undefined) {
   console.error(
     'step4-calldata: refusing to guess `App`\'s nonce — the pointers are its CREATE addresses.\n' +
@@ -125,9 +157,25 @@ const sha = (s) => createHash('sha256').update(s).digest('hex');
 const docParts = cut(payload);
 const widgetParts = cut(widget);
 if (widgetParts.length !== 1) {
-  /* A second widget chunk would need a second `addWidgetChunk` call and a fourth `App` pointer — a
+  /* A second widget chunk would need a second `addWidgetChunk` call and another `App` pointer — a
      plan change, not a loop iteration. */
-  console.error(`widget needs ${widgetParts.length} chunks; the plan's five calls assume 1`);
+  console.error(`widget needs ${widgetParts.length} chunks; the plan's call shape assumes 1`);
+  process.exit(1);
+}
+if (docParts.length < 2) {
+  /* One chunk would make the widget chunk proposal 2 and change what a reviewer re-derives. The
+     shape starts at two because the committed upload has two; a smaller document is a plan change. */
+  console.error(`document needs ${docParts.length} chunk(s); the proposal shape assumes 2 or more`);
+  process.exit(1);
+}
+if (docParts.length > 3) {
+  /* The plan's own stop, made mechanical: three chunks were ruled on with the batch's size measured
+     against the cap (amended step 6). A fourth changes that arithmetic, so it is a question for the
+     plan and not a number this tool may raise on its own. */
+  console.error(
+    `document needs ${docParts.length} chunks; stop and report — the third chunk was ruled on at ${payload.length} bytes\n` +
+    '  a fourth is a plan question (proposal count, batch size against the 65,536-character cap, gas per chunk)',
+  );
   process.exit(1);
 }
 
@@ -153,6 +201,18 @@ calls.push({
    `--rpc` and the nonce is read from the chain, or pass `--app-nonce` for an offline run such as
    the anvil rehearsal; with neither, this exits non-zero rather than guessing — refused above,
    before any read, so the refusal does not depend on a build being present. */
+/* With a chain to ask, the target is checked for code before anything is built. An `App` that is not
+   deployed — a typo, a chain where the redeploy has not happened, a mainnet address that is not ours
+   — would otherwise yield calldata whose `setChunks` names CREATE addresses of an account that will
+   never make them (#311). Code alone does not prove it is `App`; it proves the target is not empty,
+   which is the failure that has actually happened. */
+if (rpc !== undefined) {
+  const code = cast('code', app, '--rpc-url', rpc);
+  if (!code || code === '0x') {
+    console.error(`step4-calldata: no code at ${app} on the chain behind --rpc — refusing to build an upload for an undeployed App (#311)`);
+    process.exit(2);
+  }
+}
 const appNonce = nonceFlag !== undefined
   ? Number(String(nonceFlag).trim())
   : Number(String(cast('nonce', app, '--rpc-url', rpc)).trim());
@@ -185,11 +245,14 @@ calls.push({
   data: cast('calldata', 'setWidgetChunks(address[])', `[${widgetPointers.join(',')}]`),
 });
 
-/* Calls 3, 4 and 5 — the widget chunk and the two setters — in one vault self-call. Sliced after the
-   five are built, so the numbered files and this wrapper cannot disagree about what is in it. */
+/* Everything after the first two document chunks — any further document chunk, then the widget chunk
+   and the two setters — in one vault self-call. Sliced after the numbered calls are built, so the
+   files and this wrapper cannot disagree about what is in it. The name carries the call numbers it
+   holds, so a two-chunk document still writes `batch345.hex` byte for byte. */
 const batched = calls.slice(2);
+const batchFile = `batch${batched.map((_, i) => i + 3).join('')}.hex`;
 calls.push({
-  file: 'batch345.hex',
+  file: batchFile,
   data: cast(
     'calldata',
     'batch(address[],uint256[],bytes[])',
@@ -203,7 +266,11 @@ mkdirSync(outDir, { recursive: true });
 console.log(`chain ${chain} · App ${app} · App nonce ${appNonce} · batch target (vault) ${vault}`);
 console.log(`payload ${payload.length} bytes → ${docParts.length} chunks (${docParts.map((p) => p.length).join(' + ')})`);
 console.log(`widget  ${widget.length} bytes → ${widgetParts.length} chunk`);
-console.log(`pointers ${pointers.join(' ')}`);
+/* The pointer list, said out loud with the call each belongs to: `setChunks` names them by position
+   and a reviewer has to be able to check that mapping without re-deriving it. */
+console.log(`pointers (App CREATE from nonce ${appNonce}):`);
+pointers.forEach((p, i) => console.log(`  ${p}  ${calls[i].file}`));
+console.log(`batch ${batchFile} carries ${batched.length} calls: ${batched.map((c) => c.file).join(', ')}`);
 for (const c of calls) {
   /* No trailing newline: the file is the hex string and nothing else, so `cat` of it drops straight
      into `cast estimate` and `getTransactionHash`. */
@@ -217,7 +284,7 @@ for (const c of calls) {
    a control), and the dapp enforces the same limit client-side. A file over it is not a slow
    proposal, it is an impossible one, so this refuses here rather than at the POST. */
 const CAP = 65_536;
-const proposals = ['1-addChunk-0.hex', '2-addChunk-1.hex', 'batch345.hex'];
+const proposals = [calls[0].file, calls[1].file, batchFile];
 let over = 0;
 console.log(`proposal sizes against the ${CAP}-character cap:`);
 for (const file of proposals) {

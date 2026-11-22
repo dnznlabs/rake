@@ -33,15 +33,24 @@
    genesis on a real chain. */
 const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTRIBUTIONFACTORY__', factoryBlock: '__DISTRIBUTIONFACTORY_BLOCK__', featuredSalt: '__FEATURED_SALT__', app: '__APP__', impl: '__DISTRIBUTION__' };
 const CONTRACTS = [['DistributionFactory', CFG.factory]];
-const CHAINS = { 1: 'mainnet', 10: 'op mainnet', 8453: 'base', 42161: 'arbitrum', 11155111: 'sepolia', 84532: 'base sepolia', 31337: 'anvil', 31338: 'anvil-b' };
+const CHAINS = { 1: 'mainnet', 10: 'op mainnet', 8453: 'base', 42161: 'arbitrum', 4326: 'megaeth', 4663: 'robinhood', 11155111: 'sepolia', 84532: 'base sepolia', 31337: 'anvil', 31338: 'anvil-b' };
+// Every chain rake intends to be on: M05's four mainnets, its stretch row, and the two testnets.
+// Listed whether or not it is live yet; `ENABLED` says which are.
+const NETWORKS = [1, 8453, 42161, 10, 4326, 4663, 11155111, 84532];
+/* The chains known live when this bundle was built, linked with no read. The rest of `NETWORKS` is
+   pending deployment until `liveCheck` finds a document on one. */
+const ENABLED = [11155111, 84532];
+const TESTNETS = [11155111, 84532];
+// The same route on another chain. The rewriters are `Model.GATEWAYS`: a new gateway is an entry there.
+const chainHref = to => Model.chainHref(location.href, CFG.chainId, to);
 /* A dev chain has no explorer, so `ext()` prints plain text with the full value in the title. */
-const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.io', 8453: 'https://basescan.org', 42161: 'https://arbiscan.io', 11155111: 'https://sepolia.etherscan.io', 84532: 'https://sepolia.basescan.org' };
+const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.io', 8453: 'https://basescan.org', 42161: 'https://arbiscan.io', 4326: 'https://mega.etherscan.io', 4663: 'https://robinhoodchain.blockscout.com', 11155111: 'https://sepolia.etherscan.io', 84532: 'https://sepolia.basescan.org' };
 /* Two readers. It is what the widget snippet in #/docs puts in `data-rpc` — the embedding page's
    developer picks their own endpoint; these are only known public ones, so the example works when
    pasted — and it is this page's own read path when `discover` found no injected provider (#273), by
    way of the read-provider helper below. A chain absent from this table has no read path without a
    wallet, which is the one case `route()`'s no-provider notice is still reached on. */
-const PUBLIC_RPC = { 1: 'https://ethereum-rpc.publicnode.com', 10: 'https://mainnet.optimism.io', 8453: 'https://mainnet.base.org', 42161: 'https://arb1.arbitrum.io/rpc', 11155111: 'https://ethereum-sepolia-rpc.publicnode.com', 84532: 'https://sepolia.base.org', 31337: 'http://127.0.0.1:8545', 31338: 'http://127.0.0.1:8546' };
+const PUBLIC_RPC = { 1: 'https://ethereum-rpc.publicnode.com', 10: 'https://mainnet.optimism.io', 8453: 'https://mainnet.base.org', 42161: 'https://arb1.arbitrum.io/rpc', 4326: 'https://mainnet.megaeth.com/rpc', 4663: 'https://robinhood-rpc.publicnode.com', 11155111: 'https://ethereum-sepolia-rpc.publicnode.com', 84532: 'https://sepolia.base.org', 31337: 'http://127.0.0.1:8545', 31338: 'http://127.0.0.1:8546' };
 const ZERO = '0x' + '0'.repeat(40);
 /*DEV*/
 const Q = new URLSearchParams(location.search);
@@ -56,13 +65,23 @@ const ICON = {
 };
 const iconLink = (href, icon, label, text) => `<a class="ico" href="${href}" target="_blank" rel="noopener noreferrer" aria-label="${label}">${ICON[icon]}${text ? `<span>${text}</span>` : ''}</a>`;
 document.getElementById('ver').textContent = `dnzn labs · ${CFG.version}`;
-document.getElementById('flinks').innerHTML = iconLink(REPO, 'github', 'source on GitHub') + iconLink(SITE, 'robot', 'dnzn.dev');
+document.getElementById('flinks').innerHTML = '<a href="https://eip.tools/eip/8244" target="_blank" rel="noopener noreferrer">ERC-8244</a><span class="fsep" aria-hidden="true"></span>' + iconLink(REPO, 'github', 'source on GitHub') + iconLink(SITE, 'robot', 'dnzn.dev');
 
 /* ---- provider ------------------------------------------------------------------------------ */
 let P = null, ACC = null, CHAIN = null;
 // True only when `discover` found an injected provider: the one thing `who()` reads to tell a visitor
 // with no wallet from a wallet that is there but not connected.
 let WALLET = false;
+/* Every wallet the browser announced, each `{ info, provider }` as EIP-6963 hands it over, and the
+   `rdns` of the one in use. With several announced and none remembered, `PICK` is empty and the page
+   reads through the public endpoint until Connect picks one — the same reading a visitor with no
+   wallet gets, which is what makes the menu a choice rather than a silent guess. */
+let WALLETS = [], PICK = '';
+const WALLET_KEY = 'rake.wallet';
+/* Set by `disconnect`, cleared by `connect`. A wallet without `wallet_revokePermissions` hands the
+   account back on the next load, so revoking alone does not hold: the page has to remember that the
+   visitor asked to be disconnected and stop asking (the Product Owner's requirement, 2026-11-21). */
+const OFF_KEY = 'rake.off';
 // The endpoint the landing's widget is handed in `data-rpc`: the dev `?rpc=` override when there is
 // one, and otherwise empty, in which case the mount falls back to this chain's `PUBLIC_RPC` entry for
 // a visitor with no wallet and to the injected EIP-1193 global for one who has it. Reads never
@@ -119,21 +138,164 @@ async function discover() {
     ACC = Q.get('from') || null; WRPC = Q.get('rpc'); return;
   }
   /*DEV*/
-  const found = [];
-  addEventListener('eip6963:announceProvider', e => found.push(e.detail));
+  /* Every announcement, not the first: a visitor with two extensions had whichever announced first,
+     with no way to reach the other (decision 67). The listener is never removed, so an extension that
+     announces late is added to the list and offered on the next Connect. `info.rdns` is the identity
+     a remembered choice is stored under; `info.name` is the wallet's own string and is only ever
+     written as text. */
+  addEventListener('eip6963:announceProvider', e => {
+    const d = e && e.detail;
+    if (!d || !d.provider || !d.info || !d.info.rdns) return;
+    if (!WALLETS.some(w => w.info.rdns === d.info.rdns)) WALLETS.push(d);
+  });
   dispatchEvent(new Event('eip6963:requestProvider'));
   await new Promise(r => setTimeout(r, 150));
-  P = (found[0] && found[0].provider) || window.ethereum || null;
+  /* `window.ethereum` only when nothing announced: an extension that announces is reachable by its
+     own rdns, and the global is whichever one won the race for it. */
+  const remembered = WALLETS.length ? WALLETS.find(w => w.info.rdns === store.get(WALLET_KEY)) : null;
+  /* Forgotten only when wallets announced and the remembered one was not among them. A load where
+     nothing announces at all is a disabled or slow extension, not a choice withdrawn, and wiping the
+     key there would cost a visitor the wallet they picked. */
+  if (WALLETS.length && !remembered && store.get(WALLET_KEY)) store.set(WALLET_KEY, '');
+  const chosen = remembered || (WALLETS.length === 1 ? WALLETS[0] : null);
+  PICK = chosen ? chosen.info.rdns : '';
+  P = (chosen && chosen.provider) || (WALLETS.length === 0 ? window.ethereum : null) || null;
   WALLET = !!P;
   P = readProvider(P);
   if (!P) return;
   /* Only a wallet has an account to report. A public endpoint has no notion of "your account" —
      `eth_accounts` on a dev chain answers with its own unlocked keys, which would paint a connected
      account for a visitor who has no wallet at all. */
-  if (WALLET) { try { const a = await P.request({ method: 'eth_accounts' }); ACC = a[0] || null; } catch (e) {} }
-  if (P.on) { P.on('accountsChanged', a => { ACC = a[0] || null; who(); route(); }); P.on('chainChanged', () => location.reload()); }
+  if (WALLET && !store.get(OFF_KEY)) { try { const a = await P.request({ method: 'eth_accounts' }); ACC = a[0] || null; } catch (e) {} }
+  wire();
 }
-async function connect() { const a = await P.request({ method: 'eth_requestAccounts' }); ACC = a[0] || null; who(); route(); }
+/* The provider's two events, wired in one place because `pickWallet` wires the same pair.
+
+   **Each handler belongs to the provider it was attached to, and does nothing unless that provider is
+   still the one in use.** An extension cannot be un-subscribed from reliably — EIP-1193's
+   `removeListener` is optional and some wallets do not implement it — so the guard is the provider's
+   own identity, captured here and compared when the event arrives. Without it, picking wallet A and
+   then wallet B leaves A able to set `ACC` to its account while sends go through B: the page would
+   show one wallet's address and transact with another's. `readProvider` passes a wallet's object
+   through unchanged, so `p !== P` is exactly "this is not the wallet in use".
+
+   `WIRED` makes it at most once per provider, because picking the same wallet twice would otherwise
+   attach a second pair and act on every event twice. */
+const WIRED = new WeakSet();
+function wire() {
+  const p = P;
+  if (!p || !p.on || WIRED.has(p)) return;
+  WIRED.add(p);
+  /* Ignored while disconnected: a wallet that cannot revoke keeps reporting the account, and acting
+     on that would reconnect the visitor who just asked not to be. */
+  p.on('accountsChanged', a => { if (p !== P || store.get(OFF_KEY)) return; ACC = a[0] || null; who(); route(); });
+  p.on('chainChanged', id => { if (p !== P) return; chainChanged(id); });
+}
+/* Reload only when the chain actually changed (#341). Phantom's in-app browser emits `chainChanged`
+   on load with the chain the page is already reading, and reloading on every event is a page that
+   reloads for ever. `CHAIN` is the chain last read; before anything has been read there is nothing to
+   re-read, so the first event only records it. */
+function chainChanged(id) {
+  const n = id == null ? null : String(Number(id));
+  if (n === null || CHAIN === null || n === String(CHAIN)) { if (n !== null) CHAIN = n; return; }
+  location.reload();
+}
+/* `wallet_requestPermissions` first: it is what makes a wallet that supports it show its own prompt
+   again after a disconnect, where `eth_requestAccounts` would hand back the account silently. A
+   wallet that does not support it answers with an error rather than a prompt, so the older method is
+   the fallback — but not after a refusal (4001), which would prompt a second time for an answer the
+   visitor has already given. */
+async function connect() {
+  store.set(OFF_KEY, '');
+  let a = [];
+  try {
+    await P.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] });
+    a = await P.request({ method: 'eth_accounts' });
+  } catch (e) {
+    if (e && e.code === 4001) { who(); return; }
+    a = await P.request({ method: 'eth_requestAccounts' });
+  }
+  ACC = a[0] || null; who(); route();
+}
+/* "Phone or tablet", in the order the hints become reliable: the browser's own `mobile` boolean
+   where it exists, then the user-agent's own words, then an iPad — which reports a Mac user-agent and
+   is told apart only by having more than one touch point. */
+function isPhone() {
+  /*DEV*/
+  /* A desktop look on a phone and a phone look on a desktop, for the preview sitting of step 7a:
+     `?phone=1` takes the phone path, `?phone=0` the desktop one. Inside the fence, so the document
+     that ships cannot be talked into either. */
+  if (Q.get('phone')) return Q.get('phone') !== '0';
+  /*DEV*/
+  const n = navigator, u = n.userAgent || '';
+  if (n.userAgentData && typeof n.userAgentData.mobile === 'boolean') return n.userAgentData.mobile;
+  if (/Android|iPhone|iPad|iPod/.test(u)) return true;
+  return /Macintosh/.test(u) && n.maxTouchPoints > 1;
+}
+/* The list a phone with no wallet is offered: each link opens *this* page — this host, this path,
+   this fragment — in the wallet's own browser, where a wallet exists to connect. Only over `https:`,
+   because a link built from an `http:` or `file:` page hands the wallet somewhere it should not go,
+   and only while no wallet has been found: a visitor who has one does not need an app store.
+   The list holds the two formats read on a real device (#334). Rainbow connects and then cannot
+   answer the boot read (#342) and Trust's link host publishes no app-association file, so both are
+   off; Phantom waits on the preview of the reload fix. */
+function phoneLinks() {
+  if (WALLET || WALLETS.length || location.protocol !== 'https:' || !isPhone()) return [];
+  const here = location.host + location.pathname + location.hash;
+  const url = encodeURIComponent(location.protocol + '//' + here);
+  return [
+    ['MetaMask', 'https://metamask.app.link/dapp/' + here],
+    ['Coinbase Wallet', 'https://go.cb-w.com/dapp?cb_url=' + url],
+  ];
+}
+/* The menu's rows, one per announced wallet. A wallet's name is the wallet's own string, so it goes
+   in through `textContent` and never as markup, and its icon is not rendered at all: an `<img>` whose
+   src a third party chooses is a request this page does not need to make. */
+function noWalletMenu() {
+  km.innerHTML = '<div class="k">no wallet found — open this page in a browser with a wallet to send transactions.</div>'
+    + phoneLinks().map(([n, href]) => `<a href="${esc(href)}" target="_blank" rel="noopener">open in ${esc(n)}</a>`).join('');
+}
+function walletMenu() {
+  km.textContent = '';
+  for (const w of WALLETS) {
+    const row = document.createElement('div');
+    row.dataset.a = 'pick';
+    row.dataset.rdns = w.info.rdns;
+    row.textContent = w.info.name || w.info.rdns;
+    km.appendChild(row);
+  }
+}
+/* Picking is remembered under `rake.wallet` by `rdns`, so the next load uses it as today's single
+   wallet is used, silent `eth_accounts` included. Disconnect forgets it, and `discover` forgets it if
+   that wallet no longer announces.
+
+   **A pick is remembered only once the wallet has handed back an account.** The wallet has to be in
+   use before it can be asked — `connect` sends through `P` — so the choice is made in memory first
+   and written to the store last. A visitor who picks a wallet and then rejects or abandons its
+   prompt is left where they started: nothing stored, `PICK` empty, reads back on the public
+   endpoint, and the next Connect offering the menu again. Remembering it before the answer locked
+   such a visitor to that wallet with no control on the page to forget it, since Disconnect appears
+   only once an account is connected (Product Owner, 2026-11-21, by hand with two extensions).
+   `who()` after the revert, because `connect`'s own refusal path repaints while the pick still
+   looks live. The menu is reachable only with no account and no wallet in use (`who`), so `ACC`
+   here is this pick's answer and not an earlier wallet's. */
+async function pickWallet(rdns) {
+  const w = WALLETS.find(x => x.info.rdns === rdns);
+  if (!w) return;
+  const was = { PICK, P, WALLET, CHAIN };
+  PICK = rdns;
+  P = readProvider(w.provider); WALLET = true;
+  wire();
+  try { CHAIN = String(Number(await P.request({ method: 'eth_chainId' }))); } catch (e) {}
+  /* `finally`, not a plain sequence: a wallet whose `eth_requestAccounts` throws must not leave the
+     pick behind either, and the error still reaches the caller after the revert. */
+  try {
+    await connect();
+  } finally {
+    if (ACC) store.set(WALLET_KEY, rdns);
+    else { PICK = was.PICK; P = was.P; WALLET = was.WALLET; CHAIN = was.CHAIN; who(); }
+  }
+}
 // Wallets keep a network per site, so the extension's own picker may not move this page; asking does.
 // A successful switch lands in the chainChanged reload.
 async function switchChain() {
@@ -146,7 +308,13 @@ async function switchChain() {
 }
 // Revoking (EIP-2255) is what survives a reload; a wallet without it hands the account back next load.
 async function disconnect() {
+  /* Set before the revoke, not after: the mark is what holds across a reload, and a revoke that
+     throws must not leave the page connected to a wallet the visitor has dismissed. */
+  store.set(OFF_KEY, '1');
   try { await P.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] }); } catch (e) {}
+  /* The choice is forgotten too, so the next Connect offers the menu again rather than silently
+     reconnecting the wallet the visitor has just disconnected (decision 67). */
+  if (WALLETS.length > 1) { PICK = ''; store.set(WALLET_KEY, ''); WALLET = false; P = readProvider(null); }
   ACC = null; who(); route();
 }
 const call = async (to, sig, args, types) => Eth.dec(types, await P.request({ method: 'eth_call', params: [{ to, data: Eth.enc(sig, args) }, 'latest'] }));
@@ -454,7 +622,7 @@ const BAD_SUM = 'checksum does not match — a character is likely wrong';
 const COPY = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><g class="i-c"><rect x="4" y="4" width="6.5" height="6.5"/><path d="M8 2.5v-1H1.5V8h1"/></g><path class="i-k" d="M2 6.5l2.5 2.5 5-6"/></svg>';
 // `inLink` drops the ↗ for a value printed inside an <a>: a nested <a> makes the parser close the
 // outer one early, and the row's later cells fall out of its grid (only on a chain with an explorer).
-const ext = (kind, v, text, inLink) => {
+const ext = (kind, v, text, inLink, chain = CFG.chainId) => {
   /* A value that is not the shape its kind promises is printed escaped and alone. There is nothing
      to copy and nothing an explorer could open, so the copy icon and the ↗ go with the shape, and
      the answer reads as the malformed answer it is rather than as a short address. */
@@ -462,12 +630,12 @@ const ext = (kind, v, text, inLink) => {
   const known = kind === 'address' ? NAMED.get(String(v).toLowerCase()) : null;
   const body = known ? esc(known) : text, mark = kind === 'address' ? ` data-addr="${v}"` : '';
   return `<span title="${v}"${mark}>${body}</span><span class="cp" role="button" tabindex="0" title="copy" aria-label="copy ${v}" data-copy="${v}">${COPY}</span>`
-    + (EXPLORER[CFG.chainId] && kind !== 'hash' && !inLink ? ` ${xlink(kind, v, '↗')}` : '');
+    + (EXPLORER[chain] && kind !== 'hash' && !inLink ? ` ${xlink(kind, v, '↗', chain)}` : '');
 };
 // The same check again rather than once in `ext`: `xlink` builds an `href` of its own and is one
 // call away from being used on its own, so the guard belongs where the attribute is written.
-const xlink = (kind, v, text) => EXPLORER[CFG.chainId] && shaped(kind, v)
-  ? `<a class="xl" href="${EXPLORER[CFG.chainId]}/${kind}/${v}" target="_blank" rel="noopener noreferrer" title="open in explorer">${text}</a>` : '';
+const xlink = (kind, v, text, chain = CFG.chainId) => EXPLORER[chain] && shaped(kind, v)
+  ? `<a class="xl" href="${EXPLORER[chain]}/${kind}/${v}" target="_blank" rel="noopener noreferrer" title="open in explorer">${text}</a>` : '';
 // `navigator.clipboard` needs a secure context; a gateway or file:// page may not be one, so the old
 // selection copy is the fallback. `on` is the copied state for a moment, like every state, a class.
 async function copyClick(e) {
@@ -485,8 +653,20 @@ addEventListener('click', copyClick, true);
 addEventListener('keydown', copyClick, true);
 // localStorage throws in a sandboxed frame, so every access is guarded and a failure means no history.
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
-const recents = () => { try { const r = JSON.parse(store.get('rake.recent') || '[]'); return Array.isArray(r) ? r.filter(isAddr) : []; } catch (e) { return []; } };
-const addRecent = a => store.set('rake.recent', JSON.stringify([a, ...recents().filter(x => x !== a)].slice(0, 8)));
+/* One key per chain. Through the gateway a project's chains share an origin (gw44 decision 9), so a
+   single `rake.recent` was one list for every chain: an address visited on one chain was offered on
+   another, where it may be a different contract or none (m05-t04 § Step 8). The unkeyed value is read
+   once, as this chain's, so nobody loses the list they had. */
+const RECENT = 'rake.recent.' + CFG.chainId;
+const recents = () => {
+  try {
+    let raw = store.get(RECENT);
+    if (raw === null) { const old = store.get('rake.recent'); if (old !== null) { raw = old; store.set(RECENT, old); } }
+    const r = JSON.parse(raw || '[]');
+    return Array.isArray(r) ? r.filter(isAddr) : [];
+  } catch (e) { return []; }
+};
+const addRecent = a => store.set(RECENT, JSON.stringify([a, ...recents().filter(x => x !== a)].slice(0, 8)));
 
 /* ---- names ---------------------------------------------------------------------------------- */
 /* Ported from state-collection `app/src/index.html:224-279`, which took it from its own
@@ -606,11 +786,55 @@ async function addrField(value, res) {
 function fill(id, html) { const el = document.getElementById(id); if (el) { el.innerHTML = html; nameSweep(); } }
 
 /* ---- header --------------------------------------------------------------------------------- */
+/* The network menu's rows: this chain, then a link to the same route on every other enabled one,
+   mainnets ahead of testnets, then the chains still to come, greyed. A dev chain is in none of the
+   lists and gets its own row, since it is the one being read. */
+const isHere = id => String(id) === String(CFG.chainId);
+/* Enabled is `ENABLED`, or found serving a document. A chain goes live by its own upload, and baking
+   that into `ENABLED` would mean an upload on every other chain just to say so; so the chains outside
+   the list are asked once per page load whether their `App` holds a document, and a yes is kept in
+   `rake.live` so the next visit needs no read. Once `ENABLED` is complete nothing is asked at all. */
+const LIVE_KEY = 'rake.live';
+const LIVE = new Set((store.get(LIVE_KEY) || '').split(',').filter(Boolean).map(Number));
+const enabled = id => ENABLED.includes(Number(id)) || isHere(id) || LIVE.has(Number(id));
+let LIVECHECK = null;
+// A failed read leaves the chain pending: `0x` from an address with no code throws in `BigInt` too.
+function liveCheck() {
+  return LIVECHECK ||= Promise.all(NETWORKS.filter(id => !enabled(id) && PUBLIC_RPC[id]).map(async id => {
+    try {
+      const n = await rpcProvider(PUBLIC_RPC[id]).request({ method: 'eth_call', params: [{ to: DEPLOYED.app, data: Eth.enc('chunkCount()', []) }, 'latest'] });
+      if (BigInt(n) > 0n) LIVE.add(id);
+    } catch (e) {}
+  })).then(() => {
+    store.set(LIVE_KEY, [...LIVE].join(','));
+    who();
+    const t = document.getElementById('ctab');
+    if (t) t.innerHTML = CTAB_HEAD + contractRows();
+  });
+}
+const netRow = id => isHere(id) ? `<div class="on" aria-current="true">${cname(id)}</div>`
+  : enabled(id) ? `<a href="${esc(chainHref(id))}">${cname(id)}</a>`
+  : `<div class="off">${cname(id)}</div>`;
+const netGroup = (label, ids) => ids.length ? `<div class="h">${label}</div>` + ids.map(netRow).join('') : '';
+const netRows = () => {
+  const on = NETWORKS.filter(enabled), test = id => TESTNETS.includes(id);
+  return (NETWORKS.some(isHere) ? '' : netGroup('local', [CFG.chainId]))
+    + netGroup('mainnets', on.filter(id => !test(id))) + netGroup('testnets', on.filter(test))
+    + netGroup('pending deployment', NETWORKS.filter(id => !enabled(id)));
+};
+// Where else an address or a wallet might belong: every other enabled chain, as links to this route.
+const elsewhere = () => NETWORKS.filter(id => enabled(id) && !isHere(id)).map(id => `<a class="link" href="${esc(chainHref(id))}">${cname(id)}</a>`).join(' · ');
 function who() {
   const b = document.getElementById('who');
   b.textContent = ACC ? short(ACC) : 'connect';
   b.title = ACC || '';
-  b.onclick = ACC ? e => { e.stopPropagation(); toggle(wm); } : WALLET ? connect : e => { e.stopPropagation(); toggle(nm); };
+  b.onclick = ACC ? e => { e.stopPropagation(); toggle(wm); }
+    : WALLET ? connect
+    /* Several announced and none remembered: Connect is a choice, not a connection. */
+    : WALLETS.length > 1 ? e => { e.stopPropagation(); walletMenu(); toggle(km); }
+    /* No wallet at all: Connect says so under its own button, with the phone links, rather than
+       opening the network menu, which is a list of networks. */
+    : e => { e.stopPropagation(); noWalletMenu(); toggle(km); };
   // Not awaited: the short address is on the button before any round trip, and `who()` stays
   // synchronous for `accountsChanged`, `connect` and `disconnect`, which each already call it.
   if (ACC) nameWho(ACC);
@@ -620,12 +844,15 @@ function who() {
   /* Without a wallet `CHAIN` is the public endpoint's answer, so the switch is a wallet's alone. A
      chain with no `PUBLIC_RPC` entry has no read path to name: `P` is null there. */
   const pub = PUBLIC_RPC[CFG.chainId], read = WRPC || pub;
-  nm.innerHTML = (WALLET
-      ? `<div class="k">This app lives on ${cname(CFG.chainId)}. Reads and transactions go through your wallet, so it has to be on the same network.</div>`
-      : `<div class="k">no wallet found — open this page in a browser with a wallet to act.</div>`
-        + (read ? `<div class="k">reads go through ${new URL(read).host}</div>` : ''))
-    + `<div class="k">wallet: ${WALLET && CHAIN ? cname(CHAIN) : 'none'}</div>`
-    + (WALLET && wrong ? `<div data-a="switch">switch wallet to ${cname(CFG.chainId)}</div>` : '');
+  // The networks the page can read, in labelled groups and chosen by URL, then the wallet under a
+  // heavier rule, which only has to agree with it. The switch row stays last: `switchChain` writes its refusal into `lastElementChild`.
+  nm.innerHTML = netRows()
+    + '<div class="h sep">wallet</div>'
+    + (!WALLET ? '<div class="k">none found</div>' + (read ? `<div class="k">reads go through ${new URL(read).host}</div>` : '')
+      : !CHAIN ? '<div class="k">not reachable</div>'
+      : !wrong ? `<div class="k">on ${cname(CHAIN)}</div>`
+      : `<div class="k">on ${cname(CHAIN)}. Transactions go through your wallet, so it has to be on ${cname(CFG.chainId)} too.</div>`
+        + `<div data-a="switch">switch wallet to ${cname(CFG.chainId)}</div>`);
   pill.classList.toggle('warn', wrong);
   pill.title = wrong ? `expected ${cname(CFG.chainId)}` : '';
 }
@@ -905,7 +1132,7 @@ const bindOlder = () => V.querySelectorAll('.older').forEach(b => { b.onclick = 
 const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow${e.kind === 'escrowed' ? ' err' : e.kind === 'queued' && !e.closed ? ' amber' : e.kind === 'applied' || e.kind === 'accepted' ? ' done' : ''}"><b>${e.kind}</b><span class="w">${e.what}</span><span class="t">block ${e.block} · ${ext('tx', e.tx, short(e.tx))}</span></div>`).join('')}</div>`;
 const eyebrow = (text, cls) => `<div class="eyebrow${cls ? ' ' + cls : ''}">${text}</div>`;
 const notice = (text, cls) => `<div class="notice${cls ? ' ' + cls : ''}">${text}</div>`;
-const unreadable = addr => notice(`could not read a distribution at ${ext('address', addr, short(addr))} on ${cname(CFG.chainId)} — nothing is deployed there.`, 'err');
+const unreadable = addr => notice(`could not read a distribution at ${ext('address', addr, short(addr))} on ${cname(CFG.chainId)} — nothing is deployed there.${elsewhere() ? ` It may be on another network: ${elsewhere()}.` : ''}`, 'err');
 /* The other half of "could not read": there is code at the address, but it is not a clone of this
    factory's implementation, so nothing below this line would be this app's state (R3). */
 const notFactory = addr => notice(`${ext('address', addr, short(addr))} on ${cname(CFG.chainId)} has code, but it is not a distribution of this app's factory — this page will not read it.`, 'err');
@@ -2045,7 +2272,7 @@ async function list() {
    The contract's own surface is docs/REFERENCE.md in the repo, and the last section points there. The
    ids are what the rail and `#/docs#<section>` reach; the owner bar's widget link depends on `widget`.
    README.md § Credits carries the Credits section's text; change one, change both. */
-const SECTIONS = [['disclaimer', 'Disclaimer'], ['what', 'Overview'],['economics', 'Economics'], ['credits', 'Credits'], ['why', 'Purpose'], ['how', 'Mechanism'], ['create', 'Creating a distribution'], ['payin', 'Receiving funds'], ['payout', 'Distributing funds'], ['change', 'Changing a distribution'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['developers', 'For developers']];
+const SECTIONS = [['disclaimer', 'Disclaimer'], ['what', 'Overview'],['economics', 'Economics'], ['credits', 'Credits'], ['why', 'Purpose'], ['how', 'Mechanism'], ['create', 'Creating a distribution'], ['payin', 'Receiving funds'], ['payout', 'Distributing funds'], ['change', 'Changing a distribution'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['developers', 'For developers'], ['contracts', 'Contracts']];
 /* The two figures, hand-drawn rather than rendered from Mermaid: there is no Mermaid in the bundle and
    none at build time either, so the caption says what shipped. Colour comes through classes on
    currentColor, as the landing's fee path does, so theme.css owns every one. */
@@ -2069,14 +2296,24 @@ const figState = () => '<svg class="fig" width="560" height="150" viewBox="0 0 5
   + '<g class="d"><path d="M60 108v6H488v-6" fill="none" stroke="currentColor" stroke-width="1"/><text x="274" y="128" text-anchor="middle" font-size="10">the owner may cancel at any point until it is applied</text></g>'
   + '<text class="m" x="30" y="146" font-size="10">with a delay of zero there is no window: the proposal applies in the same transaction</text>'
   + '</svg><div class="cap">fig 2 · one change over time — the delay is the window in which everyone can see it coming</div>';
-/* The six chains M05 deploys to, and the dev chain's own row when that is what is being read, so a
-   local anvil shows the factory `make addresses` prints rather than six dashes. */
-const DOCS_CHAINS = ['ethereum', 'base', 'arbitrum', 'op mainnet', 'sepolia', 'base sepolia'];
-const chainRows = () => {
-  const dev = ['31337', '31338'].includes(String(CFG.chainId));
-  return DOCS_CHAINS.map(c => `<tr><td>${c}</td><td class="dim">—</td><td class="dim">not deployed</td></tr>`).join('')
-    + (dev ? `<tr><td>${cname(CFG.chainId)}</td><td>${ext('address', CFG.factory, esc(CFG.factory))}</td><td>dev chain</td></tr>` : '');
-};
+/* The addresses of record, from m05-t01's HANDOFF (the README still names the pre-#201 pair until a
+   later task updates it): CREATE2 repeats them on every chain while the bytes are unchanged. Not
+   `CFG`'s: anvil places both by plain CREATE, so a dev build's tokens name addresses no other chain has. */
+const DEPLOYED = { factory: '0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E', app: '0x00a9F390A6010d045e0d34856048DdD6910d25BA' };
+// Every chain in `NETWORKS`, then the dev chain's own row with its own addresses when that is the
+// chain being read.
+const DEV_CHAIN = ['31337', '31338'].includes(String(CFG.chainId));
+const contractChains = () => NETWORKS.map(id => ({ id, ...DEPLOYED }))
+  .concat(DEV_CHAIN ? [{ id: CFG.chainId, factory: CFG.factory, app: CFG.app }] : []);
+/* Status follows `enabled`, the same answer the network menu links from, so the two never disagree.
+   A dev chain's own row is the chain being read. */
+const CTAB_HEAD = '<tr><th>chain</th><th>factory</th><th>app</th><th>status</th></tr>';
+const contractRows = () => contractChains().map(c => {
+  const on = enabled(c.id);
+  return `<tr${on ? '' : ' class="off"'}><td>${cname(c.id)}</td>`
+    + ['factory', 'app'].map(k => `<td>${ext('address', c[k], esc(short(c[k])), false, c.id)}</td>`).join('')
+    + `<td>${on ? 'live' : 'pending deployment'}</td></tr>`;
+}).join('');
 /* `widget.js` is the second document `App` serves, so on an http(s) page it sits beside this one.
    Anywhere else the snippet names an ERC-5219 gateway (#68): `html()`-only clients such as Freedom
    answer every web3:// path with this page, so a bare web3:// src is offered only as the alternative. The address is the distribution its owner arrived from (the owner bar links here), else
@@ -2202,11 +2439,16 @@ function docs() {
   <p>The contracts have not yet been audited. Security issues should be reported through the repository's <a href="${REPO}/security/advisories/new" target="_blank" rel="noopener noreferrer">advisory form</a>.</p>
 
   <h2 id="s-developers">For developers</h2>
-  <p>The source is published at <a href="${REPO}" target="_blank" rel="noopener noreferrer">github.com/dnznlabs/rake</a> under the MIT licence. Both contracts reside in one file with no imports. Every function, event and error, and the <code>Snapshot</code> struct the widget reads, are documented in <a href="${REPO}/blob/main/docs/REFERENCE.md" target="_blank" rel="noopener noreferrer">docs/REFERENCE.md</a>. This page is itself served by the <code>html()</code> view of a contract; see <a href="#/docs#credits">credits</a>.</p>
-  <div class="scroll"><table class="dtab"><tr><th>chain</th><th>factory</th><th>status</th></tr>${chainRows()}</table></div>
+  <p>The source is published at <a href="${REPO}" target="_blank" rel="noopener noreferrer">github.com/dnznlabs/rake</a> under the MIT licence. Both contracts reside in one file with no imports. Every function, event and error, and the <code>Snapshot</code> struct the widget reads, are documented in <a href="${REPO}/blob/main/docs/REFERENCE.md" target="_blank" rel="noopener noreferrer">docs/REFERENCE.md</a>. This page is itself served by the <code>html()</code> view of a contract; see <a href="#/docs#credits">credits</a>. The deployed addresses are listed under <a href="#/docs#contracts">contracts</a>.</p>
+
+  <h2 id="s-contracts">Contracts</h2>
+  <p>Two contracts are deployed: <code>DistributionFactory</code>, which creates every distribution and is unowned, and <code>App</code>, which serves this page and the widget. Each is placed by a salted <code>CREATE2</code>, so it has the same address on every chain it is deployed to. A distribution has no fixed address; each one is created through the factory.</p>
+  <p>The status column is which chains this app offers: <i>live</i> means the <code>App</code> there serves this page. Chains marked <i>pending deployment</i> are planned; the addresses shown are where the contracts will be placed.</p>
+  <div class="scroll"><table class="dtab" id="ctab">${CTAB_HEAD}${contractRows()}</table></div>
   </article></div>`;
   widgetDemo();
   giveBind();
+  liveCheck();
 }
 /* The support form under Economics: a plain payment to the featured distribution, any amount, nothing
    pre-filled (decision 1). It goes through `tx` like every write, so it is preflighted and confirmed. */
@@ -2298,7 +2540,7 @@ function route() {
   if (h.startsWith('#/docs')) { docs(); docScroll(h); return; }
   EMBED = null;
   if (!P) { V.innerHTML = notice('No wallet found. Open this page in a browser with a wallet.'); return; }
-  if (wrongChain()) { V.innerHTML = notice(`Your wallet is on ${cname(CHAIN)}. This app lives on ${cname(CFG.chainId)}. <button id="sw">Switch network</button>.`); document.getElementById('sw').onclick = switchChain; return; }
+  if (wrongChain()) { V.innerHTML = notice(`Your wallet is on ${cname(CHAIN)}. This app lives on ${cname(CFG.chainId)}. <button id="sw">Switch network</button>${enabled(CHAIN) ? `, or <a class="link" href="${esc(chainHref(CHAIN))}">open rake on ${cname(CHAIN)}</a>` : ''}.`); document.getElementById('sw').onclick = switchChain; return; }
   if (S.error) { V.innerHTML = notice(`could not read the factory at ${CFG.factory}: ${esc(S.error)}`, 'err'); return; }
   if (!S.loaded) return;
   scrollTo(0, 0);
@@ -2310,13 +2552,14 @@ function route() {
 }
 addEventListener('hashchange', route);
 document.getElementById('refresh').onclick = () => route();
-const tb = document.getElementById('theme-btn'), tm = document.getElementById('theme-menu'), wm = document.getElementById('who-menu'), nm = document.getElementById('net-menu');
-const menus = [tm, wm, nm], toggle = m => menus.forEach(x => x.hidden = x === m ? !x.hidden : true);
+const tb = document.getElementById('theme-btn'), tm = document.getElementById('theme-menu'), wm = document.getElementById('who-menu'), nm = document.getElementById('net-menu'), km = document.getElementById('wallet-menu');
+const menus = [tm, wm, nm, km], toggle = m => menus.forEach(x => x.hidden = x === m ? !x.hidden : true);
 tb.onclick = e => { e.stopPropagation(); toggle(tm); const t = localStorage.getItem('theme') || 'system'; tm.querySelectorAll('div').forEach(d => d.className = d.dataset.t === t ? 'on' : ''); };
 tm.onclick = e => { const t = e.target.dataset.t; if (!t) return; localStorage.setItem('theme', t); const d = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme:dark)').matches); document.documentElement.className = d ? 'dark' : ''; tm.hidden = true; };
 wm.onclick = e => { if (e.target.dataset.a === 'off') { wm.hidden = true; disconnect(); } };
-document.getElementById('net').onclick = e => { e.stopPropagation(); toggle(nm); };
+document.getElementById('net').onclick = e => { e.stopPropagation(); toggle(nm); if (!nm.hidden) liveCheck(); };
 nm.onclick = e => { e.stopPropagation(); if (e.target.dataset.a === 'switch') switchChain(); };
+km.onclick = e => { e.stopPropagation(); if (e.target.dataset.a === 'pick') { km.hidden = true; pickWallet(e.target.dataset.rdns); } };
 document.addEventListener('click', () => toggle(null)); document.addEventListener('keydown', e => { if (e.key === 'Escape') toggle(null); });
 
 (async () => {
