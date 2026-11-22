@@ -48,7 +48,7 @@ function widget() {
     addEventListener() {},
   };
   const win = {};
-  const api = new Function('window', 'document', `${body}\nreturn { decode, SNAP, SETBEN, etaText, GRACE, SKEW, esc };`)(win, doc);
+  const api = new Function('window', 'document', `${body}\nreturn { decode, SNAP, SETBEN, etaText, GRACE, SKEW, esc, fmtDelay };`)(win, doc);
   assert.deepEqual(Object.keys(win.RakeWidget), ['mount', 'refresh'], 'the widget\'s public surface changed');
   return api;
 }
@@ -305,4 +305,37 @@ test('the real fixture still decodes through both new checks', () => {
   assert.equal(snap.owner, OWNER);
   assert.equal(snap.table.length, 2);
   assert.equal(snap.pending.length, 1);
+});
+
+/* `fmtDelay` — the footer's delay, after step 4c. The page's `delayText` rounded a sub-hour delay to
+   `0h` and this had the same shape, so a widget embedded beside a ten-minute distribution announced
+   that there was effectively no notice period (#345). The widget takes no input, so the requirement
+   here is only that the text is exact; `test/delay.test.mjs` holds the page's round trip. */
+test('the widget shows a sub-hour delay in minutes or seconds, never `0h`', () => {
+  const { fmtDelay } = widget();
+  const got = [1, 59, 600, 3599, 3600, 5400, 86399, 86400, 90061, 604800].map(fmtDelay);
+
+  assert.deepEqual(got, ['1s', '59s', '10m', '3599s', '1h', '90m', '86399s', '1d', '90061s', '7d']);
+  assert.equal(fmtDelay(600), '10m');
+  assert.ok(!got.includes('0h'), 'a delay still renders as 0h');
+});
+
+test('the widget still says `no delay` for zero, which is its own sentence', () => {
+  assert.equal(widget().fmtDelay(0), 'no delay');
+});
+
+test('the widget and the page agree, unit for unit', () => {
+  /* Two formatters on two surfaces for one number: a divergence here is a distribution that reads
+     one delay in the dapp and another in an embedded widget. The page's own declaration is lifted,
+     not copied. */
+  const OPEN = 'const delayText = d =>', CLOSE = ": Number(d) + 's';";
+  const page = read('app/src/index.html');
+  const from = page.indexOf(OPEN), at = page.indexOf(CLOSE, from);
+  assert.ok(from >= 0 && at > from, 'app/src/index.html no longer declares delayText as this test lifts it');
+  const delayText = new Function(`${page.slice(from, at + CLOSE.length)}\nreturn delayText;`)();
+
+  const { fmtDelay } = widget();
+  for (const x of [1, 59, 600, 3599, 3600, 5400, 86399, 86400, 90061, 604800]) {
+    assert.equal(fmtDelay(x), delayText(x), `${x} s reads differently in the widget and on the page`);
+  }
 });
