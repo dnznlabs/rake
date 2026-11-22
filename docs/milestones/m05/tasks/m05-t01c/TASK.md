@@ -134,6 +134,27 @@ chains later.
      since the same document compresses about 260 bytes apart under two zlib builds;
      `RUNBOOK.md`'s sizing text gains that sentence where it states the two-chunk figures, and
      says that a size read outside `devbox run` is not a size of the upload.
+4c. **A delay is shown exactly, and the queue field never proposes a delay nobody typed** (added
+   2026-11-22, found at the preview sitting, [#345](https://github.com/dnznlabs/rake/issues/345)).
+   `delayText` (`app/src/index.html:1088`) rounds to whole hours, so a 600-second delay reads
+   `0h`, read live on a Sepolia distribution. The queue's delay field is prefilled from the same
+   function (`:1789`), and `parseDelay('0h')` is 0, so pressing queue without editing the field
+   proposes `setDelay(0)`. The same rounding turns 5,400 seconds into `2h`, which would propose
+   7,200.
+   - `delayText` returns one number and one unit, the largest of `d`, `h`, `m`, `s` that divides
+     the delay exactly, so nothing is rounded: 600 is `10m`, 5,400 is `90m`, 86,400 is `1d`,
+     90,061 is `90061s`. Zero keeps its sentence. That is the form `Model.parseDelay` already
+     reads.
+   - The queue field's prefill is that string, and its hint names the four units.
+   - `fmtDelay` in `app/src/widget.js` shows a sub-hour delay in minutes or seconds in the same
+     way. The widget has no input, so it only has to stop saying `0h`.
+   - Tests: for a list of delays including 1, 59, 600, 3,599, 3,600, 5,400, 86,399, 86,400,
+     90,061 and 604,800, `parseDelay(delayText(x))` equals `x`; a test that the queue field's
+     prefill for a 600-second distribution parses back to 600; a test that the widget's text for
+     600 is not `0h`.
+   - **Then step 7a again:** the preview is rebuilt and the Product Owner is told which rows this
+     touches. Step 6's size is re-read; its stops are unchanged.
+
 4b. **Base and Ethereum are in `ENABLED`** (the Product Owner's ruling, 2026-11-22; decision 69
    as amended). `app/src/index.html:42` becomes `[1, 8453, 11155111, 84532]`, so the document
    that goes to both testnets, and after them to Base and Ethereum, links both mainnets with no
@@ -189,6 +210,9 @@ chains later.
     listed and left out with the device each was tried on, and the signoff.
 
 ## Acceptance criteria
+
+- No delay is rounded on the page or in the widget, and an unedited queue field proposes the
+  delay the distribution already has: step 4c's tests.
 
 - `devbox run -- make test` passes, with the new tests of steps 2 to 5 in it.
 - With two wallet extensions announcing, Connect lists both by name and connects the one picked;
