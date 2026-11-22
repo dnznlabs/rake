@@ -134,6 +134,17 @@ chains later.
      since the same document compresses about 260 bytes apart under two zlib builds;
      `RUNBOOK.md`'s sizing text gains that sentence where it states the two-chunk figures, and
      says that a size read outside `devbox run` is not a size of the upload.
+4b. **Base and Ethereum are in `ENABLED`** (the Product Owner's ruling, 2026-11-22; decision 69
+   as amended). `app/src/index.html:42` becomes `[1, 8453, 11155111, 84532]`, so the document
+   that goes to both testnets, and after them to Base and Ethereum, links both mainnets with no
+   read. He accepted what comes with it: until a mainnet's own document is up and the gateway
+   carries that chain, the menu's link to it leads nowhere, and the `#/docs` contracts table reads
+   it as live. Correct the comment above the list and any test that pins it. Steps 2 to 6 merged
+   in #347, so this is a PR of its own, `Refs` the task issue. Then the preview of step 7a is
+   rebuilt from `main`; it lands before his word on that preview, which is when decision 71's
+   freeze begins. Check: `grep -n 'const ENABLED' app/src/index.html` prints that list, and in the
+   rebuilt preview the network menu shows `mainnet` and `base` as links and the other four as
+   pending deployment.
 7. **One PR** with steps 2 to 6, the regenerated `calldata/` for both testnets, and
    `docs/milestones/m04/tasks/m04-t05/UAT.md` gaining rows for: the menu with two extensions, a remembered wallet after reload, a
    disconnect that holds after reload, the chain's name with no wallet, and each listed phone link. Review, then merge.

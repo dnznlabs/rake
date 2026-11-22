@@ -1208,7 +1208,12 @@ convention. Numbered 45 because 44 is taken by
     alone, as #349 first built it (an upload on every live chain per chain enabled); a live lookup
     alone (a read per chain for every visitor for good, and it treats placed contracts as offered).
     Changing network is a link and never `wallet_switchEthereumChain`, in the same change; the
-    link's form per gateway is `Model.GATEWAYS` (`app/src/model.js`).
+    link's form per gateway is `Model.GATEWAYS` (`app/src/model.js`). *Amended 2026-11-22:* by his
+    ruling that day (Telegram, 02:05 CST) `ENABLED` also holds Ethereum and Base from the document
+    m05-t01c uploads, ahead of their own uploads, so the first mainnet documents need no lookup for
+    each other. Accepted by him: until each of the two has its document and its gateway entry,
+    the link to it leads nowhere and the contracts table reads it as live; nothing else uses the
+    gateway in earnest before then.
 
 70. **M05's mainnets are Base and Ethereum; the contracts go to both first, then the document; the
     other four chains wait until those two have been in real use.** Ruled by Denizen on 2026-11-22
@@ -1227,8 +1232,9 @@ convention. Numbered 45 because 44 is taken by
     code and the salt and `App`'s owner is inside that init code, and only the Creator key can
     create DNZN's distribution (decision 10). Decision 67 had already separated the contract
     deploys from the first document. **`rake.dnzn.dev/` goes to Ethereum** once its document is
-    up, which closes the question decision 68 left with m05-t04, whose default was Base; if Base's
-    upload lands first it holds `/` until Ethereum's does. The embed and criterion 5's screenshot
+    up, which closes the question decision 68 left with m05-t04, whose default was Base. Base does
+    not take `/` at any point (his ruling of 2026-11-22, 02:05 CST): until Ethereum's document is
+    up and the gateway carries it, `/` stays on Sepolia, where decision 68 put it. The embed and criterion 5's screenshot
     are taken on Ethereum for the same reason. **Accepted with it:** both deploys precede any real
     use on a mainnet, so a `fix`-grade finding after them supersedes two deployments where the
     earlier phasing risked one; what remains of that hedge is Base first, a stop before Ethereum,
