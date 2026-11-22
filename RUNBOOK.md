@@ -613,7 +613,24 @@ calldata that is well-formed, byte-reproducible and points at the wrong three co
 
 ```sh
 devbox run -- make dapp-nodev CHAIN_ID=$CHAIN_ID
-devbox run -- node tools/step4-calldata.mjs --chain $CHAIN_ID --rpc "$RPC" --out calldata
+devbox run -- node tools/step4-calldata.mjs --chain $CHAIN_ID --app $APP --rpc "$RPC" --out calldata
+```
+
+**`--app $APP` is not optional, and `$APP` is § 0's — read from `README` § Contracts, never recalled**
+([#311](https://github.com/dnznlabs/rake/issues/311)). The tool used to default the address, and the
+default outlived the deployment it named: m05-t01 redeployed `App`, and on m05-t01c the whole upload
+was generated and committed against the retired `0x00A90943…5BaE` before review caught it. Nothing in
+the checks below could see it — every one of them compares the calldata to the *build*, and a
+well-formed upload aimed at the wrong contract passes all of them, executes without a revert if that
+contract is still vault-owned, and is first contradicted by § 4d's `chain-doc`, two sittings later.
+The tool now exits 2 without `--app`, and with `--rpc` it refuses an address holding no code.
+
+**So check the target, not only the bytes**, before proposing — the one check § 4a did not have:
+
+```sh
+cast codesize $APP --rpc-url "$RPC"                    # non-zero: the App exists on this chain
+grep -o "App 0x[0-9a-fA-F]*" <<<"$(devbox run -- node tools/step4-calldata.mjs --chain $CHAIN_ID --app $APP --app-nonce $N --out /tmp/check)"
+# and the proposal targets: 1 and 2 are plain calls to $APP, the batch targets $OWNER (§ 4a's table)
 ```
 
 `dapp-nodev`, never `dapp`: a dev bundle on chain reads through its `?rpc=` override and never
@@ -670,9 +687,11 @@ is what to follow when the count differs:
   pointer is the CREATE at *N* + 2 and the widget's at *N* + 3.
 - **A fourth document chunk is a stop**, not a fourth proposal: it changes the proposal arithmetic
   and the gas per piece, so it is a plan question. `tools/step4-calldata.mjs` refuses it.
-- Measured for the three-chunk document of m05-t01c: proposals 1 and 2 are 48,138 characters each
-  and the batch is **21,194** against the 65,536 cap, 44,342 spare. The two-chunk batch it replaces
-  was 19,018.
+- Measured for the three-chunk document of m05-t01c, against `App`
+  `0x00a9F390A6010d045e0d34856048DdD6910d25BA` at its nonce **4** on both testnets: proposals 1 and
+  2 are 48,138 characters each and the batch is **20,682** against the 65,536 cap, 44,854 spare. The
+  two-chunk batch it replaces was 19,018. A size quoted here means nothing without the `App` and the
+  nonce it was cut for — the pointers are that contract's CREATE addresses.
 
 `batch345.hex` keeps the setters atomic with the widget chunk: the setter calls validate their
 pointers through `_requireChunk` (§ The five calls, and their order), so the widget pointer is created and
@@ -1403,7 +1422,9 @@ receipt is `status 1`. The two hash columns were
 written from a fork at 4a, before the proposals were signed, and **4d re-read both from the chain
 after execution and they are unchanged** — so, as in rows 1 and 2, the column now carries a live
 `chain-doc` reading rather than a prediction. The pointers landed at the three predicted addresses and
-`cast nonce $APP` reads `10` on both chains. This upload carries
+`cast nonce` reads `10` on both chains **for the `App` of that upload, `0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE`** — named
+rather than written as `$APP`, because m05-t01 redeployed `App` and `$APP` now means
+`0x00a9F390…25BA`, whose nonce is its own (#311). This upload carries
 m04-t11, m04-t04 and m04-t13; #227 (m04-t12) is held out by ruling and #235's R18 waits for a later
 upload. The generating commit is `3751211` and the bundle under `app/` and `src/` is byte-identical to
 the `06fbaab` the plan scoped — `git diff --stat 06fbaab 3751211 -- app/ src/` is empty, the one

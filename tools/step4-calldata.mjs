@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 /* Emit step 4's five calldatas, in execution order, for the Ops vault, and the batch that carries them.
 
-   node tools/step4-calldata.mjs --chain 11155111 --rpc "$RPC" --out calldata
-   node tools/step4-calldata.mjs --chain 31337 --app-nonce 1 --out /tmp/rehearsal   # offline
+   node tools/step4-calldata.mjs --chain 11155111 --app "$APP" --rpc "$RPC" --out calldata
+   node tools/step4-calldata.mjs --chain 31337 --app "$APP" --app-nonce 1 --out /tmp/rehearsal  # offline
 
-   One of `--rpc` or `--app-nonce` is required: the pointers are `App`'s CREATE addresses, so a
-   wrong nonce yields calldata that is reproducible and points at the wrong contracts.
+   `--app` is required, and one of `--rpc` or `--app-nonce` with it: the pointers are `App`'s CREATE
+   addresses, so a wrong nonce yields calldata that is reproducible and points at the wrong
+   contracts, and a retired address yields an upload that is correct and lands where nothing serves
+   it ([#311](https://github.com/dnznlabs/rake/issues/311)).
 
    Step 4 is an Ops-vault action (decision 44, #178): `App`'s chunk setters are `onlyOwner` and the
    owner is the vault, so the engineer proposes the bytes and the product owner signs them. These files
@@ -68,14 +70,23 @@ const arg = (name, fallback) => {
 
 const chain = arg('chain');
 if (!chain) {
-  console.error('usage: node tools/step4-calldata.mjs --chain <id> (--rpc <url> | --app-nonce <n>) [--app 0x…] [--vault 0x…] [--out <dir>] [--max-chunk <bytes>]');
+  console.error('usage: node tools/step4-calldata.mjs --chain <id> --app 0x… (--rpc <url> | --app-nonce <n>) [--vault 0x…] [--out <dir>] [--max-chunk <bytes>]');
   process.exit(2);
 }
-/* `App` is the same address on every chain of RUNBOOK § 1 (decision 35), so this is a default and
-   not a per-chain table. */
-const app = arg('app', '0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE');
+/* **No default for `--app`** ([#311](https://github.com/dnznlabs/rake/issues/311)). It used to
+   default to `0x00A90943…5BaE`, the `App` that m05-t01's redeploy retired, and `App` being one
+   address on every chain (decision 35) made that look safe — but a *retired* address is as silent as
+   a wrong nonce and worse: every check in RUNBOOK § 4a compares the calldata to the build, and none
+   compares the target to the deployed `App`, so the whole upload is well-formed, reproducible and
+   aimed at a contract nothing serves. It was caught in review on m05-t01c after the calldata had
+   been generated and committed against the old address. So it is required, like the nonce, and with
+   `--rpc` the code at it is read below. */
+const app = arg('app');
 const vault = arg('vault', '0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790'); // RUNBOOK § 0 OWNER, one value on every chain
-const outDir = join(arg('out', 'docs/milestones/m04/tasks/m04-t08/calldata'), chain);
+/* `calldata/<chain>` at the repository root, which RUNBOOK § The five calls calls the live path for
+   every routine upload. It used to default into m04-t08's own directory — a finished task's record,
+   which a later upload would have quietly rewritten (#311). */
+const outDir = join(arg('out', 'calldata'), chain);
 
 /* Every argument is validated here, before the first file or chain read, so that a refusal is the
    same in a clean checkout as in a built one. Validating after the reads below makes a missing
@@ -84,6 +95,18 @@ const outDir = join(arg('out', 'docs/milestones/m04/tasks/m04-t08/calldata'), ch
    that a wrong nonce is silent. The nonce's own rationale is at `appNonce` below, where it is used. */
 const rpc = arg('rpc');
 const nonceFlag = arg('app-nonce');
+if (app === undefined) {
+  console.error(
+    'step4-calldata: refusing to guess which `App` this upload targets — pass --app 0x…\n' +
+    '  the address is per deployment, not per chain: `deploy/gw44.json` names the one the gateway\n' +
+    '  reads, and a retired `App` produces a well-formed upload that nothing serves (#311).',
+  );
+  process.exit(2);
+}
+if (!/^0x[0-9a-fA-F]{40}$/.test(String(app))) {
+  console.error(`step4-calldata: --app must be a 20-byte hex address, got ${JSON.stringify(app)}`);
+  process.exit(2);
+}
 if (nonceFlag === undefined && rpc === undefined) {
   console.error(
     'step4-calldata: refusing to guess `App`\'s nonce — the pointers are its CREATE addresses.\n' +
@@ -178,6 +201,18 @@ calls.push({
    `--rpc` and the nonce is read from the chain, or pass `--app-nonce` for an offline run such as
    the anvil rehearsal; with neither, this exits non-zero rather than guessing — refused above,
    before any read, so the refusal does not depend on a build being present. */
+/* With a chain to ask, the target is checked for code before anything is built. An `App` that is not
+   deployed — a typo, a chain where the redeploy has not happened, a mainnet address that is not ours
+   — would otherwise yield calldata whose `setChunks` names CREATE addresses of an account that will
+   never make them (#311). Code alone does not prove it is `App`; it proves the target is not empty,
+   which is the failure that has actually happened. */
+if (rpc !== undefined) {
+  const code = cast('code', app, '--rpc-url', rpc);
+  if (!code || code === '0x') {
+    console.error(`step4-calldata: no code at ${app} on the chain behind --rpc — refusing to build an upload for an undeployed App (#311)`);
+    process.exit(2);
+  }
+}
 const appNonce = nonceFlag !== undefined
   ? Number(String(nonceFlag).trim())
   : Number(String(cast('nonce', app, '--rpc-url', rpc)).trim());
