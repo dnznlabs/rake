@@ -199,3 +199,59 @@ attestation has to tell its reader whether this is one immutable or a different 
 ## Open questions
 
 None. Part B's first gate is the balance read of step 6, and nothing in Part A is waiting on anyone.
+
+## Part B — the gates, read before the first send
+
+Read **2026-11-22 08:35–08:42Z** at `1d26c2d` (`main` with Part A merged), through the devbox pin, on
+the § 1 endpoints: Base `https://mainnet.base.org`, Ethereum `https://ethereum-rpc.publicnode.com`.
+Every gate re-read rather than carried from the 05:56Z column in the plan.
+
+| gate | must read | Base (8453) | Ethereum (1) |
+|:--|:--|:--|:--|
+| `cast chain-id` | the chain's id | **8453** | **1** |
+| step 1f's prediction | `FACTORY` `0x00D19609…6d7f8E`, `APP` `0x00a9F390…0d25BA` | **equal** | **equal** (one prediction, both chains) |
+| `cast code` at `FACTORY`, `APP`, implementation `0xc4eD7EA2…F8cB0A`, `DISTRO` `0xB611Ff19…0F4D5199` | `0x` at all four | **`0x` at all four** | **`0x` at all four** |
+| step 1c, the proxy | § 1's keccak | **69 bytes**, keccak `0x2fa86add0aed31f33a762c9d88e807c475bd51d0f52bd0955754b2608f7e4989` | **identical** |
+| the native-balance check of § 1 | § 1's rows reproduced | **reproduced** — both named aliases `0x` | **not literally reproduced; see below** |
+| `cast estimate --create`, factory / `App` | recorded; it is `E` | **2,396,446 / 1,666,007** | **2,396,446 / 1,666,007** |
+| block `gasLimit` | recorded | **40,000,000** | **60,000,000** |
+| `cast base-fee` against the stop | under the stop | **5,000,000 wei = 0.005 gwei** against 0.05 → **10× under** | **153,595,171 wei ≈ 0.154 gwei** against 1 → **6.5× under** |
+| `cast balance $ENGINEER` | ≥ the two limits × twice the base fee | **0.005 ETH** against 0.000081249 needed → **61.5×** | **0.025093601 ETH** against 0.002495893 needed → **10.1×** |
+| `ETHERSCAN_API_KEY` answers for the chain | `getsourcecode` `status` 1 | **1** (`WETH9` at `0x4200…0006`) | **1** (`WETH9` at `0xC02aaA39…756Cc2`) |
+
+**The balance arithmetic, in full**, because "at least the two limits times twice the base fee" is
+three multiplications and a reader should not have to redo them: the limits are 2 × `E` each, so
+4,792,892 + 3,332,014 = **8,124,906 gas**; at twice Base's base fee that is 81,249,060,000,000 wei
+(0.000081249 ETH) and at twice Ethereum's, 2,495,892,652,857,852 wei (0.002495893 ETH).
+
+**No re-size is needed on [#362](https://github.com/dnznlabs/rake/issues/362).** The ask was 0.002 ETH
+on Base and 0.01 ETH more on Ethereum; each chain's requirement is under **half** its ask — 0.0000812
+against 0.001, and 0.0024959 against 0.005 — which is the condition the plan sets for saying so.
+
+### One gate does not reproduce: Ethereum's native-balance row
+
+§ 1 records Ethereum as "none — no alias has code … measured, all four aliases `0x`". Today **one of
+the two addresses that section names has code on Ethereum**:
+`0x471EcE3750Da237f93B8E339c536989b8978a438` (Celo's `GoldToken` address) holds **1,582 bytes**,
+keccak `0x80bfbeda8c9e4f750701d422e5e03fd6ed6d94bd093a2bdb2cda22e2e1cbfa44`.
+
+**The precondition still holds, and this is why.** Every call the check cares about reverts, on two
+different arguments:
+
+```
+name()        -> execution reverted      totalSupply()           -> execution reverted
+symbol()      -> execution reverted      balanceOf(engineer)     -> execution reverted
+decimals()    -> execution reverted      balanceOf(0x0)          -> execution reverted
+                                         transfer(engineer, 1)   -> execution reverted
+```
+
+So whatever sits there is not an ERC-20 on Ethereum: it cannot **read** the native balance, let alone
+move value through it, which is the requirement F12 and the #127 ruling actually state. The probe
+address carried a non-zero balance (0.025093601 ETH), so "equal" was distinguishable from "empty" —
+the section's own caution.
+
+**What is wrong is the record, not the chain.** "All four aliases `0x`" is no longer a true sentence
+for Ethereum, and the section does not enumerate which four, so I checked the two it names and say so
+rather than claiming a set I could not read. Reported to the architect before any Ethereum send;
+Ethereum is behind step 8's stop in any case. **Base's row reproduced exactly**, so this does not gate
+Base.
