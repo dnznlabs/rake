@@ -255,3 +255,35 @@ for Ethereum, and the section does not enumerate which four, so I checked the tw
 rather than claiming a set I could not read. Reported to the architect before any Ethereum send;
 Ethereum is behind step 8's stop in any case. **Base's row reproduced exactly**, so this does not gate
 Base.
+
+## Part B — Base (8453), step 2: the factory
+
+Sent 2026-11-22 08:5xZ from the engineer's key `0x5A158aF8…bBC50d`, at `1d26c2d`'s build.
+
+**Step 1e's rule, applied rather than quoted:** `E` = **2,396,446** (`cast estimate --create`, read on
+the day), `P` = **3,482,636** (the dry run's own line), so forge's per-transaction estimate is
+`P ÷ 1.3` = 2,678,951 and `G = ceil(100 × 2 × E ÷ (P ÷ 1.3))` = **179**. The limit sent was
+**4,795,322** gas — above 2 × `E` (4,792,892), above 1.3 × `E` (3,115,380), and under half Base's
+40,000,000 block (the three bounds the rule sets). The base fee was re-read **immediately before the
+send** at **5,299,967 wei** against the 0.05 gwei stop, by a script that exits rather than sends if
+the stop is reached, so the stop is mechanical and not a judgement.
+
+| reading | value |
+|:--|:--|
+| transaction | **`0x07b81dcabe7b1041e800831ad460b27dfd5e589c2ba254ee71cef9b54f9d7377`** |
+| status | **1** |
+| block | **60,730,845** |
+| `gasUsed` | **2,381,290** of the 4,795,322 limit (49.7%) |
+| effective gas price | 6,333,075 wei |
+| `DistributionFactory` | **`0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`** — equal to step 1f's prediction |
+| `implementation()` | **`0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`** — the same implementation address as both testnets, which is what a CREATE2 from the same factory means |
+| `cast code` at the factory | **1,319 bytes** |
+
+The hash, status and `gasUsed` are `cast receipt`'s, not `run-latest.json`'s (#140); the broadcast log
+was read only for the hash to ask the receipt about.
+
+**The runtime against the artifact**, the comparison § 2 writes out: both sides **1,319 bytes**;
+**60 differing bytes**; **none outside a declared span**; and each of the three spans — at bytes 274,
+864 and 939 — holds `IMPL` left-padded to 32 bytes. Sixty is three times twenty, which is the
+address itself: the twelve pad bytes of each span match the artifact's zeros, so only the twenty
+address bytes differ per span.
