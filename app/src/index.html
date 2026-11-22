@@ -194,6 +194,31 @@ async function connect() {
   }
   ACC = a[0] || null; who(); route();
 }
+/* "Phone or tablet", in the order the hints become reliable: the browser's own `mobile` boolean
+   where it exists, then the user-agent's own words, then an iPad — which reports a Mac user-agent and
+   is told apart only by having more than one touch point. */
+function isPhone() {
+  const n = navigator, u = n.userAgent || '';
+  if (n.userAgentData && typeof n.userAgentData.mobile === 'boolean') return n.userAgentData.mobile;
+  if (/Android|iPhone|iPad|iPod/.test(u)) return true;
+  return /Macintosh/.test(u) && n.maxTouchPoints > 1;
+}
+/* The list a phone with no wallet is offered: each link opens *this* page — this host, this path,
+   this fragment — in the wallet's own browser, where a wallet exists to connect. Only over `https:`,
+   because a link built from an `http:` or `file:` page hands the wallet somewhere it should not go,
+   and only while no wallet has been found: a visitor who has one does not need an app store.
+   The list holds the two formats read on a real device (#334). Rainbow connects and then cannot
+   answer the boot read (#342) and Trust's link host publishes no app-association file, so both are
+   off; Phantom waits on the preview of the reload fix. */
+function phoneLinks() {
+  if (WALLET || WALLETS.length || location.protocol !== 'https:' || !isPhone()) return [];
+  const here = location.host + location.pathname + location.hash;
+  const url = encodeURIComponent(location.protocol + '//' + here);
+  return [
+    ['MetaMask', 'https://metamask.app.link/dapp/' + here],
+    ['Coinbase Wallet', 'https://go.cb-w.com/dapp?cb_url=' + url],
+  ];
+}
 /* The menu's rows, one per announced wallet. A wallet's name is the wallet's own string, so it goes
    in through `textContent` and never as markup, and its icon is not rendered at all: an `<img>` whose
    src a third party chooses is a request this page does not need to make. */
@@ -730,6 +755,7 @@ function who() {
   nm.innerHTML = (WALLET
       ? `<div class="k">This app lives on ${cname(CFG.chainId)}. Reads and transactions go through your wallet, so it has to be on the same network.</div>`
       : `<div class="k">no wallet found — open this page in a browser with a wallet to act.</div>`
+        + phoneLinks().map(([n, href]) => `<a href="${esc(href)}" target="_blank" rel="noopener">open in ${esc(n)}</a>`).join('')
         + (read ? `<div class="k">reads go through ${new URL(read).host}</div>` : ''))
     + `<div class="k">wallet: ${WALLET && CHAIN ? cname(CHAIN) : 'none'}</div>`
     + (WALLET && wrong ? `<div data-a="switch">switch wallet to ${cname(CFG.chainId)}</div>` : '');

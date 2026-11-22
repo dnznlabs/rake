@@ -413,6 +413,71 @@ test('a wallet with no name falls back to its rdns rather than an empty row', as
   assert.equal(km.children[0].textContent, 'io.metamask');
 });
 
+/* ---- the phone links (#334) ------------------------------------------------------------------- */
+
+/* A phone browser has no extension to announce, so the page is read-only there with nothing to say
+   but a sentence. These links open the same page inside a wallet's own browser, where there is a
+   wallet to connect. Only the two formats that were tapped on a real device are listed. */
+
+const links = ({ ua = '', mobile = undefined, touch = 0, wallet = false, wallets = 0, url = 'https://rake.dnzn.dev/8453/#/docs' } = {}) => {
+  const u = new URL(url);
+  const navigator = { userAgent: ua, maxTouchPoints: touch };
+  if (mobile !== undefined) navigator.userAgentData = { mobile };
+  const body = [
+    `const WALLET = ${wallet};`,
+    `const WALLETS = new Array(${wallets});`,
+    block('function isPhone'),
+    block('function phoneLinks'),
+    'return phoneLinks();',
+  ].join('\n');
+  return new Function('navigator', 'location', body)(navigator, {
+    protocol: u.protocol, host: u.host, pathname: u.pathname, hash: u.hash,
+  });
+};
+
+const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1';
+const IPAD = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15';
+const DESKTOP = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
+
+test('each link is built from this page\'s own host, path and fragment', () => {
+  assert.deepEqual(links({ ua: IPHONE }), [
+    ['MetaMask', 'https://metamask.app.link/dapp/rake.dnzn.dev/8453/#/docs'],
+    ['Coinbase Wallet', 'https://go.cb-w.com/dapp?cb_url=https%3A%2F%2Frake.dnzn.dev%2F8453%2F%23%2Fdocs'],
+  ]);
+});
+
+test('the list is empty on a desktop', () => {
+  assert.deepEqual(links({ ua: DESKTOP }), [], 'a desktop with no wallet reads the sentence, unchanged');
+  assert.deepEqual(links({ ua: IPHONE, mobile: false }), [], 'the browser\'s own hint outranks the user-agent string');
+});
+
+test('the list is empty when a wallet is found, phone or not', () => {
+  assert.deepEqual(links({ ua: IPHONE, wallet: true }), []);
+  assert.deepEqual(links({ ua: IPHONE, wallets: 2 }), [], 'a visitor with two wallets needs the picker, not an app store');
+});
+
+test('an iPad is a phone for this purpose, and a Mac is not', () => {
+  assert.equal(links({ ua: IPAD, touch: 5 }).length, 2, 'an iPad reports a Mac user-agent and is told apart by its touch points');
+  assert.deepEqual(links({ ua: IPAD, touch: 0 }), []);
+});
+
+test('a browser that says it is mobile is believed without a user-agent', () => {
+  assert.equal(links({ ua: '', mobile: true }).length, 2);
+});
+
+test('the list is offered only over https', () => {
+  assert.deepEqual(links({ ua: IPHONE, url: 'http://rake.dnzn.dev/8453/' }), [], 'a link built from an http: page hands the wallet an http: url');
+});
+
+test('a wallet that failed on the device is not listed', () => {
+  const got = links({ ua: IPHONE }).map(([n]) => n);
+
+  assert.deepEqual(got, ['MetaMask', 'Coinbase Wallet']);
+  for (const off of ['Trust', 'Rainbow', 'Phantom']) {
+    assert.ok(!got.some(n => n.includes(off)), `${off} is on the list; it was read as failing or is unproven (#334, #342)`);
+  }
+});
+
 /* ---- one recent list per chain --------------------------------------------------------------- */
 
 /* Through the gateway a project's chains share an origin, so a single `rake.recent` was one list for

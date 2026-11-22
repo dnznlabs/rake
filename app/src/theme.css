@@ -200,7 +200,7 @@ footer{display:flex;justify-content:space-between;border-top:1px solid var(--rul
 .rf{display:inline-flex;color:var(--dim)}.rf:hover{color:var(--accent)}.rf.on{color:var(--rule);cursor:default}
 .asof[hidden],.rf[hidden]{display:none}
 .menu{position:absolute;right:0;top:36px;border:1px solid var(--ink);background:var(--paper);min-width:120px;font-size:12px;z-index:2}
-.menu div{padding:9px 12px}.menu div.k{color:var(--muted);font:12px/1.5 var(--sans)}#net-menu{min-width:220px}.menu div.on{background:var(--ink);color:var(--paper)}
+.menu div{padding:9px 12px}.menu div.k{color:var(--muted);font:12px/1.5 var(--sans)}.menu a{display:block;padding:9px 12px;font:12px/1.5 var(--sans);color:var(--ink)}#net-menu{min-width:220px}.menu div.on{background:var(--ink);color:var(--paper)}
 .menu div[data-a],.menu div[data-t]{cursor:pointer}
 .notice{font:15px/1.65 var(--sans);color:var(--muted);max-width:60ch;margin:40px 0}
 .notice a,.notice button{color:var(--ink);border-bottom:1px solid var(--ink)}
