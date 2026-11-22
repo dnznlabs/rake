@@ -49,14 +49,26 @@ chains later.
    - `rake.recent` is one key for every chain on a shared origin (m05-t04's handoff, § Step 8).
      Key it by chain id, and read an old unkeyed value once as the current chain's so nobody
      loses a list. Check: a test in which an address saved on one chain id is absent on another.
+4a. **The page reloads only on a real chain change** ([#341](https://github.com/dnznlabs/rake/issues/341)).
+   In Phantom's in-app browser the dapp reloads without stopping, through two different
+   gateways (#334). `index.html:134` reloads on every `chainChanged`; reload only when the
+   event's chain differs from the chain the page last read. That this is the cause is a
+   hypothesis until step 7a's preview is opened in Phantom. Check: a test in which a provider
+   emits `chainChanged` on load with an unchanged chain and no reload follows, and one in which
+   a changed chain still reloads.
 5. **The phone links.** Shown only when **no wallet is found and the device is a phone or a
    tablet**; a desktop with no wallet reads today's sentence, unchanged. One function decides
    "phone": `navigator.userAgentData.mobile` where it exists, otherwise the user-agent names
    Android, iPhone, iPad or iPod, otherwise a Mac user-agent with `maxTouchPoints > 1` (an
    iPad). Each link carries the page's own `location.host`, path and fragment, and the list is
    offered only on `https:`. The list holds **only the wallets step 1 saw work**; a format that
-   failed or was not tried on any device is left out, and the handoff says which. Candidates,
-   none of them proven by us:
+   failed or was not tried on any device is left out, and the handoff says which. **Read on the
+   Product Owner's iPhone on 2026-11-21 (#334), each link tapped in Chrome: MetaMask, Coinbase
+   Wallet and Rainbow open the page in the wallet; Trust Wallet does not, and its link host
+   publishes no app-association file, so it is off the list; Phantom opens the page and is
+   listed only if step 7a's preview shows step 4a stopped the reloading.** A link pasted into the
+   address bar goes to the App Store and is not a failure of the link. The candidates as first
+   written:
 
    | Wallet | Link, for a page at `https://<host><path><fragment>` | Source |
    |:--|:--|:--|
@@ -75,6 +87,31 @@ chains later.
 7. **One PR** with steps 2 to 6, the regenerated `calldata/` for both testnets, and
    `docs/milestones/m04/tasks/m04-t05/UAT.md` gaining rows for: the menu with two extensions, a remembered wallet after reload, the chain's
    name with no wallet, and each listed phone link. Review, then merge.
+7a. **A preview the Product Owner tests before anything is uploaded** (his requirement,
+   2026-11-21). No proposal of step 8 is made until he has said the preview is good.
+   - **What is served:** the document that would be uploaded, `app/dist/index.html` from
+     `make dapp-nodev`, one chain at a time, as a static file. It reads the testnet contracts
+     through the chain's public endpoint and through his wallet, as the uploaded one will. It is
+     not served through the gateway, so anything that depends on the gateway's first load is
+     still read at step 9.
+   - **How it reaches his phone:** a static file server bound to `127.0.0.1` over
+     `app/dist/` alone, and a temporary HTTPS address in front of it from a quick tunnel
+     (`cloudflared tunnel --url http://127.0.0.1:<port>`; `nix run nixpkgs#cloudflared` gave
+     version 2026.10.7 on this machine on 2026-11-21, and no account is needed). Nothing is added
+     to `devbox.json`. The address is random, is sent to him on the action issue and nowhere
+     else, and the tunnel and the server are stopped when the sitting ends. Check before sending
+     it: `curl` of the address returns the built file's SHA-256, and a path outside `app/dist/`
+     returns 404.
+   - **A switch for a desktop look, in the development build only:** `?phone=1` makes the page
+     take the phone path, and `?phone=0` the desktop one, inside the `/*DEV*/` fence that
+     `app/build.mjs` strips, so the document that ships has no such switch. Check: the strip test
+     of `test/nowallet.test.mjs` covers it, and `grep -c 'phone=' app/dist/index.html` after
+     `make dapp-nodev` prints 0.
+   - **What he checks:** the new `UAT.md` rows of step 7 that need no upload: the menu with two
+     extensions on a desktop, a remembered wallet after reload, and on the phone each listed
+     link opening the preview's own address inside that wallet with Connect working there.
+   - **His word gates step 8.** A comment on the action issue, or in chat and recorded there. A
+     row that fails is fixed in a PR and previewed again; nothing is uploaded to find it.
 8. **Run B on both testnets** (`RUNBOOK.md` Step 4), proposals by the engineer, co-signed and
    executed as that section has it. Check: `make chain-doc` reports `inflated sha256` equal to
    the build's on both chains, and `make verify` from a gw44 checkout at the gateway's pin prints
@@ -101,6 +138,9 @@ chains later.
   and the document is still two chunks, or the stop of step 6 was taken.
 - M04 criterion 6's signoff is in the handoff, dated, in the Product Owner's words, for this
   document.
+- The Product Owner's word that the preview of step 7a was good is on its action issue, dated
+  before the first proposal of step 8, and `grep -c 'phone=' app/dist/index.html` prints 0 for
+  the document uploaded.
 - `git diff --stat main` touches only `app/`, `test/`, `calldata/`, `shots/`,
   `docs/milestones/m04/tasks/m04-t05/UAT.md`, `RUNBOOK.md` § Uploads, and this task's directory.
 
@@ -117,6 +157,9 @@ chains later.
 
 ## Open questions
 
+- **Action on the Product Owner: test the preview of step 7a**, filed by the engineer as an
+  `action` issue when the preview is up, with the address. Gates step 8. No default: the upload
+  waits for his word.
 - **Action on the Product Owner: try the candidate links on a phone**, filed as an `action` issue
   when this plan merges. Gates step 5's list only. *Default if a wallet is not installed on any
   device he has:* it is left off the list and named in the handoff as untried.
