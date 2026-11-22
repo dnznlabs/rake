@@ -578,3 +578,20 @@ and a second one only lengthens the queue.
 "the last long alphanumeric run" from forge's output, which matched the **address** in the URL line
 below the GUID, and `checkverifystatus` answered `Invalid GUID length`. The GUID now comes off its
 own labelled line. A character-class guess is not a parser.
+
+## For the Product Owner — Ethereum's `create`
+
+Posted to [#363](https://github.com/dnznlabs/rake/issues/363) after Ethereum's step 5, as step 10
+orders. Prechecks on chain 1: `predict` returns **`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`**, the
+same address as Base and both testnets; `cast code` there is **`0x`**; the Creator's simulation returns
+that address and another address reverts **`0x0c4549ef`**; the estimate is **480,533** — identical to
+Base — against the Creator's **0.01 ETH**, about **170×** the cost at 0.12 gwei.
+
+**One thing worth stating because it shortens his work: the calldata is byte-identical on both
+chains.** The arguments carry no chain id, so the same 1,188-byte blob to the same factory address
+creates the same distribution address on whichever network it is sent to. I compared the two strings
+rather than their lengths — a `diff -q` first said they differed, which turned out to be a trailing
+newline in one of the files and not a difference in the data.
+
+Etherscan's Write Contract form is unavailable for chain 1 as well, for the same queued-verification
+reason, and the `table_` comma warning is repeated with it.
