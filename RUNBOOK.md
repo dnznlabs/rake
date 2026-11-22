@@ -987,6 +987,14 @@ cast call $APP "chunkCount()(uint256)" --rpc-url "$RPC"   # above 0 once the doc
 
 #### The five calls, and their order
 
+**The committed `calldata/` is the last cut, not a mirror of `main`.** It is regenerated at step 4a
+from the head the proposals are built from, so any `app/` commit merged after that cut leaves these
+files describing a document `main` no longer builds — measured on 2026-11-22, when three merges and a
+direct commit moved the document and the committed chunks still decoded to the previous payload.
+**Never propose from the files as committed**: re-cut at the proposing head and compare, which § 4a
+and § 4d already require. The same applies to the widget: it has its own chunk and its own hash, and
+both move whenever `app/src/widget.js` does.
+
 `tools/step4-calldata.mjs` writes them to **`calldata/$CHAIN_ID/`** at the repository root — § 4a's
 `--out calldata`, which is the live path for every routine upload; only m04-t08's first upload kept
 its calldata under its own task directory, which is where the tool's own default would still put it.
