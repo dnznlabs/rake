@@ -1,18 +1,15 @@
-# m05-t02 — The contracts on the six mainnets
+# m05-t02 — The contracts on Base and Ethereum
 
-Milestone: [M05](../../MILESTONE.md) · Phase: 2 — The contracts, on all six mainnets
+Milestone: [M05](../../MILESTONE.md) · Phase: 2 — The contracts, on Base and Ethereum
 
-`DistributionFactory`, its implementation and `App` at the § 0 addresses on Base, OP Mainnet,
-Arbitrum One, Ethereum, Robinhood Chain and MegaETH, verified, attested, and DNZN's distribution
-created on each. No document is uploaded and nothing is proposed to the vault: on every one of the
-six, `App` ends this task deployed and empty (decision 70).
+`DistributionFactory`, its implementation and `App` at the § 0 addresses on Base and on Ethereum,
+verified, attested, and DNZN's distribution created on each. No document is uploaded and nothing is
+proposed to the vault: on both, `App` ends this task deployed and empty (decision 70).
 
-**These transactions are public, permanent and paid for.** Order, fixed: **Base (8453), OP Mainnet
-(10), Arbitrum One (42161), Ethereum (1), Robinhood Chain (4663), MegaETH (4326)**. Ethereum is the
-last of the four the milestone requires, because it is the dearest place to meet a deviation and
-the one DNZN's own products are built on. The two after it are decision 4's stretch chains: placed
-last so that a stop on either holds nothing the first four need, and closed as not reached if
-either cannot be deployed or verified.
+**These transactions are public, permanent and paid for.** Order, fixed: **Base (8453), then
+Ethereum (1)**. Base first because it is the cheap one and the sibling of the testnet the runbook
+was rehearsed on; Ethereum second because it is the dearest place to meet a deviation and the chain
+DNZN's own products are built on. No other chain is touched.
 
 ## Plan
 
@@ -97,36 +94,34 @@ Branch `m05/t02-preflight` from `origin/main`. Baseline, measured on `1ad6caa` o
    `Closes #293`. Handoff section "Part A" in `HANDOFF.md` beside this file. Request the
    architect's review. **Part B does not start until PR 1 is on `main`.**
 
-### Part B — the six chains
+### Part B — the two chains
 
 Branch `m05/t02-mainnet-contracts` from `origin/main` after PR 1 merges. § 0's variables as written
 there, `DNZN_DELAY=604800`. `RPC` per chain from `RUNBOOK.md` § 1's table.
 
-6. **Gates, read and committed before the first send, dated, one table for the six chains.**
-   Readings taken on 2026-11-22 (05:56Z on the first four, 07:27Z on the last two, in the order above) are beside each so a difference is visible; re-read every
+6. **Gates, read and committed before the first send, dated, one table for the two chains.**
+   Readings taken on 2026-11-22 (05:56Z) are beside each so a difference is visible; re-read every
    one.
 
-   | gate | must read | read 2026-11-22 |
+   | gate | must read | read 2026-11-22, Base; Ethereum |
    |:--|:--|:--|
-   | `cast chain-id` | the chain's id | 8453, 10, 42161, 1, 4663, 4326 |
+   | `cast chain-id` | the chain's id | 8453; 1 |
    | step 1f's prediction | `FACTORY` `0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`, `APP` `0x00a9F390A6010d045e0d34856048DdD6910d25BA`, equal to § 0 | equal, at `1ad6caa` |
-   | `cast code` at `FACTORY`, `APP`, the implementation `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A` and `DISTRO` `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199` | `0x` at all four, on all six chains | `0x` at `FACTORY`, `APP`, `DISTRO` on all six; the implementation not read |
-   | step 1c, the proxy | 141 characters and § 1's keccak | 141 on all six; keccak not re-read |
-   | the native-balance check of § 1, with its `transfer` assertion on OP Mainnet | § 1's table reproduced, on **all six mainnets** of § 1 (it is keyless) | not re-read |
-   | `cast estimate --create`, factory / `App` | recorded; it is `E` of step 1e | 2,396,446 / 1,666,007 on Base, OP Mainnet, Ethereum and Robinhood Chain; 2,411,316 / 1,677,870 on Arbitrum One; **111,772,970 / 75,618,906 on MegaETH** |
-   | block `gasLimit` | recorded | 40,000,000; 40,000,000; placeholder (use 32,000,000); 59,999,943; placeholder (no documented figure, § 1); 10,000,000,000 |
-   | `cast base-fee` against the stop | under the stop below | 0.005 gwei; 0.0000138 gwei; 0.020 gwei; 0.117 gwei; 0.020 gwei; 0.001 gwei |
-   | `cast balance $ENGINEER` | at least the two limits of step 1e times twice the base fee read | 0; 0; 0; 0.0051 ETH; 0; 0 |
-   | `ETHERSCAN_API_KEY` answers for the chain | the `getsourcecode` read of step 5 against any verified contract on that `chainid` answers `status` 1 | not read; Etherscan's v2 chain list carries all six |
-   | the Ops vault, on the two stretch chains | `isOwner($ENGINEER)` true, `threshold()` 2 | true, 2, `delay()` 3600, four owners, on both |
+   | `cast code` at `FACTORY`, `APP`, the implementation `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A` and `DISTRO` `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199` | `0x` at all four addresses, on both chains | `0x` at `FACTORY`, `APP`, `DISTRO` on both; the implementation not read |
+   | step 1c, the proxy | 141 characters and § 1's keccak | 141 on both; keccak not re-read |
+   | the native-balance check of § 1 | § 1's rows for Base and Ethereum reproduced | not re-read |
+   | `cast estimate --create`, factory / `App` | recorded; it is `E` of step 1e | 2,396,446 / 1,666,007 on both |
+   | block `gasLimit` | recorded | 40,000,000; 59,999,943 |
+   | `cast base-fee` against the stop | under the stop below | 0.005 gwei; 0.117 gwei |
+   | `cast balance $ENGINEER` | at least the two limits of step 1e times twice the base fee read | 0; 0.0051 ETH |
+   | `ETHERSCAN_API_KEY` answers for the chain | the `getsourcecode` read of step 5 against any verified contract on that `chainid` answers `status` 1 | not read |
 
-   **Stops, base fee, before every send:** Ethereum **1 gwei** (§ 0). Base and OP Mainnet
-   **0.05 gwei**, Arbitrum One and Robinhood Chain **0.2 gwei**, MegaETH **0.01 gwei**; these are this
-   plan's figures, about ten times the readings above (OP Mainnet's set to Base's), and they defer a send, they do not widen a budget.
+   **Stops, base fee, before every send:** Ethereum **1 gwei** (§ 0); Base **0.05 gwei**, this
+   plan's figure, ten times the reading above. A stop defers a send; it does not widen a budget.
 
    **Funding** is the Product Owner's, asked in the action issue this task's issue links, and
-   sized there as an estimate: 0.002 ETH on each of the five chains other than Ethereum and
-   0.01 ETH more on Ethereum for the engineer's key. Re-size it from this table's readings before he is asked to send
+   sized there as an estimate: 0.002 ETH on Base and 0.01 ETH more on Ethereum for the engineer's
+   key. Re-size it from this table's readings before he is asked to send
    ([#279](https://github.com/dnznlabs/rake/issues/279)): if a chain's two limits at twice its base
    fee come to more than half the ask, say so on the action issue with the figure. A chain is not
    started until its balance gate reads true.
@@ -144,37 +139,14 @@ there, `DNZN_DELAY=604800`. `RPC` per chain from `RUNBOOK.md` § 1's table.
    - `deployments/8453.json` written from the chain, and `make attest` exiting 0 across every file;
    - `cast call $APP "chunkCount()(uint256)"` prints 0. Step 4 is not run.
 
-8. **The stop between chains.** Go on to the next chain only if, on this one: no send failed or was
+8. **The stop before Ethereum.** Go on to Ethereum only if, on Base: no send failed or was
    refused; the logged `DistributionFactory` and `App` equalled step 1f's prediction; every
    read-back in steps 2 and 3 equalled its required value; the Sourcify loop exited 0. Anything
-   else: commit the record, stop, and message the architect with the chain and the reading. The
-   next chain starts on the architect's reply.
+   else: commit the record, stop, and message the architect with the reading. Ethereum
+   starts on the architect's reply.
 
-9. **OP Mainnet, Arbitrum One, Ethereum, then Robinhood Chain and MegaETH**, each as step 7, each
-   followed by step 8. The chain-specific lines:
-
-   - **OP Mainnet:** the `LegacyERC20ETH` `transfer` assertion of § 1 is re-run immediately before
-     step 2 and must revert.
-   - **Arbitrum One:** `E` carries an L1 data component and moves with Ethereum's base fee
-     (m05-t01 handoff, deviation 7), so it is read immediately before each send, and `gasUsed` is
-     recorded with that named.
-   - **Ethereum:** `cast base-fee` under 1 gwei immediately before each of the two sends. Above
-     it, wait; do not raise it.
-   - **Robinhood Chain and MegaETH, before the first send on each:** show that step 5 can be done
-     there. Neither chain has been verified against by this repository; Sourcify's chain list
-     marks both supported and Etherscan's v2 chain list carries both (read 2026-11-22). Find out
-     whether the pinned forge resolves the chain id for `--chain` on each verifier, and if it does
-     not, what `--verifier-url` it needs, and write that into step 5. **If the three contracts
-     cannot be verified on at least Sourcify, the chain is not deployed**: an immutable contract
-     nobody can read is worse than no contract.
-   - **MegaETH:** `E` is about 47 times what forge's own simulation estimates, so `G` comes out in
-     the thousands. If `forge script` will not send with it, stop and message the architect; the
-     raw `cast send $PROXY` fallback of § 1 is not taken without a reply.
-   - **Robinhood Chain:** its per-transaction ceiling is unread (§ 1). A refusal is step 1e's
-     refusal rule.
-   - **A stop on either stretch chain does not hold this task.** Record the reading, close that
-     chain as not reached in the handoff and in `MILESTONE.md` beside criterion 3 (decision 4),
-     and go on.
+9. **Ethereum**, as step 7 with `deployments/1.json`. `cast base-fee` under 1 gwei immediately
+   before each of the two sends. Above it, wait; do not raise it.
 
 10. **DNZN's `create`, prepared per chain, sent by the Product Owner** (step 6; the Creator key
     signs it and nobody else can, `src/Distribution.sol:459-467`). As each chain's step 5
@@ -191,14 +163,14 @@ there, `DNZN_DELAY=604800`. `RPC` per chain from `RUNBOOK.md` § 1's table.
 11. **The records.** `RUNBOOK.md` gains § Executed on mainnets beside § Executed on testnets: one
     § Record table per chain, the base fee paid at each send, what each key spent per chain, and
     every failed or refused attempt. Every deviation is a `RUNBOOK.md` change in this PR or one
-    line in the handoff saying why not (M05 criterion 6). `README.md`: one row per mainnet in
+    line in the handoff saying why not (M05 criterion 6). `README.md`: a row for Base and a row for Ethereum in
     § Contracts with explorer and Sourcify links, and the sentence at `:17` rewritten so that
     `grep -c -i 'No mainnet deployment' README.md` prints 0 and it says what is true: the
-    contracts are on the mainnets it lists and the dapp's document is not yet uploaded to any of them.
-    § 1's native-balance table carries the six readings of this plan's step 6 with their date.
+    contracts are on Base and Ethereum and the dapp's document is not yet uploaded to either.
+    § 1's native-balance table carries this plan's step 6 readings for the two chains with their date.
 
 12. **PR 2**, from the template, `Closes` this task's issue and
-    `Closes #127`. It opens when steps 7 to 9 and 11 are done on the four required chains and each stretch chain is done or recorded as not reached. A `create` the
+    `Refs #127`, which stays open for the chains not yet deployed. It opens when steps 7 to 9 and 11 are done on both chains. A `create` the
     Product Owner has not yet sent does not hold it: the handoff names each such chain as pending
     under the action issue, and its read-backs are added as a later commit. `HANDOFF.md` section
     "Part B". Request the architect's review and message the architect's session.
@@ -215,8 +187,7 @@ Part A, at PR 1's head:
 - `make attest` exits 0 for the two testnets and non-zero in both tampered cases; the workflow has
   one green dispatched run. `make test` and CI are green.
 
-Part B, at PR 2's head, on each of 8453, 10, 42161 and 1, and on 4663 and 4326 unless the handoff
-records the chain as not reached:
+Part B, at PR 2's head, on each of 8453 and 1:
 
 - **M05 criterion 1.** `cast code $FACTORY` equals the artifact outside the three spans;
   `implementation()` is `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`; `App`'s `cmp` reports equal;
@@ -228,9 +199,9 @@ records the chain as not reached:
   `description()` `DNZN // FUND DISTRIBUTION`, the three rows of decision 50. Where it has not,
   the handoff says so.
 - **No document.** `cast call $APP "chunkCount()(uint256)"` prints 0, and no proposal was posted
-  to the coordination service for any of the six chains.
-- **Attested.** `deployments/` holds one file per chain deployed, eight when both stretch chains are
-  reached, and `make attest` exits 0.
+  to the coordination service for either chain.
+- **Attested.** `deployments/` holds four files, the two testnets and the two mainnets, and
+  `make attest` exits 0.
 - **Recorded.** § Executed on mainnets carries each chain's table with no blank hash in steps 2
   and 3; every hash in it answers `cast receipt` with the `gasUsed` written beside it; the handoff
   lists every failed or refused send and what each key spent per chain;
@@ -241,7 +212,7 @@ records the chain as not reached:
 ## Out of scope
 
 - **`RUNBOOK.md` Step 4, on any mainnet.** No `make dapp-nodev` for a mainnet, no calldata cut, no
-  proposal, no signature asked of anyone. The documents are m05-t03's, on Base and Ethereum first.
+  proposal, no signature asked of anyone. The documents are m05-t03's.
 - **The gateway.** No chain is added to `deploy/gw44.json` here: `make get` answers 404 for an
   `App` with no document, and decision 69 treats a chain as live from its document.
 - **`app/`**, including `ENABLED` and `NETWORKS`. It is frozen on `main` while the testnet upload
@@ -250,14 +221,15 @@ records the chain as not reached:
   task (step 3).
 - **`App.lock()`, any ownership change, the first deposit and `distribute` on Base.** The last is
   m05-t03's, with the Product Owner's signoff.
-- **A document or a gateway entry for Robinhood Chain or MegaETH.** That is m05-t05's.
+- **Any other chain.** OP Mainnet, Arbitrum One, Robinhood Chain and MegaETH are not deployed to
+  in M05 (decision 70). No reading, estimate or funding for them belongs in this task.
 - **A retry of a collision.** Code at a predicted address that is not ours is `RUNBOOK.md` step
   1g's stop, never a new salt.
 
 ## Open questions
 
 None. The Product Owner's go for these sends is decision 70; his steps are the two action issues
-this task's issue links (funding the two keys, and the `create`s, one per chain reached).
+this task's issue links (funding the two keys, and the two `create`s).
 
 ## Context
 

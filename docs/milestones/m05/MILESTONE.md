@@ -1,6 +1,13 @@
 # M05 — Mainnet
 
-Status: in progress · scoped 2026-11-18 · re-phased 2026-11-22 (decision 70)
+Status: in progress · scoped 2026-11-18 · re-scoped 2026-11-22 (decision 70)
+
+**Re-scoped 2026-11-22, decision 70: this milestone's mainnets are Base and Ethereum.** Wherever the
+text below says "the four chains", read those two, and where it says "all six", read those two and
+the two testnets. OP Mainnet, Arbitrum One, MegaETH and Robinhood Chain are not deployed to in this
+milestone: they follow on the Product Owner's word once Base and Ethereum have been in real use,
+scoped then as their own work. The text below is otherwise as scoped on 2026-11-18, and the phases
+and tasks are current.
 
 `RUNBOOK.md` Run A executed for real on **Ethereum (1), Base (8453), Arbitrum One (42161) and OP
 Mainnet (10)** so that `DistributionFactory`, its implementation and `App` sit at one address on all
@@ -65,13 +72,6 @@ Sepolia and Base Sepolia. Measured 2026-11-18 on all six mainnets of § 1: `cast
 M04 addresses prints `0x`, the proxy at `0x4e59b448…` is 69 bytes, and the Ops vault answers
 `ownerCount()` 4, `threshold()` 2, `delay()` 3600 with the engineer's key an owner on every one.
 Re-run rather than quote.
-
-**Amended 2026-11-22, decision 70.** Criteria 1, 2 and 4 hold on all four chains, and on Robinhood
-Chain and MegaETH where m05-t02 reaches them; a stretch chain it cannot deploy or verify is recorded
-beside criterion 3 and does not hold the close-out (decision 4). Criteria 3 and 5
-are measured on the chains whose document has been uploaded: Base and Ethereum are required for the
-close-out; OP Mainnet and Arbitrum One are deployed with no document until the Product Owner asks for
-theirs, and the milestone closes without them, with one carried issue naming the two uploads.
 
 1. **The four addresses carry code on all six chains, and they are the same four.** With
    `FACTORY` and `APP` recomputed from `main`'s init code and the re-mined salts by step 1f
@@ -288,13 +288,10 @@ form; the numbers here are the milestone's and the record is `ROADMAP.md` § Dec
   0.57 gwei, both read 2026-11-19 (`RUNBOOK.md` § 1). It does not hold if Ethereum adopts EIP-8037
   before a cut, or at a base fee a few times that. Each deploy task re-reads both at its gate and
   re-sizes its ask before any funding is requested. m05-t02 asks for the contract sends only, an
-  estimate: 0.002 ETH on each of the five chains other than Ethereum and 0.01 ETH more on Ethereum for
-  the engineer's key, and about 0.002 ETH on Ethereum and 0.0005 ETH on each of the other five for
-  the Creator key's six `create`s. m05-t03
-  sizes the uploads.
-- **Signatures: six `create`s, and six vault co-signatures** for Base's and Ethereum's uploads
-  (decision 70); six more when OP Mainnet's and Arbitrum One's are asked for, and the stretch row's
-  beside them.
+  estimate: 0.002 ETH on Base and 0.01 ETH more on Ethereum for the engineer's key, and about
+  0.0005 ETH on Base and 0.002 ETH on Ethereum for the Creator key's two `create`s. m05-t03 sizes
+  the uploads.
+- **Signatures: two `create`s and six vault co-signatures**, for Base and Ethereum (decision 70).
   Each mainnet is three Run B proposals co-signed through the coordination service (decision 47's
   route; the engineer proposes, Denizen co-signs, the engineer executes after the vault's hour), then
   one `create` from the step-6 key by hand with the exact command in the task's handoff. **Whether
@@ -318,24 +315,22 @@ form; the numbers here are the milestone's and the record is `ROADMAP.md` § Dec
 
 ## Phases
 
-In order, as re-phased on 2026-11-22 (decision 70). Phase 1's redeploy fixes the addresses, so it
-merged before anything is sent to a mainnet. Phase 2 places the contracts on all six mainnets, the
-four required and the two stretch chains, and uploads nothing. Phase 3 uploads the document, to Base and then to Ethereum, and needs Phase 1's
+In order, as re-scoped on 2026-11-22 (decision 70). Phase 1's redeploy fixes the addresses, so it
+merged before anything is sent to a mainnet. Phase 2 places the contracts on Base and on Ethereum
+and uploads nothing. Phase 3 uploads the document, to Base and then to Ethereum, and needs Phase 1's
 last task (the document a wallet has been run against) and Phase 2's merge. Phase 4's gateway
-(m05-t04) needed no mainnet and is done; its embed (m05-t04b) follows Phase 3. The stretch chains'
-documents are Phase 3's second task and gate nothing.
+(m05-t04) needed no mainnet and is done; its embed (m05-t04b) follows Phase 3.
 
-**Contracts on six chains before a document on any.** The addresses are the permanent part, and
-the Product Owner wants them placed on every chain rake intends to be on. DNZN's own products are built on Ethereum; the
-other mainnets are there for other people's distributions, and Base is the one of them he wants
-live at launch. Inside Phase 2 the order is Base, OP Mainnet, Arbitrum One, Ethereum, then Robinhood Chain and
-MegaETH, with a stop between chains on any deviation: Base is the cheapest place to meet a runbook surprise and the sibling of
-the testnet the runbook was rehearsed on, and Ethereum is the dearest. Rejected, and the plan until
-2026-11-22: Base end to end, then the other three in a second task. It kept a `fix`-grade finding
-after Base's first real use to one superseded deployment, at the cost of a document round trip
-before three of the four addresses were placed; decision 70 accepted the other side of that trade.
-Rejected: Ethereum first — nothing Ethereum would teach is learned by going first except its
-code-deposit pricing, which step 1e reads for free.
+**Two chains, the two the testnets rehearsed.** DNZN's own products are built on Ethereum, Base is
+the one other chain the Product Owner wants live at launch, and Sepolia and Base Sepolia are the
+only chains the runbook has run on. The other four add nothing DNZN needs at launch and cannot be
+lost by waiting: an address can only ever hold our own bytes (`CREATE2` through the proxy, with
+`App`'s owner inside the init code), and only the Creator key can create DNZN's distribution. So
+they wait until these two have been in real use, and a `fix`-grade finding in that time supersedes
+two deployments and not six. Inside Phase 2 the order is Base, then Ethereum, with a stop between
+them: Base is the cheapest place to meet a runbook surprise and Ethereum the dearest. Rejected, and
+the plan until 2026-11-22: the four chains of decision 4 in two tasks, Base end to end and then the
+other three, with a stretch row for two more.
 
 ### Phase 1 — Same bytes everywhere
 
@@ -349,29 +344,26 @@ reader-verifiable additions to the self-review that decision 56 puts before the 
 | m05-t01b | **Threat model, coverage floor, mutation run** (decision 56, [#262](https://github.com/dnznlabs/rake/issues/262)). `docs/THREAT_MODEL.md` listing actors, token classes, chains and what each assumption's test is, each row naming a test `forge test --list` returns, diffed against the Solodit checklist and two Pashov fee-distribution reports; a `forge coverage --ir-minimum` summary committed with a CI floor one point under the measured figure; `slither-mutate` over `src/` with `forge test`, results committed per commit, every survivor given a test or a one-line reason. The next `audits/<date>/AUDIT.md` provenance block names the coverage floor and the mutation score beside the leg versions. § Out of scope's first line holds: a survivor whose only remedy is under `src/` is recorded with its reason, not fixed | done — [#292](https://github.com/dnznlabs/rake/pull/292) merged 2026-11-19; campaign at `audits/mutation/e770054/`, 755 of 847 caught, no `src/` byte moved; carries #127 and [#293](https://github.com/dnznlabs/rake/issues/293) |
 | [m05-t01c](tasks/m05-t01c/TASK.md) | **The wallet picker and the phone links** (decision 67). Connect lists every announced wallet extension; on a phone with no wallet found it offers "Open in <wallet>" links, only for wallets seen to work on a phone first. The header names its chain with no wallet (#328) and `rake.recent` is kept apart by chain. One Run B upload on both testnets and the Product Owner's wallet run on the result (m05-t01's criterion 18b, moved here), so the document m05-t03 uploads to Base is this one | in progress — [#336](https://github.com/dnznlabs/rake/issues/336); steps 2 to 7 merged ([#347](https://github.com/dnznlabs/rake/pull/347)); the testnet upload and the wallet run are open. Gates m05-t03, not m05-t02 |
 
-### Phase 2 — The contracts, on all six mainnets
+### Phase 2 — The contracts, on Base and Ethereum
 
-Base (8453), OP Mainnet (10), Arbitrum One (42161), Ethereum (1), Robinhood Chain (4663) and MegaETH
-(4326), in that order, contracts only (decision 70). The last two are decision 4's stretch chains:
-attempted here, and recorded as not reached if either cannot be deployed or verified. No document is uploaded and nothing is proposed to the vault in this phase.
+Base (8453), then Ethereum (1), contracts only. No document is uploaded and nothing is proposed to
+the vault in this phase.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m05-t02](tasks/m05-t02/TASK.md) | **The contracts on the six mainnets.** Before any send: step 1e's gas-limit rule written as procedure ([#308](https://github.com/dnznlabs/rake/issues/308)), § 4a's comparison made a stop ([#359](https://github.com/dnznlabs/rake/issues/359)), the test [#293](https://github.com/dnznlabs/rake/issues/293) asks for, and decision 56's bytecode attestation built against the two testnets. Then, per chain, Run A steps 1, 2, 3 and 5 with every `record:` line read from the chain, the native-balance assertion re-run ([#127](https://github.com/dnznlabs/rake/issues/127)), `deployments/<chainId>.json`, and DNZN's `create` prepared by the engineer and sent by the Product Owner from the Creator key; § Executed on mainnets opened, one README row per chain reached. A stop between chains on any deviation, and at anything that touches `src/`. The architect's second update to state-collection#74, with the landed mainnet `DISTRO`, follows this task's merge | planned 2026-11-22 — starts on this plan's merge, which with decision 70 is the written go M05-D3 asks for; needs the engineer's key and the Creator key funded |
+| [m05-t02](tasks/m05-t02/TASK.md) | **The contracts on Base and Ethereum.** Before any send: step 1e's gas-limit rule written as procedure ([#308](https://github.com/dnznlabs/rake/issues/308)), § 4a's comparison made a stop ([#359](https://github.com/dnznlabs/rake/issues/359)), the test [#293](https://github.com/dnznlabs/rake/issues/293) asks for, and decision 56's bytecode attestation built against the two testnets. Then, per chain, Run A steps 1, 2, 3 and 5 with every `record:` line read from the chain, the native-balance check re-run ([#127](https://github.com/dnznlabs/rake/issues/127)), `deployments/<chainId>.json`, and DNZN's `create` prepared by the engineer and sent by the Product Owner from the Creator key; § Executed on mainnets opened, two README rows. A stop before Ethereum on any deviation on Base, and at anything that touches `src/`. The architect's second update to state-collection#74, with the landed mainnet `DISTRO`, follows this task's merge | planned 2026-11-22 — starts on this plan's merge, which with decision 70 is the written go M05-D3 asks for; needs the engineer's key and the Creator key funded |
 
-### Phase 3 — The documents, and the stretch
+### Phase 3 — The documents
 
-The document on Base and on Ethereum through the Ops vault, each chain added to the gateway as its
-upload lands. OP Mainnet's and Arbitrum One's uploads are the same steps and are not proposed until
-the Product Owner asks for them: an unsigned proposal cannot be withdrawn from the coordination
-service and goes stale at the vault's next nonce (m05-t01 handoff, deviation 0). Until then both
-read as pending deployment in the dapp's network menu (decision 69). MegaETH and Robinhood Chain
-are a second task that passes or is recorded.
+The document on Base and then on Ethereum, through the Ops vault, each chain added to the gateway
+as its upload lands.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
 | m05-t03 | **The document on Base, then on Ethereum.** Run B on each: the cut from the tip of `main`, three proposals at the vault's live nonce, co-signed, executed after the vault's delay, 4d's byte comparison before the batch is executed; `make gateway-check` against `https://<App>.<chainId>.w3link.io/`; the chain added to `rake.dnzn.dev` by `RUNBOOK.md` § The gateway, with `/` going to Ethereum once its document is up (decision 70) and to Base only until then; a § Uploads row each. Ethereum's base fee against the stop rule before every send. On Base, the first deposit and `distribute`, and the signoff below. A chain's upload needs that chain's `create` landed, or its featured panel has nothing to paint | not started — not yet planned; gated on m05-t01c's testnet upload and wallet run, since the document is that one, and on m05-t02's merge |
-| m05-t05 | **The documents on Robinhood Chain (4663) and MegaETH (4326), the stretch row** (decision 4), for whichever of the two m05-t02 reached. First measurement, no key: a gateway that resolves the chain (w3link.io answered nothing for both on 2026-11-18; `rake.dnzn.dev` reads through public RPCs and may not need it). Then m05-t03's list on each, on the Product Owner's word as for OP Mainnet and Arbitrum One. A chain that fails is recorded in this file beside criterion 3 and the row closes as not reached. The milestone closes either way | not started — after m05-t03; optional by decision 4 |
+
+m05-t05, the stretch row for MegaETH and Robinhood Chain, is withdrawn with the other two chains
+(decision 70).
 
 **Signoff:** _not yet — a dated line by Denizen after reading DNZN's distribution on Base through the
 gateway from a wallet, and after the first deposit and `distribute` have run, goes here._
@@ -399,8 +391,8 @@ starts, and hands M07 nothing it needs. No task.
 **Estimate, labelled as one:** nine tasks, one optional; three to five weeks of calendar time, of
 which m05-t01 is about one week (two testnet signing rounds and two `create`s by hand), m05-t01b
 under two days of agent time beside it (decision 56's figure, unmeasured), Phase 2 a
-few days after the go, and the rest is Denizen's signing sessions — six `create`s, and six
-co-signatures for Base's and Ethereum's uploads (decision 70). The earlier six-to-ten-week figure carried a paid review's lead time,
+few days after the go, and the rest is Denizen's signing sessions — two `create`s and six
+co-signatures (decision 70). The earlier six-to-ten-week figure carried a paid review's lead time,
 which M05-D3 (decision 55) removed. Re-estimate when m05-t02 reports.
 
 ## Carried issues at close-out
@@ -412,7 +404,7 @@ issues whose body names this milestone:
 |:------|:---------------|
 | [#207](https://github.com/dnznlabs/rake/issues/207) Step 5 read-back gate | t01; criterion 2. |
 | [#188](https://github.com/dnznlabs/rake/issues/188) chunk gas term | t01; the per-chain table and `MAX_CHUNK` per chain, before any mainnet upload. |
-| [#127](https://github.com/dnznlabs/rake/issues/127) native-balance alias (F12) | t02 re-runs the check on all six mainnets of § 1 at its gate and the `transfer` assertion before OP Mainnet's deploy, and closes it with the six-row table. |
+| [#127](https://github.com/dnznlabs/rake/issues/127) native-balance alias (F12) | t02 re-runs the check on Base and Ethereum at its gate. It stays open for the four chains not deployed in this milestone and is relabelled at close-out with that reason. |
 | [#308](https://github.com/dnznlabs/rake/issues/308) gas-limit rule, [#359](https://github.com/dnznlabs/rake/issues/359) § 4a's stop, [#293](https://github.com/dnznlabs/rake/issues/293) views mid-`distribute` | t02 Part A, before any mainnet send. |
 | [#279](https://github.com/dnznlabs/rake/issues/279) the 0.03 ETH ask | Conditioned in § Needs from the Product Owner on 2026-11-22; t02's gate re-sizes it. Closed by that change. |
 | [#167](https://github.com/dnznlabs/rake/issues/167) paid review quotes | Ruled 2026-11-18, option 3, decision 55: no paid review, no quote request. Closes on the transcription's merge. |
@@ -463,8 +455,8 @@ Things that would cost a redeploy, a re-upload or real ETH to learn late. Each s
 3. **A `fix`-grade finding after deploy** — from the self-review's next run, a reader, or a later
    bounty (decision 55). Then `src/` reopens, the salts are mined again, and whatever is deployed is
    superseded. Bounded, not settled: no review precedes mainnet now, so the ordering inside
-   m05-t02 is the only hedge — Base first, a stop between chains, Ethereum last; decision 70 accepted
-   that all four are placed before any is in real use — and the alpha posture of
+   m05-t02 is the only hedge — Base first, a stop before Ethereum; decision 70 keeps it to two
+   deployments until both have been in real use — and the alpha posture of
    decision 45 is published where a visitor sees it.
 4. **The hosted gateway's chain list.** Measured 2026-11-18 for 1, 10, 8453 and 42161 (resolved) and
    4326 and 4663 (no answer). Settled for the four; the stretch row's first step for the other two,
