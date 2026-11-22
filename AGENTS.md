@@ -128,6 +128,13 @@
   read path without a wallet, and is the one case `route()`'s "No wallet found" notice is reached on.
   The build inlines `eth.js` (keccak and the ABI subset), `model.js`, `widget.js`, `theme.css` and
   `layout.html` into it.
+- A bundle is built for one chain, so changing network means opening another URL, never
+  `wallet_switchEthereumChain`. The network menu lists every chain in `NETWORKS`. Chains in
+  `ENABLED` link to the same route there, built by the first `GATEWAYS` rewriter that recognises the
+  current URL (gw44's `/<id>/` path, then a `.<id>.` host label), falling back to `GATEWAY_HOME`.
+  The other chains are greyed out under "pending deployment". `ENABLED` is hand-kept and never
+  read from the chain: enabling a chain is a decision, so a deployed chain stays greyed until it is
+  added there. A new gateway, such as an ENS one, is one more entry in `GATEWAYS`.
 - `app/src/model.js` is everything that needs no DOM and no provider: `pct`, `countdown`,
   `decodePending`, `supersededBy`, `salt` and the `snapshot()` type string `SNAPSHOT_T`. It is tested
   under node in `test/model.test.mjs` and inlined unchanged, so it reads an ambient `Eth` rather than

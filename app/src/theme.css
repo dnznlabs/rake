@@ -202,6 +202,8 @@ footer{display:flex;justify-content:space-between;border-top:1px solid var(--rul
 .menu{position:absolute;right:0;top:36px;border:1px solid var(--ink);background:var(--paper);min-width:120px;font-size:12px;z-index:2}
 .menu div{padding:9px 12px}.menu div.k{color:var(--muted);font:12px/1.5 var(--sans)}.menu a{display:block;padding:9px 12px;font:12px/1.5 var(--sans);color:var(--ink)}#net-menu{min-width:220px}.menu div.on{background:var(--ink);color:var(--paper)}
 .menu div[data-a],.menu div[data-t]{cursor:pointer}
+.menu a{display:block;padding:9px 12px;color:inherit;text-decoration:none}.menu a:hover{color:var(--accent)}.menu div.off{color:var(--dim)}.menu a,.menu div.on,.menu div.off{padding-left:22px}
+.menu div.h{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding-bottom:4px}.menu div.h{border-top:1px solid var(--rule);margin-top:6px;padding-top:12px}.menu div.h:first-child{border-top:0;margin-top:0}.menu div.h.sep{border-top-color:var(--ink)}
 .notice{font:15px/1.65 var(--sans);color:var(--muted);max-width:60ch;margin:40px 0}
 .notice a,.notice button{color:var(--ink);border-bottom:1px solid var(--ink)}
 .notice.err{color:var(--err)}

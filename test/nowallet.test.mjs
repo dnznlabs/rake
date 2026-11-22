@@ -107,8 +107,12 @@ test('the network menu offers a switch and names an endpoint only where there is
   const from = SHIPPED.indexOf('function who()');
   const body = SHIPPED.slice(from, SHIPPED.indexOf('\n}\n', from));
 
-  assert.ok(body.includes('WALLET && wrong ? `<div data-a="switch"'), 'no wallet, so nothing to switch');
-  assert.ok(body.includes('WALLET && CHAIN ? cname(CHAIN)'), 'the endpoint\'s chain is not a wallet\'s');
+  // The wallet section is one chain of ternaries, no wallet first: everything after that branch,
+  // the switch and every line naming `CHAIN` as the wallet's, is reached only with a wallet.
+  const none = body.indexOf('(!WALLET ? \'<div class="k">none found'), sw = body.indexOf('data-a="switch"');
+  assert.ok(none > 0, 'the wallet section opens on the no-wallet branch');
+  assert.ok(sw > body.indexOf('!wrong ?', none), 'no wallet, so nothing to switch; a wallet on this chain, neither');
+  assert.ok(body.indexOf('on ${cname(CHAIN)}') > none, 'the endpoint\'s chain is not a wallet\'s');
   assert.ok(!body.includes('new URL(PUBLIC_RPC['), 'an unlisted chain has no endpoint, and new URL(undefined) throws');
 });
 
