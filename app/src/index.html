@@ -56,7 +56,7 @@ const ICON = {
 };
 const iconLink = (href, icon, label, text) => `<a class="ico" href="${href}" target="_blank" rel="noopener noreferrer" aria-label="${label}">${ICON[icon]}${text ? `<span>${text}</span>` : ''}</a>`;
 document.getElementById('ver').textContent = `dnzn labs · ${CFG.version}`;
-document.getElementById('flinks').innerHTML = iconLink(REPO, 'github', 'source on GitHub') + iconLink(SITE, 'robot', 'dnzn.dev');
+document.getElementById('flinks').innerHTML = '<a href="https://eip.tools/eip/8244" target="_blank" rel="noopener noreferrer">ERC-8244</a><span class="fsep" aria-hidden="true"></span>' + iconLink(REPO, 'github', 'source on GitHub') + iconLink(SITE, 'robot', 'dnzn.dev');
 
 /* ---- provider ------------------------------------------------------------------------------ */
 let P = null, ACC = null, CHAIN = null;
@@ -609,7 +609,7 @@ const BAD_SUM = 'checksum does not match — a character is likely wrong';
 const COPY = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><g class="i-c"><rect x="4" y="4" width="6.5" height="6.5"/><path d="M8 2.5v-1H1.5V8h1"/></g><path class="i-k" d="M2 6.5l2.5 2.5 5-6"/></svg>';
 // `inLink` drops the ↗ for a value printed inside an <a>: a nested <a> makes the parser close the
 // outer one early, and the row's later cells fall out of its grid (only on a chain with an explorer).
-const ext = (kind, v, text, inLink) => {
+const ext = (kind, v, text, inLink, chain = CFG.chainId) => {
   /* A value that is not the shape its kind promises is printed escaped and alone. There is nothing
      to copy and nothing an explorer could open, so the copy icon and the ↗ go with the shape, and
      the answer reads as the malformed answer it is rather than as a short address. */
@@ -617,12 +617,12 @@ const ext = (kind, v, text, inLink) => {
   const known = kind === 'address' ? NAMED.get(String(v).toLowerCase()) : null;
   const body = known ? esc(known) : text, mark = kind === 'address' ? ` data-addr="${v}"` : '';
   return `<span title="${v}"${mark}>${body}</span><span class="cp" role="button" tabindex="0" title="copy" aria-label="copy ${v}" data-copy="${v}">${COPY}</span>`
-    + (EXPLORER[CFG.chainId] && kind !== 'hash' && !inLink ? ` ${xlink(kind, v, '↗')}` : '');
+    + (EXPLORER[chain] && kind !== 'hash' && !inLink ? ` ${xlink(kind, v, '↗', chain)}` : '');
 };
 // The same check again rather than once in `ext`: `xlink` builds an `href` of its own and is one
 // call away from being used on its own, so the guard belongs where the attribute is written.
-const xlink = (kind, v, text) => EXPLORER[CFG.chainId] && shaped(kind, v)
-  ? `<a class="xl" href="${EXPLORER[CFG.chainId]}/${kind}/${v}" target="_blank" rel="noopener noreferrer" title="open in explorer">${text}</a>` : '';
+const xlink = (kind, v, text, chain = CFG.chainId) => EXPLORER[chain] && shaped(kind, v)
+  ? `<a class="xl" href="${EXPLORER[chain]}/${kind}/${v}" target="_blank" rel="noopener noreferrer" title="open in explorer">${text}</a>` : '';
 // `navigator.clipboard` needs a secure context; a gateway or file:// page may not be one, so the old
 // selection copy is the fallback. `on` is the copied state for a moment, like every state, a class.
 async function copyClick(e) {
@@ -2217,7 +2217,7 @@ async function list() {
    The contract's own surface is docs/REFERENCE.md in the repo, and the last section points there. The
    ids are what the rail and `#/docs#<section>` reach; the owner bar's widget link depends on `widget`.
    README.md § Credits carries the Credits section's text; change one, change both. */
-const SECTIONS = [['disclaimer', 'Disclaimer'], ['what', 'Overview'],['economics', 'Economics'], ['credits', 'Credits'], ['why', 'Purpose'], ['how', 'Mechanism'], ['create', 'Creating a distribution'], ['payin', 'Receiving funds'], ['payout', 'Distributing funds'], ['change', 'Changing a distribution'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['developers', 'For developers']];
+const SECTIONS = [['disclaimer', 'Disclaimer'], ['what', 'Overview'],['economics', 'Economics'], ['credits', 'Credits'], ['why', 'Purpose'], ['how', 'Mechanism'], ['create', 'Creating a distribution'], ['payin', 'Receiving funds'], ['payout', 'Distributing funds'], ['change', 'Changing a distribution'], ['owner', 'Ownership'], ['widget', 'The widget'], ['limits', 'Limits'], ['developers', 'For developers'], ['contracts', 'Contracts']];
 /* The two figures, hand-drawn rather than rendered from Mermaid: there is no Mermaid in the bundle and
    none at build time either, so the caption says what shipped. Colour comes through classes on
    currentColor, as the landing's fee path does, so theme.css owns every one. */
@@ -2241,14 +2241,43 @@ const figState = () => '<svg class="fig" width="560" height="150" viewBox="0 0 5
   + '<g class="d"><path d="M60 108v6H488v-6" fill="none" stroke="currentColor" stroke-width="1"/><text x="274" y="128" text-anchor="middle" font-size="10">the owner may cancel at any point until it is applied</text></g>'
   + '<text class="m" x="30" y="146" font-size="10">with a delay of zero there is no window: the proposal applies in the same transaction</text>'
   + '</svg><div class="cap">fig 2 · one change over time — the delay is the window in which everyone can see it coming</div>';
-/* The six chains M05 deploys to, and the dev chain's own row when that is what is being read, so a
-   local anvil shows the factory `make addresses` prints rather than six dashes. */
-const DOCS_CHAINS = ['ethereum', 'base', 'arbitrum', 'op mainnet', 'sepolia', 'base sepolia'];
-const chainRows = () => {
-  const dev = ['31337', '31338'].includes(String(CFG.chainId));
-  return DOCS_CHAINS.map(c => `<tr><td>${c}</td><td class="dim">—</td><td class="dim">not deployed</td></tr>`).join('')
-    + (dev ? `<tr><td>${cname(CFG.chainId)}</td><td>${ext('address', CFG.factory, esc(CFG.factory))}</td><td>dev chain</td></tr>` : '');
+/* The addresses of record, from m05-t01's HANDOFF (the README still names the pre-#201 pair until a
+   later task updates it): CREATE2 repeats them on every chain while the bytes are unchanged. Not
+   `CFG`'s: anvil places both by plain CREATE, so a dev build's tokens name addresses no other chain has. */
+const DEPLOYED = { factory: '0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E', app: '0x00a9F390A6010d045e0d34856048DdD6910d25BA' };
+// The six chains M05 deploys to, then the dev chain's own row with its own addresses when that is
+// the chain being read.
+const DOCS_CHAINS = [1, 8453, 42161, 10, 11155111, 84532];
+const DEV_CHAIN = ['31337', '31338'].includes(String(CFG.chainId));
+const contractChains = () => DOCS_CHAINS.map(id => ({ id, ...DEPLOYED }))
+  .concat(DEV_CHAIN ? [{ id: CFG.chainId, factory: CFG.factory, app: CFG.app }] : []);
+/* Status is read, never written down: a hand-kept column is what left the testnets "not deployed" while
+   they were live. One `eth_getCode` per contract per chain, sent once per page load and only when the
+   table scrolls into view, so opening the docs is not six chains' worth of requests. Code at the
+   address is presence, not proof of the current bytes. */
+const CSTAT = {};
+const codeAt = async (id, a) => {
+  const p = String(id) === String(CFG.chainId) && P ? P : PUBLIC_RPC[id] ? rpcProvider(PUBLIC_RPC[id]) : null;
+  if (!p) throw 0;
+  return (await p.request({ method: 'eth_getCode', params: [a, 'latest'] })).length > 2;
 };
+const chainStatus = c => CSTAT[c.id] ||= Promise.all([codeAt(c.id, c.factory), codeAt(c.id, c.app)])
+  .then(([f, a]) => f && a ? ['live', ''] : f ? ['factory only', 'warn'] : a ? ['app only', 'warn'] : ['not deployed', 'dim'])
+  .catch(() => ['unreachable', 'dim']);
+const contractRows = () => contractChains().map(c => `<tr><td>${cname(c.id)}</td>`
+  + ['factory', 'app'].map(k => `<td>${ext('address', c[k], esc(short(c[k])), false, c.id)}</td>`).join('')
+  + `<td class="dim" data-cstat="${c.id}">checking…</td></tr>`).join('');
+function contractsCheck() {
+  const t = document.getElementById('ctab');
+  if (!t) return;
+  const fill = () => contractChains().forEach(c => chainStatus(c).then(([s, cls]) => {
+    const td = document.querySelector(`[data-cstat="${c.id}"]`);
+    if (td) { td.textContent = s; td.className = cls; }
+  }));
+  if (!self.IntersectionObserver) return fill();
+  const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); fill(); } });
+  io.observe(t);
+}
 /* `widget.js` is the second document `App` serves, so on an http(s) page it sits beside this one.
    Anywhere else the snippet names an ERC-5219 gateway (#68): `html()`-only clients such as Freedom
    answer every web3:// path with this page, so a bare web3:// src is offered only as the alternative. The address is the distribution its owner arrived from (the owner bar links here), else
@@ -2364,11 +2393,16 @@ function docs() {
   <p>The contracts have not yet been audited. Security issues should be reported through the repository's <a href="${REPO}/security/advisories/new" target="_blank" rel="noopener noreferrer">advisory form</a>.</p>
 
   <h2 id="s-developers">For developers</h2>
-  <p>The source is published at <a href="${REPO}" target="_blank" rel="noopener noreferrer">github.com/dnznlabs/rake</a> under the MIT licence. Both contracts reside in one file with no imports. Every function, event and error, and the <code>Snapshot</code> struct the widget reads, are documented in <a href="${REPO}/blob/main/docs/REFERENCE.md" target="_blank" rel="noopener noreferrer">docs/REFERENCE.md</a>. This page is itself served by the <code>html()</code> view of a contract; see <a href="#/docs#credits">credits</a>.</p>
-  <div class="scroll"><table class="dtab"><tr><th>chain</th><th>factory</th><th>status</th></tr>${chainRows()}</table></div>
+  <p>The source is published at <a href="${REPO}" target="_blank" rel="noopener noreferrer">github.com/dnznlabs/rake</a> under the MIT licence. Both contracts reside in one file with no imports. Every function, event and error, and the <code>Snapshot</code> struct the widget reads, are documented in <a href="${REPO}/blob/main/docs/REFERENCE.md" target="_blank" rel="noopener noreferrer">docs/REFERENCE.md</a>. This page is itself served by the <code>html()</code> view of a contract; see <a href="#/docs#credits">credits</a>. The deployed addresses are listed under <a href="#/docs#contracts">contracts</a>.</p>
+
+  <h2 id="s-contracts">Contracts</h2>
+  <p>Two contracts are deployed: <code>DistributionFactory</code>, which creates every distribution and is unowned, and <code>App</code>, which serves this page and the widget. Each is placed by a salted <code>CREATE2</code>, so it has the same address on every chain it is deployed to. A distribution has no fixed address; each one is created through the factory.</p>
+  <p>The status column is read from each chain when this table is shown: <i>live</i> means both addresses hold code.</p>
+  <div class="scroll"><table class="dtab" id="ctab"><tr><th>chain</th><th>factory</th><th>app</th><th>status</th></tr>${contractRows()}</table></div>
   </article></div>`;
   widgetDemo();
   giveBind();
+  contractsCheck();
 }
 /* The support form under Economics: a plain payment to the featured distribution, any amount, nothing
    pre-filled (decision 1). It goes through `tx` like every write, so it is preflighted and confirmed. */
