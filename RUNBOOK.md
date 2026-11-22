@@ -445,11 +445,31 @@ On Sepolia that gap is what made the first step-2 attempt fail: `0xf80fc26d…53
 cast block latest --rpc-url "$RPC" --field gasLimit   # the estimate must fit in a block
 ```
 
-Compare the node's estimate with the `Estimated total gas used for script` the dry run prints. If the
-node's figure is the larger, the broadcast needs the limit raised explicitly rather than forge's — and
-a step-2 or step-3 transaction that fails for gas is **safe** (it creates nothing and is not a
-collision: #22's one-way door closes only on a *successful* create), but it is not free, so read the
-estimate rather than discovering it. `record:` both estimates and the block gas limit.
+**The rule, not a judgement** ([#308](https://github.com/dnznlabs/rake/issues/308)). Every figure
+below is from m05-t01's handoff § Step 13, both chains:
+
+- **`E`** is the node's own `cast estimate --rpc-url "$RPC" --create` for the init code being sent —
+  `$INIT` for step 2, `$AINIT` for step 3 — read **on the day**, not carried from a previous run.
+- **`P`** is the `Estimated total gas used for script` line of a dry run: the same `forge script`
+  command *without* `--broadcast`.
+- **`-g` multiplies forge's own per-transaction estimate, which is `P ÷ 1.3`, not `P`.** Two pairs
+  measured: 3,482,636 ÷ 1.3 = 2,678,951 and 2,286,547 ÷ 1.3 = 1,758,883. Using `P` as the base
+  silently asks for 1.3× more than intended.
+- **Send 2 × `E`.** So `G = ceil(100 × 2 × E ÷ (P ÷ 1.3))` and the send is
+  `forge script … --broadcast -g $G $SIGNER`.
+- **Never below 1.3 × `E`.** The node's estimate was exceeded by the transaction itself on both
+  Sepolia sends, by 58,514 and 99,321 gas.
+- **The limit must be under half the chain's block `gasLimit`** (§ 1's table; Arbitrum One's
+  documented 32,000,000). **If it is not, stop.**
+- **A submission the node refuses — `-32003: gas limit too high`, as on Base Sepolia — sends nothing
+  and burns nothing.** Recompute `G` for 1.5 × `E`, record the refusal, and resubmit **once**. A
+  second refusal is a **stop**.
+- **`cast run` on a failed hash is not a post-mortem instrument for gas** (handoff, Sepolia step 3).
+
+A step-2 or step-3 transaction that fails for gas is **safe** — it creates nothing and is not a
+collision, since #22's one-way door closes only on a *successful* create — but it is not free, so
+read the estimate rather than discovering it. On Sepolia that gap is what made the first step-2
+attempt fail. `record:` `E`, `P`, the computed `G`, and the block gas limit, per chain.
 
 **1f. The prediction, offline, before any transaction.**
 
@@ -674,7 +694,7 @@ APP_IN=$(sed -E "s/.*app: '([^']*)'.*/\1/" <<<"$CFG")
 IMPL_IN=$(sed -E "s/.*impl: '([^']*)'.*/\1/" <<<"$CFG")
 SALT_IN=$(sed -E "s/.*featuredSalt: '([^']*)'.*/\1/" <<<"$CFG")
 
-test "${APP_IN,,}" = "${APP,,}" || echo "the document names another App than the one being uploaded to"
+test "${APP_IN,,}" = "${APP,,}" || { echo "the document names another App than the one being uploaded to"; exit 1; }
 for a in $FACTORY_IN $APP_IN $IMPL_IN; do
   cast codesize $a --rpc-url "$RPC"                    # three non-zero readings, or stop
 done

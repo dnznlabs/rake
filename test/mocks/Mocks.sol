@@ -568,3 +568,70 @@ contract BalanceRevertingToken {
         return true;
     }
 }
+
+/// @notice A token that reads the distributor's own views *inside* its `distribute` frame and records
+/// what it saw, one entry per row it is asked to pay.
+/// @dev The vehicle [#293](https://github.com/dnznlabs/rake/issues/293) asks for. It works because
+/// the ERC-20 push carries no `PUSH_GAS` cap (`src/Distribution.sol:417`), unlike the ETH one, so a
+/// callback here has the gas to copy a whole `snapshot()` — description, table and queue — into
+/// memory. `refuse` makes one row's push fail, which is what writes an escrow mid-loop and gives the
+/// later rows something partially written to see.
+contract ViewReadingToken {
+    error InsufficientBalance();
+    error Refused();
+
+    mapping(address => uint256) public balanceOf;
+
+    /// @dev The distribution to read. Set after `create`, since its address is not known before.
+    Distribution public watched;
+    /// @dev The one row whose push reverts, or `address(0)` for none.
+    address public refuse;
+
+    // What each surviving callback saw, in row order.
+    uint256[] public reservedSeen;
+    uint256[] public watchedBalanceSeen;
+    uint32[] public nonceSeen;
+    uint32[] public delaySeen;
+    address[] public ownerSeen;
+    uint256[] public pendingLengthSeen;
+    bytes32[] public beneficiariesHashSeen;
+    bytes32[] public snapshotTableHashSeen;
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function watch(Distribution watched_) external {
+        watched = watched_;
+    }
+
+    function setRefuse(address refuse_) external {
+        refuse = refuse_;
+    }
+
+    function seen() external view returns (uint256) {
+        return reservedSeen.length;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        if (address(watched) != address(0)) {
+            Distribution.Snapshot memory s = watched.snapshot();
+            Distribution.Beneficiary[] memory t = watched.beneficiaries();
+            reservedSeen.push(watched.reserved(address(this)));
+            watchedBalanceSeen.push(balanceOf[address(watched)]);
+            nonceSeen.push(s.nonce);
+            delaySeen.push(s.delay);
+            ownerSeen.push(s.owner);
+            pendingLengthSeen.push(s.pending.length);
+            beneficiariesHashSeen.push(keccak256(abi.encode(t)));
+            snapshotTableHashSeen.push(keccak256(abi.encode(s.table)));
+        }
+        // After the reads, so that a refusing row's own observation is rolled back with its revert —
+        // which is itself part of what the test pins.
+        if (to == refuse) revert Refused();
+        if (balanceOf[msg.sender] < amount) revert InsufficientBalance();
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+}
