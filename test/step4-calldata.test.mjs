@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdtempSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -73,11 +73,10 @@ test('an --app-nonce that is not a non-negative integer is refused', () => {
    both sizes; a second widget chunk is a refusal the tool makes on purpose.
 
    **Only the printed count is asserted for the narrow run, and deliberately not its exit code.**
-   The tool's five numbered files and its proposal list name two document chunks by position, so a
-   cut into three stops it later, after the count is printed. That shape is RUNBOOK § Gas's rule to
-   change in the task that lowers the size, not this flag's; what this case measures is that the
-   flag reaches the cut at all. Asserting the count rather than the exit also keeps the case true if
-   the shape is later generalised.
+   What this case measures is that the flag reaches the cut at all. The comment here used to say the
+   tool stopped on a three-chunk cut; measured against `main`'s tool on a 60,000-byte fixture
+   (m05-t01c), it did not — it exited 0 and wrote the extra chunk into the batch, under a file name
+   that said `batch345`. So the count was the right thing to assert, but not for the reason given.
 
    `--app-nonce 1` keeps it off the chain. `cast` is still needed, for the ABI encoding the tool
    never hand-rolls, so the case states its own precondition rather than failing obscurely without
@@ -103,3 +102,107 @@ test('--max-chunk reaches the cut, and its default leaves the piece count alone'
     assert.match(narrow.stdout, /payload 30000 bytes → 3 chunks/,
       '--max-chunk 10000 did not reach the cut — the flag parses but is ignored');
   });
+
+/* ---- a document of three chunks (m05-t01c, amended step 6) ------------------------------------ */
+
+/* Document chunks 0 and 1 stay proposals 1 and 2; every later chunk rides inside the batch, ahead of
+   the widget chunk. So the count of signatures per chain does not grow with the document, and the
+   two things a reviewer re-derives — the call order and the pointer each setter names — have to hold
+   for any count of two or more.
+
+   Both cases run against fixtures in a throwaway cwd, for the reason the case above gives: the tool
+   reads `app/dist/` relative to cwd and `make test` builds no bundle. `--app-nonce` keeps them off
+   the chain, and the pointer assertions are pinned to that nonce. */
+const fixture = (docBytes) => {
+  const home = mkdtempSync(join(tmpdir(), 'step4-shape-'));
+  mkdirSync(join(home, 'app', 'dist'), { recursive: true });
+  writeFileSync(join(home, 'app', 'dist', 'index.html.gz'), Buffer.alloc(docBytes, 0x61));
+  writeFileSync(join(home, 'app', 'dist', 'widget.js'), Buffer.alloc(10, 0x62));
+  return home;
+};
+const APP = '0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE';
+const skip = haveCast ? false : 'cast is not on PATH — run through `devbox run -- make test`';
+
+test('a three-chunk document still takes three proposals, the third inside the batch', { skip }, () => {
+  const home = fixture(60_000); // three chunks at the 24,000-byte default: 24,000 + 24,000 + 12,000
+  const out = join(home, 'out');
+  const r = spawnSync(process.execPath, [tool, '--chain', '11155111', '--app-nonce', '7', '--out', out], { cwd: home, encoding: 'utf8' });
+
+  assert.equal(r.status, 0, `a three-chunk document was refused: ${r.stderr}`);
+  assert.match(r.stdout, /payload 60000 bytes → 3 chunks \(24000 \+ 24000 \+ 12000\)/);
+
+  /* The files: chunks 0 and 1 are proposals, and the batch is named for the four calls it carries. */
+  const files = readdirSync(join(out, '11155111')).sort();
+  assert.deepEqual(files, [
+    '1-addChunk-0.hex', '2-addChunk-1.hex', '3-addChunk-2.hex',
+    '4-addWidgetChunk.hex', '5-setChunks.hex', '6-setWidgetChunks.hex',
+    'batch3456.hex',
+  ].sort());
+
+  /* The batch's decoded calls, in order: the third document chunk, the widget chunk, then the two
+     setters. `cast decode-calldata` gives back the three arrays; the selectors in the bytes[] are
+     what pins the order. */
+  const batch = readFileSync(join(out, '11155111', 'batch3456.hex'), 'utf8');
+  const selectors = ['addChunk(bytes)', 'addWidgetChunk(bytes)', 'setChunks(address[],bool)', 'setWidgetChunks(address[])']
+    .map(sig => spawnSync('cast', ['sig', sig], { encoding: 'utf8' }).stdout.trim());
+  let at = 0;
+  for (const sel of selectors) {
+    const found = batch.indexOf(sel.slice(2), at);
+    assert.ok(found > 0, `the batch does not carry ${sel} after the previous call — the order is wrong`);
+    at = found;
+  }
+
+  /* The pointers: `App`'s CREATE addresses from the nonce given, in call order — chunk 2's is N + 2
+     and the widget's is N + 3, which is the mapping the amendment names. */
+  const expected = [7, 8, 9, 10].map(n =>
+    spawnSync('cast', ['compute-address', APP, '--nonce', String(n)], { encoding: 'utf8' }).stdout.trim().split(/\s+/).pop());
+  for (const [i, addr] of expected.entries()) {
+    assert.match(r.stdout, new RegExp(`${addr}\\s+${i < 3 ? `${i + 1}-addChunk-${i}` : '4-addWidgetChunk'}`),
+      `pointer ${i} (nonce ${7 + i}) is not reported against its call: ${addr}`);
+  }
+  const setChunks = readFileSync(join(out, '11155111', '5-setChunks.hex'), 'utf8');
+  for (const addr of expected.slice(0, 3)) {
+    assert.ok(setChunks.toLowerCase().includes(addr.slice(2).toLowerCase()), `setChunks does not name ${addr}`);
+  }
+  assert.ok(
+    !setChunks.toLowerCase().includes(expected[3].slice(2).toLowerCase()),
+    'setChunks names the widget pointer, so the document would serve the widget as a third chunk',
+  );
+});
+
+test('a two-chunk document still produces today\'s files byte for byte', { skip }, () => {
+  /* The committed upload's shape. A generalisation that changed these bytes would invalidate every
+     signature and every re-derivation recorded against them, so it is pinned against itself: the
+     same fixture through the same tool twice, and the file set and names of the two-chunk case. */
+  const home = fixture(30_000);
+  const a = join(home, 'a'), b = join(home, 'b');
+  const run2 = (out) => spawnSync(process.execPath, [tool, '--chain', '11155111', '--app-nonce', '1', '--out', out], { cwd: home, encoding: 'utf8' });
+
+  assert.equal(run2(a).status, 0);
+  assert.equal(run2(b).status, 0);
+
+  const names = readdirSync(join(a, '11155111')).sort();
+  assert.deepEqual(names, [
+    '1-addChunk-0.hex', '2-addChunk-1.hex', '3-addWidgetChunk.hex',
+    '4-setChunks.hex', '5-setWidgetChunks.hex', 'batch345.hex',
+  ].sort(), 'the two-chunk file set changed, so the committed calldata no longer regenerates');
+
+  for (const n of names) {
+    assert.equal(
+      readFileSync(join(a, '11155111', n), 'utf8'),
+      readFileSync(join(b, '11155111', n), 'utf8'),
+      `${n} is not reproducible`,
+    );
+  }
+});
+
+test('a fourth document chunk is a stop, not a fourth proposal', { skip }, () => {
+  const home = fixture(80_000); // four chunks at the default
+  const out = join(home, 'out');
+  const r = spawnSync(process.execPath, [tool, '--chain', '11155111', '--app-nonce', '1', '--out', out], { cwd: home, encoding: 'utf8' });
+
+  assert.notEqual(r.status, 0, 'a four-chunk document was built without a word to anyone');
+  assert.match(`${r.stderr}${r.stdout}`, /stop and report/);
+  /* The refusal lands before the first write, so the output directory is never created. */
+  assert.ok(!existsSync(out), 'the refusal created the output directory, so it got as far as writing');
+});

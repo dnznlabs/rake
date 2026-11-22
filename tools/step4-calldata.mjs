@@ -24,11 +24,20 @@
    every `add*Chunk` must land before the setter that names its pointer.
 
    **Three proposals carry step 4, not one** (decision 47, ruled 2026-11-16): call 1 plain, call 2
-   plain, then `batch345.hex` over calls 3, 4 and 5. A single `batch` over all five was the route
+   plain, then one batch over everything after them — `batch345.hex` for a two-chunk document.
+
+   **A document of more than two chunks keeps that count** (amended step 6, 2026-11-21): document
+   chunks 0 and 1 stay proposals 1 and 2, and every later document chunk is an `addChunk` *inside*
+   the batch, ahead of `addWidgetChunk`. So the batch is `addChunk`…, `addWidgetChunk`, `setChunks`,
+   `setWidgetChunks`, the file is named for the call numbers it carries (`batch3456.hex` for three
+   document chunks), and an upload of any size is three signatures per chain rather than one per
+   chunk. The alternative — a fourth proposal — buys nothing while the batch is far under the cap.
+
+   A single `batch` over all five calls was the route
    until it turned out to be unproposable — the coordination API caps a proposal's calldata at 65,536
    characters and that batch was 109,962 — so the upload is split at the boundary where splitting
-   costs least. `batch345.hex` targets the vault, not `App`, because `batch` is `onlySelf`; it runs
-   its three sequentially and atomically, which is what keeps the widget chunk and the two setters
+   costs least. The batch file targets the vault, not `App`, because `batch` is `onlySelf`; it runs
+   its calls sequentially and atomically, which is what keeps the widget chunk and the two setters
    that name its pointer in one transaction. Calls 1 and 2 are proposed as plain calls to `App`.
 
    **The ordering is now the operator's, and it protects correctness and not merely liveness.** The
@@ -41,8 +50,8 @@
    shape makes it a procedure. RUNBOOK § Step 4 names the hazard and the repair.
 
    The numbered files stay as the review copy: files 1 and 2 are proposals in their own right, and
-   3, 4 and 5 are the elements of the `bytes[]` a reviewer gets back from `cast decode-calldata` on
-   `batch345.hex`.
+   every file after them is an element of the `bytes[]` a reviewer gets back from
+   `cast decode-calldata` on the batch file, in that order.
 
    ABI encoding comes from `cast calldata` rather than from a hand-rolled encoder here, the same way
    `tools/abi-vectors.sh` generates the codec's fixtures: the oracle is never the thing under test. */
@@ -125,9 +134,25 @@ const sha = (s) => createHash('sha256').update(s).digest('hex');
 const docParts = cut(payload);
 const widgetParts = cut(widget);
 if (widgetParts.length !== 1) {
-  /* A second widget chunk would need a second `addWidgetChunk` call and a fourth `App` pointer — a
+  /* A second widget chunk would need a second `addWidgetChunk` call and another `App` pointer — a
      plan change, not a loop iteration. */
-  console.error(`widget needs ${widgetParts.length} chunks; the plan's five calls assume 1`);
+  console.error(`widget needs ${widgetParts.length} chunks; the plan's call shape assumes 1`);
+  process.exit(1);
+}
+if (docParts.length < 2) {
+  /* One chunk would make the widget chunk proposal 2 and change what a reviewer re-derives. The
+     shape starts at two because the committed upload has two; a smaller document is a plan change. */
+  console.error(`document needs ${docParts.length} chunk(s); the proposal shape assumes 2 or more`);
+  process.exit(1);
+}
+if (docParts.length > 3) {
+  /* The plan's own stop, made mechanical: three chunks were ruled on with the batch's size measured
+     against the cap (amended step 6). A fourth changes that arithmetic, so it is a question for the
+     plan and not a number this tool may raise on its own. */
+  console.error(
+    `document needs ${docParts.length} chunks; stop and report — the third chunk was ruled on at ${payload.length} bytes\n` +
+    '  a fourth is a plan question (proposal count, batch size against the 65,536-character cap, gas per chunk)',
+  );
   process.exit(1);
 }
 
@@ -185,11 +210,14 @@ calls.push({
   data: cast('calldata', 'setWidgetChunks(address[])', `[${widgetPointers.join(',')}]`),
 });
 
-/* Calls 3, 4 and 5 — the widget chunk and the two setters — in one vault self-call. Sliced after the
-   five are built, so the numbered files and this wrapper cannot disagree about what is in it. */
+/* Everything after the first two document chunks — any further document chunk, then the widget chunk
+   and the two setters — in one vault self-call. Sliced after the numbered calls are built, so the
+   files and this wrapper cannot disagree about what is in it. The name carries the call numbers it
+   holds, so a two-chunk document still writes `batch345.hex` byte for byte. */
 const batched = calls.slice(2);
+const batchFile = `batch${batched.map((_, i) => i + 3).join('')}.hex`;
 calls.push({
-  file: 'batch345.hex',
+  file: batchFile,
   data: cast(
     'calldata',
     'batch(address[],uint256[],bytes[])',
@@ -203,7 +231,11 @@ mkdirSync(outDir, { recursive: true });
 console.log(`chain ${chain} · App ${app} · App nonce ${appNonce} · batch target (vault) ${vault}`);
 console.log(`payload ${payload.length} bytes → ${docParts.length} chunks (${docParts.map((p) => p.length).join(' + ')})`);
 console.log(`widget  ${widget.length} bytes → ${widgetParts.length} chunk`);
-console.log(`pointers ${pointers.join(' ')}`);
+/* The pointer list, said out loud with the call each belongs to: `setChunks` names them by position
+   and a reviewer has to be able to check that mapping without re-deriving it. */
+console.log(`pointers (App CREATE from nonce ${appNonce}):`);
+pointers.forEach((p, i) => console.log(`  ${p}  ${calls[i].file}`));
+console.log(`batch ${batchFile} carries ${batched.length} calls: ${batched.map((c) => c.file).join(', ')}`);
 for (const c of calls) {
   /* No trailing newline: the file is the hex string and nothing else, so `cat` of it drops straight
      into `cast estimate` and `getTransactionHash`. */
@@ -217,7 +249,7 @@ for (const c of calls) {
    a control), and the dapp enforces the same limit client-side. A file over it is not a slow
    proposal, it is an impossible one, so this refuses here rather than at the POST. */
 const CAP = 65_536;
-const proposals = ['1-addChunk-0.hex', '2-addChunk-1.hex', 'batch345.hex'];
+const proposals = [calls[0].file, calls[1].file, batchFile];
 let over = 0;
 console.log(`proposal sizes against the ${CAP}-character cap:`);
 for (const file of proposals) {
