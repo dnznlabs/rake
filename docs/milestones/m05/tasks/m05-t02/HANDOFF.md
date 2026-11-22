@@ -398,3 +398,32 @@ This is the one part of step 5 still open, and the cause is on Basescan's side:
 So nothing is claimed as verified on the explorer. I stopped re-submitting once the API told me the
 first submission was queued: a second submission only lengthens the queue, and asking the API what
 became of the first is the cheaper question — which I should have asked before submitting twice.
+
+## For the Product Owner — Base's `create`
+
+Handed to him on [#363](https://github.com/dnznlabs/rake/issues/363) and assigned, as step 10 asks,
+once step 5's Sourcify half was green. **The `create` needs only the factory**, which is deployed and
+matches its prediction; the explorer row is about publishing source, not about whether the factory is
+safe to call (the architect's ruling, 2026-11-22).
+
+**The four prechecks, on Base, before the command was written:**
+
+| check | reading |
+|:--|:--|
+| `predict($DNZN_SALT)` | **`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`** — the same address as both testnets |
+| `cast code $DISTRO` | **`0x`** |
+| simulation from `$CREATOR` | returns that address |
+| simulation from any other address | reverts **`0x0c4549ef`** — the salt-prefix guard, so the Creator key is necessary and not merely conventional |
+| estimate from `$CREATOR` | **480,533** gas, against the Creator's **0.001 ETH** on Base — about 350× the cost at today's base fee |
+
+**Three forms, and which one actually works today.** He has no `cast` installed, so form 1 is
+reference only. **Form 2, Basescan's Write Contract, is unavailable while the verification sits in
+the queue** — there is no decoded `create` to fill in until Basescan answers — and that is said in
+the issue rather than left for him to discover. **Form 3, the raw calldata, is therefore the one that
+works now**: selector `0xf0f469ff`, 1,188 bytes, `0xf0f469ff00000000…0000000000000000`, to the factory with value 0.
+
+The `table_` warning is carried over from m05-t01 and not softened: two of the three notes contain
+commas, Etherscan's tuple parser has split on commas inside quoted strings before, and he is told to
+**stop and say so** if the preview mangles it or the table reads as four or more rows.
+
+**Ethereum's `create` is explicitly not in that issue** — it follows its own deploy.
