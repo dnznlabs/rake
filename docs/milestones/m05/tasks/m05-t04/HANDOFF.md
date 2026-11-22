@@ -95,7 +95,21 @@ Three readings, taken against the live site on 2026-11-21 **with no wallet conne
    > search, and reading 1's finding is what [#336](https://github.com/dnznlabs/rake/issues/336)
    > keys per chain.
 
-**The wallet half is asked and recorded, not skipped.** [#327](https://github.com/dnznlabs/rake/issues/327) is on the Product Owner, filed 2026-11-21 by the architect: connect on `/11155111/`, open `/84532/` in the same browser, and report whether the wallet stays connected, what the recent list shows, and whether either page names its network. His answers arrive here by a Markdown-only amendment; this row stays open until then and nothing else in the task waits on it.
+**The wallet half, answered.** [#327](https://github.com/dnznlabs/rake/issues/327) was filed on the Product Owner by the architect on 2026-11-21: connect on `/11155111/`, open `/84532/` in the same browser, and say whether the wallet stays connected, what the recent list shows, and whether either page names its network. He answered on the issue at **2026-11-22 18:53:15Z** ([comment](https://github.com/dnznlabs/rake/issues/327#issuecomment-7083944148)), from a desktop browser against the live site:
+
+| asked | his answer |
+|:--|:--|
+| does the wallet stay connected on the second chain's page | **yes, still connected** |
+| what does the recent list show there | **the distribution is listed**, with his own caveat that he had probably opened it on both chains already |
+| does either page tell you which network you are on | **yes, and more than the name**: the network picker reads **orange** while the wallet is on the other chain, and the page prompts to switch |
+
+**The wallet carrying across is by construction.** `rake.wallet` and `rake.off` (`app/src/index.html:84`, `:88`) are not keyed by chain, so a remembered pick is one pick for the whole origin — the same shared origin, and the same `localStorage`, that reading 1 measured.
+
+**The orange picker answers more than was asked.** The question was only whether a page names its network, which the architect's correction above had already settled through `#netname`. His reading adds that a mismatch is *announced*: the picker colours and the page asks for a switch, so the wrong-chain path is answering on the live site and not only in tests.
+
+**What his recent-list answer cannot settle is what reading 1 already settled.** Having opened that distribution on both chains himself, his observation cannot discriminate between one carried list and two lists that each hold it. Reading 1 discriminated directly through `localStorage` on 2026-11-21 and found one key serving both chains, so nothing here rests on the caveat.
+
+**And the behaviour he saw is the behaviour the next upload changes.** The live site is an older build than `main`: its `widget.js`, read over HTTP on 2026-11-22, is **8,509 bytes** against `main`'s **8,525** (`sha256` `8b6bbc88…` against `044139b7…`). `main` keys the list per chain — `const RECENT = 'rake.recent.' + CFG.chainId` (`app/src/index.html:664`), with the unkeyed value read once so nobody loses the list they had — which is [#336](https://github.com/dnznlabs/rake/issues/336)'s change and reaches the site with m05-t01c's upload. A reader comparing this row against the site after that upload will get a different answer; that is the fix landing, not a contradiction.
 
 ## The runbook section's own test
 
@@ -133,6 +147,6 @@ The two worker figures differ by 21 bytes because the endpoint lists we each wro
 
 ## Open questions
 
-1. **Step 8's wallet half**, [#327](https://github.com/dnznlabs/rake/issues/327), on the Product Owner.
+1. ~~**Step 8's wallet half**, [#327](https://github.com/dnznlabs/rake/issues/327), on the Product Owner.~~ **Answered 2026-11-22 and closed** — his three answers are in § Step 8, with what they settle and the one thing they do not.
 2. **Which mainnet chain `/` lands on** once all four are live — the plan's own open question, default (1) Base, taken at m05-t02's last step unless ruled otherwise. Nothing here waits on it.
 3. **Two deploying runs remain** of the three this task was allotted. m05-t02 and m05-t03 each add a chain through § The gateway and will need one apiece.
