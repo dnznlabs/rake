@@ -145,6 +145,10 @@ chains later.
    freeze begins. Check: `grep -n 'const ENABLED' app/src/index.html` prints that list, and in the
    rebuilt preview the network menu shows `mainnet` and `base` as links and the other four as
    pending deployment.
+   **In the same PR, one link** (his request, 2026-11-22): the `ERC-8244` link in `#/docs`
+   (`app/src/index.html:2382`, today `https://github.com/ethereum/ERCs/pull/1712`) goes where the
+   footer's does (`:68`, `https://eip.tools/eip/8244`). Check: `grep -c 'ERCs/pull/1712'
+   app/src/index.html` prints 0, and both links carry the same `href`.
 7. **One PR** with steps 2 to 6, the regenerated `calldata/` for both testnets, and
    `docs/milestones/m04/tasks/m04-t05/UAT.md` gaining rows for: the menu with two extensions, a remembered wallet after reload, a
    disconnect that holds after reload, the chain's name with no wallet, and each listed phone link. Review, then merge.
