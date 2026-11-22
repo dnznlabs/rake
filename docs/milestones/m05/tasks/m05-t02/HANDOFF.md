@@ -1,6 +1,6 @@
 # m05-t02 — handoff
 
-PR: (opened below) · Branch: `m05/t02-preflight` · 2026-11-22
+PR: #365 · Branch: `m05/t02-preflight` · 2026-11-22
 
 **Part A only. Nothing was sent to any chain, and no mainnet was touched.** Every reading below comes
 from the two testnets or from a local build, through the devbox pin (node v24.12.0, forge 1.7.1,
