@@ -34,8 +34,18 @@ chains later.
      next load that wallet is used as today's single wallet is, including the silent
      `eth_accounts`. If it is no longer announced, the choice is forgotten.
    - **Disconnect** forgets the choice, so the next Connect offers the menu again.
+   - **Disconnect holds across a reload** (the Product Owner's requirement, 2026-11-21). Today
+     `disconnect` asks the wallet to revoke (`wallet_revokePermissions`, `index.html:148`), and a
+     wallet without that method hands the account back on the next load, so the page reconnects
+     by itself. Disconnect also sets a mark in the page's storage, `rake.off`. While it is set
+     the page does not ask the wallet for accounts at boot and ignores `accountsChanged`, so it
+     stays disconnected. Connect clears the mark and asks with `wallet_requestPermissions` for
+     `eth_accounts` first, which makes a wallet that supports it show its own prompt again, and
+     with `eth_requestAccounts` where it does not. What the page cannot do is make a wallet ask:
+     one that supports neither revoke nor a permission request may return the account with no
+     prompt, and the handoff names any wallet seen to do so.
    A wallet's name is the wallet's own string: it reaches the page through `textContent` or
-   `esc`, never as markup, and its icon is not rendered. Check: tests for each of the four cases,
+   `esc`, never as markup, and its icon is not rendered. Check: tests for each of the five cases, the fifth with a provider that has no `wallet_revokePermissions` and still reports an account after a reload,
    and one in which a wallet announces a name containing markup and the menu shows it as text.
 4. **One carried finding that rides this upload**, because it would otherwise cost one of its
    own. (Amended 2026-11-21: this step first carried a second,
@@ -63,8 +73,10 @@ chains later.
    iPad). Each link carries the page's own `location.host`, path and fragment, and the list is
    offered only on `https:`. The list holds **only the wallets step 1 saw work**; a format that
    failed or was not tried on any device is left out, and the handoff says which. **Read on the
-   Product Owner's iPhone on 2026-11-21 (#334), each link tapped in Chrome: MetaMask, Coinbase
-   Wallet and Rainbow open the page in the wallet; Trust Wallet does not, and its link host
+   Product Owner's iPhone on 2026-11-21 (#334), each link tapped in Chrome: MetaMask and Coinbase
+   Wallet open the page in the wallet and Connect works there, so those two are the list.
+   Rainbow opens the page and connects, and the page then cannot read the chain through it
+   ([#342](https://github.com/dnznlabs/rake/issues/342)), so it is off the list until that is closed; Trust Wallet does not, and its link host
    publishes no app-association file, so it is off the list; Phantom opens the page and is
    listed only if step 7a's preview shows step 4a stopped the reloading.** A link pasted into the
    address bar goes to the App Store and is not a failure of the link. The candidates as first
@@ -118,8 +130,8 @@ chains later.
      the same source gives sizes about 260 bytes apart; `RUNBOOK.md`'s sizing text gains that
      sentence where it states the two-chunk figures.
 7. **One PR** with steps 2 to 6, the regenerated `calldata/` for both testnets, and
-   `docs/milestones/m04/tasks/m04-t05/UAT.md` gaining rows for: the menu with two extensions, a remembered wallet after reload, the chain's
-   name with no wallet, and each listed phone link. Review, then merge.
+   `docs/milestones/m04/tasks/m04-t05/UAT.md` gaining rows for: the menu with two extensions, a remembered wallet after reload, a
+   disconnect that holds after reload, the chain's name with no wallet, and each listed phone link. Review, then merge.
 7a. **A preview the Product Owner tests before anything is uploaded** (his requirement,
    2026-11-21). No proposal of step 8 is made until he has said the preview is good.
    - **What is served:** the document that would be uploaded, `app/dist/index.html` from
