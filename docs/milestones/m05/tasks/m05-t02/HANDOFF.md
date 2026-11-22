@@ -532,3 +532,49 @@ because it is also a check: a different figure would have meant different bytes.
 
 The engineer's key holds **0.024605769225114410 ETH** on Ethereum and **0.004973603667288535 ETH** on
 Base afterwards. Ethereum's ask was 0.01 ETH, so the deploy used **under 5%** of it.
+
+## Part B — Ethereum (1), step 5 and the record
+
+**Sourcify — the gate — passes.** Three `exact_match`, loop exit **0**, with the key unset for the
+verifies.
+
+| address | what happened | `verifiedAt` | deployed |
+|:--|:--|:--|:--|
+| `DistributionFactory` | already verified | **09:38:02Z** | 09:36:59Z — **63s earlier** |
+| `App` | already verified | **09:39:02Z** | 09:37:59Z — **63s earlier** |
+| `Distribution` | **verified by this run**, `Status: exact_match` | **09:40:43Z** | no transaction of its own |
+
+Same pattern as Base and recorded the same way: "already verified" means **about a minute after its
+own deploy**, by something other than my loop, not on an earlier day. One difference worth noting
+rather than explaining away: on chain 1 all three carry `creationMatch: exact_match`, where Base's
+implementation carried none. I have not established why, and do not need to for the gate — the
+`match` each returns is what the loop asserts.
+
+**OpenChain: 82 `Duplicated:`, 0 `Imported:`** — the same unchanged ABI.
+
+**`make attest` exits 0 across all four records** — twelve contract readings over Ethereum, Sepolia,
+Base and Base Sepolia. **The three code hashes are identical on all four chains**: factory
+`0x66d10374…8b6c2`, implementation `0xd3399543…caa8c`, `App` `0x691c7120…88a75`. That is the strongest
+single statement in this handoff: one init-code set, four chains, same bytes everywhere, each checked
+against a build of this tree rather than against each other.
+
+### The explorer verifications are submitted and queued on both mainnets
+
+Etherscan's v2 API serves both chains from one queue, and it is backed up:
+
+| chain | contract | GUID | status |
+|:--|:--|:--|:--|
+| 8453 | factory | `6xw4xwzxi2dcmrtkvyxchcehcansymkj6jrvgkzd8gqxqviaiq` | `Pending in queue` |
+| 1 | factory | `vyqncc7ethysu5igia38zpmlv2lpdiaxsqtt8gsjtpny5qrqg9` | `Pending in queue` |
+| 1 | implementation | `4qe7mxxtx6lybemkrh6gz4tyyzfxl28nhxmmj86s8ce8j1jg1h` | `Pending in queue` |
+| 1 | `App` | `hfnhk7c5sarhs9821ecqy3iifb2ng6anz5cw9awlh4phtbwer3` | `Pending in queue` |
+
+Nothing is claimed verified on either explorer. **M05 criterion 2 therefore reads NOT MET at this
+head**, with the GUIDs above, and it is not softened: the criterion asks for `getsourcecode` to name
+the three contracts, and it does not yet. Not re-submitted — the API says the submissions are queued,
+and a second one only lengthens the queue.
+
+**One instrument note, because it nearly went into the record wrong.** My first GUID extraction took
+"the last long alphanumeric run" from forge's output, which matched the **address** in the URL line
+below the GUID, and `checkverifystatus` answered `Invalid GUID length`. The GUID now comes off its
+own labelled line. A character-class guess is not a parser.
