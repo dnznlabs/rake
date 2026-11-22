@@ -42,23 +42,10 @@ const NETWORKS = [1, 8453, 42161, 10, 4326, 4663, 11155111, 84532];
    first. The rest of `NETWORKS` is listed as pending deployment. */
 const ENABLED = [11155111, 84532];
 const TESTNETS = [11155111, 84532];
-/* How this page's URL names its chain, so the network menu can open the same route on another one.
-   Each entry rewrites a URL from chain `from` to chain `to`, or returns null where its scheme is not
-   the one in use; the first that applies wins. A new gateway is a new entry here. Where none applies
-   the link goes to `GATEWAY_HOME`, so an unknown host still gets a working link, only not its own. */
-const GATEWAYS = [
-  // gw44 (rake.dnzn.dev, decision 66): one origin, the chain is the first path segment.
-  (u, from, to) => u.pathname.split('/')[1] === from ? (u.pathname = u.pathname.replace('/' + from, '/' + to), u.href) : null,
-  // w3link.io and the local web3url gateway: `<app>.<chain id>.<gateway host>`.
-  (u, from, to) => { const h = u.hostname.split('.'), i = h.indexOf(from); return i > 0 ? (h[i] = to, u.hostname = h.join('.'), u.href) : null; },
-];
-const GATEWAY_HOME = 'https://rake.dnzn.dev/';
-const chainHref = to => {
-  for (const g of GATEWAYS) { const r = g(new URL(location.href), String(CFG.chainId), String(to)); if (r) return r; }
-  return GATEWAY_HOME + to + '/' + location.hash;
-};
+// The same route on another chain. The rewriters are `Model.GATEWAYS`: a new gateway is an entry there.
+const chainHref = to => Model.chainHref(location.href, CFG.chainId, to);
 /* A dev chain has no explorer, so `ext()` prints plain text with the full value in the title. */
-const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.io', 8453: 'https://basescan.org', 42161: 'https://arbiscan.io', 4326: 'https://megaeth.blockscout.com', 4663: 'https://robinhoodchain.blockscout.com', 11155111: 'https://sepolia.etherscan.io', 84532: 'https://sepolia.basescan.org' };
+const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.io', 8453: 'https://basescan.org', 42161: 'https://arbiscan.io', 4326: 'https://mega.etherscan.io', 4663: 'https://robinhoodchain.blockscout.com', 11155111: 'https://sepolia.etherscan.io', 84532: 'https://sepolia.basescan.org' };
 /* Two readers. It is what the widget snippet in #/docs puts in `data-rpc` — the embedding page's
    developer picks their own endpoint; these are only known public ones, so the example works when
    pasted — and it is this page's own read path when `discover` found no injected provider (#273), by
@@ -805,10 +792,12 @@ const netRow = id => isHere(id) ? `<div class="on" aria-current="true">${cname(i
   : `<div class="off">${cname(id)}</div>`;
 const netGroup = (label, ids) => ids.length ? `<div class="h">${label}</div>` + ids.map(netRow).join('') : '';
 const netRows = () => {
-  const on = NETWORKS.filter(id => ENABLED.includes(id)), test = id => TESTNETS.includes(id);
+  // The chain being read counts as enabled here: a bundle uploaded ahead of its `ENABLED` entry must
+  // not list itself as pending.
+  const en = id => ENABLED.includes(id) || isHere(id), on = NETWORKS.filter(en), test = id => TESTNETS.includes(id);
   return (NETWORKS.some(isHere) ? '' : netGroup('local', [CFG.chainId]))
     + netGroup('mainnets', on.filter(id => !test(id))) + netGroup('testnets', on.filter(test))
-    + netGroup('pending deployment', NETWORKS.filter(id => !ENABLED.includes(id)));
+    + netGroup('pending deployment', NETWORKS.filter(id => !en(id)));
 };
 // Where else an address or a wallet might belong: every other enabled chain, as links to this route.
 const elsewhere = () => ENABLED.filter(id => !isHere(id)).map(id => `<a class="link" href="${esc(chainHref(id))}">${cname(id)}</a>`).join(' · ');
@@ -2420,7 +2409,7 @@ function docs() {
 
   <h2 id="s-contracts">Contracts</h2>
   <p>Two contracts are deployed: <code>DistributionFactory</code>, which creates every distribution and is unowned, and <code>App</code>, which serves this page and the widget. Each is placed by a salted <code>CREATE2</code>, so it has the same address on every chain it is deployed to. A distribution has no fixed address; each one is created through the factory.</p>
-  <p>Chains marked <i>pending deployment</i> are planned; the addresses shown are where the contracts will be placed.</p>
+  <p>The status column is which chains this app offers, and is not read from the chain: <i>live</i> means the app is deployed and enabled there. Chains marked <i>pending deployment</i> are planned; the addresses shown are where the contracts will be placed.</p>
   <div class="scroll"><table class="dtab" id="ctab"><tr><th>chain</th><th>factory</th><th>app</th><th>status</th></tr>${contractRows()}</table></div>
   </article></div>`;
   widgetDemo();

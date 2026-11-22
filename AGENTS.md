@@ -130,8 +130,8 @@
   `layout.html` into it.
 - A bundle is built for one chain, so changing network means opening another URL, never
   `wallet_switchEthereumChain`. The network menu lists every chain in `NETWORKS`. Chains in
-  `ENABLED` link to the same route there, built by the first `GATEWAYS` rewriter that recognises the
-  current URL (gw44's `/<id>/` path, then a `.<id>.` host label), falling back to `GATEWAY_HOME`.
+  `ENABLED` link to the same route there, built by the first `Model.GATEWAYS` rewriter (`model.js`, tested in `test/model.test.mjs`) that recognises the
+  current URL (gw44's `/<id>/` path, then the chain label after the app's address in the host), falling back to `GATEWAY_HOME`.
   The other chains are greyed out under "pending deployment". `ENABLED` is hand-kept and never
   read from the chain: enabling a chain is a decision, so a deployed chain stays greyed until it is
   added there. A new gateway, such as an ENS one, is one more entry in `GATEWAYS`. The `#/docs` contracts

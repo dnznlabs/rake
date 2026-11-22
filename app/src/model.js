@@ -297,6 +297,24 @@ const Model = (() => {
     return s.length <= 64 && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(s);
   }
 
+  /* How a page's URL names its chain, so the network menu can open the same route on another one.
+     Each entry rewrites a `URL` from chain `from` to chain `to`, or returns null where its scheme is
+     not the one in use; the first that applies wins. A new gateway is a new entry here. */
+  const GATEWAYS = [
+    // gw44 (rake.dnzn.dev, decision 66): one origin, the chain is the first path segment.
+    (u, from, to) => u.pathname.split('/')[1] === from ? (u.pathname = u.pathname.replace('/' + from, '/' + to), u.href) : null,
+    // w3link.io and the local web3url gateway: `<app>.<chain id>.<gateway host>`. Only the second
+    // label is the chain: matching any label would rewrite an octet of an IP host.
+    (u, from, to) => { const h = u.hostname.split('.'); return h.length > 2 && h[1] === from && /^0x/i.test(h[0]) ? (h[1] = to, u.hostname = h.join('.'), u.href) : null; },
+  ];
+  const GATEWAY_HOME = 'https://rake.dnzn.dev/';
+  /** `href` on chain `to`, keeping route, query and hash. With no gateway recognised it is the
+      canonical gateway's copy, so an unknown host still gets a working link, only not its own. */
+  function chainHref(href, from, to) {
+    for (const g of GATEWAYS) { const r = g(new URL(href), String(from), String(to)); if (r) return r; }
+    return GATEWAY_HOME + to + '/' + new URL(href).hash;
+  }
+
   /** EIP-137 namehash, over eth.js's own keccak. */
   function namehash(name) {
     let node = '0'.repeat(64);
@@ -304,6 +322,6 @@ const Model = (() => {
     return '0x' + node;
   }
 
-  return { SNAPSHOT_T, BENEFICIARY_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash, plainName, windows, rangeCap, isPruned, isWrappedRefusal, nonceOf };
+  return { SNAPSHOT_T, BENEFICIARY_T, GATEWAYS, chainHref, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash, plainName, windows, rangeCap, isPruned, isWrappedRefusal, nonceOf };
 })();
 export default Model;
