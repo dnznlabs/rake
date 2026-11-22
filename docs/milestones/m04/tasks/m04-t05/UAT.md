@@ -1,7 +1,11 @@
 # m04-t05 — the UAT script
 
-Two lists, one per chain, **14 rows each**. The rows are [TASK.md](TASK.md) step 3's; what differs per
-chain is the URL, the explorer and the block time. Fill the `hash` and `screenshot` cells rather than
+Two lists, one per chain, **20 rows each**: rows (a) to (m) are [TASK.md](TASK.md) step 3's, and rows
+(w1) to (w6) are m05-t01c step 7's — the wallet picker, the held disconnect and the phone links, added
+2026-11-21. What differs per chain is the URL, the explorer and the block time.
+
+The (w) rows are run against the gateway, `https://rake.dnzn.dev/<chain_id>/`, which is where m05-t01c
+step 9 runs every row; the per-chain URLs below are the direct addresses the m04 rows were read at. Fill the `hash` and `screenshot` cells rather than
 compose: a row whose expected state did not match is one issue, titled
 `uat: <row> <chain> — <what the page did>`, labelled `m04` and `uat`.
 
@@ -37,6 +41,12 @@ about **five** blocks.
 | (j) | `#/create` with the owner field set to the Ops vault: screenshot the owner note, then a two-row table (the UAT wallet, the engineer's wallet), delay `3600`. After `create`, press one drawer write | the owner note reads `not the connected wallet — a contract — it will have to propose and cancel through its own calls` and step 2 proceeds with **no** acknowledgement — [#172](https://github.com/dnznlabs/rake/issues/172) requires one only for a never-used address, so `probeOwner` gives a contract no class (`app/src/index.html:1482`) and the box is drawn only for a classed reading (`:1742`); the new page's owner bar reads `you are a signer on <vault>, which owns this distribution — every change below is calldata to submit through it`; the drawer's writes read `copy calldata for your vault`, and pressing one gives the clipboard or the textarea fallback with the bytes, no transaction | `shots/11155111/j-guard.png`, `shots/11155111/j-ownerbar.png`, `shots/11155111/j-calldata.png` | `create` … |
 | (k) | Open the dnzn.dev host page of m04-t04 AC (e) in the same browser, wallet on Sepolia | both mounts render the DNZN table — the one with `data-rpc` through publicnode, the one without through the wallet | `shots/11155111/k-host.png`, also filed as m04-t04's `shots/host-wallet.png` | — |
 | (l) | Open `#/docs`, then `#/docs#widget` | fourteen sections in the rail, Disclaimer first; the widget section carries the snippet with this chain's gateway URL | `shots/11155111/l-docs.png` | — |
+| (w1) | With **two** wallet extensions enabled, press connect | a menu names both wallets; no account is requested until one is picked. Picking one connects that wallet and the header shows its short address. With only one extension there is no menu and connect behaves as today — if you have only one, record that and say so | `shots/11155111/w1-menu.png` | — |
+| (w2) | After (w1), reload the page | the picked wallet is used again with no menu, and the header shows its address without a prompt. Then press disconnect: the next connect offers the menu again | `shots/11155111/w2-remembered.png` | — |
+| (w3) | In a browser profile with **no** wallet extension, open the page | the header reads `sepolia`, lower case, with no wallet connected; the connect menu reads `no wallet found` and names the endpoint reads go through | `shots/11155111/w3-netname.png` | — |
+| (w4) | Connect, press disconnect, then **reload** | the page stays disconnected — the header reads `connect`, not an address. Then press connect: the wallet prompts again. Record the wallet's name if it hands the account back with no prompt | `shots/11155111/w4-disconnect-held.png` | — |
+| (w5) | On a **phone**, in Safari or Chrome, open the page and press connect | the menu offers `open in MetaMask` and `open in Coinbase Wallet` below the `no wallet found` line | `shots/11155111/w5-links.png` | — |
+| (w6) | Tap `open in MetaMask`, then repeat with `open in Coinbase Wallet` | each opens **this** page inside that wallet's browser — same chain, same route — and connect works there | `shots/11155111/w6-metamask.png`, `shots/11155111/w6-coinbase.png` | — |
 | (m) | Disposition: one issue per row whose expected state did not match | with nothing open, the dated signoff line under `MILESTONE.md` § Phases 4 in Denizen's own words | — | — |
 
 ## Base Sepolia — 84532
@@ -60,4 +70,10 @@ about **three hundred** blocks.
 | (j) | `#/create` with the owner field set to the Ops vault: screenshot the owner note, then a two-row table (the UAT wallet, the engineer's wallet), delay `3600`. After `create`, press one drawer write | the owner note reads `not the connected wallet — a contract — it will have to propose and cancel through its own calls` and step 2 proceeds with **no** acknowledgement — [#172](https://github.com/dnznlabs/rake/issues/172) requires one only for a never-used address, so `probeOwner` gives a contract no class (`app/src/index.html:1482`) and the box is drawn only for a classed reading (`:1742`); the new page's owner bar reads `you are a signer on <vault>, which owns this distribution — every change below is calldata to submit through it`; the drawer's writes read `copy calldata for your vault`, and pressing one gives the clipboard or the textarea fallback with the bytes, no transaction | `shots/84532/j-guard.png`, `shots/84532/j-ownerbar.png`, `shots/84532/j-calldata.png` | `create` … |
 | (k) | Not run on this chain | the host page is Sepolia's by design (TASK.md step 3 (k)), so this row is Sepolia-only and carries no reading here | — | — |
 | (l) | Open `#/docs`, then `#/docs#widget` | fourteen sections in the rail, Disclaimer first; the widget section carries the snippet with this chain's gateway URL | `shots/84532/l-docs.png` | — |
+| (w1) | With **two** wallet extensions enabled, press connect | a menu names both wallets; no account is requested until one is picked. Picking one connects that wallet and the header shows its short address. With only one extension there is no menu and connect behaves as today — if you have only one, record that and say so | `shots/84532/w1-menu.png` | — |
+| (w2) | After (w1), reload the page | the picked wallet is used again with no menu, and the header shows its address without a prompt. Then press disconnect: the next connect offers the menu again | `shots/84532/w2-remembered.png` | — |
+| (w3) | In a browser profile with **no** wallet extension, open the page | the header reads `base sepolia`, lower case, with no wallet connected; the connect menu reads `no wallet found` and names the endpoint reads go through | `shots/84532/w3-netname.png` | — |
+| (w4) | Connect, press disconnect, then **reload** | the page stays disconnected — the header reads `connect`, not an address. Then press connect: the wallet prompts again. Record the wallet's name if it hands the account back with no prompt | `shots/84532/w4-disconnect-held.png` | — |
+| (w5) | On a **phone**, in Safari or Chrome, open the page and press connect | the menu offers `open in MetaMask` and `open in Coinbase Wallet` below the `no wallet found` line | `shots/84532/w5-links.png` | — |
+| (w6) | Tap `open in MetaMask`, then repeat with `open in Coinbase Wallet` | each opens **this** page inside that wallet's browser — same chain, same route — and connect works there | `shots/84532/w6-metamask.png`, `shots/84532/w6-coinbase.png` | — |
 | (m) | Disposition: one issue per row whose expected state did not match | with nothing open, the dated signoff line under `MILESTONE.md` § Phases 4 in Denizen's own words | — | — |
