@@ -147,7 +147,7 @@ owner-set table through a timelock. Disposition is one of `held by test <name>`,
 | SOL-Basics-Payment-5 | How is withdrawal handled? | held by test `test_claimEthToOtherAddress` |
 | SOL-Basics-Payment-6 | Is `transfer()` or `send()` used for sending ETH? | held by test `test_receiveMinimaAreUnderPushGas` — neither: a `call` under an explicit `PUSH_GAS` cap |
 | SOL-Basics-Payment-7 | Can native ETH be locked in the contract? | held by test `test_selfRowRecycles` — the distribution as its own row recycles rather than stranding |
-| SOL-AM-ReentrancyAttack-1 | Can a view function return a stale value during interaction? | open — `snapshot()` and `beneficiaries()` are readable mid-`distribute` by a hook token's callback, and no test asserts what they return in that frame. [#293](https://github.com/dnznlabs/rake/issues/293) |
+| SOL-AM-ReentrancyAttack-1 | Can a view function return a stale value during interaction? | held by test `test_viewsMidDistributeAreTheFrameAndNotTheTable` — they are readable mid-`distribute`, and neither is stale or half-written: `distribute` writes `escrowed`, `reserved` and balances, none of which `snapshot()` or `beneficiaries()` read, so a hook sees the whole current table and queue. The figures it *can* see partially written are the ones the loop moves, named beside `SECURITY.md` F8 |
 | SOL-AM-ReentrancyAttack-2 | Is there a state change after an external interaction? | held by test `test_reentrantRecipientIsEscrowed` |
 | SOL-Timelock-1 | Are timelocks implemented for important changes? | held by test `testFuzz_applyWindow` |
 | MoleculeVesting [M-01] | `revoke` incompatible with block-list tokens | see SOL-AM-DOSA-3 — rake has no `revoke`, and the block-list consequence is the same |
@@ -160,8 +160,11 @@ owner-set table through a timelock. Disposition is one of `held by test <name>`,
 
 ## Open list
 
-Everything above that is assumed and not asserted. **Two rows** of § Checklist diff are
-dispositioned open and they name **two distinct findings**, each with an issue carried against it.
+Everything above that is assumed and not asserted. **One row** of § Checklist diff is
+dispositioned open and it names **one finding**, with an issue carried against it. The second such
+row left this list on 2026-11-22: SOL-AM-ReentrancyAttack-1's views-mid-`distribute` question is now
+held by a test, and [#293](https://github.com/dnznlabs/rake/issues/293) is closed by it rather than
+by a ruling — see § What left this list at review.
 **Two further rows** are dispositioned with no test, one in § Token classes and one in § Chains;
 neither is a § Actors row, so every actor above carries a test. Nothing here is a `src/` change,
 per decision 56.
@@ -177,7 +180,6 @@ three rows now read `design — decision 25` and the finding is not carried.
 | What | Where | Why it is open | Carried |
 |:--|:--|:--|:--|
 | A token whose `balanceOf` is the native balance | SOL-Token-FE-5 | Checked per chain against a live node by `RUNBOOK.md` § 1, which no local test can stand in for | [#127](https://github.com/dnznlabs/rake/issues/127) |
-| Views readable mid-`distribute` | SOL-AM-ReentrancyAttack-1 | The transient lock stops re-entry into the state-changing functions, but `snapshot()` and `beneficiaries()` are `view` and unguarded; no test pins what a hook sees | [#293](https://github.com/dnznlabs/rake/issues/293) |
 
 The two rows that carry no test are reasons rather than gaps, and neither needs an issue:
 

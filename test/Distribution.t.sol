@@ -12,6 +12,7 @@ import {
     CallbackToken,
     GasBurnerAny,
     HookRecipientToken,
+    ViewReadingToken,
     HookToken,
     HungryReceiver,
     MockERC20,
@@ -1780,6 +1781,78 @@ contract DistributionTest is Test {
     /// the frame still holds: several ~95M attempts in one transaction starve each other and report a
     /// threshold that is an artefact of their position rather than of the contract. That is why the
     /// bisection ran one limit per test and this test spends three sub-calls, not eight.
+    /// @dev What a hook token sees when it reads the distributor's views from inside `distribute`
+    /// ([#293](https://github.com/dnznlabs/rake/issues/293), `THREAT_MODEL.md`
+    /// SOL-AM-ReentrancyAttack-1). The transient lock refuses re-entry into the state-changing
+    /// functions, but `snapshot()` and `beneficiaries()` are `view` and unguarded, so the question is
+    /// what they return mid-loop. The answer has two halves and this pins both:
+    ///
+    /// - **Neither view is partially written, because `distribute` does not touch what they read.**
+    ///   It writes `escrowed`, `reserved` and the token balance; `Snapshot` carries owner, delay,
+    ///   nonce, description, table and queue, and `beneficiaries()` is the table. So a hook sees the
+    ///   same table and queue a caller would see before or after — no stale half-table, no row
+    ///   appearing twice.
+    /// - **The figures that *are* partially written are readable, and they are the ones that move:**
+    ///   `reserved(token)` already carries an earlier row's escrow, and the contract's token balance
+    ///   is already drained by the rows paid so far. A hook can therefore observe a state no
+    ///   completed call ever leaves behind. That is accepted rather than fixed (SECURITY.md F8): the
+    ///   values are correct for the frame, and nothing a hook reads lets it take another row's share.
+    ///
+    /// A refusing row's own observation is rolled back with its revert, so the surviving entries are
+    /// the first and third rows — which is why `seen()` is 2 for a three-row table.
+    function test_viewsMidDistributeAreTheFrameAndNotTheTable() public {
+        // Arrange: three ascending rows, the middle one refusing, so an escrow lands mid-loop.
+        ViewReadingToken tk = new ViewReadingToken();
+        Distribution.Beneficiary[] memory t = new Distribution.Beneficiary[](3);
+        t[0] = _row(A, 5000);
+        t[1] = _row(B, 2500);
+        t[2] = _row(C, 2500);
+        Distribution d = _deploy(3600, _asc(t));
+        tk.mint(address(d), 10_000);
+        tk.watch(d);
+        tk.setRefuse(B);
+
+        // The values a reader outside the frame sees, to compare the inside against.
+        Distribution.Snapshot memory before = d.snapshot();
+        bytes32 tableHash = keccak256(abi.encode(d.beneficiaries()));
+        bytes32 snapshotTableHash = keccak256(abi.encode(before.table));
+
+        // Act
+        d.distribute(address(tk));
+
+        // Assert: two observations, the refusing row's having been undone with its revert.
+        assertEq(tk.seen(), 2, "a reverting hook's own reads are rolled back with it");
+
+        for (uint256 i; i < 2; ++i) {
+            assertEq(tk.beneficiariesHashSeen(i), tableHash, "the table a hook sees is the whole table");
+            assertEq(tk.snapshotTableHashSeen(i), snapshotTableHash, "and so is the snapshot's copy of it");
+            assertEq(tk.ownerSeen(i), before.owner, "owner");
+            assertEq(tk.delaySeen(i), before.delay, "delay");
+            assertEq(tk.nonceSeen(i), before.nonce, "nonce");
+            assertEq(tk.pendingLengthSeen(i), before.pending.length, "queue length");
+        }
+
+        // The partially written figures, which do move between the two observations.
+        assertEq(tk.reservedSeen(0), 0, "row 1 runs before any escrow exists");
+        assertEq(tk.reservedSeen(1), 2500, "row 3 sees row 2's escrow already reserved");
+        assertEq(tk.watchedBalanceSeen(0), 10_000, "row 1 sees the whole balance");
+        assertEq(
+            tk.watchedBalanceSeen(1),
+            5000,
+            "row 3 sees it drained by row 1 only: row 2's transfer reverted and moved nothing"
+        );
+
+        // And the call itself landed where a completed `distribute` should.
+        assertEq(tk.balanceOf(A), 5000);
+        assertEq(tk.balanceOf(C), 2500);
+        assertEq(tk.balanceOf(address(d)), 2500, "the escrow stays in the contract");
+        assertEq(d.escrowed(address(tk), B), 2500);
+        assertEq(d.reserved(address(tk)), 2500);
+
+        // The views are unchanged by the whole call, which is the other end of the first half above.
+        assertEq(keccak256(abi.encode(d.beneficiaries())), tableHash, "the table outlives the frame unchanged");
+    }
+
     function test_hookRecipientStarvesLaterRows() public {
         // A whole 30M block is not enough: the rows after the burner are starved.
         assertFalse(_starvationSucceedsAt(30_000_000), "a 30,000,000-gas distribute is starved");
