@@ -953,6 +953,25 @@ It splits `app/dist/index.html.gz` at `MAX_CHUNK = 24_000` bytes exactly as `Chu
 does, and wraps calls 3–5 into `batch345.hex`. They are committed, so what the product owner signs is
 reviewable before it is signed and re-derivable after:
 
+**Cut the calldata through the pinned toolchain, and check which `node` you have.** The payload is
+`gzipSync`'s output, and `app/build.mjs` says it is "deterministic per zlib build, not across them".
+Measured 2026-11-21 on one byte-identical document (`sha256 268afd4b…`): **48,551** bytes under
+devbox's node v24.12.0 (zlib 1.3.1) and **48,810** under this machine's node v24.21.0
+(zlib 1.3.2.1-motley). The raw document is the same either way — so § 4d's `inflated sha256` check
+still passes — but the chunk bytes, their hashes and the chunk *count* are not, so calldata cut under
+the wrong one will not match what is committed.
+
+The trap is that `devbox run` does not always give you the pinned node:
+
+| command | `which node` |
+|:--|:--|
+| `devbox run -- bash <script>.sh` | `.devbox/nix/profile/default/bin/node` — **pinned, use this** |
+| `devbox run -- make dapp-nodev …` | pinned |
+| `devbox run -- bash -c '…'` | `/usr/bin/node` — the system one |
+
+So run the generation from a **script file** or as a direct `make`/`node` argument, never through
+`bash -c`, and record the node and zlib versions with the sizes.
+
 **"Five" is this upload's count, not the rule (amended 2026-11-21, m05-t01c step 6).** A document of
 three chunks has six calls and a `batch3456.hex`; the heading keeps its name because m04-t08's and
 m04-t10's records cite it. The rule is § 4a's: chunks 0 and 1 are the two plain proposals, everything
@@ -1044,8 +1063,11 @@ cast rpc anvil_setBalance $OWNER 0xDE0B6B3A7640000 --rpc-url http://127.0.0.1:87
 for f in 1-addChunk-0 2-addChunk-1; do
   cast send --from $OWNER --unlocked $APP "$(cat calldata/$CHAIN_ID/$f.hex)" --rpc-url http://127.0.0.1:8701
 done
-cast estimate --from $OWNER $OWNER "$(cat calldata/$CHAIN_ID/batch345.hex)" --rpc-url http://127.0.0.1:8701
-cast send --from $OWNER --unlocked $OWNER "$(cat calldata/$CHAIN_ID/batch345.hex)" --rpc-url http://127.0.0.1:8701
+# The batch file is named for the calls it carries — batch345.hex for a two-chunk document,
+# batch3456.hex for a three-chunk one (§ 4a). The glob keeps this command true for either.
+BATCH=$(ls calldata/$CHAIN_ID/batch*.hex)
+cast estimate --from $OWNER $OWNER "$(cat $BATCH)" --rpc-url http://127.0.0.1:8701
+cast send --from $OWNER --unlocked $OWNER "$(cat $BATCH)" --rpc-url http://127.0.0.1:8701
 node tools/chain-doc.mjs --app $APP --rpc http://127.0.0.1:8701 --chain $CHAIN_ID
 ```
 
