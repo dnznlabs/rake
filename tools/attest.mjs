@@ -142,11 +142,17 @@ for (const file of files) {
     continue;
   }
 
-  const endpoints = rpcs[chain];
-  if (!endpoints || endpoints.length === 0) {
+  /* The record's own endpoint first, `deploy/chains.json` second. The fallback exists because the
+     two testnets were written before this field; the preference exists because `deploy/chains.json`
+     is the **gateway's** chain list, and adding a mainnet to it to make an attestation run would
+     change what the gateway serves — a side effect nobody asked for. A deployment record should
+     carry everything needed to check it. */
+  const endpoints = [rec.rpc].flat().filter(Boolean);
+  if (endpoints.length === 0) endpoints.push(...(rpcs[chain] ?? []));
+  if (endpoints.length === 0) {
     /* Named rather than skipped: a chain with a deployment record and no endpoint is unattestable,
        which is a gap in the same way a mismatch is. */
-    fail(chain, '-', 'no endpoint for this chain in deploy/chains.json');
+    fail(chain, '-', 'no endpoint: put one in this record\'s "rpc", or in deploy/chains.json');
     continue;
   }
   const rpc = endpoints[0];

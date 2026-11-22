@@ -1,0 +1,25 @@
+{
+  "chainId": 8453,
+  "read": "2026-11-22",
+  "rpc": "https://mainnet.base.org",
+  "commit": "9fac8364ee2a02df783a17d0268a85e68166a144",
+  "deployedBy": {
+    "factory": "0x07b81dcabe7b1041e800831ad460b27dfd5e589c2ba254ee71cef9b54f9d7377",
+    "app": "0x96a64bcb5a59f1812efd68fb952fe97f6b013876b7f5e103ba3789b82fd58b19"
+  },
+  "contracts": {
+    "DistributionFactory": {
+      "address": "0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E",
+      "codeKeccak": "0x66d10374c73ab5c6d5046225f1612465bc64620c91d717d74788c627edc8b6c2"
+    },
+    "Distribution": {
+      "address": "0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A",
+      "codeKeccak": "0xd3399543d74c606df25df4c7501a27042c23f4f30f9b7e57311be5cb1d8caa8c",
+      "note": "the factory's implementation, read from implementation() on the day"
+    },
+    "App": {
+      "address": "0x00a9F390A6010d045e0d34856048DdD6910d25BA",
+      "codeKeccak": "0x691c7120121434dadde0fb5f271aa5213f98feb90de5baacb773b9c42ee88a75"
+    }
+  }
+}
