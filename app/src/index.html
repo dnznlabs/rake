@@ -37,9 +37,13 @@ const CHAINS = { 1: 'mainnet', 10: 'op mainnet', 8453: 'base', 42161: 'arbitrum'
 // Every chain rake intends to be on: M05's four mainnets, its stretch row, and the two testnets.
 // Listed whether or not it is live yet; `ENABLED` says which are.
 const NETWORKS = [1, 8453, 42161, 10, 4326, 4663, 11155111, 84532];
-/* The chains known live when this bundle was built, linked with no read. The rest of `NETWORKS` is
-   pending deployment until `liveCheck` finds a document on one. */
-const ENABLED = [11155111, 84532];
+/* Linked with no read. **Not "known live": the Product Owner's ruling of 2026-11-22 puts Base and
+   Ethereum here before either has a document**, so this document — which goes to the testnets first
+   and to those two mainnets after — links all four from the day it ships. What he accepted with it:
+   until a mainnet carries its own document and the gateway carries that chain, its menu link leads
+   nowhere and the `#/docs` contracts table reads it as live. The rest of `NETWORKS` stays pending
+   deployment until `liveCheck` finds a document on one. */
+const ENABLED = [1, 8453, 11155111, 84532];
 const TESTNETS = [11155111, 84532];
 // The same route on another chain. The rewriters are `Model.GATEWAYS`: a new gateway is an entry there.
 const chainHref = to => Model.chainHref(location.href, CFG.chainId, to);
