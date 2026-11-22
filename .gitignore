@@ -35,3 +35,4 @@ audits/.skills/
 # The skill's per-scan bundle, `mktemp -d ./.audit-XXXXXX`. A scan that dies leaves it behind by
 # design, and unignored it would make the next audit's provenance record itself as dirty.
 .audit-*/
+tools/uat/node_modules/
