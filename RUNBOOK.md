@@ -616,6 +616,24 @@ devbox run -- make dapp-nodev CHAIN_ID=$CHAIN_ID
 devbox run -- node tools/step4-calldata.mjs --chain $CHAIN_ID --app $APP --rpc "$RPC" --out calldata
 ```
 
+**Cut from the tip of `main`, fetched in the same sitting, and from nothing else** (ruled by the
+Product Owner on 2026-11-21: what is uploaded is `main` as it stands at the upload). The build reads
+`app/` and the addresses under `broadcast/`, and no check below compares either to `main`: every one
+compares the calldata to the *build*, so a well-formed upload cut from a branch or from a checkout a
+day old passes all of them.
+
+```sh
+git fetch origin && git status --porcelain | wc -l        # 0
+git rev-parse HEAD origin/main                            # the same commit twice
+```
+
+`record:` that commit as the generating commit. **It has to still be `main` when the upload goes
+out.** If a commit touching `app/` or `broadcast/` merges after the cut, the proposals describe a
+document `main` no longer builds: they are not signed, or if signed are not submitted, and 4a is run
+again at the new tip. Once 4c has submitted, the upload is what it is and the newer commit waits for
+the next one, so nothing touching `app/` is merged between the cut and 4c's last `executeQueued`
+unless the upload is meant to be redone.
+
 **`--app $APP` is not optional, and `$APP` is § 0's — read from `README` § Contracts, never recalled**
 ([#311](https://github.com/dnznlabs/rake/issues/311)). The tool used to default the address, and the
 default outlived the deployment it named: m05-t01 redeployed `App`, and on m05-t01c the whole upload
@@ -756,8 +774,15 @@ they were generated for.
 #### 4b — the product owner reviews and signs
 
 In the multisig dapp, open each of the three proposals — handbook § Doing it as a human, *Sign* —
-and before signing it, against a checkout of the commit 4a recorded. **Proposals 1 and 2** (the plain
-`addChunk` calls):
+and before signing it, against a checkout of the commit 4a recorded. **First, that commit is still
+what `main` builds**, or nothing below is worth checking:
+
+```sh
+git fetch origin && git diff --quiet <the commit 4a recorded> origin/main -- app/ broadcast/ && echo current
+```
+
+No `current` means `main` has moved under the proposals: do not sign, and 4a is run again. **Proposals
+1 and 2** (the plain `addChunk` calls):
 
 1. **The target is `App` and the value is 0.** `$APP`, not the vault; a proposal whose target is the
    vault is proposal 3 or not this upload.
