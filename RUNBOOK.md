@@ -657,12 +657,30 @@ chains; the deleted `batch.hex` was 109,962 characters, **44,426 over the cap**.
 own digest, `getTransactionHash(<target>, 0, <file>, <nonce>)` on the vault, with the proposal's own
 target: `$APP` for 1 and 2, `$OWNER` for 3.
 
-`batch345.hex` keeps the setters atomic with the widget chunk: calls 4 and 5 validate their pointers
-through `_requireChunk` (§ The five calls), so the widget pointer is created and consumed inside one
-transaction, and the two setters either both land or neither does. That works only because the
-widget chunk is the **third** CREATE: `addWidgetChunk` inside the batch deploys at `App` nonce 3, the
-address `5-setWidgetChunks.hex` names, and that is where the nonce stands only after proposals 1 and
-2 have each executed once, in that order (4c's gates). The document pointers are created by
+**Three proposals whatever the document's size (amended 2026-11-21, m05-t01c step 6).** The table
+above records a two-chunk document, which is the shape the committed calldata has. The rule, which
+is what to follow when the count differs:
+
+- **Proposals 1 and 2 are always document chunks 0 and 1**, plain calls to `$APP`, same file names.
+- **Every document chunk after the second rides inside the batch**, ahead of `addWidgetChunk`, so
+  the batch is `addChunk`…, `addWidgetChunk`, `setChunks`, `setWidgetChunks` — in that order, which
+  is the order `App` must create the pointers in. The batch file is named for the call numbers it
+  carries: `batch345.hex` for two document chunks, `batch3456.hex` for three.
+- **The pointers follow call order from `cast nonce $APP`.** With three document chunks, chunk 2's
+  pointer is the CREATE at *N* + 2 and the widget's at *N* + 3.
+- **A fourth document chunk is a stop**, not a fourth proposal: it changes the proposal arithmetic
+  and the gas per piece, so it is a plan question. `tools/step4-calldata.mjs` refuses it.
+- Measured for the three-chunk document of m05-t01c: proposals 1 and 2 are 48,138 characters each
+  and the batch is **21,194** against the 65,536 cap, 44,342 spare. The two-chunk batch it replaces
+  was 19,018.
+
+`batch345.hex` keeps the setters atomic with the widget chunk: the setter calls validate their
+pointers through `_requireChunk` (§ The five calls, and their order), so the widget pointer is created and
+consumed inside one transaction, and the two setters either both land or neither does. That works
+because the widget chunk is the **last** CREATE of the upload: `addWidgetChunk` inside the batch
+deploys at the `App` nonce after the document's chunks, the address `*-setWidgetChunks.hex` names,
+and that is where the nonce stands only after proposals 1 and 2 have each executed once, in that
+order (4c's gates). The document pointers are created by
 proposals 1 and 2, which is why the batch executes last and why 1 precedes 2 (4c). `batch` is
 `onlySelf`, so the vault is its target and it calls `App` as its owner.
 
@@ -793,10 +811,14 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
 
    ```sh
    # the two document pointers, in order, and the widget pointer
-   cast calldata-decode 'setChunks(address[],bool)'   "$(cat calldata/$CHAIN_ID/4-setChunks.hex)"
-   cast calldata-decode 'setWidgetChunks(address[])'  "$(cat calldata/$CHAIN_ID/5-setWidgetChunks.hex)"
-   # the same three, independently, from the nonce — the two must agree
-   for i in $N $((N+1)) $((N+2)); do cast compute-address $APP --nonce $i; done
+   cast calldata-decode 'setChunks(address[],bool)'   "$(cat calldata/$CHAIN_ID/*-setChunks.hex)"
+   cast calldata-decode 'setWidgetChunks(address[])'  "$(cat calldata/$CHAIN_ID/*-setWidgetChunks.hex)"
+   # the same pointers, independently, from the nonce — the two must agree.
+   # CHUNKS is the number of add*Chunk calls in this upload: document chunks plus the widget's one
+   # (3 for a two-chunk document, 4 for a three-chunk one). The glob above keeps the file numbers
+   # out of the command, because they shift with the chunk count.
+   CHUNKS=$(ls calldata/$CHAIN_ID/*-add*Chunk*.hex | wc -l)
+   for i in $(seq $N $((N + CHUNKS - 1))); do cast compute-address $APP --nonce $i; done
    ```
 
    Those two routes agreeing is itself a check: the first reads what the setters will be told, the
@@ -808,7 +830,12 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
    | piece 1 | *N* | nothing yet — both document pointers print `0x` |
    | piece 2 | *N* + 1 | doc 0 (the `CREATE` at *N*) |
    | the batch | *N* + 2 | doc 0 **and** doc 1 (the `CREATE` at *N* + 1) |
-   | (after the batch) | *N* + 3 | widget (the `CREATE` at *N* + 2) — step 4d's check |
+   | (after the batch) | *N* + `CHUNKS` | every pointer — step 4d's check |
+
+   The table is read for a two-chunk document, where `CHUNKS` is 3 and the last row is *N* + 3. The
+   first three rows do not move with the count: chunks 0 and 1 are always the two plain proposals,
+   and everything else is inside the batch. What moves is the last row and what the batch creates —
+   with a three-chunk document the batch creates doc 2 **and** the widget, so `CHUNKS` is 4.
 
    Neither the nonce nor a non-empty `cast code` is the gate against the swap: after piece 2
    executed first, the nonce reads *N* + 1 *and* the doc-0 pointer holds code — chunk 1's. Only the
@@ -876,6 +903,10 @@ The equality to check is the one `docs/milestones/m03/tasks/m03-t03/HANDOFF.md` 
 `record:` the chunk pointers, `inflated sha256`, `widget sha256`, both byte counts, and the three
 submit and three `executeQueued` transaction hashes.
 
+**The nonce after an upload is *N* plus the number of chunks uploaded**, document and widget
+together — 3 for a two-chunk document, 4 for a three-chunk one — not a constant. `cast nonce $APP`
+is the reading; `ls calldata/$CHAIN_ID/*-add*Chunk*.hex | wc -l` is what it should have moved by.
+
 **Then prove it through the gateway, because nothing above does.** `chain-doc` reads the ERC-5219
 path with our own reader, so it establishes what the chain holds and nothing at all about what a
 visitor receives — a gateway can serve a document two uploads old while every reading above is
@@ -921,6 +952,11 @@ its calldata under its own task directory, which is where the tool's own default
 It splits `app/dist/index.html.gz` at `MAX_CHUNK = 24_000` bytes exactly as `Chunks.s.sol:_upload`
 does, and wraps calls 3–5 into `batch345.hex`. They are committed, so what the product owner signs is
 reviewable before it is signed and re-derivable after:
+
+**"Five" is this upload's count, not the rule (amended 2026-11-21, m05-t01c step 6).** A document of
+three chunks has six calls and a `batch3456.hex`; the heading keeps its name because m04-t08's and
+m04-t10's records cite it. The rule is § 4a's: chunks 0 and 1 are the two plain proposals, everything
+after them is one batch in call order, and a fourth document chunk is a stop.
 
 | # | call | file | proposed as |
 |--:|:--|:--|:--|
