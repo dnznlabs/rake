@@ -332,7 +332,7 @@ native balance), so a clean row below means the check ran and missed, not that i
 |:------|:------------------------------------------|:---------------|
 | Ethereum | **the gate holds, read 2026-11-22 under #368's amended test.** No alias address on chain 1 is a token whose `balanceOf` answers an account's native balance, and none whose `transfer` moves it — which is the reading this row exists for (`SECURITY.md` F12). All four § 1 names, against a probe holding 25,093,601,299,726,950 wei: `LegacyERC20ETH` `0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000` **0 bytes**; `0x0000000000000000000000000000000000001010` **0**; `0x0000000000000000000000000000000000000001` **0**; and `0x471EcE3750Da237f93B8E339c536989b8978a438` **1,582 bytes** whose `name`, `symbol`, `decimals`, `totalSupply`, `balanceOf` and `transfer` **all revert with empty data** — it is not Celo's `GoldToken`, which is 2,585 bytes there. **Control first:** on Celo mainnet the same call on `GoldToken` returns 457,156,951,045,076,936,137, exactly the probe's native balance, so the probe fires on the case it is looking for and a clean row here means the check ran and missed | code sizes and calls both read by the engineer and the architect **on 2026-11-22**, independently and on public endpoints. The two controls used different probe accounts: the engineer's was the token's own address on Celo (`0x471EcE37…a438`, 457,156,951,045,076,936,137 wei), the architect's three funded accounts including that one. **Re-read immediately before Ethereum's step 2.** ~~measured, all four aliases `0x`~~ — **superseded**: the 2026-11-01 reading, no longer true of `0x471EcE37…a438` |
 | OP Mainnet | **`LegacyERC20ETH` `0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000` is live on the read side** — 3,671 bytes, `name()` "Ether", `symbol()` "ETH", `balanceOf(x)` equal to x's native balance. **Every stateful method reverts** (`transfer`, `transferFrom`, `approve` — all "disabled"), so no value can move through it. **Passes: ruled on [#127](https://github.com/dnznlabs/rake/issues/127) on 2026-11-01**, because the requirement is no alias through which value *can move* and nothing moves through this one. The `transfer` assertion above is what keeps that true, and it is re-run before each deploy to chain 10. | measured at block 158,979,851: `balanceOf(0x4200…0016)` and `cast balance` both `92688343257757826764769`, and `transfer(…,1)` reverts `LegacyERC20ETH: transfer is disabled`. Code size is **3,671 bytes** — `cast code` returns 7,344 characters including the `0x`, so a figure of 3,672 is that string halved. Corroborated by the [OP Stack spec § Predeploys](https://specs.optimism.io/protocol/predeploys.html#legacyerc20eth): LegacyERC20ETH is **Deprecated**, "All of the stateful methods in this contract will revert after the Bedrock upgrade" |
-| Base | none — post-Bedrock OP Stack chain, so the legacy alias was never deployed | measured, `0x` at the legacy address |
+| Base | none — post-Bedrock OP Stack chain, so the legacy alias was never deployed | measured 2026-11-01, and **re-measured 2026-11-22 for m05-t02's step 6 against a probe holding 0.005 ETH**: `0x` at `0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000` and at `0x471EcE3750Da237f93B8E339c536989b8978a438`. The row reproduced, which is why Base was not gated by Ethereum's correction |
 | Arbitrum One | none — no native-balance ERC-20; the Arbitrum precompiles are not tokens | measured, all four aliases `0x` |
 | MegaETH | none | measured, all four aliases `0x` |
 | Robinhood Chain | none | measured, all four aliases `0x` |
@@ -1817,6 +1817,65 @@ note. `make chain-doc` exits 0 and its `inflated sha256` is the one above. Note 
 rebuilds the **dev** bundle last, so `app/dist/index.html` afterwards is the dev build (128,047
 bytes) and will not match the chain's hash — which is exactly why step 4 checks the equality
 immediately after `dapp-nodev` and `chunks`, and why this document says `dapp-nodev`, never `dapp`.
+
+## Executed on mainnets
+
+**Deployed 2026-11-22 (m05-t02 Part B).** Base and Ethereum were taken through steps 1, 2, 3 and 5.
+**Step 4 was not run on either and no document is on either chain** — the mainnet documents are
+m05-t03's — so `App` is live and serves nothing, with `chunkCount()` 0 and `locked()` false. M05 is
+Base and Ethereum only (decision 70).
+
+**Four sends, every one landing first time: no failure, no `-32003` refusal, no retry, no deviation
+from step 1e's rule.** Addresses are the same as the testnets', which is what one init-code set under
+`CREATE2` means: factory `0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`, implementation
+`0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`, `App` `0x00a9F390A6010d045e0d34856048DdD6910d25BA`.
+**The three `cast code` keccaks are identical on all four chains** — `0x66d10374…8b6c2`,
+`0xd3399543…caa8c`, `0x691c7120…88a75` — each compared against a build of the repository rather than
+against another chain, by `make attest` over `deployments/{1,8453,11155111,84532}.json`.
+
+### § Record — Base (8453)
+
+| step | what | reading |
+|:--|:--|:--|
+| 1 | gates | chain id 8453; both predictions equal § 0; `0x` at all four addresses; proxy 69 bytes, keccak `0x2fa86add…f7e4989`; block `gasLimit` 40,000,000; `E` 2,396,446 / 1,666,007; balance 0.005 ETH against 0.000081249 needed (61.5×); explorer key `status` 1 |
+| 2 | factory | tx `0x07b81dcabe7b1041e800831ad460b27dfd5e589c2ba254ee71cef9b54f9d7377`, status 1, block 60,730,845, `gasUsed` **2,381,290** of a 4,795,322 limit (`G` 179), effective gas price 6,333,075 wei, **base fee at send 5,299,967 wei** |
+| 2 | runtime | 1,319 bytes each side, 60 differing, **none outside the three immutable spans**, each holding `IMPL` |
+| 3 | `App` | tx `0x96a64bcb5a59f1812efd68fb952fe97f6b013876b7f5e103ba3789b82fd58b19`, status 1, block 60,731,271, `gasUsed` **1,655,420** of 3,341,876 (`G` 190), effective gas price 6,746,681 wei, **base fee at send 5,758,940 wei** |
+| 3 | read-backs | `owner()` the Ops vault, `version()` `v0.1`, `locked()` false, `chunkCount()` 0, `cmp` against the artifact equal at 7,154 bytes |
+| 5 | Sourcify | three `exact_match`, asserting loop exit 0; factory `verifiedAt` 08:38:35Z and `App` 08:40:25Z, each about three minutes after its own deploy and not by this run's loop; implementation 08:47:37Z, this run's |
+| 5 | explorer | **queued, not verified** — GUID `6xw4xwzxi2dcmrtkvyxchcehcansymkj6jrvgkzd8gqxqviaiq`, `Pending in queue`, `getsourcecode` empty |
+| 5 | OpenChain | 82 `Duplicated:`, 0 `Imported:` |
+| 6 | DNZN `create` | **not sent** — prepared for the Product Owner on [#363](https://github.com/dnznlabs/rake/issues/363); `predict` `0xB611Ff19…0F4D5199`, `cast code` `0x`, Creator's simulation returns it, another address reverts `0x0c4549ef`, estimate 480,533 |
+
+**What the engineer's key spent on Base: 26,396,332,711,465 wei (~0.0000264 ETH)** for both sends —
+0.005000000 ETH before, 0.004973603667288535 after. The Creator key spent nothing; its 0.001 ETH is
+untouched.
+
+### § Record — Ethereum (1)
+
+| step | what | reading |
+|:--|:--|:--|
+| 1 | gates | chain id 1; both predictions equal § 0; `0x` at all four addresses; proxy 69 bytes, same keccak; block `gasLimit` 60,000,000; `E` 2,396,446 / 1,666,007; balance 0.025093601 ETH against 0.002171 needed (11.6×); explorer key `status` 1; **alias gate re-read immediately before step 2** — `0`, 1,582, `0`, `0`, `balanceOf` reverting |
+| 2 | factory | tx `0x5cfd85b738dad390dfc0b43f7aa29e8883265d9b58cb3db87f14ad19dd4a8f50`, status 1, block 26,469,801, `gasUsed` **2,381,290** of 4,795,322 (`G` 179), effective gas price 118,800,946 wei, **base fee at send 126,882,335 wei** |
+| 2 | runtime | 1,319 bytes each side, 60 differing, **none outside the three spans**, each holding `IMPL` |
+| 3 | `App` | tx `0x37d157cc643bb26358d59e6de43bc967b5bcffd72e57d26a2ec57bdd5f8d3295`, status 1, block 26,469,806, `gasUsed` **1,655,420** of 3,341,876 (`G` 190), effective gas price 123,794,910 wei, **base fee at send 117,397,085 wei** |
+| 3 | read-backs | `owner()` the Ops vault, `version()` `v0.1`, `locked()` false, `chunkCount()` 0, `cmp` equal at 7,154 bytes |
+| 5 | Sourcify | three `exact_match`, loop exit 0; factory `verifiedAt` 09:38:02Z against a 09:36:59Z deploy and `App` 09:39:02Z against 09:37:59Z — each about a minute later, not this run's loop; implementation 09:40:43Z, this run's. All three carry `creationMatch: exact_match`, unlike Base's implementation, which carries none; recorded unexplained |
+| 5 | explorer | **queued, not verified** — GUIDs `vyqncc7ethysu5igia38zpmlv2lpdiaxsqtt8gsjtpny5qrqg9` (factory), `4qe7mxxtx6lybemkrh6gz4tyyzfxl28nhxmmj86s8ce8j1jg1h` (implementation), `hfnhk7c5sarhs9821ecqy3iifb2ng6anz5cw9awlh4phtbwer3` (`App`) |
+| 5 | OpenChain | 82 `Duplicated:`, 0 `Imported:` |
+| 6 | DNZN `create` | **not sent** — prepared on #363; `predict` the same address, `cast code` `0x`, Creator's simulation returns it, another reverts `0x0c4549ef`, estimate 480,533, Creator holds 0.01 ETH (~170× the cost at 0.12 gwei) |
+
+**What the engineer's key spent on Ethereum: 487,832,074,612,540 wei (~0.000488 ETH)** — 0.025093601299726950
+ETH before, 0.024605769225114410 after. Under **5%** of the 0.01 ETH asked for that chain. The Creator
+key spent nothing.
+
+**The per-step gas is identical on both chains** — 2,381,290 for each factory and 1,655,420 for each
+`App`. That is expected from one init-code set at one optimiser setting, and it is also a check: a
+different figure would have meant different bytes. The *prices* differ by about twenty times, which is
+the whole of the cost difference between the two chains.
+
+**Failed or refused attempts: none, on either chain.** Recorded explicitly because the plan asks for
+every one, and an empty list is only worth anything if it was asked for.
 
 ## Executed on testnets
 
