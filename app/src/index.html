@@ -63,6 +63,12 @@ let P = null, ACC = null, CHAIN = null;
 // True only when `discover` found an injected provider: the one thing `who()` reads to tell a visitor
 // with no wallet from a wallet that is there but not connected.
 let WALLET = false;
+/* Every wallet the browser announced, each `{ info, provider }` as EIP-6963 hands it over, and the
+   `rdns` of the one in use. With several announced and none remembered, `PICK` is empty and the page
+   reads through the public endpoint until Connect picks one — the same reading a visitor with no
+   wallet gets, which is what makes the menu a choice rather than a silent guess. */
+let WALLETS = [], PICK = '';
+const WALLET_KEY = 'rake.wallet';
 // The endpoint the landing's widget is handed in `data-rpc`: the dev `?rpc=` override when there is
 // one, and otherwise empty, in which case the mount falls back to this chain's `PUBLIC_RPC` entry for
 // a visitor with no wallet and to the injected EIP-1193 global for one who has it. Reads never
@@ -119,11 +125,28 @@ async function discover() {
     ACC = Q.get('from') || null; WRPC = Q.get('rpc'); return;
   }
   /*DEV*/
-  const found = [];
-  addEventListener('eip6963:announceProvider', e => found.push(e.detail));
+  /* Every announcement, not the first: a visitor with two extensions had whichever announced first,
+     with no way to reach the other (decision 67). The listener is never removed, so an extension that
+     announces late is added to the list and offered on the next Connect. `info.rdns` is the identity
+     a remembered choice is stored under; `info.name` is the wallet's own string and is only ever
+     written as text. */
+  addEventListener('eip6963:announceProvider', e => {
+    const d = e && e.detail;
+    if (!d || !d.provider || !d.info || !d.info.rdns) return;
+    if (!WALLETS.some(w => w.info.rdns === d.info.rdns)) WALLETS.push(d);
+  });
   dispatchEvent(new Event('eip6963:requestProvider'));
   await new Promise(r => setTimeout(r, 150));
-  P = (found[0] && found[0].provider) || window.ethereum || null;
+  /* `window.ethereum` only when nothing announced: an extension that announces is reachable by its
+     own rdns, and the global is whichever one won the race for it. */
+  const remembered = WALLETS.length ? WALLETS.find(w => w.info.rdns === store.get(WALLET_KEY)) : null;
+  /* Forgotten only when wallets announced and the remembered one was not among them. A load where
+     nothing announces at all is a disabled or slow extension, not a choice withdrawn, and wiping the
+     key there would cost a visitor the wallet they picked. */
+  if (WALLETS.length && !remembered && store.get(WALLET_KEY)) store.set(WALLET_KEY, '');
+  const chosen = remembered || (WALLETS.length === 1 ? WALLETS[0] : null);
+  PICK = chosen ? chosen.info.rdns : '';
+  P = (chosen && chosen.provider) || (WALLETS.length === 0 ? window.ethereum : null) || null;
   WALLET = !!P;
   P = readProvider(P);
   if (!P) return;
@@ -134,6 +157,31 @@ async function discover() {
   if (P.on) { P.on('accountsChanged', a => { ACC = a[0] || null; who(); route(); }); P.on('chainChanged', () => location.reload()); }
 }
 async function connect() { const a = await P.request({ method: 'eth_requestAccounts' }); ACC = a[0] || null; who(); route(); }
+/* The menu's rows, one per announced wallet. A wallet's name is the wallet's own string, so it goes
+   in through `textContent` and never as markup, and its icon is not rendered at all: an `<img>` whose
+   src a third party chooses is a request this page does not need to make. */
+function walletMenu() {
+  km.textContent = '';
+  for (const w of WALLETS) {
+    const row = document.createElement('div');
+    row.dataset.a = 'pick';
+    row.dataset.rdns = w.info.rdns;
+    row.textContent = w.info.name || w.info.rdns;
+    km.appendChild(row);
+  }
+}
+/* Picking is remembered under `rake.wallet` by `rdns`, so the next load uses it as today's single
+   wallet is used, silent `eth_accounts` included. Disconnect forgets it, and `discover` forgets it if
+   that wallet no longer announces. */
+async function pickWallet(rdns) {
+  const w = WALLETS.find(x => x.info.rdns === rdns);
+  if (!w) return;
+  PICK = rdns; store.set(WALLET_KEY, rdns);
+  P = readProvider(w.provider); WALLET = true;
+  if (P && P.on) { P.on('accountsChanged', a => { ACC = a[0] || null; who(); route(); }); P.on('chainChanged', () => location.reload()); }
+  try { CHAIN = String(Number(await P.request({ method: 'eth_chainId' }))); } catch (e) {}
+  await connect();
+}
 // Wallets keep a network per site, so the extension's own picker may not move this page; asking does.
 // A successful switch lands in the chainChanged reload.
 async function switchChain() {
@@ -147,6 +195,9 @@ async function switchChain() {
 // Revoking (EIP-2255) is what survives a reload; a wallet without it hands the account back next load.
 async function disconnect() {
   try { await P.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] }); } catch (e) {}
+  /* The choice is forgotten too, so the next Connect offers the menu again rather than silently
+     reconnecting the wallet the visitor has just disconnected (decision 67). */
+  if (WALLETS.length > 1) { PICK = ''; store.set(WALLET_KEY, ''); WALLET = false; P = readProvider(null); }
   ACC = null; who(); route();
 }
 const call = async (to, sig, args, types) => Eth.dec(types, await P.request({ method: 'eth_call', params: [{ to, data: Eth.enc(sig, args) }, 'latest'] }));
@@ -485,8 +536,20 @@ addEventListener('click', copyClick, true);
 addEventListener('keydown', copyClick, true);
 // localStorage throws in a sandboxed frame, so every access is guarded and a failure means no history.
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
-const recents = () => { try { const r = JSON.parse(store.get('rake.recent') || '[]'); return Array.isArray(r) ? r.filter(isAddr) : []; } catch (e) { return []; } };
-const addRecent = a => store.set('rake.recent', JSON.stringify([a, ...recents().filter(x => x !== a)].slice(0, 8)));
+/* One key per chain. Through the gateway a project's chains share an origin (gw44 decision 9), so a
+   single `rake.recent` was one list for every chain: an address visited on one chain was offered on
+   another, where it may be a different contract or none (m05-t04 § Step 8). The unkeyed value is read
+   once, as this chain's, so nobody loses the list they had. */
+const RECENT = 'rake.recent.' + CFG.chainId;
+const recents = () => {
+  try {
+    let raw = store.get(RECENT);
+    if (raw === null) { const old = store.get('rake.recent'); if (old !== null) { raw = old; store.set(RECENT, old); } }
+    const r = JSON.parse(raw || '[]');
+    return Array.isArray(r) ? r.filter(isAddr) : [];
+  } catch (e) { return []; }
+};
+const addRecent = a => store.set(RECENT, JSON.stringify([a, ...recents().filter(x => x !== a)].slice(0, 8)));
 
 /* ---- names ---------------------------------------------------------------------------------- */
 /* Ported from state-collection `app/src/index.html:224-279`, which took it from its own
@@ -610,7 +673,11 @@ function who() {
   const b = document.getElementById('who');
   b.textContent = ACC ? short(ACC) : 'connect';
   b.title = ACC || '';
-  b.onclick = ACC ? e => { e.stopPropagation(); toggle(wm); } : WALLET ? connect : e => { e.stopPropagation(); toggle(nm); };
+  b.onclick = ACC ? e => { e.stopPropagation(); toggle(wm); }
+    : WALLET ? connect
+    /* Several announced and none remembered: Connect is a choice, not a connection. */
+    : WALLETS.length > 1 ? e => { e.stopPropagation(); walletMenu(); toggle(km); }
+    : e => { e.stopPropagation(); toggle(nm); };
   // Not awaited: the short address is on the button before any round trip, and `who()` stays
   // synchronous for `accountsChanged`, `connect` and `disconnect`, which each already call it.
   if (ACC) nameWho(ACC);
@@ -2300,13 +2367,14 @@ function route() {
 }
 addEventListener('hashchange', route);
 document.getElementById('refresh').onclick = () => route();
-const tb = document.getElementById('theme-btn'), tm = document.getElementById('theme-menu'), wm = document.getElementById('who-menu'), nm = document.getElementById('net-menu');
-const menus = [tm, wm, nm], toggle = m => menus.forEach(x => x.hidden = x === m ? !x.hidden : true);
+const tb = document.getElementById('theme-btn'), tm = document.getElementById('theme-menu'), wm = document.getElementById('who-menu'), nm = document.getElementById('net-menu'), km = document.getElementById('wallet-menu');
+const menus = [tm, wm, nm, km], toggle = m => menus.forEach(x => x.hidden = x === m ? !x.hidden : true);
 tb.onclick = e => { e.stopPropagation(); toggle(tm); const t = localStorage.getItem('theme') || 'system'; tm.querySelectorAll('div').forEach(d => d.className = d.dataset.t === t ? 'on' : ''); };
 tm.onclick = e => { const t = e.target.dataset.t; if (!t) return; localStorage.setItem('theme', t); const d = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme:dark)').matches); document.documentElement.className = d ? 'dark' : ''; tm.hidden = true; };
 wm.onclick = e => { if (e.target.dataset.a === 'off') { wm.hidden = true; disconnect(); } };
 document.getElementById('net').onclick = e => { e.stopPropagation(); toggle(nm); };
 nm.onclick = e => { e.stopPropagation(); if (e.target.dataset.a === 'switch') switchChain(); };
+km.onclick = e => { e.stopPropagation(); if (e.target.dataset.a === 'pick') { km.hidden = true; pickWallet(e.target.dataset.rdns); } };
 document.addEventListener('click', () => toggle(null)); document.addEventListener('keydown', e => { if (e.key === 'Escape') toggle(null); });
 
 (async () => {
