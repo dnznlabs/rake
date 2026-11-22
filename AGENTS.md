@@ -128,6 +128,16 @@
   read path without a wallet, and is the one case `route()`'s "No wallet found" notice is reached on.
   The build inlines `eth.js` (keccak and the ABI subset), `model.js`, `widget.js`, `theme.css` and
   `layout.html` into it.
+- A bundle is built for one chain, so changing network means opening another URL, never
+  `wallet_switchEthereumChain`. The network menu lists every chain in `NETWORKS`. Chains in
+  `ENABLED` link to the same route there, built by the first `Model.GATEWAYS` rewriter (`model.js`, tested in `test/model.test.mjs`) that recognises the
+  current URL (gw44's `/<id>/` path, then the chain label after the app's address in the host), falling back to `GATEWAY_HOME`.
+  The other chains are greyed out under "pending deployment" until `liveCheck` finds a document
+  on one: a single `chunkCount()` read per chain outside `ENABLED`, once per page load, when the
+  menu or `#/docs` first opens, with a yes kept in `rake.live`. So uploading a chain's document is
+  what enables it, on every chain's menu, with no upload elsewhere; `ENABLED` is only the set that
+  needs no read, and once it is complete nothing is asked. A new gateway, such as an ENS one, is one more entry in `GATEWAYS`. The `#/docs` contracts
+  table follows the same answer, greying the rest.
 - `app/src/model.js` is everything that needs no DOM and no provider: `pct`, `countdown`,
   `decodePending`, `supersededBy`, `salt` and the `snapshot()` type string `SNAPSHOT_T`. It is tested
   under node in `test/model.test.mjs` and inlined unchanged, so it reads an ambient `Eth` rather than

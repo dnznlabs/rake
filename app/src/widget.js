@@ -30,7 +30,7 @@
    `test/widget.test.mjs` (b) compares both against it. */
 var SNAP = '0x9711715a', SETBEN = '0x8868f490';
 var CHAINS = {
- '1': 'ethereum', '10': 'op mainnet', '8453': 'base', '42161': 'arbitrum',
+ '1': 'ethereum', '10': 'op mainnet', '8453': 'base', '42161': 'arbitrum', '4326': 'megaeth', '4663': 'robinhood',
  '11155111': 'sepolia', '84532': 'base sepolia', '31337': 'anvil', '31338': 'anvil 31338'
 };
 /* Read now: `currentScript` is null by the time a deferred mount runs. Inlined into the dapp it has no

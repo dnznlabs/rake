@@ -184,7 +184,7 @@ input.narrow{max-width:160px}
 .ticks.pending .tick{border-color:var(--amber);color:var(--amber);padding:6px 0 0 8px;font-size:11px}
 .ticks.pending .nm{opacity:.75}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
-footer{display:flex;justify-content:space-between;border-top:1px solid var(--rule);margin-top:64px;padding:16px 0 40px;font-size:11px;color:var(--dim)}
+footer{display:flex;justify-content:space-between;border-top:1px solid var(--rule);margin-top:64px;padding:16px 0;font-size:11px;color:var(--dim)}
 /* The alpha tag line (ROADMAP decisions 45 and 48), in the header under the nav. The footer's dim
    and size, because it is the same register — a standing statement about the software rather than
    part of the view. One line, no box and no icon: it is read once and then lived with. It is never
@@ -200,8 +200,10 @@ footer{display:flex;justify-content:space-between;border-top:1px solid var(--rul
 .rf{display:inline-flex;color:var(--dim)}.rf:hover{color:var(--accent)}.rf.on{color:var(--rule);cursor:default}
 .asof[hidden],.rf[hidden]{display:none}
 .menu{position:absolute;right:0;top:36px;border:1px solid var(--ink);background:var(--paper);min-width:120px;font-size:12px;z-index:2}
-.menu div{padding:9px 12px}.menu div.k{color:var(--muted);font:12px/1.5 var(--sans)}.menu a{display:block;padding:9px 12px;font:12px/1.5 var(--sans);color:var(--ink)}#net-menu{min-width:220px}.menu div.on{background:var(--ink);color:var(--paper)}
+.menu div{padding:9px 12px}.menu div.k{color:var(--muted);font:12px/1.5 var(--sans)}.menu a{display:block;padding:9px 12px;font:12px/1.5 var(--sans);color:var(--ink);text-decoration:none}.menu a:hover{color:var(--accent)}#net-menu,#wallet-menu{min-width:220px}.menu div.on{background:var(--ink);color:var(--paper)}
 .menu div[data-a],.menu div[data-t]{cursor:pointer}
+.menu div.off{color:var(--dim)}.menu a,.menu div.on,.menu div.off{padding-left:22px}
+.menu div.h{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding-bottom:4px;border-top:1px solid var(--rule);margin-top:6px;padding-top:12px}.menu div.h:first-child{border-top:0;margin-top:0}.menu div.h.sep{border-top-color:var(--ink)}
 .notice{font:15px/1.65 var(--sans);color:var(--muted);max-width:60ch;margin:40px 0}
 .notice a,.notice button{color:var(--ink);border-bottom:1px solid var(--ink)}
 .notice.err{color:var(--err)}
@@ -245,7 +247,7 @@ footer{display:flex;justify-content:space-between;border-top:1px solid var(--rul
 .dtab th{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);text-align:left;padding:10px 16px 10px 0;border-bottom:1px solid var(--rule)}
 .dtab td{padding:11px 16px 11px 0;border-bottom:1px solid var(--rule);vertical-align:baseline;white-space:nowrap}
 .dtab a,.doc a{border-bottom:1px solid var(--rule)}
-.dtab td.dim{color:var(--dim)}.dtab td.warn{color:var(--amber)}
+.dtab tr.off td,.dtab tr.off a{color:var(--dim)}
 /* Small widths. The nav's two links stay: a header whose only destinations vanish on a phone is a
    header with no navigation, so the row pays for them in gap and type size instead. The network pill
    drops its name, the widget goes under the prose, and the fee path swaps to its tall drawing, whose
@@ -257,7 +259,8 @@ footer{display:flex;justify-content:space-between;border-top:1px solid var(--rul
    article rather than a column beside it, so the nine destinations survive a phone. */
 @media (max-width:720px){.frame{padding:0 16px}.navr{gap:10px;font-size:11px}.netname{display:none}#net{padding:6px 8px}.verbs{grid-template-columns:1fr}.hero{grid-template-columns:1fr;gap:40px}.landing>.hero{margin-top:40px}.landing>.sechead{margin-top:40px}.lfig .wide{display:none}.lfig .tall{display:block}.uses{grid-template-columns:1fr}.wdgrid{grid-template-columns:1fr}.two{gap:20px}
 .docgrid{grid-template-columns:1fr;gap:20px}
-.rail{position:static;display:flex;flex-wrap:wrap;gap:2px 14px;line-height:1.8;border-bottom:1px solid var(--rule);padding-bottom:10px}
+.rail{position:static;display:flex;flex-wrap:wrap;justify-content:flex-start;align-items:baseline;gap:2px 14px;line-height:1.8;border-bottom:1px solid var(--rule);padding-bottom:10px}
+.rail .eyebrow{flex-basis:100%;margin:0}
 .erow{grid-template-columns:1fr 72px 24px;row-gap:8px}
 .erow>:nth-child(1){grid-area:1/1}.erow>:nth-child(4){grid-area:1/2}.erow>:nth-child(5){grid-area:1/3}
 .erow>:nth-child(2){grid-area:2/1/auto/-1}.erow>:nth-child(3){grid-area:3/1/auto/-1}.erow .addr-in{width:100%;font-size:11px}

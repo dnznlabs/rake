@@ -33,15 +33,24 @@
    genesis on a real chain. */
 const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTRIBUTIONFACTORY__', factoryBlock: '__DISTRIBUTIONFACTORY_BLOCK__', featuredSalt: '__FEATURED_SALT__', app: '__APP__', impl: '__DISTRIBUTION__' };
 const CONTRACTS = [['DistributionFactory', CFG.factory]];
-const CHAINS = { 1: 'mainnet', 10: 'op mainnet', 8453: 'base', 42161: 'arbitrum', 11155111: 'sepolia', 84532: 'base sepolia', 31337: 'anvil', 31338: 'anvil-b' };
+const CHAINS = { 1: 'mainnet', 10: 'op mainnet', 8453: 'base', 42161: 'arbitrum', 4326: 'megaeth', 4663: 'robinhood', 11155111: 'sepolia', 84532: 'base sepolia', 31337: 'anvil', 31338: 'anvil-b' };
+// Every chain rake intends to be on: M05's four mainnets, its stretch row, and the two testnets.
+// Listed whether or not it is live yet; `ENABLED` says which are.
+const NETWORKS = [1, 8453, 42161, 10, 4326, 4663, 11155111, 84532];
+/* The chains known live when this bundle was built, linked with no read. The rest of `NETWORKS` is
+   pending deployment until `liveCheck` finds a document on one. */
+const ENABLED = [11155111, 84532];
+const TESTNETS = [11155111, 84532];
+// The same route on another chain. The rewriters are `Model.GATEWAYS`: a new gateway is an entry there.
+const chainHref = to => Model.chainHref(location.href, CFG.chainId, to);
 /* A dev chain has no explorer, so `ext()` prints plain text with the full value in the title. */
-const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.io', 8453: 'https://basescan.org', 42161: 'https://arbiscan.io', 11155111: 'https://sepolia.etherscan.io', 84532: 'https://sepolia.basescan.org' };
+const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.io', 8453: 'https://basescan.org', 42161: 'https://arbiscan.io', 4326: 'https://mega.etherscan.io', 4663: 'https://robinhoodchain.blockscout.com', 11155111: 'https://sepolia.etherscan.io', 84532: 'https://sepolia.basescan.org' };
 /* Two readers. It is what the widget snippet in #/docs puts in `data-rpc` — the embedding page's
    developer picks their own endpoint; these are only known public ones, so the example works when
    pasted — and it is this page's own read path when `discover` found no injected provider (#273), by
    way of the read-provider helper below. A chain absent from this table has no read path without a
    wallet, which is the one case `route()`'s no-provider notice is still reached on. */
-const PUBLIC_RPC = { 1: 'https://ethereum-rpc.publicnode.com', 10: 'https://mainnet.optimism.io', 8453: 'https://mainnet.base.org', 42161: 'https://arb1.arbitrum.io/rpc', 11155111: 'https://ethereum-sepolia-rpc.publicnode.com', 84532: 'https://sepolia.base.org', 31337: 'http://127.0.0.1:8545', 31338: 'http://127.0.0.1:8546' };
+const PUBLIC_RPC = { 1: 'https://ethereum-rpc.publicnode.com', 10: 'https://mainnet.optimism.io', 8453: 'https://mainnet.base.org', 42161: 'https://arb1.arbitrum.io/rpc', 4326: 'https://mainnet.megaeth.com/rpc', 4663: 'https://robinhood-rpc.publicnode.com', 11155111: 'https://ethereum-sepolia-rpc.publicnode.com', 84532: 'https://sepolia.base.org', 31337: 'http://127.0.0.1:8545', 31338: 'http://127.0.0.1:8546' };
 const ZERO = '0x' + '0'.repeat(40);
 /*DEV*/
 const Q = new URLSearchParams(location.search);
@@ -242,6 +251,10 @@ function phoneLinks() {
 /* The menu's rows, one per announced wallet. A wallet's name is the wallet's own string, so it goes
    in through `textContent` and never as markup, and its icon is not rendered at all: an `<img>` whose
    src a third party chooses is a request this page does not need to make. */
+function noWalletMenu() {
+  km.innerHTML = '<div class="k">no wallet found — open this page in a browser with a wallet to send transactions.</div>'
+    + phoneLinks().map(([n, href]) => `<a href="${esc(href)}" target="_blank" rel="noopener">open in ${esc(n)}</a>`).join('');
+}
 function walletMenu() {
   km.textContent = '';
   for (const w of WALLETS) {
@@ -773,6 +786,44 @@ async function addrField(value, res) {
 function fill(id, html) { const el = document.getElementById(id); if (el) { el.innerHTML = html; nameSweep(); } }
 
 /* ---- header --------------------------------------------------------------------------------- */
+/* The network menu's rows: this chain, then a link to the same route on every other enabled one,
+   mainnets ahead of testnets, then the chains still to come, greyed. A dev chain is in none of the
+   lists and gets its own row, since it is the one being read. */
+const isHere = id => String(id) === String(CFG.chainId);
+/* Enabled is `ENABLED`, or found serving a document. A chain goes live by its own upload, and baking
+   that into `ENABLED` would mean an upload on every other chain just to say so; so the chains outside
+   the list are asked once per page load whether their `App` holds a document, and a yes is kept in
+   `rake.live` so the next visit needs no read. Once `ENABLED` is complete nothing is asked at all. */
+const LIVE_KEY = 'rake.live';
+const LIVE = new Set((store.get(LIVE_KEY) || '').split(',').filter(Boolean).map(Number));
+const enabled = id => ENABLED.includes(Number(id)) || isHere(id) || LIVE.has(Number(id));
+let LIVECHECK = null;
+// A failed read leaves the chain pending: `0x` from an address with no code throws in `BigInt` too.
+function liveCheck() {
+  return LIVECHECK ||= Promise.all(NETWORKS.filter(id => !enabled(id) && PUBLIC_RPC[id]).map(async id => {
+    try {
+      const n = await rpcProvider(PUBLIC_RPC[id]).request({ method: 'eth_call', params: [{ to: DEPLOYED.app, data: Eth.enc('chunkCount()', []) }, 'latest'] });
+      if (BigInt(n) > 0n) LIVE.add(id);
+    } catch (e) {}
+  })).then(() => {
+    store.set(LIVE_KEY, [...LIVE].join(','));
+    who();
+    const t = document.getElementById('ctab');
+    if (t) t.innerHTML = CTAB_HEAD + contractRows();
+  });
+}
+const netRow = id => isHere(id) ? `<div class="on" aria-current="true">${cname(id)}</div>`
+  : enabled(id) ? `<a href="${esc(chainHref(id))}">${cname(id)}</a>`
+  : `<div class="off">${cname(id)}</div>`;
+const netGroup = (label, ids) => ids.length ? `<div class="h">${label}</div>` + ids.map(netRow).join('') : '';
+const netRows = () => {
+  const on = NETWORKS.filter(enabled), test = id => TESTNETS.includes(id);
+  return (NETWORKS.some(isHere) ? '' : netGroup('local', [CFG.chainId]))
+    + netGroup('mainnets', on.filter(id => !test(id))) + netGroup('testnets', on.filter(test))
+    + netGroup('pending deployment', NETWORKS.filter(id => !enabled(id)));
+};
+// Where else an address or a wallet might belong: every other enabled chain, as links to this route.
+const elsewhere = () => NETWORKS.filter(id => enabled(id) && !isHere(id)).map(id => `<a class="link" href="${esc(chainHref(id))}">${cname(id)}</a>`).join(' · ');
 function who() {
   const b = document.getElementById('who');
   b.textContent = ACC ? short(ACC) : 'connect';
@@ -781,7 +832,9 @@ function who() {
     : WALLET ? connect
     /* Several announced and none remembered: Connect is a choice, not a connection. */
     : WALLETS.length > 1 ? e => { e.stopPropagation(); walletMenu(); toggle(km); }
-    : e => { e.stopPropagation(); toggle(nm); };
+    /* No wallet at all: Connect says so under its own button, with the phone links, rather than
+       opening the network menu, which is a list of networks. */
+    : e => { e.stopPropagation(); noWalletMenu(); toggle(km); };
   // Not awaited: the short address is on the button before any round trip, and `who()` stays
   // synchronous for `accountsChanged`, `connect` and `disconnect`, which each already call it.
   if (ACC) nameWho(ACC);
@@ -791,13 +844,16 @@ function who() {
   /* Without a wallet `CHAIN` is the public endpoint's answer, so the switch is a wallet's alone. A
      chain with no `PUBLIC_RPC` entry has no read path to name: `P` is null there. */
   const pub = PUBLIC_RPC[CFG.chainId], read = WRPC || pub;
-  nm.innerHTML = (WALLET
-      ? `<div class="k">This app lives on ${cname(CFG.chainId)}. Reads and transactions go through your wallet, so it has to be on the same network.</div>`
-      : `<div class="k">no wallet found — open this page in a browser with a wallet to act.</div>`
-        + phoneLinks().map(([n, href]) => `<a href="${esc(href)}" target="_blank" rel="noopener">open in ${esc(n)}</a>`).join('')
-        + (read ? `<div class="k">reads go through ${new URL(read).host}</div>` : ''))
-    + `<div class="k">wallet: ${WALLET && CHAIN ? cname(CHAIN) : 'none'}</div>`
-    + (WALLET && wrong ? `<div data-a="switch">switch wallet to ${cname(CFG.chainId)}</div>` : '');
+  // The networks the page can read, in labelled groups and chosen by URL, then the wallet under a
+  // heavier rule, which only has to agree with it. The switch row stays last: `switchChain` writes its refusal into `lastElementChild`.
+  nm.innerHTML = netRows()
+    + (!WALLET && read ? `<div class="k">reads go through ${new URL(read).host}</div>` : '')
+    + '<div class="h sep">wallet</div>'
+    + (!WALLET ? '<div class="k">none found</div>'
+      : !CHAIN ? '<div class="k">not reachable</div>'
+      : !wrong ? `<div class="k">on ${cname(CHAIN)}</div>`
+      : `<div class="k">on ${cname(CHAIN)}. Transactions go through your wallet, so it has to be on ${cname(CFG.chainId)} too.</div>`
+        + `<div data-a="switch">switch wallet to ${cname(CFG.chainId)}</div>`);
   pill.classList.toggle('warn', wrong);
   pill.title = wrong ? `expected ${cname(CFG.chainId)}` : '';
 }
@@ -1077,7 +1133,7 @@ const bindOlder = () => V.querySelectorAll('.older').forEach(b => { b.onclick = 
 const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow${e.kind === 'escrowed' ? ' err' : e.kind === 'queued' && !e.closed ? ' amber' : e.kind === 'applied' || e.kind === 'accepted' ? ' done' : ''}"><b>${e.kind}</b><span class="w">${e.what}</span><span class="t">block ${e.block} · ${ext('tx', e.tx, short(e.tx))}</span></div>`).join('')}</div>`;
 const eyebrow = (text, cls) => `<div class="eyebrow${cls ? ' ' + cls : ''}">${text}</div>`;
 const notice = (text, cls) => `<div class="notice${cls ? ' ' + cls : ''}">${text}</div>`;
-const unreadable = addr => notice(`could not read a distribution at ${ext('address', addr, short(addr))} on ${cname(CFG.chainId)} — nothing is deployed there.`, 'err');
+const unreadable = addr => notice(`could not read a distribution at ${ext('address', addr, short(addr))} on ${cname(CFG.chainId)} — nothing is deployed there.${elsewhere() ? ` It may be on another network: ${elsewhere()}.` : ''}`, 'err');
 /* The other half of "could not read": there is code at the address, but it is not a clone of this
    factory's implementation, so nothing below this line would be this app's state (R3). */
 const notFactory = addr => notice(`${ext('address', addr, short(addr))} on ${cname(CFG.chainId)} has code, but it is not a distribution of this app's factory — this page will not read it.`, 'err');
@@ -2245,39 +2301,20 @@ const figState = () => '<svg class="fig" width="560" height="150" viewBox="0 0 5
    later task updates it): CREATE2 repeats them on every chain while the bytes are unchanged. Not
    `CFG`'s: anvil places both by plain CREATE, so a dev build's tokens name addresses no other chain has. */
 const DEPLOYED = { factory: '0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E', app: '0x00a9F390A6010d045e0d34856048DdD6910d25BA' };
-// The six chains M05 deploys to, then the dev chain's own row with its own addresses when that is
-// the chain being read.
-const DOCS_CHAINS = [1, 8453, 42161, 10, 11155111, 84532];
+// Every chain in `NETWORKS`, then the dev chain's own row with its own addresses when that is the
+// chain being read.
 const DEV_CHAIN = ['31337', '31338'].includes(String(CFG.chainId));
-const contractChains = () => DOCS_CHAINS.map(id => ({ id, ...DEPLOYED }))
+const contractChains = () => NETWORKS.map(id => ({ id, ...DEPLOYED }))
   .concat(DEV_CHAIN ? [{ id: CFG.chainId, factory: CFG.factory, app: CFG.app }] : []);
-/* Status is read, never written down: a hand-kept column is what left the testnets "not deployed" while
-   they were live. One `eth_getCode` per contract per chain, sent once per page load and only when the
-   table scrolls into view, so opening the docs is not six chains' worth of requests. Code at the
-   address is presence, not proof of the current bytes. */
-const CSTAT = {};
-const codeAt = async (id, a) => {
-  const p = String(id) === String(CFG.chainId) && P ? P : PUBLIC_RPC[id] ? rpcProvider(PUBLIC_RPC[id]) : null;
-  if (!p) throw 0;
-  return (await p.request({ method: 'eth_getCode', params: [a, 'latest'] })).length > 2;
-};
-const chainStatus = c => CSTAT[c.id] ||= Promise.all([codeAt(c.id, c.factory), codeAt(c.id, c.app)])
-  .then(([f, a]) => f && a ? ['live', ''] : f ? ['factory only', 'warn'] : a ? ['app only', 'warn'] : ['not deployed', 'dim'])
-  .catch(() => ['unreachable', 'dim']);
-const contractRows = () => contractChains().map(c => `<tr><td>${cname(c.id)}</td>`
-  + ['factory', 'app'].map(k => `<td>${ext('address', c[k], esc(short(c[k])), false, c.id)}</td>`).join('')
-  + `<td class="dim" data-cstat="${c.id}">checking…</td></tr>`).join('');
-function contractsCheck() {
-  const t = document.getElementById('ctab');
-  if (!t) return;
-  const fill = () => contractChains().forEach(c => chainStatus(c).then(([s, cls]) => {
-    const td = document.querySelector(`[data-cstat="${c.id}"]`);
-    if (td) { td.textContent = s; td.className = cls; }
-  }));
-  if (!self.IntersectionObserver) return fill();
-  const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); fill(); } });
-  io.observe(t);
-}
+/* Status follows `enabled`, the same answer the network menu links from, so the two never disagree.
+   A dev chain's own row is the chain being read. */
+const CTAB_HEAD = '<tr><th>chain</th><th>factory</th><th>app</th><th>status</th></tr>';
+const contractRows = () => contractChains().map(c => {
+  const on = enabled(c.id);
+  return `<tr${on ? '' : ' class="off"'}><td>${cname(c.id)}</td>`
+    + ['factory', 'app'].map(k => `<td>${ext('address', c[k], esc(short(c[k])), false, c.id)}</td>`).join('')
+    + `<td>${on ? 'live' : 'pending deployment'}</td></tr>`;
+}).join('');
 /* `widget.js` is the second document `App` serves, so on an http(s) page it sits beside this one.
    Anywhere else the snippet names an ERC-5219 gateway (#68): `html()`-only clients such as Freedom
    answer every web3:// path with this page, so a bare web3:// src is offered only as the alternative. The address is the distribution its owner arrived from (the owner bar links here), else
@@ -2397,12 +2434,12 @@ function docs() {
 
   <h2 id="s-contracts">Contracts</h2>
   <p>Two contracts are deployed: <code>DistributionFactory</code>, which creates every distribution and is unowned, and <code>App</code>, which serves this page and the widget. Each is placed by a salted <code>CREATE2</code>, so it has the same address on every chain it is deployed to. A distribution has no fixed address; each one is created through the factory.</p>
-  <p>The status column is read from each chain when this table is shown: <i>live</i> means both addresses hold code.</p>
-  <div class="scroll"><table class="dtab" id="ctab"><tr><th>chain</th><th>factory</th><th>app</th><th>status</th></tr>${contractRows()}</table></div>
+  <p>The status column is which chains this app offers: <i>live</i> means the <code>App</code> there serves this page. Chains marked <i>pending deployment</i> are planned; the addresses shown are where the contracts will be placed.</p>
+  <div class="scroll"><table class="dtab" id="ctab">${CTAB_HEAD}${contractRows()}</table></div>
   </article></div>`;
   widgetDemo();
   giveBind();
-  contractsCheck();
+  liveCheck();
 }
 /* The support form under Economics: a plain payment to the featured distribution, any amount, nothing
    pre-filled (decision 1). It goes through `tx` like every write, so it is preflighted and confirmed. */
@@ -2494,7 +2531,7 @@ function route() {
   if (h.startsWith('#/docs')) { docs(); docScroll(h); return; }
   EMBED = null;
   if (!P) { V.innerHTML = notice('No wallet found. Open this page in a browser with a wallet.'); return; }
-  if (wrongChain()) { V.innerHTML = notice(`Your wallet is on ${cname(CHAIN)}. This app lives on ${cname(CFG.chainId)}. <button id="sw">Switch network</button>.`); document.getElementById('sw').onclick = switchChain; return; }
+  if (wrongChain()) { V.innerHTML = notice(`Your wallet is on ${cname(CHAIN)}. This app lives on ${cname(CFG.chainId)}. <button id="sw">Switch network</button>${enabled(CHAIN) ? `, or <a class="link" href="${esc(chainHref(CHAIN))}">open rake on ${cname(CHAIN)}</a>` : ''}.`); document.getElementById('sw').onclick = switchChain; return; }
   if (S.error) { V.innerHTML = notice(`could not read the factory at ${CFG.factory}: ${esc(S.error)}`, 'err'); return; }
   if (!S.loaded) return;
   scrollTo(0, 0);
@@ -2511,7 +2548,7 @@ const menus = [tm, wm, nm, km], toggle = m => menus.forEach(x => x.hidden = x ==
 tb.onclick = e => { e.stopPropagation(); toggle(tm); const t = localStorage.getItem('theme') || 'system'; tm.querySelectorAll('div').forEach(d => d.className = d.dataset.t === t ? 'on' : ''); };
 tm.onclick = e => { const t = e.target.dataset.t; if (!t) return; localStorage.setItem('theme', t); const d = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme:dark)').matches); document.documentElement.className = d ? 'dark' : ''; tm.hidden = true; };
 wm.onclick = e => { if (e.target.dataset.a === 'off') { wm.hidden = true; disconnect(); } };
-document.getElementById('net').onclick = e => { e.stopPropagation(); toggle(nm); };
+document.getElementById('net').onclick = e => { e.stopPropagation(); toggle(nm); if (!nm.hidden) liveCheck(); };
 nm.onclick = e => { e.stopPropagation(); if (e.target.dataset.a === 'switch') switchChain(); };
 km.onclick = e => { e.stopPropagation(); if (e.target.dataset.a === 'pick') { km.hidden = true; pickWallet(e.target.dataset.rdns); } };
 document.addEventListener('click', () => toggle(null)); document.addEventListener('keydown', e => { if (e.key === 'Escape') toggle(null); });

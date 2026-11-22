@@ -15,7 +15,7 @@ globalThis.Eth = Eth;
 const { SNAPSHOT_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt } = Model;
 const { revertMessage, tableFrom, parseDelay, wei, namehash, plainName } = Model;
 const { windows, rangeCap, isPruned, isWrappedRefusal, nonceOf } = Model;
-const FUNCTIONS = ['countdown', 'dateText', 'deadline', 'decodePending', 'isPruned', 'isWrappedRefusal', 'namehash', 'nonceOf', 'ownerChange', 'ownerKind', 'parseDelay', 'pct', 'plainName', 'rangeCap', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei', 'windows'];
+const FUNCTIONS = ['chainHref', 'countdown', 'dateText', 'deadline', 'decodePending', 'isPruned', 'isWrappedRefusal', 'namehash', 'nonceOf', 'ownerChange', 'ownerKind', 'parseDelay', 'pct', 'plainName', 'rangeCap', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei', 'windows'];
 const SET_BENEFICIARIES = 'setBeneficiaries((address,uint96,string,string)[])';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/abi');
@@ -570,4 +570,26 @@ test('plainName caps a name at 64 characters', () => {
   assert.equal(plainName(label(64)), true, 'a 64-character name was refused');
   assert.equal(label(65).length, 65);
   assert.equal(plainName(label(65)), false, 'a 65-character name passed the cap');
+});
+
+test('chainHref rewrites the chain in each gateway scheme and falls back to the canonical one', () => {
+  const APP = '0x00a9f390a6010d045e0d34856048ddd6910d25ba';
+  const cases = [
+    // gw44: the chain is the first path segment; route, query and hash are kept.
+    ['https://rake.dnzn.dev/11155111/#/distros/0xabc', 11155111, 84532, 'https://rake.dnzn.dev/84532/#/distros/0xabc'],
+    ['https://rake.dnzn.dev/1/?x=1#/docs', 1, 10, 'https://rake.dnzn.dev/10/?x=1#/docs'],
+    ['https://rake.dnzn.dev/10/', 10, 1, 'https://rake.dnzn.dev/1/'],
+    // w3link and the local gateway: the chain is the label after the app's address.
+    [`https://${APP}.11155111.w3link.io/#/docs`, 11155111, 84532, `https://${APP}.84532.w3link.io/#/docs`],
+    [`http://${APP}.31337.w3.localhost:8787/`, 31337, 1, `http://${APP}.1.w3.localhost:8787/`],
+    // No scheme recognised: the canonical gateway, with the hash.
+    ['https://rake.dnzn.dev/#/docs', 11155111, 84532, 'https://rake.dnzn.dev/84532/#/docs'],
+    ['https://rake.wei.limo/#/docs', 1, 8453, 'https://rake.dnzn.dev/8453/#/docs'],
+    ['http://localhost:3000/?rpc=x#/', 31337, 84532, 'https://rake.dnzn.dev/84532/#/'],
+    // An IP host is not a gateway label, whatever its octets are.
+    ['http://127.0.0.1:8000/', 1, 10, 'https://rake.dnzn.dev/10/'],
+    ['http://192.168.1.10/#/docs', 10, 1, 'https://rake.dnzn.dev/1/#/docs'],
+  ];
+
+  for (const [href, from, to, want] of cases) assert.equal(Model.chainHref(href, from, to), want, href);
 });
