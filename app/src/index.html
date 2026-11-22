@@ -1085,7 +1085,15 @@ function describe(p, owner) {
   }
   return 'unknown action · selector ' + esc(p.selector);
 }
-const delayText = d => Number(d) === 0 ? 'none — changes apply instantly' : Number(d) % 86400 === 0 ? Number(d) / 86400 + 'd' : Math.round(Number(d) / 3600) + 'h';
+/* One number and one unit — the largest of `d`, `h`, `m`, `s` that divides the delay exactly, so
+   nothing is rounded and what is shown is a string `Model.parseDelay` reads back as the same number
+   of seconds. The hours-only form rounded 600 s to `0h` and 5,400 s to `2h`, and the queue field is
+   prefilled from here, so a round trip through it proposed a delay nobody typed (#345, step 4c). */
+const delayText = d => Number(d) === 0 ? 'none — changes apply instantly'
+  : Number(d) % 86400 === 0 ? Number(d) / 86400 + 'd'
+  : Number(d) % 3600 === 0 ? Number(d) / 3600 + 'h'
+  : Number(d) % 60 === 0 ? Number(d) / 60 + 'm'
+  : Number(d) + 's';
 
 /* ---- the bar, the ledger, the lines ---------------------------------------------------------- */
 const V = document.getElementById('view');
@@ -1786,7 +1794,7 @@ function drawerHTML(d) {
     + '<div class="qrows">'
     + qrow('name', `<input id="q-desc" aria-label="name" value="${esc(d.description)}">`,
       prop('desc', 'queue', 'setDescription', 'setDescription(string)', () => [val('q-desc')]))
-    + qrow('delay', `<input id="q-delay" aria-label="delay" value="${Number(d.delay) ? esc(delayText(d.delay)) : '0'}"><div class="res">7d, 48h or 0</div>`,
+    + qrow('delay', `<input id="q-delay" aria-label="delay" value="${Number(d.delay) ? esc(delayText(d.delay)) : '0'}"><div class="res">7d, 48h, 30m, 90s or 0</div>`,
       prop('delay', 'queue', 'setDelay', 'setDelay(uint32)', () => {
         const s = Model.parseDelay(val('q-delay'));
         if (s === null) throw new Error('delay takes 7d, 48h, 30m or a number of seconds');

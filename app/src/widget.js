@@ -85,7 +85,9 @@ function pct(bps){return bps/100}
 /* An unlisted chain reads as its id rather than as ethereum: the mismatch sentence below names two
    chains, and a default would make one of them a lie. */
 function cname(id){return CHAINS[id]||'chain '+id}
-function fmtDelay(s){if(!s)return 'no delay';var d=Math.floor(s/86400),h=Math.round(s%86400/3600);return d?d+'d'+(h?' '+h+'h':''):h+'h'}
+/* The page's `delayText` rule, in the widget's idiom: one number and the largest unit that divides
+   the delay exactly, so a sub-hour delay reads `10m` rather than the `0h` the rounding gave (#345). */
+function fmtDelay(s){return !s?'no delay':s%86400===0?s/86400+'d':s%3600===0?s/3600+'h':s%60===0?s/60+'m':s+'s'}
 function fmtEta(eta){var s=eta-Math.floor(Date.now()/1000);if(s<=0)return null;var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d?d+'d '+h+'h':(h?h+'h '+m+'m':m+'m')}
 /* `GRACE` in `src/Distribution.sol`: a matured action stays applicable for fourteen days and expires
    after that, so a row that only ever says `ready to apply` goes on claiming something the contract
