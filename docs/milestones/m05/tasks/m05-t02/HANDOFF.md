@@ -312,3 +312,58 @@ before the send at **5,758,940 wei**, under the 0.05 gwei stop.
 **4,036,710** gas of the 8,137,198 limits asked for, and the engineer's key went from
 0.005000000 ETH to **0.004973603667288535 ETH** — **26,396,332,711,465 wei, about 0.0000264 ETH**, for
 the pair. The 0.002 ETH Base ask was therefore about **76×** what the chain charged.
+
+## Part B — Base (8453), step 5 and the record
+
+**Sourcify — the gate — passes.** Run with `env -u ETHERSCAN_API_KEY`, for the reason § 5 gives: with
+the key set, forge ignores `--verifier sourcify`, goes to Etherscan, reports `already verified` and
+exits 0, so a Sourcify verification that never ran looks done.
+
+| address | what happened | `match` read back |
+|:--|:--|:--|
+| `DistributionFactory` `0x00D19609…6d7f8E` | **already verified** — not this run's submission | `exact_match` |
+| `Distribution` `0xc4eD7EA2…F8cB0A` | **verified by this run**, `Status: exact_match` after one pending poll | `exact_match` |
+| `App` `0x00a9F390…0d25BA` | **already verified** — not this run's submission | `exact_match` |
+
+The asserting loop printed **three `exact_match` lines and exited 0**. Which of the two each address
+was is recorded above because § 5 says to: `getsourcecode` carries no verification timestamp, so a
+re-run cannot tell a verification this run submitted from one that already existed. Two of the three
+were already held — the same bytes and metadata as the testnets — and only the implementation was
+submitted here.
+
+**The loop was also run against an address Sourcify cannot hold**
+(`0x0000…dEaD`), which answered `null`, the reading that would exit 1. The gate therefore
+discriminates rather than merely passing — which is the whole point of #207 making the shell the
+judge instead of the operator's eye.
+
+**OpenChain signatures: 82 `Duplicated:`, 0 `Imported:`** — the 82 this ABI has, all of them already
+held, which is what an unchanged ABI on a new chain should print. Uploaded 2026-11-22 from the
+artifacts this deployment was built from.
+
+**`make attest` exits 0 across all three records** — nine contract readings over Sepolia, Base
+Sepolia and Base. Base's code hashes are **identical to both testnets'**: factory
+`0x66d10374…8b6c2`, implementation `0xd3399543…caa8c`, `App` `0x691c7120…88a75`, which is what one
+CREATE2 input set means in practice.
+
+`deployments/8453.json` carries its **own `rpc`**, and `tools/attest.mjs` now prefers that over
+`deploy/chains.json`. The reason is a side effect worth avoiding: `deploy/chains.json` is the
+**gateway's** chain list, so adding a mainnet to it in order to attest would change what the gateway
+serves. A deployment record should carry everything needed to check it.
+
+`cast call $APP "chunkCount()(uint256)"` prints **0** on Base. **Step 4 was not run** and no mainnet
+document exists.
+
+### The explorer verification is submitted and queued, not done
+
+This is the one part of step 5 still open, and the cause is on Basescan's side:
+
+- `forge verify-contract --watch` twice returned `Error: Checking verification result failed` with
+  `Verification is still pending...`.
+- Submitting without `--watch` gave `Response: OK` and GUID
+  **`6xw4xwzxi2dcmrtkvyxchcehcansymkj6jrvgkzd8gqxqviaiq`**, and
+  `checkverifystatus` has answered **`Pending in queue`** on every poll across ~20 minutes.
+- `getsourcecode` for all three addresses still returns an **empty `ContractName`**.
+
+So nothing is claimed as verified on the explorer. I stopped re-submitting once the API told me the
+first submission was queued: a second submission only lengthens the queue, and asking the API what
+became of the first is the cheaper question — which I should have asked before submitting twice.
