@@ -84,6 +84,39 @@ chains later.
    two chunks today, 24,068 and 21,444 bytes of calldata (`RUNBOOK.md:649-650`). **If the build
    needs a third document chunk, stop and report** with the byte count: the proposal count and
    the sizing rule change, and that is a plan question.
+   **Amended 2026-11-21: the stop was taken, and a third chunk is allowed, inside the batch.**
+   As reported by the engineer on [#336](https://github.com/dnznlabs/rake/issues/336): `main`'s
+   document compresses to between 47,659 and 47,917 bytes depending on which contract addresses
+   the build substitutes (equal length, different bytes, so the raw size holds and the compressed
+   size moves by about 260), against the 48,000 two chunks hold. This task's changes add 464 to
+   467 compressed bytes in either state and bring it to between 48,123 and 48,384, so a third
+   chunk of 123 to 384 bytes is needed whichever addresses are in it.
+   The chunk size stays 24,000: `RUNBOOK.md` § Gas makes that the ceiling, and it is not raised
+   to buy room. What changes is the upload's shape, and only as far as it must:
+   - **Proposals stay three per chain.** Document chunks 0 and 1 are proposals 1 and 2 as today.
+     Every document chunk after the second is an `addChunk` call **inside the batch**, ahead of
+     `addWidgetChunk`, so the batch becomes `addChunk` (one per extra chunk), `addWidgetChunk`,
+     `setChunks`, `setWidgetChunks`, in that order. `App` creates its pointers in call order, so
+     the pointer `setChunks` names for chunk 2 is `App`'s CREATE at nonce *N* + 2 and the
+     widget's at *N* + 3.
+   - **`tools/step4-calldata.mjs` builds that shape for any chunk count of two or more**, refuses
+     a batch over the 65,536-character cap as it refuses any file over it, and prints the pointer
+     list it derived. The file names for proposals 1 and 2 do not change. A unit test builds a
+     three-chunk payload and asserts the batch's decoded calls and their order, the pointer
+     addresses for a given `App` nonce, and that a two-chunk payload still produces today's five
+     files byte for byte.
+   - **`RUNBOOK.md` § 4a to § 4d say it**: the batch's contents by rule and not by count, the
+     gate before each piece read from the calldata as now, and `cast nonce $APP` after an upload
+     as *N* plus the number of chunks uploaded, document and widget together, in place of the
+     literal 4.
+   - **The fork proof of § Gas runs before any signature**, as it does today, on both testnets:
+     the three pieces executed in order on a fork, then `chain-doc`'s `inflated sha256` equal to
+     the build. That is what shows the three-chunk document reassembles.
+   - **Stop and report** if the batch's estimate on either testnet exceeds half that chain's
+     block gas limit, or if the document needs a fourth chunk.
+   - **The handoff quotes the compressed size with the address set it was built against**, since
+     the same source gives sizes about 260 bytes apart; `RUNBOOK.md`'s sizing text gains that
+     sentence where it states the two-chunk figures.
 7. **One PR** with steps 2 to 6, the regenerated `calldata/` for both testnets, and
    `docs/milestones/m04/tasks/m04-t05/UAT.md` gaining rows for: the menu with two extensions, a remembered wallet after reload, the chain's
    name with no wallet, and each listed phone link. Review, then merge.
@@ -135,7 +168,9 @@ chains later.
 - A test holds the header's network name with no wallet connected, and an address saved under
   one chain id is not listed under another.
 - On both testnets `make chain-doc`'s `inflated sha256` equals `sha256sum app/dist/index.html`,
-  and the document is still two chunks, or the stop of step 6 was taken.
+  and the document is two chunks, or three with the third inside the batch as step 6 was
+  amended; three proposals per chain either way, and a two-chunk payload still produces
+  byte-identical calldata to `main`'s tool.
 - M04 criterion 6's signoff is in the handoff, dated, in the Product Owner's words, for this
   document.
 - The Product Owner's word that the preview of step 7a was good is on its action issue, dated
