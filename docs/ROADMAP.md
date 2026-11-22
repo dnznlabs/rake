@@ -1220,8 +1220,13 @@ convention. Numbered 45 because 44 is taken by
     in the network menu. Their uploads are not proposed until he asks, and M05's close-out does not
     wait for them. This is also the written go M05-D3 requires for the contract sends; every
     document upload still takes his co-signatures. **Why:** the addresses are the permanent part,
-    and he wants them placed on all four; the chains he wants in use at launch are Base and
-    Ethereum. Decision 67 had already separated the contract deploys from the first document.
+    and he wants them placed on all four. DNZN's own products are built on Ethereum (his statement of
+    2026-11-22); the other mainnets are there for other people's distributions, and Base is the
+    one of them he wants live at launch. Decision 67 had already separated the contract deploys
+    from the first document. **`rake.dnzn.dev/` goes to Ethereum** once its document is up, which
+    closes the question decision 68 left with m05-t04, whose default was Base; if Base's upload
+    lands first it holds `/` until Ethereum's does. The embed and criterion 5's screenshot are
+    taken on Ethereum for the same reason.
     **Accepted with it:** all four deploys precede any real use on a mainnet, so a `fix`-grade
     finding after them supersedes four deployments where the earlier phasing risked one. What
     remains of that hedge is the order inside m05-t02 (Base first, a stop between chains on any

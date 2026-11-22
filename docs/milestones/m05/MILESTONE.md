@@ -323,8 +323,9 @@ last task (the document a wallet has been run against) and Phase 2's merge. Phas
 Phase 3's second task and gates nothing.
 
 **Contracts on four chains before a document on any.** The addresses are the permanent part, and
-the Product Owner wants them placed on all four; the chains he wants in use at launch are Base and
-Ethereum. Inside Phase 2 the order is Base, OP Mainnet, Arbitrum One, Ethereum, with a stop between
+the Product Owner wants them placed on all four. DNZN's own products are built on Ethereum; the
+other mainnets are there for other people's distributions, and Base is the one of them he wants
+live at launch. Inside Phase 2 the order is Base, OP Mainnet, Arbitrum One, Ethereum, with a stop between
 chains on any deviation: Base is the cheapest place to meet a runbook surprise and the sibling of
 the testnet the runbook was rehearsed on, and Ethereum is the dearest. Rejected, and the plan until
 2026-11-22: Base end to end, then the other three in a second task. It kept a `fix`-grade finding
@@ -365,7 +366,7 @@ are a second task that passes or is recorded.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| m05-t03 | **The document on Base, then on Ethereum.** Run B on each: the cut from the tip of `main`, three proposals at the vault's live nonce, co-signed, executed after the vault's delay, 4d's byte comparison before the batch is executed; `make gateway-check` against `https://<App>.<chainId>.w3link.io/`; the chain added to `rake.dnzn.dev` by `RUNBOOK.md` § The gateway, Base taking `/`; a § Uploads row each. Ethereum's base fee against the stop rule before every send. On Base, the first deposit and `distribute`, and the signoff below. A chain's upload needs that chain's `create` landed, or its featured panel has nothing to paint | not started — not yet planned; gated on m05-t01c's testnet upload and wallet run, since the document is that one, and on m05-t02's merge |
+| m05-t03 | **The document on Base, then on Ethereum.** Run B on each: the cut from the tip of `main`, three proposals at the vault's live nonce, co-signed, executed after the vault's delay, 4d's byte comparison before the batch is executed; `make gateway-check` against `https://<App>.<chainId>.w3link.io/`; the chain added to `rake.dnzn.dev` by `RUNBOOK.md` § The gateway, with `/` going to Ethereum once its document is up (decision 70) and to Base only until then; a § Uploads row each. Ethereum's base fee against the stop rule before every send. On Base, the first deposit and `distribute`, and the signoff below. A chain's upload needs that chain's `create` landed, or its featured panel has nothing to paint | not started — not yet planned; gated on m05-t01c's testnet upload and wallet run, since the document is that one, and on m05-t02's merge |
 | m05-t05 | **MegaETH (4326) and Robinhood Chain (4663), the stretch row** (decision 4). First measurements, no key: a gateway that resolves either chain (w3link.io answered nothing for both on 2026-11-18), an explorer `forge verify-contract` can reach, step 1e's pricing. If both pass, the m05-t02 and m05-t03 lists on each; if either fails, the finding is recorded in this file beside criterion 3 and the row closes as not reached. The milestone closes either way | not started — after m05-t03; optional by decision 4 |
 
 **Signoff:** _not yet — a dated line by Denizen after reading DNZN's distribution on Base through the
