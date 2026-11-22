@@ -6,6 +6,12 @@ PR: #329 · Branches: `feat/m05-t04-gateway`, `fix/m05-t04-concurrency`, `docs/m
 
 Four PRs rather than one, because two of them were fixes found by running the thing: **#322** (the configuration and the caller), **#324** (the caller's `concurrency`, which deadlocked the call), **#325** (`RUNBOOK.md` § The gateway and the README row) and this handoff. **#323 was opened on a wrong diagnosis and closed without merging**; it is in § Deviations because the record should show what I believed before I measured.
 
+**Amended 2026-11-21, by m05-t04a:** the Product Owner ruled on seeing the deployed site that `/`
+lands on **Sepolia** while rake is testnet-only, so this task's first acceptance criterion and its
+step 1 `"default"` are superseded. What is recorded below was true when it was measured and is not
+rewritten; [m05-t04a](../m05-t04a/HANDOFF.md) carries the change and its own readings. The rule for
+the first mainnet chain is untouched.
+
 ## Acceptance criteria
 
 | AC | Result | Evidence |
