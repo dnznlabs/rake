@@ -388,8 +388,11 @@ This is the one part of step 5 still open, and the cause is on Basescan's side:
 - `forge verify-contract --watch` twice returned `Error: Checking verification result failed` with
   `Verification is still pending...`.
 - Submitting without `--watch` gave `Response: OK` and GUID
-  **`6xw4xwzxi2dcmrtkvyxchcehcansymkj6jrvgkzd8gqxqviaiq`**, and
-  `checkverifystatus` has answered **`Pending in queue`** on every poll across ~20 minutes.
+  **`6xw4xwzxi2dcmrtkvyxchcehcansymkj6jrvgkzd8gqxqviaiq`**, issued at about **08:44Z**, and
+  `checkverifystatus` answered **`Pending in queue`** on every poll from then to **08:52Z** —
+  **about eight minutes**, not the "~20 minutes" first written here. The figure is the poll loop's own
+  elapsed runtime against the clock, not an impression of how long it felt; the first draft of this
+  line was the impression, which is exactly the kind of number that should never be written down.
 - `getsourcecode` for all three addresses still returns an **empty `ContractName`**.
 
 So nothing is claimed as verified on the explorer. I stopped re-submitting once the API told me the
