@@ -131,6 +131,9 @@ there, `DNZN_DELAY=604800`. `RPC` per chain from `RUNBOOK.md` § 1's table.
      `balanceOf` of an account holding a known non-zero native balance, and a `cast call` of
      `transfer` from that account, each with what it returned or that it reverted. The gate holds
      if `balanceOf` does not answer that account's native balance and `transfer` does not succeed;
+   - **the control first:** the same `balanceOf` call against Celo's `GoldToken` on Celo mainnet,
+     which § 1 records as answering the native balance. A probe that cannot see that case proves
+     nothing by missing it on Ethereum;
    - `RUNBOOK.md` § 1's Ethereum row corrected to say what was measured and when, the old cell
      kept beside it as superseded.
 
