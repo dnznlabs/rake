@@ -345,7 +345,10 @@ gateway from a wallet, and after the first deposit and `distribute` have run, go
 
 OP Mainnet, Arbitrum One, Ethereum in one task after Base's handoff is reviewed; M05-D3 is ruled
 (decision 55), so no review result is waited on;
-MegaETH and Robinhood Chain as a second task that passes or is recorded.
+MegaETH and Robinhood Chain as a second task that passes or is recorded. Under decision 69 the
+order of the uploads does not matter to the dapp's network menu: each chain appears on every other
+chain's menu when its own document is up, and both stretch chains are listed there as pending
+deployment whether or not m05-t05 reaches them.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
