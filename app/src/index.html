@@ -847,9 +847,8 @@ function who() {
   // The networks the page can read, in labelled groups and chosen by URL, then the wallet under a
   // heavier rule, which only has to agree with it. The switch row stays last: `switchChain` writes its refusal into `lastElementChild`.
   nm.innerHTML = netRows()
-    + (!WALLET && read ? `<div class="k">reads go through ${new URL(read).host}</div>` : '')
     + '<div class="h sep">wallet</div>'
-    + (!WALLET ? '<div class="k">none found</div>'
+    + (!WALLET ? '<div class="k">none found</div>' + (read ? `<div class="k">reads go through ${new URL(read).host}</div>` : '')
       : !CHAIN ? '<div class="k">not reachable</div>'
       : !wrong ? `<div class="k">on ${cname(CHAIN)}</div>`
       : `<div class="k">on ${cname(CHAIN)}. Transactions go through your wallet, so it has to be on ${cname(CFG.chainId)} too.</div>`
