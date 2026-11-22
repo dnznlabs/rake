@@ -37,11 +37,15 @@ chains later.
    A wallet's name is the wallet's own string: it reaches the page through `textContent` or
    `esc`, never as markup, and its icon is not rendered. Check: tests for each of the four cases,
    and one in which a wallet announces a name containing markup and the menu shows it as text.
-4. **Two carried findings that ride this upload**, because each would otherwise cost one of its
-   own:
-   - [#328](https://github.com/dnznlabs/rake/issues/328): the header names the chain the page
-     reads, from `CFG.chainId`, with no wallet connected. Check: the issue's own search of
-     `document.body.innerText` finds the chain's name on the home route.
+4. **One carried finding that rides this upload**, because it would otherwise cost one of its
+   own. (Amended 2026-11-21: this step first carried a second,
+   [#328](https://github.com/dnznlabs/rake/issues/328), that the page names no network with no
+   wallet connected. It does: `app/src/index.html:619` sets `#netname` from `CFG.chainId`, and the
+   live pages read `sepolia` and `base sepolia`. The reading behind #328 searched for the names
+   with capitals; the issue is closed as invalid and nothing is built for it.)
+   - **Hold what is already true.** A test asserts that the header's network name is set from the
+     build's chain with no wallet connected. If a test already asserts it, name it in the handoff
+     and add none.
    - `rake.recent` is one key for every chain on a shared origin (m05-t04's handoff, § Step 8).
      Key it by chain id, and read an old unkeyed value once as the current chain's so nobody
      loses a list. Check: a test in which an address saved on one chain id is absent on another.
@@ -91,8 +95,8 @@ chains later.
 - A phone browser with no wallet shows a link for each wallet step 1 saw work and for no other,
   and each opens the same page, fragment included, in that wallet's browser, where Connect
   works. Shown by the Product Owner's rows in `shots/`.
-- #328's search finds the chain's name with no wallet connected, and an address saved under one
-  chain id is not listed under another.
+- A test holds the header's network name with no wallet connected, and an address saved under
+  one chain id is not listed under another.
 - On both testnets `make chain-doc`'s `inflated sha256` equals `sha256sum app/dist/index.html`,
   and the document is still two chunks, or the stop of step 6 was taken.
 - M04 criterion 6's signoff is in the handoff, dated, in the Product Owner's words, for this
@@ -134,4 +138,5 @@ chains later.
 - m05-t01's criterion 18b and [#302](https://github.com/dnznlabs/rake/issues/302), which this
   task's step 9 now answers.
 - gw44 decision 11: a testnet shares the origin on condition that the application says which
-  network it is showing. #328 is that condition with no wallet connected.
+  network it is showing. The header does, with or without a wallet (`app/src/index.html:619`);
+  step 4's test holds it.
