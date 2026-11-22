@@ -498,3 +498,37 @@ script that exits rather than sends.
 
 The engineer's key went from 0.025093601 to **0.024810701795026610 ETH** — **282,899,700,340 wei**,
 about **0.000283 ETH**, for this send.
+
+## Part B — Ethereum (1), step 3: `App`
+
+`P` = **2,286,547** from its own dry run, `G` = **190**, limit **3,341,876**. Base fee read
+immediately before the send: **117,397,085 wei ≈ 0.117 gwei**, against the 1 gwei stop.
+
+| reading | value | required |
+|:--|:--|:--|
+| transaction | **`0x37d157cc643bb26358d59e6de43bc967b5bcffd72e57d26a2ec57bdd5f8d3295`** | — |
+| status | **1** | — |
+| block | **26,469,806** | — |
+| `gasUsed` | **1,655,420** of 3,341,876 (49.5%) | — |
+| effective gas price | 123,794,910 wei | — |
+| `App` | **`0x00a9F390A6010d045e0d34856048DdD6910d25BA`** | equal to step 1f's prediction ✓ |
+| `owner()` | **`0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`** | the Ops vault ✓ |
+| `version()` | **`v0.1`** | ✓ |
+| `locked()` | **false** | false, and stays false ✓ |
+| `chunkCount()` | **0** | 0 — no mainnet document in this task ✓ |
+| `cmp` against the artifact | **equal**, 7,154 bytes | equal outright ✓ |
+
+**Four sends across two mainnets, every one landing first time, no refusal and no retry.** The gas is
+identical per step across the two chains — 2,381,290 for each factory and 1,655,420 for each `App` —
+which is what the same init code at the same optimiser settings should cost, and is worth stating
+because it is also a check: a different figure would have meant different bytes.
+
+**What the two chains cost, from the balances rather than the estimates:**
+
+| chain | spent | at |
+|:--|--:|:--|
+| Base | **0.0000264 ETH** | ~0.006 gwei |
+| Ethereum | **0.00048783 ETH** | ~0.12 gwei |
+
+The engineer's key holds **0.024605769225114410 ETH** on Ethereum and **0.004973603667288535 ETH** on
+Base afterwards. Ethereum's ask was 0.01 ETH, so the deploy used **under 5%** of it.
