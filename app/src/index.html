@@ -37,9 +37,8 @@ const CHAINS = { 1: 'mainnet', 10: 'op mainnet', 8453: 'base', 42161: 'arbitrum'
 // Every chain rake intends to be on: M05's four mainnets, its stretch row, and the two testnets.
 // Listed whether or not it is live yet; `ENABLED` says which are.
 const NETWORKS = [1, 8453, 42161, 10, 4326, 4663, 11155111, 84532];
-/* The chains the network menu links to. Hand-kept and not read from the chain on purpose: a chain is
-   enabled when it is deployed *and* meant to be offered, and code at an address answers only the
-   first. The rest of `NETWORKS` is listed as pending deployment. */
+/* The chains known live when this bundle was built, linked with no read. The rest of `NETWORKS` is
+   pending deployment until `liveCheck` finds a document on one. */
 const ENABLED = [11155111, 84532];
 const TESTNETS = [11155111, 84532];
 // The same route on another chain. The rewriters are `Model.GATEWAYS`: a new gateway is an entry there.
@@ -787,20 +786,40 @@ function fill(id, html) { const el = document.getElementById(id); if (el) { el.i
    mainnets ahead of testnets, then the chains still to come, greyed. A dev chain is in none of the
    lists and gets its own row, since it is the one being read. */
 const isHere = id => String(id) === String(CFG.chainId);
+/* Enabled is `ENABLED`, or found serving a document. A chain goes live by its own upload, and baking
+   that into `ENABLED` would mean an upload on every other chain just to say so; so the chains outside
+   the list are asked once per page load whether their `App` holds a document, and a yes is kept in
+   `rake.live` so the next visit needs no read. Once `ENABLED` is complete nothing is asked at all. */
+const LIVE_KEY = 'rake.live';
+const LIVE = new Set((store.get(LIVE_KEY) || '').split(',').filter(Boolean).map(Number));
+const enabled = id => ENABLED.includes(Number(id)) || isHere(id) || LIVE.has(Number(id));
+let LIVECHECK = null;
+// A failed read leaves the chain pending: `0x` from an address with no code throws in `BigInt` too.
+function liveCheck() {
+  return LIVECHECK ||= Promise.all(NETWORKS.filter(id => !enabled(id) && PUBLIC_RPC[id]).map(async id => {
+    try {
+      const n = await rpcProvider(PUBLIC_RPC[id]).request({ method: 'eth_call', params: [{ to: DEPLOYED.app, data: Eth.enc('chunkCount()', []) }, 'latest'] });
+      if (BigInt(n) > 0n) LIVE.add(id);
+    } catch (e) {}
+  })).then(() => {
+    store.set(LIVE_KEY, [...LIVE].join(','));
+    who();
+    const t = document.getElementById('ctab');
+    if (t) t.innerHTML = CTAB_HEAD + contractRows();
+  });
+}
 const netRow = id => isHere(id) ? `<div class="on" aria-current="true">${cname(id)}</div>`
-  : ENABLED.includes(id) ? `<a href="${esc(chainHref(id))}">${cname(id)}</a>`
+  : enabled(id) ? `<a href="${esc(chainHref(id))}">${cname(id)}</a>`
   : `<div class="off">${cname(id)}</div>`;
 const netGroup = (label, ids) => ids.length ? `<div class="h">${label}</div>` + ids.map(netRow).join('') : '';
 const netRows = () => {
-  // The chain being read counts as enabled here: a bundle uploaded ahead of its `ENABLED` entry must
-  // not list itself as pending.
-  const en = id => ENABLED.includes(id) || isHere(id), on = NETWORKS.filter(en), test = id => TESTNETS.includes(id);
+  const on = NETWORKS.filter(enabled), test = id => TESTNETS.includes(id);
   return (NETWORKS.some(isHere) ? '' : netGroup('local', [CFG.chainId]))
     + netGroup('mainnets', on.filter(id => !test(id))) + netGroup('testnets', on.filter(test))
-    + netGroup('pending deployment', NETWORKS.filter(id => !en(id)));
+    + netGroup('pending deployment', NETWORKS.filter(id => !enabled(id)));
 };
 // Where else an address or a wallet might belong: every other enabled chain, as links to this route.
-const elsewhere = () => ENABLED.filter(id => !isHere(id)).map(id => `<a class="link" href="${esc(chainHref(id))}">${cname(id)}</a>`).join(' · ');
+const elsewhere = () => NETWORKS.filter(id => enabled(id) && !isHere(id)).map(id => `<a class="link" href="${esc(chainHref(id))}">${cname(id)}</a>`).join(' · ');
 function who() {
   const b = document.getElementById('who');
   b.textContent = ACC ? short(ACC) : 'connect';
@@ -809,7 +828,7 @@ function who() {
     : WALLET ? connect
     /* Several announced and none remembered: Connect is a choice, not a connection. */
     : WALLETS.length > 1 ? e => { e.stopPropagation(); walletMenu(); toggle(km); }
-    : e => { e.stopPropagation(); toggle(nm); };
+    : e => { e.stopPropagation(); toggle(nm); if (!nm.hidden) liveCheck(); };
   // Not awaited: the short address is on the button before any round trip, and `who()` stays
   // synchronous for `accountsChanged`, `connect` and `disconnect`, which each already call it.
   if (ACC) nameWho(ACC);
@@ -2282,10 +2301,11 @@ const DEPLOYED = { factory: '0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E', app: '
 const DEV_CHAIN = ['31337', '31338'].includes(String(CFG.chainId));
 const contractChains = () => NETWORKS.map(id => ({ id, ...DEPLOYED }))
   .concat(DEV_CHAIN ? [{ id: CFG.chainId, factory: CFG.factory, app: CFG.app }] : []);
-/* Status follows `ENABLED`, the same hand-kept list the network menu links from, so the two never
-   disagree and the docs send no request per chain. A dev chain's own row is the chain being read. */
+/* Status follows `enabled`, the same answer the network menu links from, so the two never disagree.
+   A dev chain's own row is the chain being read. */
+const CTAB_HEAD = '<tr><th>chain</th><th>factory</th><th>app</th><th>status</th></tr>';
 const contractRows = () => contractChains().map(c => {
-  const on = ENABLED.includes(Number(c.id)) || isHere(c.id);
+  const on = enabled(c.id);
   return `<tr${on ? '' : ' class="off"'}><td>${cname(c.id)}</td>`
     + ['factory', 'app'].map(k => `<td>${ext('address', c[k], esc(short(c[k])), false, c.id)}</td>`).join('')
     + `<td>${on ? 'live' : 'pending deployment'}</td></tr>`;
@@ -2409,11 +2429,12 @@ function docs() {
 
   <h2 id="s-contracts">Contracts</h2>
   <p>Two contracts are deployed: <code>DistributionFactory</code>, which creates every distribution and is unowned, and <code>App</code>, which serves this page and the widget. Each is placed by a salted <code>CREATE2</code>, so it has the same address on every chain it is deployed to. A distribution has no fixed address; each one is created through the factory.</p>
-  <p>The status column is which chains this app offers, and is not read from the chain: <i>live</i> means the app is deployed and enabled there. Chains marked <i>pending deployment</i> are planned; the addresses shown are where the contracts will be placed.</p>
-  <div class="scroll"><table class="dtab" id="ctab"><tr><th>chain</th><th>factory</th><th>app</th><th>status</th></tr>${contractRows()}</table></div>
+  <p>The status column is which chains this app offers: <i>live</i> means the <code>App</code> there serves this page. Chains marked <i>pending deployment</i> are planned; the addresses shown are where the contracts will be placed.</p>
+  <div class="scroll"><table class="dtab" id="ctab">${CTAB_HEAD}${contractRows()}</table></div>
   </article></div>`;
   widgetDemo();
   giveBind();
+  liveCheck();
 }
 /* The support form under Economics: a plain payment to the featured distribution, any amount, nothing
    pre-filled (decision 1). It goes through `tx` like every write, so it is preflighted and confirmed. */
@@ -2505,7 +2526,7 @@ function route() {
   if (h.startsWith('#/docs')) { docs(); docScroll(h); return; }
   EMBED = null;
   if (!P) { V.innerHTML = notice('No wallet found. Open this page in a browser with a wallet.'); return; }
-  if (wrongChain()) { V.innerHTML = notice(`Your wallet is on ${cname(CHAIN)}. This app lives on ${cname(CFG.chainId)}. <button id="sw">Switch network</button>${ENABLED.includes(Number(CHAIN)) ? `, or <a class="link" href="${esc(chainHref(CHAIN))}">open rake on ${cname(CHAIN)}</a>` : ''}.`); document.getElementById('sw').onclick = switchChain; return; }
+  if (wrongChain()) { V.innerHTML = notice(`Your wallet is on ${cname(CHAIN)}. This app lives on ${cname(CFG.chainId)}. <button id="sw">Switch network</button>${enabled(CHAIN) ? `, or <a class="link" href="${esc(chainHref(CHAIN))}">open rake on ${cname(CHAIN)}</a>` : ''}.`); document.getElementById('sw').onclick = switchChain; return; }
   if (S.error) { V.innerHTML = notice(`could not read the factory at ${CFG.factory}: ${esc(S.error)}`, 'err'); return; }
   if (!S.loaded) return;
   scrollTo(0, 0);
@@ -2522,7 +2543,7 @@ const menus = [tm, wm, nm, km], toggle = m => menus.forEach(x => x.hidden = x ==
 tb.onclick = e => { e.stopPropagation(); toggle(tm); const t = localStorage.getItem('theme') || 'system'; tm.querySelectorAll('div').forEach(d => d.className = d.dataset.t === t ? 'on' : ''); };
 tm.onclick = e => { const t = e.target.dataset.t; if (!t) return; localStorage.setItem('theme', t); const d = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme:dark)').matches); document.documentElement.className = d ? 'dark' : ''; tm.hidden = true; };
 wm.onclick = e => { if (e.target.dataset.a === 'off') { wm.hidden = true; disconnect(); } };
-document.getElementById('net').onclick = e => { e.stopPropagation(); toggle(nm); };
+document.getElementById('net').onclick = e => { e.stopPropagation(); toggle(nm); if (!nm.hidden) liveCheck(); };
 nm.onclick = e => { e.stopPropagation(); if (e.target.dataset.a === 'switch') switchChain(); };
 km.onclick = e => { e.stopPropagation(); if (e.target.dataset.a === 'pick') { km.hidden = true; pickWallet(e.target.dataset.rdns); } };
 document.addEventListener('click', () => toggle(null)); document.addEventListener('keydown', e => { if (e.key === 'Escape') toggle(null); });
