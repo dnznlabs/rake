@@ -622,6 +622,11 @@ Product Owner on 2026-11-21: what is uploaded is `main` as it stands at the uplo
 compares the calldata to the *build*, so a well-formed upload cut from a branch or from a checkout a
 day old passes all of them.
 
+**And `main`'s `app/` does not move while an upload is in flight** (decision 71). From the Product
+Owner's word on the preview until the last `executeQueued` of that upload on every chain it goes
+to, nothing under `app/` reaches `main`. A commit there in that window makes the calldata, the fork
+proof and the preview stale together, and the cut starts again.
+
 ```sh
 git fetch origin && git status --porcelain | wc -l        # 0
 git rev-parse HEAD origin/main                            # the same commit twice

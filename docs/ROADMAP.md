@@ -17,7 +17,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 | [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain, and Denizen has ironed out the experience against it | done 2026-10-26 — t01 (#33), t02 (#40), t03 (#52), t04 (#60), t05 (#65), t06 done; Phase 5 signed off by Denizen in [#73](https://github.com/dnznlabs/rake/pull/73) |
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | **done 2026-11-07** — ten tasks (t01–t10), three two-leg reviews (`audits/2026-10-30`, `10-31`, `11-06`), 14 `SECURITY.md` rows, decisions 20–40; `src/` final at `3ad48ec` ([#153](https://github.com/dnznlabs/rake/pull/153)), `FACTORY_SALT`/`APP_SALT` mined against it (decision 37: `0x00D18B5b…`, `0x00A90943…`), `RUNBOOK.md` rehearsed on two anvils with the real Creator key; DNZN's predicted address `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`; criteria 1–8 re-run in [CLOSEOUT.md](milestones/m03/CLOSEOUT.md) |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | **done 2026-11-19** — sixteen tasks (t01–t16; t12 closed unmerged by decision 62), criteria 1–8 re-run at `2f93d26` in [CLOSEOUT.md](milestones/m04/CLOSEOUT.md), closed on that close-out's merge ([#296](https://github.com/dnznlabs/rake/pull/296), `eec7164`) by decision 64, with criteria 1, 3 and 5's unmet clauses transferred to m05-t01 Part B beside criterion 6's wallet run (decision 63) and criterion 8's state-collection#74 comment drafted and awaiting the Product Owner's word. Scoped 2026-11-07: seven tasks in four phases (Phase 1 done the same day: the dapp's carried items #164 and the `web3://` gateway in the dev stack #163, the ERC-5219 surface's first real consumer; then Slither as a third audit leg gating the deploy, invariant tests beside it, the runbook for real, then the gateway and a host page, then a scripted wallet session with a signoff line); two decisions open ([#156](https://github.com/dnznlabs/rake/issues/156) the test host, [#157](https://github.com/dnznlabs/rake/issues/157) DNZN's testnet table, both ruled); needed testnet ETH on two keys and an Etherscan API key |
-| [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; the DNZN fund distribution live at its Sepolia address with the Sepolia table, the Ops vault as owner and a 7-day delay (decision 50); dapp mirrored and widget embedded in one DNZN app | not started — scoped 2026-11-18: six tasks in four phases plus a close-out (re-mine the salts against `main`'s post-[#201](https://github.com/dnznlabs/rake/pull/201) bytes and redeploy both testnets to match, with the threat model, coverage floor and mutation run of decision 56 beside it, then Base alone, then OP Mainnet, Arbitrum One and Ethereum with the stretch row beside them, then the mirror and the embed); four decisions opened (M05-D1 the stale salts, M05-D2 the step-6 key and salt, M05-D3 the paid-review go/no-go, M05-D4 the mirror and the host app; D2–D4 ruled as decisions 54, 55 and 59, D4's app name still open); M04's close-out gate met on its merge, 2026-11-19 (decision 64), which also puts four M04 clauses in m05-t01 Part B as criteria 18c–18f; needs mainnet ETH on three keys, twelve vault co-signatures and four `create`s |
+| [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; the DNZN fund distribution live at its Sepolia address with the Sepolia table, the Ops vault as owner and a 7-day delay (decision 50); dapp mirrored and widget embedded in one DNZN app | in progress — re-phased 2026-11-22 (decision 70): the contracts on all four mainnets first (m05-t02), then the document on Base and Ethereum (m05-t03), with OP Mainnet's and Arbitrum One's documents on the Product Owner's word; m05-t01, m05-t01b, m05-t04 and m05-t04a are done and m05-t01c is in progress. As scoped 2026-11-18: six tasks in four phases plus a close-out (re-mine the salts against `main`'s post-[#201](https://github.com/dnznlabs/rake/pull/201) bytes and redeploy both testnets to match, with the threat model, coverage floor and mutation run of decision 56 beside it, then Base alone, then OP Mainnet, Arbitrum One and Ethereum with the stretch row beside them, then the mirror and the embed); four decisions opened (M05-D1 the stale salts, M05-D2 the step-6 key and salt, M05-D3 the paid-review go/no-go, M05-D4 the mirror and the host app; D2–D4 ruled as decisions 54, 55 and 59, D4's app name still open); M04's close-out gate met on its merge, 2026-11-19 (decision 64), which also puts four M04 clauses in m05-t01 Part B as criteria 18c–18f; needs mainnet ETH on three keys, twelve vault co-signatures and four `create`s |
 | [M06 — Going public](milestones/m06/MILESTONE.md) | `dnznlabs/rake` is public, as a new repository whose history is one signed commit from the mainnet tag; the private repository is renamed `rake.buildarchive`, archived and never published. Four phases: the labelling of outside issues and comments installed and proven on this repo; a staging tree from the tag with the build-out record removed (milestones, tasks, handoffs, review runs, dev-chain broadcasts), the roadmap reset to the mainnet row, `SECURITY.md` carrying no findings, and every document audited for a reader who has only the repo; a fresh review of the staging tree that must come back clean; then Denizen renames, archives, creates and flips | not started — gated on M05's close-out; scoped when M05 closes (decision 60) |
 | [M07 — Owner integrations](milestones/m07/MILESTONE.md) | Optional, after mainnet. When the connected wallet is a member of the owner rather than the owner, route `propose`/`cancel` into the multisig vault's or Majeur DAO's own submit flow instead of copy-calldata. UI only; no contract change | not started |
 
@@ -1209,6 +1209,41 @@ convention. Numbered 45 because 44 is taken by
     alone (a read per chain for every visitor for good, and it treats placed contracts as offered).
     Changing network is a link and never `wallet_switchEthereumChain`, in the same change; the
     link's form per gateway is `Model.GATEWAYS` (`app/src/model.js`).
+
+70. **The contracts go to all four mainnets first; the document goes to Base and Ethereum; OP
+    Mainnet's and Arbitrum One's documents wait for the Product Owner's word.** Ruled by Denizen on
+    2026-11-21 (Telegram, 23:54 CST). M05 was phased as Base end to end and then the other three.
+    It is now two steps. First, as one task (m05-t02): Run A, verification and DNZN's `create` on
+    Base, OP Mainnet, Arbitrum One and Ethereum, in that order, with no document uploaded. Then
+    (m05-t03): the document through the Ops vault on Base and on Ethereum. OP Mainnet and Arbitrum
+    One stay in the state decision 69 calls deployed but not enabled, shown as pending deployment
+    in the network menu. Their uploads are not proposed until he asks, and M05's close-out does not
+    wait for them. This is also the written go M05-D3 requires for the contract sends; every
+    document upload still takes his co-signatures. **Why:** the addresses are the permanent part,
+    and he wants them placed on all four; the chains he wants in use at launch are Base and
+    Ethereum. Decision 67 had already separated the contract deploys from the first document.
+    **Accepted with it:** all four deploys precede any real use on a mainnet, so a `fix`-grade
+    finding after them supersedes four deployments where the earlier phasing risked one. What
+    remains of that hedge is the order inside m05-t02 (Base first, a stop between chains on any
+    deviation, Ethereum last) and the alpha posture of decision 45. The mainnet contracts are also
+    placed before the wallet run on the redeployed testnets (m05-t01c step 9); that run exercises
+    the document, and the contract bytes are the ones both testnets have carried since 2026-11-20.
+    **Amends:** M05's phases, its criteria 3 and 5, and its count of signatures; decision 4's four
+    chains stand for the contracts. **Rejected:** Base end to end before any other chain, the plan
+    until this ruling; and proposing all four uploads while leaving two unsigned, because a
+    proposal cannot be withdrawn from the coordination service and goes stale at the vault's next
+    nonce (m05-t01 handoff, deviation 0).
+
+71. **`app/` is frozen on `main` from the Product Owner's word on a preview until that upload has
+    executed.** Ruled by Denizen on 2026-11-21 (Telegram, 23:54 CST). An upload is cut from the tip
+    of `main` (`RUNBOOK.md` § 4a), so a commit under `app/` after a preview is accepted makes the
+    calldata, the fork proof and the preview stale together; on 2026-11-21 that happened twice in
+    one evening. Between his word on a preview and the last `executeQueued` of that upload on every
+    chain it goes to, nothing under `app/` reaches `main`, by merge or by direct commit, his own
+    included. A change wanted in that window rides the next upload, unless the wallet run cannot
+    pass without it, which means a new preview and a new word. First applied to m05-t01c's testnet
+    upload ([#345](https://github.com/dnznlabs/rake/issues/345)). **Rejected:** re-cutting at each
+    commit, which costs a rebuild, a fork proof and a preview sitting every time.
 
 ## Findings carried forward
 
