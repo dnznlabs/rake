@@ -1,0 +1,201 @@
+# m05-t02 — handoff
+
+PR: (opened below) · Branch: `m05/t02-preflight` · 2026-11-22
+
+**Part A only. Nothing was sent to any chain, and no mainnet was touched.** Every reading below comes
+from the two testnets or from a local build, through the devbox pin (node v24.12.0, forge 1.7.1,
+solc 0.8.38). Part B starts when this is on `main` and the balance gate reads true.
+
+What landed: the test [#293](https://github.com/dnznlabs/rake/issues/293) asked for, the gas-limit
+rule in `RUNBOOK.md` step 1e ([#308](https://github.com/dnznlabs/rake/issues/308)), § 4a's address
+comparison turned from a warning into a stop ([#359](https://github.com/dnznlabs/rake/issues/359)),
+and the bytecode attestation — `deployments/`, `make attest` and a weekly workflow — which has
+already failed once on purpose in each direction it is meant to fail.
+
+## Acceptance criteria
+
+| Criterion | Reading |
+|:--|:--|
+| `forge test` prints 125 passed, 0 failed | **125 passed, 0 failed, 0 skipped**, 7 suites. Baseline at the branch point was **124 passed**, as the plan states |
+| `forge test --list` names the #293 test | `grep -c test_viewsMidDistributeAreTheFrameAndNotTheTable` over `forge test --list` prints **1** |
+| `forge snapshot --check` exits 0 | **exit 0** after `forge clean` and `forge snapshot` |
+| `git diff --stat origin/main -- src/ foundry.toml` is empty | **empty** — zero lines. No contract byte changed |
+| THREAT_MODEL SOL-AM-ReentrancyAttack-1 reads `held by test`, and § Open list no longer carries it | both done; § Open list's count also moved from "**Two rows**… two distinct findings" to one, with a sentence saying which row left and when |
+| `RUNBOOK.md` step 1e states the rule | `grep -c 'P ÷ 1.3' RUNBOOK.md` prints **2** (both in step 1e); `grep -c 'raised explicitly'` prints **0** |
+| § 4a's comparison exits 1 on a mismatch | both runs quoted in § The two runbook changes below: differing → prints and **exit 1**; equal → **exit 0** |
+| `make attest` exits 0 for the two testnets | **exit 0**, six contract readings across the two chains, quoted in § The attestation |
+| …and non-zero in both tampered cases | **exit 1** both times, each naming the chain and the contract; quoted in full below |
+| the workflow has one green dispatched run | **not yet — deferred with cause.** `gh workflow run attest.yml --ref m05/t02-preflight` answers `HTTP 404: workflow attest.yml not found on the default branch`. A `workflow_dispatch` workflow is dispatchable only once it is on the default branch, so this is the one Part A check that cannot be met before the merge. See § Deviations |
+| `make test` and CI are green | `make test` green locally; CI at this head is on the PR |
+
+## The #293 test, and what it found
+
+`test_viewsMidDistributeAreTheFrameAndNotTheTable` in `test/Distribution.t.sol`, with a new
+`ViewReadingToken` in `test/mocks/Mocks.sol`. The vehicle is an ERC-20 whose `transfer` reads the
+distributor's own views from inside the `distribute` frame and records what it saw, one entry per row.
+It works because the ERC-20 push carries **no** `PUSH_GAS` cap (`src/Distribution.sol:417`) while the
+ETH one does, so the callback can afford to copy a whole `snapshot()` into memory.
+
+**The answer has two halves, and the row was open because neither had been written down.**
+
+1. **Neither view is partially written, because `distribute` does not touch what they read.** It
+   writes `escrowed`, `reserved` and token balances; `Snapshot` carries owner, delay, nonce,
+   description, table and queue. So a hook sees the whole current table — no half-table, no row
+   twice. Asserted by comparing `keccak256(abi.encode(...))` of both `beneficiaries()` and
+   `snapshot().table` mid-frame against the same values read before the call, and again after it.
+2. **The figures that *are* partially written are readable, and they are the ones that move.** Row 3
+   sees `reserved(token)` already carrying row 2's escrow — **2,500** of a 10,000 distribution — and
+   the contract's token balance already drained to **5,000** by row 1 alone. That is a state no
+   completed call leaves behind.
+
+**A refusing row's own observation is rolled back with its revert**, so a three-row table leaves two
+observations, not three: `seen()` is **2**. That is asserted rather than remarked.
+
+**No document is contradicted, so the step's stop condition did not fire.** `SECURITY.md` F8 now
+states what is readable in that frame and why it is accepted: the values are correct for the frame,
+and nothing readable there lets a row take another row's share or change what it is owed. Nothing
+under `src/` was touched.
+
+**Both load-bearing assertions were checked against a wrong expectation**, because a test that passes
+the first time has not yet been shown to discriminate:
+
+| Flipped to | Result |
+|:--|:--|
+| `assertEq(tk.seen(), 3)` | `FAIL: a reverting hook's own reads are rolled back with it: 2 != 3` |
+| `assertEq(tk.reservedSeen(1), 0)` | `FAIL: row 3 sees row 2's escrow already reserved: 2500 != 0` |
+
+Each was run on its own, because forge stops a test at its first failing assertion and the second
+would otherwise never have been reached.
+
+### The gas snapshot moved more than one row
+
+The plan allows only the new test's row to differ. **It is 63 rows, and the cause is mechanical:**
+adding one function to `DistributionTest` grows that contract's selector dispatch, so every function
+in it pays a few more gas on entry.
+
+- 113 fixed-gas rows compared: **63 moved**, by **17 to 94 gas** (45 of them by exactly 22, 9 by 17,
+  6 by 18, one each by 19, 28 and 94).
+- Exactly **one row added**: `DistributionTest:test_viewsMidDistributeAreTheFrameAndNotTheTable()`.
+- **No other suite moved at all** — the diff touches `DistributionTest` rows and nothing else, which
+  is what points at that contract's dispatch rather than at the measurement or the toolchain.
+
+Recorded as a deviation rather than suppressed: the alternative would be a snapshot that no longer
+matches `forge snapshot`, which `forge snapshot --check` would then fail in CI.
+
+## The two runbook changes
+
+**Step 1e** replaces "the broadcast needs the limit raised explicitly" — which left the operator to
+judge it — with the rule, each figure carried from m05-t01's handoff § Step 13: `E` is the node's
+`cast estimate --create` read on the day, `P` is the dry run's `Estimated total gas used for script`,
+`-g` multiplies **`P ÷ 1.3`** rather than `P` (3,482,636 ÷ 1.3 = 2,678,951 and 2,286,547 ÷ 1.3 =
+1,758,883), the limit to send is **2 × `E`** and never below **1.3 × `E`** (the node's estimate was
+exceeded by the transaction itself on both Sepolia sends, by 58,514 and 99,321 gas), it must be under
+half the chain's block gas limit or **stop**, and a `-32003` refusal costs nothing and may be
+resubmitted **once** at 1.5 × `E`.
+
+**§ 4a** now stops instead of warning, in step 5's Sourcify shape. Both runs, as the plan asks:
+
+```
+# APP_IN and APP differing
+the document names another App than the one being uploaded to
+exit=1
+
+# the same addresses in different case
+exit=0
+```
+
+The equal case deliberately uses one address in two cases, because the comparison lower-cases both
+and a stop that fired on case alone would be worse than the warning it replaces.
+
+## The attestation
+
+`deployments/11155111.json` and `deployments/84532.json`, `tools/attest.mjs`, `make attest`
+(`mk/35-attest.mk`) and `.github/workflows/attest.yml` — weekly on Mondays at 07:00 UTC and on
+dispatch, `contents: read` only, no key and no secret, every read over the public endpoints in
+`deploy/chains.json`.
+
+It answers two questions that fail in opposite directions: whether the chain still holds what the
+record names (`cast code`, hashed, against `codeKeccak`), and whether those bytes are what this tree
+builds (`cast code` against the build artifact).
+
+Read live on 2026-11-22; the three addresses and all three code hashes are **identical on both
+chains**, which is decision 35's one-address-per-chain property showing up in the bytes:
+
+| Contract | Address | `keccak(cast code)` |
+|:--|:--|:--|
+| `DistributionFactory` | `0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E` | `0x66d10374c73ab5c6d5046225f1612465bc64620c91d717d74788c627edc8b6c2` |
+| `Distribution` (the implementation, from `implementation()`) | `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A` | `0xd3399543d74c606df25df4c7501a27042c23f4f30f9b7e57311be5cb1d8caa8c` |
+| `App` | `0x00a9F390A6010d045e0d34856048DdD6910d25BA` | `0x691c7120121434dadde0fb5f271aa5213f98feb90de5baacb773b9c42ee88a75` |
+
+`commit` in both files is **`9fac8364ee2a02df783a17d0268a85e68166a144`**, the last commit on `main`
+to touch `src/` or `foundry.toml`: every commit after it builds the same bytes, so that is the
+earliest commit the deployed bytes are reproducible from rather than a guess at which run deployed
+them.
+
+### The implementation does not compare outright, and that is a finding
+
+The plan has `App` and the implementation compared outright and only the factory treated specially.
+**The implementation carries two immutables of its own** — `factory` and `self`,
+`src/Distribution.sol:101-102` — so a flat comparison fails on a healthy deployment. The first run of
+`make attest` said so:
+
+```
+attest: FAIL chain 11155111 · Distribution: the chain's code is not what this tree builds (9277 bytes against 9277)
+```
+
+Equal length, different bytes, which is the signature of an immutable rather than a different
+contract. Measured: the build's `immutableReferences` are two spans, at byte **33** and byte
+**4998**, 32 bytes each; on chain they hold `0x…c4ed7ea2…cb0a` (its own address) and
+`0x…00d19609…7f8e` (the factory). So the comparison is now **general**: every contract is compared
+outside its own spans, and each span's **value** is then checked against an address the record itself
+names — three times the implementation for the factory, and the pair {implementation, factory} for
+the implementation. `App` is asserted to have **zero** spans, so an immutable added to it later
+cannot pass unchecked.
+
+Checked **by value as a set rather than by position**, because a span's offset and its AST id both
+move between solc builds while the two addresses do not.
+
+### Both tampered directions
+
+```
+# an address holding no code, in a scratch copy of deployments/
+attest: FAIL chain 11155111 · App: no code at 0x000000000000000000000000000000000000dEaD
+attest: 1 failure(s)
+exit=1
+
+# one hex character of the saved App artifact changed
+attest: FAIL chain 84532 · App: bytes 0..end: 1 byte(s) differ from what this tree builds, first at 3576
+attest: 1 failure(s)
+exit=1
+```
+
+The second message names the first differing byte and how many differ because the first draft said
+only `bytes 0..end differ`, which reads as "everything" when it was one character — a failed
+attestation has to tell its reader whether this is one immutable or a different contract.
+
+## Deviations from the plan
+
+1. **The gas snapshot moved 63 rows, not one.** Cause measured, not assumed: the suite's selector
+   dispatch. § The #293 test has the figures.
+2. **The implementation is not compared outright**, because it has two immutables. The comparison was
+   generalised rather than special-cased a second time; § The attestation has the measurement.
+3. **The workflow has no dispatched run yet.** `workflow_dispatch` is only dispatchable from the
+   default branch — `HTTP 404: workflow attest.yml not found on the default branch` — so the green
+   run follows the merge rather than preceding it. The workflow's own content is exercised by
+   `make attest` passing locally under the same devbox pin, and its YAML by the `check yaml` hook.
+   **This is the one acceptance criterion of Part A not met at this head, and it is met by dispatching
+   immediately after the merge.**
+
+## Discoveries
+
+- **An ERC-20 push has no gas cap and an ETH push does** (`src/Distribution.sol:406-418`). That
+  asymmetry is F8's subject, and it is also what makes #293 answerable at all: a capped callback
+  could not afford to read `snapshot()`.
+- **A reverting hook's reads are rolled back with it.** Obvious once stated, and it changes what a
+  test can observe: the failing row's own view of the frame does not survive to be asserted.
+- **Adding one test function shifts every gas row in its suite.** Worth knowing before the next task
+  reads a snapshot diff and looks for a cause in the contract under test.
+
+## Open questions
+
+None. Part B's first gate is the balance read of step 6, and nothing in Part A is waiting on anyone.
