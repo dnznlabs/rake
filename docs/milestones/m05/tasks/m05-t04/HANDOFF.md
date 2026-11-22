@@ -76,6 +76,25 @@ Three readings, taken against the live site on 2026-11-21 **with no wallet conne
 2. **Whether that misleads is not settled, and two things stop it being settled here.** The `recent` tab does not render without a connected account, so what it would *list* was not observable; and the only distribution available exists on **both** chains (DNZN, `codesize` 45 on each, read 2026-11-21), so it could not mislead even if listed. Showing the misleading case needs a wallet **and** an address that exists on one chain only.
 3. **Neither page names its network.** On the home route of each chain, a search of the page's own text for `Sepolia`, `Base Sepolia`, `11155111` and `84532` matched **nothing** on either side; the two pages read identically and only the URL distinguishes them. Filed as [#328](https://github.com/dnznlabs/rake/issues/328) (`carried`, `m05`), with the fix named as an `app/` change that rides an upload — not fixed here, as the plan directs.
 
+   > **Correction, 2026-11-21 — reading 3 is wrong, and so is the issue it produced.** Both pages
+   > *do* name their network. The search above was **case-sensitive** and `CHAINS`
+   > (`app/src/index.html:36`) spells the names in lower case, so `Sepolia` and `Base Sepolia` could
+   > not match what the page prints. Re-measured on the same live site: `#netname` reads `sepolia`
+   > on `/11155111/` and `base sepolia` on `/84532/`, visible, with no wallet connected, and the
+   > name appears twice in each page's body text as well. `app/src/index.html:619` sets it from
+   > `cname(CFG.chainId)` when no wallet has reported a chain, which is the no-wallet case this
+   > reading was taken in.
+   >
+   > [#328](https://github.com/dnznlabs/rake/issues/328) is **closed as invalid** in consequence,
+   > and the plan step it had become was removed by amendment. The error is mine: an absence was
+   > reported without first checking that the instrument could see a presence, which one
+   > case-insensitive search would have shown. The reading is left standing above rather than
+   > rewritten, so the record shows what was claimed and what it cost.
+   >
+   > Readings 1 and 2 are unaffected: they were measured through `localStorage`, not through this
+   > search, and reading 1's finding is what [#336](https://github.com/dnznlabs/rake/issues/336)
+   > keys per chain.
+
 **The wallet half is asked and recorded, not skipped.** [#327](https://github.com/dnznlabs/rake/issues/327) is on the Product Owner, filed 2026-11-21 by the architect: connect on `/11155111/`, open `/84532/` in the same browser, and report whether the wallet stays connected, what the recent list shows, and whether either page names its network. His answers arrive here by a Markdown-only amendment; this row stays open until then and nothing else in the task waits on it.
 
 ## The runbook section's own test
