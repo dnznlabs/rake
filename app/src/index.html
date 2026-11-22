@@ -69,6 +69,10 @@ let WALLET = false;
    wallet gets, which is what makes the menu a choice rather than a silent guess. */
 let WALLETS = [], PICK = '';
 const WALLET_KEY = 'rake.wallet';
+/* Set by `disconnect`, cleared by `connect`. A wallet without `wallet_revokePermissions` hands the
+   account back on the next load, so revoking alone does not hold: the page has to remember that the
+   visitor asked to be disconnected and stop asking (the Product Owner's requirement, 2026-11-21). */
+const OFF_KEY = 'rake.off';
 // The endpoint the landing's widget is handed in `data-rpc`: the dev `?rpc=` override when there is
 // one, and otherwise empty, in which case the mount falls back to this chain's `PUBLIC_RPC` entry for
 // a visitor with no wallet and to the injected EIP-1193 global for one who has it. Reads never
@@ -153,10 +157,43 @@ async function discover() {
   /* Only a wallet has an account to report. A public endpoint has no notion of "your account" —
      `eth_accounts` on a dev chain answers with its own unlocked keys, which would paint a connected
      account for a visitor who has no wallet at all. */
-  if (WALLET) { try { const a = await P.request({ method: 'eth_accounts' }); ACC = a[0] || null; } catch (e) {} }
-  if (P.on) { P.on('accountsChanged', a => { ACC = a[0] || null; who(); route(); }); P.on('chainChanged', () => location.reload()); }
+  if (WALLET && !store.get(OFF_KEY)) { try { const a = await P.request({ method: 'eth_accounts' }); ACC = a[0] || null; } catch (e) {} }
+  wire();
 }
-async function connect() { const a = await P.request({ method: 'eth_requestAccounts' }); ACC = a[0] || null; who(); route(); }
+/* The provider's two events, wired in one place because `pickWallet` wires the same pair. */
+function wire() {
+  if (!P || !P.on) return;
+  /* Ignored while disconnected: a wallet that cannot revoke keeps reporting the account, and acting
+     on that would reconnect the visitor who just asked not to be. */
+  P.on('accountsChanged', a => { if (store.get(OFF_KEY)) return; ACC = a[0] || null; who(); route(); });
+  P.on('chainChanged', chainChanged);
+}
+/* Reload only when the chain actually changed (#341). Phantom's in-app browser emits `chainChanged`
+   on load with the chain the page is already reading, and reloading on every event is a page that
+   reloads for ever. `CHAIN` is the chain last read; before anything has been read there is nothing to
+   re-read, so the first event only records it. */
+function chainChanged(id) {
+  const n = id == null ? null : String(Number(id));
+  if (n === null || CHAIN === null || n === String(CHAIN)) { if (n !== null) CHAIN = n; return; }
+  location.reload();
+}
+/* `wallet_requestPermissions` first: it is what makes a wallet that supports it show its own prompt
+   again after a disconnect, where `eth_requestAccounts` would hand back the account silently. A
+   wallet that does not support it answers with an error rather than a prompt, so the older method is
+   the fallback — but not after a refusal (4001), which would prompt a second time for an answer the
+   visitor has already given. */
+async function connect() {
+  store.set(OFF_KEY, '');
+  let a = [];
+  try {
+    await P.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] });
+    a = await P.request({ method: 'eth_accounts' });
+  } catch (e) {
+    if (e && e.code === 4001) { who(); return; }
+    a = await P.request({ method: 'eth_requestAccounts' });
+  }
+  ACC = a[0] || null; who(); route();
+}
 /* The menu's rows, one per announced wallet. A wallet's name is the wallet's own string, so it goes
    in through `textContent` and never as markup, and its icon is not rendered at all: an `<img>` whose
    src a third party chooses is a request this page does not need to make. */
@@ -178,7 +215,7 @@ async function pickWallet(rdns) {
   if (!w) return;
   PICK = rdns; store.set(WALLET_KEY, rdns);
   P = readProvider(w.provider); WALLET = true;
-  if (P && P.on) { P.on('accountsChanged', a => { ACC = a[0] || null; who(); route(); }); P.on('chainChanged', () => location.reload()); }
+  wire();
   try { CHAIN = String(Number(await P.request({ method: 'eth_chainId' }))); } catch (e) {}
   await connect();
 }
@@ -194,6 +231,9 @@ async function switchChain() {
 }
 // Revoking (EIP-2255) is what survives a reload; a wallet without it hands the account back next load.
 async function disconnect() {
+  /* Set before the revoke, not after: the mark is what holds across a reload, and a revoke that
+     throws must not leave the page connected to a wallet the visitor has dismissed. */
+  store.set(OFF_KEY, '1');
   try { await P.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] }); } catch (e) {}
   /* The choice is forgotten too, so the next Connect offers the menu again rather than silently
      reconnecting the wallet the visitor has just disconnected (decision 67). */

@@ -45,17 +45,43 @@ const wallet = (rdns, name = rdns) => ({
   provider: { rdns, request: async () => [ACCOUNT] },
 });
 
-/* `discover` as shipped. The page's own `WALLETS`, `PICK` and `WALLET_KEY` declarations come along,
-   so the key a choice is stored under is the page's string and not this file's guess. */
-function load({ announce = [], stored = {}, injected = null }) {
+/* A provider that records what was asked of it, answers per method, and can emit the two events the
+   page listens for. `unsupported` is the lever the fifth case needs: a wallet with no
+   `wallet_revokePermissions` that still reports an account. */
+const prov = (rdns, { accounts = [ACCOUNT], unsupported = [], chainId = '0xaa36a7' } = {}) => ({
+  rdns,
+  calls: [],
+  handlers: [],
+  on(ev, fn) { this.handlers.push([ev, fn]); },
+  emit(ev, arg) { for (const [e, fn] of this.handlers) if (e === ev) fn(arg); },
+  async request({ method }) {
+    this.calls.push(method);
+    if (unsupported.includes(method)) {
+      const e = new Error('Method not supported');
+      e.code = -32601;
+      throw e;
+    }
+    if (method === 'eth_chainId') return chainId;
+    return accounts;
+  },
+});
+
+const announced = p => ({ info: { rdns: p.rdns, name: p.rdns, uuid: `uuid-${p.rdns}` }, provider: p });
+
+/* The page's wallet path as shipped. The page's own `WALLETS`, `PICK`, `WALLET_KEY` and `OFF_KEY`
+   declarations come along, so the keys a choice and a disconnect are stored under are the page's
+   strings and not this file's guess. `kv` can be handed back in to stand for a reload: the store
+   survives, everything else is built again. */
+function load({ announce = [], stored = {}, injected = null, kv = null }) {
   const listeners = [];
   const addEventListener = (type, fn) => { if (type === 'eip6963:announceProvider') listeners.push(fn); };
   /* The request event is what makes an extension announce; the stub answers it the way the browser
      does, by calling back synchronously, once per wallet. */
   const dispatchEvent = () => { for (const d of announce) for (const fn of listeners) fn({ detail: d }); };
 
-  const kv = new Map(Object.entries(stored));
+  kv = kv || new Map(Object.entries(stored));
   const store = { get: k => (kv.has(k) ? kv.get(k) : null), set: (k, v) => kv.set(k, String(v)) };
+  const reloads = [];
 
   /* `readProvider` wraps a wallet for writes and falls back to the public endpoint for reads, which is
      a transport concern `nowallet.test.mjs` already covers. Here it only has to report what selection
@@ -68,8 +94,13 @@ function load({ announce = [], stored = {}, injected = null }) {
     'let WALLET = false;',
     line('let WALLETS = [], PICK'),
     line('const WALLET_KEY ='),
+    line('const OFF_KEY ='),
     block('async function discover'),
-    'return { discover, state: () => ({ P, ACC, WALLET, WALLETS, PICK }) };',
+    block('function wire'),
+    block('function chainChanged'),
+    block('async function connect'),
+    block('async function disconnect'),
+    'return { discover, connect, disconnect, chainChanged, state: () => ({ P, ACC, CHAIN, WALLET, WALLETS, PICK }) };',
   ].join('\n');
 
   const made = new Function(
@@ -77,9 +108,9 @@ function load({ announce = [], stored = {}, injected = null }) {
     'who', 'route', 'location', body,
   )(
     addEventListener, dispatchEvent, class Event {}, fn => fn(), store,
-    { ethereum: injected }, readProvider, () => {}, () => {}, { reload: () => {} },
+    { ethereum: injected }, readProvider, () => {}, () => {}, { reload: () => reloads.push(1) },
   );
-  return { ...made, given, stored: kv };
+  return { ...made, given, stored: kv, reloads };
 }
 
 test('both extensions are kept, in announcement order, and a repeat is not', async () => {
@@ -183,6 +214,155 @@ test('a load where nothing announces at all keeps the remembered choice', async 
   await page.discover();
 
   assert.equal(page.stored.get('rake.wallet'), 'com.rainbow');
+});
+
+/* ---- reloading only on a real chain change (#341) -------------------------------------------- */
+
+/* Phantom's in-app browser reloads the dapp without stopping, through two different gateways. The
+   page reloaded on every `chainChanged`, and a wallet that emits one on load makes that a loop. The
+   cause is still a hypothesis until the preview is opened in Phantom; what is settled here is that an
+   event naming the chain the page is already reading does not reload it. */
+
+const chainOnly = chain => {
+  const reloads = [];
+  const body = [
+    `let CHAIN = ${JSON.stringify(chain)};`,
+    block('function chainChanged'),
+    'return { chainChanged, read: () => CHAIN };',
+  ].join('\n');
+  return { ...new Function('location', body)({ reload: () => reloads.push(1) }), reloads };
+};
+
+test('an unchanged chain does not reload, whichever way the id is written', () => {
+  for (const [held, event] of [[11155111, '0xaa36a7'], ['11155111', '0xaa36a7'], [84532, '0x14a34'], [11155111, 11155111]]) {
+    const page = chainOnly(held);
+    page.chainChanged(event);
+    assert.deepEqual(page.reloads, [], `held ${JSON.stringify(held)}, event ${JSON.stringify(event)} reloaded`);
+  }
+});
+
+test('a changed chain still reloads', () => {
+  const page = chainOnly(11155111);
+
+  page.chainChanged('0x14a34');
+
+  assert.deepEqual(page.reloads, [1], 'a real chain change no longer reloads, so the page reads the wrong chain');
+});
+
+test('an event before any chain has been read records it instead of reloading', () => {
+  const page = chainOnly(null);
+
+  page.chainChanged('0xaa36a7');
+
+  assert.deepEqual(page.reloads, [], 'nothing had been read yet, so there was nothing to re-read');
+  assert.equal(page.read(), '11155111');
+});
+
+test('a wallet that emits chainChanged on load does not start a reload loop', async () => {
+  const p = prov('app.phantom');
+  const page = load({ announce: [announced(p)] });
+
+  await page.discover();
+  /* The page has read the chain by the time a wallet's load-time event arrives: `load()` sets CHAIN
+     from `eth_chainId` right after `discover`. */
+  page.chainChanged('0xaa36a7');
+  p.emit('chainChanged', '0xaa36a7');
+  p.emit('chainChanged', '0xaa36a7');
+
+  assert.deepEqual(page.reloads, [], 'the page reloaded on an event naming the chain it already reads (#341)');
+});
+
+/* ---- disconnect holds across a reload --------------------------------------------------------- */
+
+test('a wallet with no revoke still ends up disconnected after a reload', async () => {
+  const p = prov('io.metamask', { unsupported: ['wallet_revokePermissions'] });
+  const first = load({ announce: [announced(p)] });
+
+  await first.discover();
+  assert.equal(first.state().ACC, ACCOUNT, 'the fixture never connected, so the test proves nothing');
+
+  await first.disconnect();
+  assert.equal(first.state().ACC, null);
+  assert.equal(first.stored.get('rake.off'), '1', 'nothing marks the page as disconnected');
+
+  /* The reload: same wallet, same storage, everything else built again. The wallet still reports the
+     account because the revoke it does not support never took anything away. */
+  p.calls.length = 0;
+  const second = load({ announce: [announced(p)], kv: first.stored });
+  await second.discover();
+
+  assert.equal(second.state().ACC, null, 'the wallet handed the account back and the page took it');
+  assert.ok(
+    !p.calls.includes('eth_accounts'),
+    `the page asked the wallet for accounts while disconnected: ${p.calls.join(', ')}`,
+  );
+});
+
+test('accountsChanged is ignored while disconnected', async () => {
+  const p = prov('io.metamask', { unsupported: ['wallet_revokePermissions'] });
+  const page = load({ announce: [announced(p)] });
+
+  await page.discover();
+  await page.disconnect();
+  p.emit('accountsChanged', [ACCOUNT]);
+
+  assert.equal(page.state().ACC, null, 'a wallet re-announcing its account reconnected the page by itself');
+});
+
+test('connect clears the mark and asks for the permission again', async () => {
+  const p = prov('io.metamask', { unsupported: ['wallet_revokePermissions'] });
+  const page = load({ announce: [announced(p)] });
+
+  await page.discover();
+  await page.disconnect();
+  p.calls.length = 0;
+  await page.connect();
+
+  assert.equal(page.state().ACC, ACCOUNT);
+  assert.equal(page.stored.get('rake.off'), '', 'the disconnect mark outlived the reconnect');
+  assert.ok(
+    p.calls.includes('wallet_requestPermissions'),
+    `connect did not ask for the permission, so a wallet that supports it shows no prompt: ${p.calls.join(', ')}`,
+  );
+});
+
+test('connect falls back where the permission request is unsupported', async () => {
+  const p = prov('io.unsupported', { unsupported: ['wallet_revokePermissions', 'wallet_requestPermissions'] });
+  const page = load({ announce: [announced(p)] });
+
+  await page.discover();
+  await page.disconnect();
+  p.calls.length = 0;
+  await page.connect();
+
+  assert.equal(page.state().ACC, ACCOUNT, 'a wallet without wallet_requestPermissions can no longer connect');
+  assert.ok(p.calls.includes('eth_requestAccounts'), p.calls.join(', '));
+});
+
+test('a refused permission request does not prompt a second time', async () => {
+  const refusing = {
+    rdns: 'io.refusing', calls: [], handlers: [],
+    on(ev, fn) { this.handlers.push([ev, fn]); },
+    async request({ method }) {
+      this.calls.push(method);
+      if (method === 'eth_accounts') return [ACCOUNT];
+      const e = new Error('User rejected the request.');
+      e.code = 4001;
+      throw e;
+    },
+  };
+  const page = load({ announce: [announced(refusing)] });
+
+  await page.discover();
+  await page.disconnect();
+  refusing.calls.length = 0;
+  await page.connect();
+
+  assert.equal(page.state().ACC, null);
+  assert.ok(
+    !refusing.calls.includes('eth_requestAccounts'),
+    `a refusal was followed by a second prompt: ${refusing.calls.join(', ')}`,
+  );
 });
 
 /* ---- the menu's rows ------------------------------------------------------------------------- */
@@ -296,6 +476,31 @@ test('a junk or hostile stored value yields an empty list rather than throwing',
     assert.ok(Array.isArray(got), `a stored ${JSON.stringify(raw)} did not yield a list`);
     assert.ok(got.every(v => /^0x[0-9a-fA-F]{40}$/.test(v)), `a non-address survived: ${JSON.stringify(got)}`);
   }
+});
+
+/* ---- the chain's name with no wallet --------------------------------------------------------- */
+
+/* The criterion #328 raised, which the page already met: the header names the chain for a visitor
+   with no wallet, from `CFG.chainId` rather than from a wallet's `CHAIN`. The search that reported it
+   missing was case-sensitive and `CHAINS` spells the names in lower case, so this pins the name the
+   page actually prints — a sentinel against the next search for `Sepolia`. */
+test('the header names the chain with no wallet, in CHAINS lower case', () => {
+  const paint = chain => {
+    const el = { textContent: '' };
+    const body = [
+      line('const CHAINS ='),
+      `const CFG = { chainId: '84532' };`,
+      line('const cname ='),
+      `const CHAIN = ${JSON.stringify(chain)};`,
+      line('  document.getElementById(\'netname\')'),
+      'return el;',
+    ].join('\n');
+    return new Function('document', 'el', body)({ getElementById: () => el }, el).textContent;
+  };
+
+  assert.equal(paint(null), 'base sepolia', 'a visitor with no wallet is not told which chain they are on');
+  assert.equal(paint('11155111'), 'sepolia', 'a connected wallet\'s chain is not named');
+  assert.ok(!paint(null).startsWith('chain '), 'the configured chain fell through to the numeric fallback');
 });
 
 test('the list is capped at eight and the newest address leads', () => {
