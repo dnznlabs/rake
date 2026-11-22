@@ -1899,8 +1899,8 @@ per contract on both chains — factory `0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7
 `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`, `App`
 `0x00a9F390A6010d045e0d34856048DdD6910d25BA` — with `codesize` 1,319 / 9,277 / 7,154 against the
 superseded set's 1,320 and 7,155. DNZN's distribution is at
-`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`, **live on Sepolia** and not yet created on Base
-Sepolia. § Record — M05 below carries the per-step readings for this deploy; § Uploads rows 5 and 6
+`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`, **live on both testnets** — read 2026-11-22,
+`cast codesize` **45** and `delay()` **86400** on each. § Record — M05 below carries the per-step readings for this deploy; § Uploads rows 5 and 6
 carry the document; the two **superseded** M04 tables further down are kept unchanged as that
 milestone's record. Nothing of the M04 set was touched: its factory is unowned and its `App` is
 vault-owned and still serves its own document.

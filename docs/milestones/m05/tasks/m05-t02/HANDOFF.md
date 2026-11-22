@@ -185,6 +185,19 @@ attestation has to tell its reader whether this is one immutable or a different 
    `make attest` passing locally under the same devbox pin, and its YAML by the `check yaml` hook.
    **This is the one acceptance criterion of Part A not met at this head, and it is met by dispatching
    immediately after the merge.**
+4. **Added 2026-11-22, after the merge — two of the six explorer verifications were never submitted,
+   and the record blamed the queue for all six.** § The explorer verifications says Etherscan's queue
+   was backed up and that nothing was re-submitted because a second submission only lengthens it.
+   That was true of the **four** GUIDs this handoff lists, which cleared on their own: chain 1's three
+   answered `Pass - Verified` and Base's factory `Already Verified`. It was false of **Base's
+   implementation and `App`, which had never been sent at all** — step 5 on Base submitted one
+   contract where chain 1 submitted three. **The tell was in this handoff in plain sight: one GUID
+   for 8453 against three for chain 1**, and neither the engineer who wrote the table nor the
+   architect who reviewed it twice counted the rows. Waiting on that queue would have waited forever,
+   because nothing of Base's was in it. Submitted 2026-11-22 with `--watch`, each exiting 0, with
+   `App`'s constructor arguments read off the chain (`owner()`, `version()`) rather than retyped.
+   **The general form, which is the part worth keeping: an absence is evidence about the whole path,
+   so check the near end — was it sent? — before explaining the far end as slow.**
 
 ## Discoveries
 
@@ -576,6 +589,44 @@ Nothing is claimed verified on either explorer. **M05 criterion 2 therefore read
 head**, with the GUIDs above, and it is not softened: the criterion asks for `getsourcecode` to name
 the three contracts, and it does not yet. Not re-submitted — the API says the submissions are queued,
 and a second one only lengthens the queue.
+
+#### Added 2026-11-22, after the merge: criterion 2 is MET
+
+The paragraph above is left as written, because it was true at this task's head and at the merge.
+**`getsourcecode` now names all three contracts on both mainnets — six of six.** Read at
+**11:42:02Z**, one address per call, spaced to stay under the API's 3/sec limit:
+
+```
+chain 1     DistributionFactory 0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E
+    ContractName=DistributionFactory  CompilerVersion=v0.8.38+commit.1835d247  OptimizationUsed=1  Runs=1000  Proxy=0  Implementation=''
+    EVMVersion=cancun  SourceCode bytes=24043  ABI entries=6
+chain 1     Distribution        0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A
+    ContractName=Distribution  CompilerVersion=v0.8.38+commit.1835d247  OptimizationUsed=1  Runs=1000  Proxy=0  Implementation=''
+    EVMVersion=cancun  SourceCode bytes=24043  ABI entries=44
+chain 1     App                 0x00a9F390A6010d045e0d34856048DdD6910d25BA
+    ContractName=App  CompilerVersion=v0.8.38+commit.1835d247  OptimizationUsed=1  Runs=1000  Proxy=0  Implementation=''
+    EVMVersion=cancun  SourceCode bytes=43741  ABI entries=40
+chain 8453  DistributionFactory 0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E
+    ContractName=DistributionFactory  CompilerVersion=v0.8.38+commit.1835d247  OptimizationUsed=1  Runs=1000  Proxy=0  Implementation=''
+    EVMVersion=cancun  SourceCode bytes=24043  ABI entries=6
+chain 8453  Distribution        0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A
+    ContractName=Distribution  CompilerVersion=v0.8.38+commit.1835d247  OptimizationUsed=1  Runs=1000  Proxy=0  Implementation=''
+    EVMVersion=cancun  SourceCode bytes=24043  ABI entries=44
+chain 8453  App                 0x00a9F390A6010d045e0d34856048DdD6910d25BA
+    ContractName=App  CompilerVersion=v0.8.38+commit.1835d247  OptimizationUsed=1  Runs=1000  Proxy=0  Implementation=''
+    EVMVersion=cancun  SourceCode bytes=43741  ABI entries=40
+```
+
+**What the figures beside the names are for.** `CompilerVersion`, `OptimizationUsed`, `Runs` and
+`EVMVersion` are the pinned settings in `foundry.toml`, so the explorer agrees with this tree and not
+merely with itself. The factory and the implementation report the same `SourceCode bytes=24043`
+because they live in one file, `src/Distribution.sol` — the figure that discriminates between them is
+`ABI entries`, **6** against **44**. `Proxy=0` on all six, including the implementation, which is
+correct: the proxy is each `Distribution` the factory places, not the implementation itself.
+
+**The read is the claim, not the submitter's word.** `forge verify-contract --watch` exited 0 and
+printed `Pass - Verified` for each contract it sent, but that is a submission result; the criterion
+asks what `getsourcecode` answers, so that is what is quoted above.
 
 **One instrument note, because it nearly went into the record wrong.** My first GUID extraction took
 "the last long alphanumeric run" from forge's output, which matched the **address** in the URL line
