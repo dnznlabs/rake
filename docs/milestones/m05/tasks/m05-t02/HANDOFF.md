@@ -428,6 +428,9 @@ commas, Etherscan's tuple parser has split on commas inside quoted strings befor
 
 **Ethereum's `create` is explicitly not in that issue** — it follows its own deploy.
 
+**Outcome: he sent it the same day.** The readings are in § Part B — the DNZN `create` on both
+mainnets below; #363 is closed.
+
 ## Part B — the amended native-balance gate on Ethereum
 
 Taken 2026-11-22 09:3xZ, after #368 put the amended gate on `main`. **The control first**, as the
@@ -596,30 +599,56 @@ newline in one of the files and not a difference in the data.
 Etherscan's Write Contract form is unavailable for chain 1 as well, for the same queued-verification
 reason, and the `table_` comma warning is repeated with it.
 
-## Part B — Base's DNZN `create`, sent by the Product Owner
+**Outcome: he sent it the same day.** The command went up at **09:43:20Z** and the transaction was
+mined at **09:45:47Z** — block timestamp, not my clock. The readings are in the next section.
 
-He sent it on 2026-11-22 from the Creator key. **M05 criterion 4 is met on Base**, and not yet on
-Ethereum. Read back from `https://mainnet.base.org` by a sibling session first and **re-read
-independently here**, because this handoff's record should not rest on another session's report:
+## Part B — the DNZN `create` on both mainnets, sent by the Product Owner
 
-| reading | value | required |
-|:--|:--|:--|
-| transaction | **`0x589b14dc65d280a251e181f4fc3ff0159ea57ca1e71a61eb937b3ee582cc4e7b`** | — |
-| status | **1** | — |
-| block | **60,747,680** | — |
-| `from` | `0x68e0741d…186ee` — **the DNZN Creator**, the one key that can sign this | the Creator's alone |
-| `to` / value | the factory `0x00d19609…d7f8e` / **0** | — |
-| `gasUsed` | **463,727** at 6,000,000 wei (0.006 gwei) | under the 480,533 estimated |
-| `cast codesize` at `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199` | **45 bytes** | 45 ✓ |
-| `owner()` | `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790` | the Ops vault ✓ |
-| `delay()` | **604800** | 604800 on a mainnet, decision 50 ✓ |
-| `description()` | `DNZN // FUND DISTRIBUTION` | § 0's ✓ |
-| `beneficiaries()` | `0x00b6E7D1…2cFb9` **2000** `treasury`, `0x00c0e887…F3790` **4000** `ops`, `0x357836fF…1902B` **4000** `creator` | the three rows of decision 50, **ascending by account** ✓ |
-| `nonce()` / `pendingCount()` | **0** / **0** | nothing queued on a fresh distribution ✓ |
+He sent both on 2026-11-22 from the Creator key, each that key's **first transaction on its chain**
+(nonce 0 → 1 on both). **M05 criterion 4 is met on Ethereum and on Base** — the distribution exists,
+owned by the Ops vault, with the decision-50 table and a week's delay. Its `distribute` is not part
+of this criterion and has not been called; `nonce()` is 0 on both.
 
-The distribution is at **the same address as Sepolia's**, which is the point of the sender-bound
-salt: one address for DNZN's fund on every chain it is created on.
+Every figure below was read **by me, after the fact, against each chain's own RPC** — Base's first by
+a sibling session and re-read here, Ethereum's by me when it landed and re-read again while writing
+this. A handoff should not rest on another session's report, nor on my own earlier one.
 
-**Ethereum's `create` is prepared and has not been sent.** Its command is on
-[#363](https://github.com/dnznlabs/rake/issues/363) in the same three forms, so the issue is back
-with the Product Owner.
+| reading | Ethereum (1) | Base (8453) | required |
+|:--|:--|:--|:--|
+| transaction | `0xe8b7ca91ff62854e3a6a8bd0bf08a51241a0cf2896f0a358ef1d9103ceb9afc1` | `0x589b14dc65d280a251e181f4fc3ff0159ea57ca1e71a61eb937b3ee582cc4e7b` | — |
+| status / block / index | **1** / 26,469,844 / 225 | **1** / 60,747,680 / 48 | — |
+| mined at (block timestamp) | 09:45:47Z | 09:31:51Z | — |
+| `from` | `0x68e0741D8d693e14BF56914567eADdC130b186eE`, nonce 0 | the same key, nonce 0 | **the Creator's alone** — the salt-prefix guard reverts anyone else with `0x0c4549ef` |
+| `to` / value | the factory `0x00D19609…d7f8E` / **0** | the same factory / **0** | — |
+| `gasUsed` | **463,727** | **463,727** | under the 480,533 estimated on both ✓ |
+| effective gas price | 126,664,141 wei | 6,000,000 wei | — |
+| cost to the Creator | 58,737,582,113,507 wei | 2,786,722,829,162 wei | see § the two spends below |
+| `cast codesize` | **45** | **45** | 45 ✓ |
+| `owner()` | `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790` | the same | the Ops vault ✓ |
+| `delay()` | **604800** | **604800** | 604800 on a mainnet, decision 50 ✓ |
+| `description()` | `DNZN // FUND DISTRIBUTION` | the same | § 0's ✓ |
+| `beneficiaries()` | `0x00b6E7D1…2cFb9` **2000** `treasury`, `0x00c0e887…F3790` **4000** `ops`, `0x357836fF…1902B` **4000** `creator` | identical, row for row | decision 50's three rows, **ascending by account** ✓ |
+| `nonce()` / `pendingCount()` | **0** / **0** | **0** / **0** | nothing queued on a fresh distribution ✓ |
+
+**One check the plan did not ask for, because a 45-byte proxy is only as good as what it points
+at.** The runtime is `0x5f5f365f5f37365f73…c4ed7ea21b8cc334f08945b4d0c182e0aff8cb0a…5af43d5f5f3e6029573d5ffd5b3d5ff3`,
+and the address inside its `PUSH20` is `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A` on **both**
+chains — the same implementation `make attest` compares to the build. So the thing the distribution
+delegates to is the attested one, not merely an address of the right shape. I extracted it by
+anchoring on the surrounding opcodes after a first attempt with a loose `73[0-9a-f]{40}` character
+class matched an earlier `73` in the prologue and returned a wrong 20 bytes. A character class is
+still not a parser.
+
+**The two spends.** On Ethereum the debit is **exactly** `463,727 × 126,664,141`, to the wei. On Base
+the debit is **4,360,829,162 wei more** than `gasUsed × effectiveGasPrice` — the L1 data fee, which an
+OP-stack chain charges outside execution gas. Worth stating because it means a receipt's two gas
+fields do not add up to what left the key on Base, and they do on Ethereum. Both keys remain funded:
+~0.00994 ETH on Ethereum, ~0.000997 ETH on Base.
+
+The distribution is at **the same address on all four chains**, which is the point of the
+sender-bound salt: one address for DNZN's fund on every chain it is created on. The arguments carry
+no chain id, so the 1,188-byte blob he used on Base is the one he used on Ethereum.
+
+**What is still not met is criterion 2, and it is not ours to clear.** Four explorer GUIDs are
+`Pending in queue` and `getsourcecode` is empty on both chains; Sourcify answers `exact_match` for
+all six mainnet addresses. Nothing is re-submitted — a second submission only lengthens the queue.

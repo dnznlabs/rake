@@ -1820,13 +1820,15 @@ immediately after `dapp-nodev` and `chunks`, and why this document says `dapp-no
 
 ## Executed on mainnets
 
-**Deployed 2026-11-22 (m05-t02 Part B).** Base and Ethereum were taken through steps 1, 2, 3 and 5.
+**Deployed 2026-11-22 (m05-t02 Part B).** Base and Ethereum were taken through steps 1, 2, 3, 5 and 6.
 **Step 4 was not run on either and no document is on either chain** — the mainnet documents are
 m05-t03's — so `App` is live and serves nothing, with `chunkCount()` 0 and `locked()` false. M05 is
 Base and Ethereum only (decision 70).
 
-**Four sends, every one landing first time: no failure, no `-32003` refusal, no retry, no deviation
-from step 1e's rule.** Addresses are the same as the testnets', which is what one init-code set under
+**Six sends, every one landing first time: no failure, no `-32003` refusal, no retry, no deviation
+from step 1e's rule.** Four from the engineer key (a factory and an `App` per chain) and **two from
+the Creator key, sent by the Product Owner** — step 6's `create` on each chain, which only that key
+can sign. Addresses are the same as the testnets', which is what one init-code set under
 `CREATE2` means: factory `0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`, implementation
 `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`, `App` `0x00a9F390A6010d045e0d34856048DdD6910d25BA`.
 **The three `cast code` keccaks are identical on all four chains** — `0x66d10374…8b6c2`,
@@ -1845,11 +1847,17 @@ against another chain, by `make attest` over `deployments/{1,8453,11155111,84532
 | 5 | Sourcify | three `exact_match`, asserting loop exit 0; factory `verifiedAt` 08:38:35Z and `App` 08:40:25Z, each about three minutes after its own deploy and not by this run's loop; implementation 08:47:37Z, this run's |
 | 5 | explorer | **queued, not verified** — GUID `6xw4xwzxi2dcmrtkvyxchcehcansymkj6jrvgkzd8gqxqviaiq`, `Pending in queue`, `getsourcecode` empty |
 | 5 | OpenChain | 82 `Duplicated:`, 0 `Imported:` |
-| 6 | DNZN `create` | **not sent** — prepared for the Product Owner on [#363](https://github.com/dnznlabs/rake/issues/363); `predict` `0xB611Ff19…0F4D5199`, `cast code` `0x`, Creator's simulation returns it, another address reverts `0x0c4549ef`, estimate 480,533 |
+| 6 | DNZN `create` | **sent by the Product Owner from the Creator key**, tx `0x589b14dc65d280a251e181f4fc3ff0159ea57ca1e71a61eb937b3ee582cc4e7b`, status 1, block 60,747,680, index 48, `from` `0x68e0741D8d693e14BF56914567eADdC130b186eE` at nonce 0, `to` the factory, value 0, `gasUsed` **463,727** of the 480,533 estimated, effective gas price 6,000,000 wei |
+| 6 | read-backs | at `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`: `codesize` **45**, `owner()` the Ops vault, `delay()` **604800**, `description()` `DNZN // FUND DISTRIBUTION`, `beneficiaries()` treasury **2000** / ops **4000** / creator **4000** ascending, `nonce()` 0, `pendingCount()` 0; the 45 bytes' `PUSH20` holds `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`, the attested implementation |
 
 **What the engineer's key spent on Base: 26,396,332,711,465 wei (~0.0000264 ETH)** for both sends —
-0.005000000 ETH before, 0.004973603667288535 after. The Creator key spent nothing; its 0.001 ETH is
-untouched.
+0.005000000 ETH before, 0.004973603667288535 after.
+
+**What the Creator key spent on Base: 2,786,722,829,162 wei (~0.00000279 ETH)** for step 6 —
+0.001000000000000000 ETH before, 0.000997213277170838 after, nonce 0 → 1. That is **4,360,829,162 wei
+more than `gasUsed × effectiveGasPrice`** (2,782,362,000,000), which is the L1 data fee an OP-stack
+chain charges outside the execution gas — the receipt's two fields do not account for the whole
+debit here, and on Ethereum they do.
 
 ### § Record — Ethereum (1)
 
@@ -1863,11 +1871,16 @@ untouched.
 | 5 | Sourcify | three `exact_match`, loop exit 0; factory `verifiedAt` 09:38:02Z against a 09:36:59Z deploy and `App` 09:39:02Z against 09:37:59Z — each about a minute later, not this run's loop; implementation 09:40:43Z, this run's. All three carry `creationMatch: exact_match`, unlike Base's implementation, which carries none; recorded unexplained |
 | 5 | explorer | **queued, not verified** — GUIDs `vyqncc7ethysu5igia38zpmlv2lpdiaxsqtt8gsjtpny5qrqg9` (factory), `4qe7mxxtx6lybemkrh6gz4tyyzfxl28nhxmmj86s8ce8j1jg1h` (implementation), `hfnhk7c5sarhs9821ecqy3iifb2ng6anz5cw9awlh4phtbwer3` (`App`) |
 | 5 | OpenChain | 82 `Duplicated:`, 0 `Imported:` |
-| 6 | DNZN `create` | **not sent** — prepared on #363; `predict` the same address, `cast code` `0x`, Creator's simulation returns it, another reverts `0x0c4549ef`, estimate 480,533, Creator holds 0.01 ETH (~170× the cost at 0.12 gwei) |
+| 6 | DNZN `create` | **sent by the Product Owner from the Creator key**, tx `0xe8b7ca91ff62854e3a6a8bd0bf08a51241a0cf2896f0a358ef1d9103ceb9afc1`, status 1, block 26,469,844, index 225, `from` `0x68e0741D8d693e14BF56914567eADdC130b186eE` at nonce 0, `to` the factory, value 0, `gasUsed` **463,727** — the same figure as Base — of the 480,533 estimated, effective gas price 126,664,141 wei (~0.0000588 ETH) |
+| 6 | read-backs | the same address and the same eleven readings as Base, value for value, re-read against `https://ethereum-rpc.publicnode.com`: 45 bytes, Ops-vault `owner()`, `delay()` **604800**, `DNZN // FUND DISTRIBUTION`, the three rows 2000/4000/4000 ascending, `nonce()` and `pendingCount()` 0, `PUSH20` holding the attested implementation |
 
 **What the engineer's key spent on Ethereum: 487,832,074,612,540 wei (~0.000488 ETH)** — 0.025093601299726950
-ETH before, 0.024605769225114410 after. Under **5%** of the 0.01 ETH asked for that chain. The Creator
-key spent nothing.
+ETH before, 0.024605769225114410 after. Under **5%** of the 0.01 ETH asked for that chain.
+
+**What the Creator key spent on Ethereum: 58,737,582,113,507 wei (~0.0000587 ETH)** for step 6 —
+0.010000000000000000 ETH before, 0.009941262417886493 after, nonce 0 → 1. That is **exactly**
+`463,727 × 126,664,141`, to the wei, with no L1 component. Both keys are left funded: the Creator
+holds ~0.00994 ETH on Ethereum and ~0.000997 ETH on Base.
 
 **The per-step gas is identical on both chains** — 2,381,290 for each factory and 1,655,420 for each
 `App`. That is expected from one init-code set at one optimiser setting, and it is also a check: a
