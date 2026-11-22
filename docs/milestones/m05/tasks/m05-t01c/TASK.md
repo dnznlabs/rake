@@ -70,8 +70,11 @@ chains later.
    the sizing rule change, and that is a plan question.
    **Amended 2026-11-21: the stop was taken, and a third chunk is allowed, inside the batch.**
    As reported by the engineer on [#336](https://github.com/dnznlabs/rake/issues/336): `main`'s
-   document compresses to 47,917 bytes, 83 under the 48,000 two chunks hold, and this task's
-   changes bring it to 48,384 and 48,383 on the two testnets, so the third chunk is 384 bytes.
+   document compresses to between 47,659 and 47,917 bytes depending on which contract addresses
+   the build substitutes (equal length, different bytes, so the raw size holds and the compressed
+   size moves by about 260), against the 48,000 two chunks hold. This task's changes add 464 to
+   467 compressed bytes in either state and bring it to between 48,123 and 48,384, so a third
+   chunk of 123 to 384 bytes is needed whichever addresses are in it.
    The chunk size stays 24,000: `RUNBOOK.md` § Gas makes that the ceiling, and it is not raised
    to buy room. What changes is the upload's shape, and only as far as it must:
    - **Proposals stay three per chain.** Document chunks 0 and 1 are proposals 1 and 2 as today.
@@ -95,6 +98,9 @@ chains later.
      the build. That is what shows the three-chunk document reassembles.
    - **Stop and report** if the batch's estimate on either testnet exceeds half that chain's
      block gas limit, or if the document needs a fourth chunk.
+   - **The handoff quotes the compressed size with the address set it was built against**, since
+     the same source gives sizes about 260 bytes apart; `RUNBOOK.md`'s sizing text gains that
+     sentence where it states the two-chunk figures.
 7. **One PR** with steps 2 to 6, the regenerated `calldata/` for both testnets, and
    `docs/milestones/m04/tasks/m04-t05/UAT.md` gaining rows for: the menu with two extensions, a remembered wallet after reload, the chain's
    name with no wallet, and each listed phone link. Review, then merge.
