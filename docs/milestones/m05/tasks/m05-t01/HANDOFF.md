@@ -15,8 +15,9 @@ branch head. Part B is not started and is gated as § Gate says.
 
 ## Acceptance criteria
 
-Criteria 13–18 are Part B's and are listed so that none reads as silently passed. Criterion 19 is
-Part B's too: this table is Part A's half.
+Criteria 13–19 are Part B's and were filled in when Part B executed; **18b is not met and says so**,
+18b is transferred out by amendment, and 18f's publish and 18e's hosted half on Sepolia are
+carried rather than passed.
 
 | AC | Result | Evidence |
 |:---|:-------|:---------|
@@ -31,11 +32,58 @@ Part B's too: this table is Part A's half.
 | 9 | pass | `grep -c '^setup:' mk/10-forge.mk` → **1** and `grep -c '^libs:' mk/10-forge.mk` → **1** (baselines 0, 0); `grep -c 'make setup' AGENTS.md README.md` → **1** each. Both directions in a throwaway worktree at this head: empty `lib/` → `make build` **exit 2**, `lib/forge-std is empty — the pinned submodules are not checked out. Run 'make setup' first.`, and `lib/forge-std` and `lib/solady` both still **0 entries** (forge never ran); after `make setup` (exit 0) `git submodule status` shows `bf647bd6… lib/forge-std (v1.16.2)` and `acd959aa… lib/solady (v0.1.26)` and `make build` exits **0**, `Compiler run successful!`. `.github/workflows/ci.yml` is unaffected and unedited: it checks out with `submodules: recursive` and runs forge directly, never through `make` |
 | 10 | pass | The coordination service holds a `wallets` row for the Ops vault on **all eight** chain ids — 1, 10, 8453, 42161, 4326, 4663, 11155111, 84532 — read 2026-11-19, recorded in § 1's table as its `signing row` column. The question that is the Product Owner's is in § For Denizen. See Discovery 4 on `owner_count` |
 | 11 | pass, less CI | `git diff --stat origin/main -- src/ test/*.t.sol .gas-snapshot foundry.toml` prints **nothing**; the `*.t.sol` population it covers was enumerated first — `App.t.sol`, `ColdStipend.t.sol`, `DistributionFactory.t.sol`, `Distribution.t.sol`, `PushGas.t.sol`, `TableCap.t.sol`. After `forge build --force` (exit 0, 0 `warning[`, 0 `Warning (`): `forge test` **107 passed, 0 failed**; `forge snapshot --check` **exit 0**; `grep -c '' .gas-snapshot` **107**; `node --test test/*.test.mjs` **168 pass, 0 fail, 0 skipped** (167 plus the one new case); `forge fmt --check` exit 0; `forge lint` exit 0. `git status --porcelain` empty. **CI is not green yet because no PR is open** — see Deviation 11 |
-| 12 | not verifiable here | **No PR was opened**: the brief reserves that. The closing line to use is `Closes #207, #188, #197, #251`, and the four folds are complete in this branch with each step's check quoted above — AC 4 for #207, AC 5 for #188, AC 9 for #197, AC 3 for #251. Each issue was read and says what the plan claims it says (§ Discoveries has nothing against them). `gh pr view <n> --json closingIssuesReferences` is the reviewer's to run, and the task's own issue (#271) must **not** be in it |
-| 13–18, 18b–18f | Part B | Not started. The two testnets, gated on M04's close-out and on this PR's merge; step 14 additionally on m04-t15's merge. **Amended 2026-11-19:** M04's close-out merged ([#296](https://github.com/dnznlabs/rake/pull/296)) and decision 64 added criteria 18c–18f — M04 criteria 1, 3 and 5's transferred clauses — beside 18b |
-| 19 | Part B | Part B's PR closes #271 and its handoff carries all **twenty-three** rows (1–18, 18b–18f). Amended 2026-11-19: nineteen as written, plus decision 64's four |
+| 12 | pass | Part A's PR is **#278**, `m05/t01-remine`, merged 2026-11-19 as `7724d73`, and `gh pr view 278 --json closingIssuesReferences` lists **188, 197, 207, 251** — the four folds, closing as this row predicted, with #271 correctly absent so that Part B's PR could close it instead. AC 4 for #207, AC 5 for #188, AC 9 for #197, AC 3 for #251, each step's check quoted above. The row said "no PR was opened" until 2026-11-21, which was true when written and had stopped being true |
+| 13 | pass | Run A's steps 1–3 and 5 on both chains: § Step 13 closes #288 and the two fixtures now agree, § For close-out's tables and § Record. The immutable-span comparison is re-run at 18c below, against the artifact `main` builds |
+| 14 | pass | § Step 14 — the amended hash check, § Step 14 — calldata and the fork proof before any signature, § Step 14 — the six proposals written and read back, and § Step 13a with step 14 re-run on top of it |
+| 15 | pass | § Step 15 and M05 criterion 4 — Sepolia's `create` has landed and verifies clean, and the Base Sepolia `create` beside it. Re-read for 18d on 2026-11-21: `predict` and `codesize` agree on both chains |
+| 16 | pass | § Step 16 — 4c and 4d on Sepolia (11155111) and § Step 16 — 4c and 4d on Base Sepolia (84532), with § Step 16a:1's readings and § Step 16a:3's cancel and re-send between them |
+| 17 | pass | § Step 17 — the records, and M05 criterion 6's deviation audit |
+| 18 | pass | This table, § Gates, § What it cost, § For Denizen and § Discoveries are present, and this PR says `Closes #271` |
+| 18b | **transferred out** | Amended on `main` on 2026-11-21 by plan PR [#335](https://github.com/dnznlabs/rake/pull/335) (decision 67): the wallet run moves to [m05-t01c](../m05-t01c/TASK.md) **step 9**, taken once on the document the wallet picker ships, because the document changes after this task. The amendment says in terms that **this task's PR does not wait for it**. [#302](https://github.com/dnznlabs/rake/issues/302) stays open under m05-t01c, and `shots/11155111/` and `shots/84532/` are therefore absent here by design rather than by omission |
+| 18c | pass, both chains | § Criterion 18c below. Factory **1,319 bytes** on both sides, **60 differing bytes, every one inside the three declared spans, 0 outside**, each span holding `IMPL` left-padded to 32 bytes; `App` **7,154 bytes equal outright**. Measured 2026-11-21 against the artifact `main` builds, which is the clause M04 could not meet |
+| 18d | pass, both chains | § Criterion 18d below. `predict($DNZN_SALT)` prints `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199` and `cast codesize` prints **45** at that address, on Sepolia and on Base Sepolia |
+| 18e | **chain half pass; the hosted half passes on one chain and is carried on the other** | § Criterion 18e below. Chain half on both chains: `inflated sha256` and `widget sha256` equal that chain's build, re-read 2026-11-21 with the values step 16 recorded. Hosted: Base Sepolia **exit 0, ten assertions ok**; Sepolia **exit 1, five failed**, serving 149 B at `/` and 110 B at `/widget.js` against 72,177 B and 8,509 B on Base Sepolia — recorded and carried as [#242](https://github.com/dnznlabs/rake/issues/242) under the criterion's own rule, and **not** re-uploaded |
+| 18f | pass for the page; **the publish is pending** | § Criterion 18f — the host page regenerated, plus the Base Sepolia amendment in `5fadcdd`: all nine of the criterion's readings match. Publishing is the Product Owner's step — [#303](https://github.com/dnznlabs/rake/issues/303), handed back 2026-11-21 with the nine readings and three hosted URL statuses — and the row stays open until the URL exists, as the criterion provides |
+| 18g | pass, rows 1–6 | § Step 13a's criterion 18g rows 1–5, and row 6 in § Deviations, where decision 65's change would otherwise have failed on a served page |
+| 19 | pass | This PR closes #271 and this table carries one row per criterion — **twenty-three**: 1–18 and 18b–18g |
 
 ## Deviations from the plan
+
+0. **Step 13a's superseded proposals — and there are two of them, not six.** Plan step 13a says
+   step 14's proposals "at `215a208` were built without this commit and are superseded" and asks for
+   their six digests listed here as never to be signed. Measured after re-running step 14 on top of
+   13a (`557a405`), **only one of the three proposals per chain actually moved.** The two that are
+   never to be signed:
+
+   | chain | nonce | **superseded digest — never sign** | calldata chars |
+   |:--|--:|:--|--:|
+   | Sepolia `11155111` | 14 | `0x8dc6d8b42a4282980d3ee265633c154a5a04da524874a843c083ff567a8b9df0` | 47,498 |
+   | Base Sepolia `84532` | 14 | `0xe2deb8b268b8c0d951e6a21787d84c38b9413f4be24eeadeade318766ae957c2` | 47,498 |
+
+   **The other four rows are not superseded; they are the same rows.** Re-posting proposals 1 and 3
+   returned the **same digest and the same row id** on each chain — `288f7bed-dfe2-44aa-a1c9-6e33b067d59f`
+   and `0822627b-7f9b-4fe7-ab13-f4bdded4f617` on Sepolia, `fd2c2058-1540-4d75-a34f-b03b7948f887` and
+   `1c3a4598-fc4d-4530-80dc-e2e746430593` on Base Sepolia — so the service is idempotent on the
+   digest and nothing was duplicated.
+
+   **Why only chunk 1 moved, mechanically rather than by luck.** The document is deflated and then
+   cut at 24,000 payload bytes. Step 13a's edit is in `#/docs` § the widget, late in the page, so the
+   deflate stream's first 24,000 bytes are untouched: `1-addChunk-0.hex` stays byte-identical
+   (`sha256 1af961fc…` on Sepolia, `cfe71f73…` on Base Sepolia, both unchanged) while chunk 1 grows
+   from 23,748 to 23,812 calldata bytes, tracking the gzip's 47,659 → 47,720. `batch345.hex` is
+   unchanged too (`d5730cfd…` on both) because it names pointer **addresses**, which depend on
+   `App`'s nonce and not on the bytes. **This is a property of where the edit landed, not a rule:**
+   an edit earlier in the page would have moved chunk 0 and both digests.
+
+   **The coordination service offers no way to withdraw the two dead rows, as found.** There is no
+   cancel or retire route — `POST /proposals/cancel`, `/cancel` and `/proposals/retire` all answer
+   **404**, and the documented surface is `POST /proposals` plus `POST /signature`. `cancelQueued`
+   does not apply: it cancels a tx already **queued** on chain, and none of these was ever submitted
+   (vault `nonce()` is still 13 on both chains). So **both nonce-14 rows stay visible beside the
+   live one**, and the only discriminators are the digest and the calldata length — 47,626 chars
+   live against 47,498 dead. That is the whole reason the 4b checklist below leads with the digest.
+   A signature on the dead row would not be unsafe, but it would upload the page without decision
+   65's change and criterion 18g row 6 would then fail on a served page.
 
 1. **Branch name.** The tree was prepared as `m05/t01-part-a`; `TASK.md:53` names `m05/t01-remine`
    for Part A. Renamed to the plan's name before the first commit. TASK.md wins over the brief.
@@ -154,6 +202,1268 @@ Part B's too: this table is Part A's half.
    `owner()` `0x357836fFcB45307FA7ff2A574F505753c961902B`, `delay()` **3600**, `nonce` 2. That is the
    state § One-way doors 2 describes and nothing here touches it; recorded because step 6's values
    were read *from* it while the thing being built uses the Ops vault as owner and 604800/86400.
+7. **Criterion 17's last clause names the wrong author, and three sources had to be read to see it.**
+   The clause is "state-collection#74 carries **the engineer's** comment with the new address"
+   (`TASK.md:556`). Two other sources say the architect: the m04 draft's preamble ("this is the text
+   for the Product Owner to approve, then the architect posts it") and — decisive, because it is the
+   commitment made to the other team — #74's own **Done when**, read 2026-11-19 and quoted verbatim:
+   "Owner: Denizen, at M4's gate; **rake's architect updates this issue when the first public deploy
+   lands**." The issue is OPEN with **0 comments**. So the criterion is wrong as written and the fix
+   is an amendment, not a clause the engineer reinterprets; it is drafted for the Product Owner
+   alongside the architect's m05-t01b item, and nothing needs it before the comment posts, which is
+   after step 13 regardless. **Ruled 2026-11-20: the amendment landed at `aecedbe`
+   ([#299](https://github.com/dnznlabs/rake/pull/299)) before this run's first send, and it carries
+   all three defects named here — author, trigger and closure shape. Criterion 17 is now met by this
+   handoff carrying the landed address, never by `state-collection` accepting a comment, and the
+   comment itself is the architect's.**
+   **The finding behind the contradiction is the dependency shape, not the author:** a criterion in
+   this repo cannot be satisfied by an artefact in another repo's issue tracker, because closure
+   then waits on a team that never agreed to the clause and on an author this repo cannot assign.
+   Worth carrying into how the remaining cross-repo gates are written.
+   **The trigger was a second defect and is resolved: #74 takes two updates, not one at a disputed
+   time** (architect's ruling 2026-11-19). Textually the testnets are public — #74's "What it is not
+   yet" opens "A contract on any public chain. rake M04 executes the runbook on Sepolia and Base
+   Sepolia; the mainnets are rake M05", drawing its contrast against the "two anvils" it measured on.
+   But the gate the issue serves consumes a **mainnet** address: `state-collection`'s
+   `docs/milestones/m4/MILESTONE.md` at `eec081a` is titled "M4 — Mainnet", its criterion 1 is a
+   go/no-go that "names the **mainnet** `payee`", and its § Needs the human adds "its readiness
+   blocks mainnet" — so #74's "at M4's gate" is a mainnet gate by their own title, and a testnet
+   address cannot answer what they are holding open. Hence the split, which is also what
+   `docs/milestones/m05/MILESTONE.md:317` already says this task owes — #74 "told the new
+   **prediction**", not a landed address:
+   1. **This task, after step 13:** the correction. Their recorded `0x6aC98EDA…` is wrong, the new
+      prediction is `0xB611Ff19…`, and #74's own invariant — the address "does not move between now
+      and then unless rake changes a `src/` byte" — broke with **no `src/` change**, because #201's
+      solc pin moved every init-code hash. Owed independently of any deploy, since their record is
+      wrong today; the landed testnet address is corroboration that the new prediction is real,
+      which is why it posts after step 13 and not before.
+   2. **m05-t02/t03, at the mainnet deploy:** the update their gate actually consumes — a mainnet
+      address with non-empty `cast code` and `owner()` the Ops vault. Not this task's to deliver, and
+      a later reader should not come back to t01 for it.
+
+## Gates — plan step 12, per chain, before the first send
+
+Read 2026-11-19 22:10–22:25 CST on branch `m05/t01-redeploy` at `7404007`, through the devbox pin.
+Plan step 12's check is that these are here, dated, before any transaction. **No transaction has
+been sent: Part B stops here, before plan step 13.**
+
+**Why the stop is here.** Step 13 is § One-way doors #1 — the testnet address set moves — and its
+own 1f check is `prediction equal to Part A's addresses`. A mismatch mid-run leaves a half-deployed
+set on one chain, which is a state to discover with attention available rather than unattended. That
+is the reason of record and it holds whatever the clock says. A second reason applied only to the
+evening of 2026-11-19 and is secondary: steps 14 and 15 are a build, six proposals, signatures and
+read-backs that would not have fitted the time left, so deploying then would have advanced step 13
+and nothing else, with a stop as the next thing regardless. Kept in that order deliberately — the
+architect's point, taken 2026-11-19 — because a reason that is only true of one evening should not be
+the recorded rationale for where an irreversible step stops.
+
+Branch pushed at `e271c62` before any send, so the step-14 ancestry and criterion 18's branch point
+are checkable by someone other than the engineer: `02d456a`, `3849cb2` and `7404007` are all
+ancestors of it, verified on both sides.
+
+| | Sepolia `11155111` | Base Sepolia `84532` |
+|:--|:--|:--|
+| `cast chain-id` | **11155111** = `$CHAIN_ID` | **84532** = `$CHAIN_ID` |
+| `cast code $FACTORY` `0x00D19609…6d7f8E` | **`0x`** | **`0x`** |
+| `cast code $APP` `0x00a9F390…0d25BA` | **`0x`** | **`0x`** |
+| `cast code $DISTRO` `0xB611Ff19…0F4D5199` | **`0x`** | **`0x`** |
+| `cast code $IMPL` `0xc4eD7EA2…fF8cB0A` | **`0x`** | **`0x`** |
+| `cast balance $ENGINEER` | **0.201987421704518312 ETH** | **0.034781705778474950 ETH** |
+| `cast balance $CREATOR` | **0.0100 ETH** | **0.0100 ETH** |
+| `cast base-fee` | **14 wei** | **5,000,000 wei** (0.005 gwei) |
+| `isOwner($ENGINEER)` | **true** | **true** |
+| `threshold()` | **2** | **2** |
+| `delay()` — read, not assumed | **900** | **900** |
+| `ownerCount()` | **4** | **4** |
+
+**Step 14's own gate is two PRs, and both are ancestors of this branch.** `TASK.md:45` and `:372`
+read "m04-t15's **and m04-t16's** task PRs merged to `main`"; [#271](https://github.com/dnznlabs/rake/issues/271)'s
+issue text names only m04-t15, so the issue undercounts it and the authority is the task file.
+Checked rather than assumed, with step 14's own form:
+
+| gate PR | merge commit | `git merge-base --is-ancestor <sha> HEAD` |
+|:--|:--|:--|
+| m04-t15 [#277](https://github.com/dnznlabs/rake/pull/277) | `02d456a` | **0** |
+| m04-t16 [#286](https://github.com/dnznlabs/rake/pull/286) | `3849cb2` | **0** |
+
+Criterion 18 wants both merge commits named, which is why they are here and not only in step 14's
+own row later. `main` is `7404007` with **zero open PRs**, so no M04 record amendment is in flight
+behind this branch.
+
+**[#288](https://github.com/dnznlabs/rake/issues/288) closes on step 13, and the two fixtures
+disagree until it does.** `test/ext.test.mjs:41` already pins `factory:
+'0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E'` — Part A's *prediction* — while
+`test/build.test.mjs:283-284` still pins the deployed `DISTRIBUTIONFACTORY:
+'0x00D18B5b72c4d8E7761776d1275B69D4DBCDe71B'` at `DISTRIBUTIONFACTORY_BLOCK: '0xb88091'`, the M04
+factory. Step 13 moves the build fixture to the **landed** factory, and the two sites agree only if
+landed equals predicted — which is step 13's own 1f check, not an assumption. The equality is stated
+in step 13's row with both `file:line` sites when it is measured, and #288 closes on it; #271's
+closes-list omits #288, so the PR's closing line carries it explicitly.
+
+**No code at any of the four predicted addresses on either chain**, so the `#22` branch of
+`RUNBOOK.md:351-391` is not taken and nothing needs identifying before the deploys.
+
+**Funding is ample, with the arithmetic rather than the adjective.** Run A's measured gas is
+28,296,098 on Sepolia and 4,035,842 on Base Sepolia, Run B's 85,666,566 and 12,206,026
+(`RUNBOOK.md:1680`, § Uploads rows 3–4). At the base fees above that is **about 0.0000000016 ETH**
+on Sepolia against 0.2020 held, and **about 0.0000812 ETH** on Base Sepolia against 0.0348 — four
+and nearly three orders of magnitude of headroom. Nothing is under twice its figure, so § For
+Denizen's funding ask stays "none asked".
+
+**`delay()` is 900 s on both testnets, not the 3,600 the runbook's prose carries** (`:475`,
+`:643-645`), matching step 12's own 2026-11-19 reading; decision 58 records 3,600 on the mainnets.
+Recorded as a deviation, not a stop: every "one hour" in Step 4 is "`delay()` seconds, read in 4c".
+Put to the Product Owner and answered on 2026-11-19 — he recalls one hour — so § For Denizen records
+the disagreement and the reading it leaves standing, rather than an open ask.
+
+**One gate item was not met at the 22:10–22:25 reading: `ETHERSCAN_API_KEY` was not set in this
+session**, and it was not on the box by design — M04's `MILESTONE.md:195-196` makes it the Product
+Owner's to hand to the engineer's session, "never committed", with the handoff naming only its last
+four characters. **Supplied and proved at 22:57 CST the same evening, key `…9SKI`**, so the item is
+met and criterion 14 needs no amendment; the reading below is left as it stood rather than rewritten.
+It is a v2 key, which is what `:1101` calls: the unified endpoint answered `status` **1**, `message`
+**OK**, `ContractName` **App** for `0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE` on `chainid`
+**11155111** *and* **84532** — one key across both chains. Attributable to the key, because the
+paired control is the same URL and address with the parameter dropped: `{"status":"0","message":
+"NOTOK","result":"Missing/Invalid API Key"}` on both. What it affects is narrow, and reading § Step 5
+rather than assuming is what establishes that:
+
+- § Step 5 is titled **"explorer verification, named and not run"** and says "M04 executes these and
+  records the explorer links; **no key is needed to write them down**". The `forge verify-contract
+  --etherscan-api-key` block at `:1065-1074` is named, not run.
+- The one place a key is actually read is the Etherscan API `ContractName` read-back at `:1101`.
+- The Sourcify verifications at `:1112-1118` require it **unset**, and `:1107` says why: while it is
+  set, forge ignores `--verifier sourcify` and goes to Etherscan, which answers `already verified`
+  and exits 0 — so the Sourcify verification looks done when it never ran. M04's close-out records
+  that its step 5 verified on Sourcify with the key unset (`CLOSEOUT.md:91`).
+
+So it blocks neither plan step 13's deploys nor the Sourcify half of step 5; it is wanted for one
+read-back line, and the asking is in § For Denizen below rather than assumed from M04.
+
+## Step 13 — Run A on the testnets
+
+**Authority and base.** The Product Owner lifted the step-13 stop in the FOCUS topic on 2026-11-20
+at 01:36 CST ("yes - go on 13"), answering the go/no-go question this handoff's § Deviations records
+the stop against. Before the first command the branch was rebased from `7404007` onto **`aecedbe`**,
+so `TASK.md` here is byte-identical to `main`: head **`b77827f`**, 8 ahead, 0 behind, tree clean.
+The only amendment in that base is criterion 17 (#299), and its effect on this run is subtractive —
+it removes the cross-repo comment from the engineer's scope; nothing in Part B's steps or the other
+criteria moved, checked by diffing `TASK.md` across `7404007..aecedbe`.
+
+**Every command in this step ran inside `devbox run --`, and that is load-bearing rather than
+habit.** 1a asserts forge `1.7.1-dev`; the host's forge is **1.8.1**, whose `cast create2` prints
+`address↹salt` instead of the address alone, so 1f's documented `| tail -1` would have silently
+yielded a two-field string and poisoned every address derived from it. The runbook's form is correct
+for the pinned toolchain and wrong for the host one.
+
+### Sepolia (11155111) — step 1, preflight, nothing broadcast
+
+| 1 | reading | required |
+|:--|:--|:--|
+| `cast chain-id` | **11155111** | `= $CHAIN_ID` ✓ |
+| 1a `forge --version` | **forge Version: 1.7.1-dev** | pinned ✓ |
+| 1a `node --version` | **v24.12.0** | recorded |
+| 1a `git status --porcelain \| wc -l` | **0** | 0 ✓ |
+| 1a `git rev-parse HEAD` | **`b77827f271736258bcaa584051ea3e680de6785d`** | recorded |
+| 1b `forge build --force` | **exit 0**, `Compiling 42 files with Solc 0.8.38` | 0, non-empty ✓ |
+| 1b `grep -c 'warning\['` / `'Warning ('` | **0** / **0** | 0 ✓ |
+| 1b `forge test` | **124 passed, 0 failed, 0 skipped**, exit 0 | all pass ✓ |
+| 1b `forge snapshot --check` | **exit 0** | 0 ✓ |
+| 1c proxy code | **69 bytes** | 69 ✓ |
+| 1c proxy keccak | **`0x2fa86add0aed31f33a762c9d88e807c475bd51d0f52bd0955754b2608f7e4989`** | § 1's value ✓ |
+| 1d `tx.origin` in `src/` | **nothing** | empty ✓ |
+| 1d `msg.sender` in `App.sol` | **nothing** | empty ✓ |
+| 1e `cast call --create` runtime | **1,319 bytes** | 1,319 ✓ |
+| 1e `cast estimate` factory | **16,738,648** | recorded |
+| 1e `cast estimate` `App` | **11,405,803** | recorded |
+| 1e `cast block latest --field gasLimit` | **200,000,000** | estimates fit ✓ |
+| 1e `cast base-fee` | **16 wei** | re-read ✓ |
+| 1g `cast code $FACTORY` | **`0x`** | `0x` ✓ |
+| 1g `cast code $APP` | **`0x`** | `0x` ✓ |
+
+**1f, the check the whole step exists for — prediction equals Part A on both addresses:**
+
+| 1f | predicted here, 2026-11-20 | Part A / § Gates |
+|:--|:--|:--|
+| `FACTORY` | **`0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`** | equal ✓ |
+| `APP` | **`0x00a9F390A6010d045e0d34856048DdD6910d25BA`** | equal ✓ |
+| factory init-code hash | **`0x9778c35879aa3214905a41c9519ae6c704dc5d00333806ac56ed6e7fbd2d8945`** | `TASK.md:20-22` ✓ |
+| `App` init-code hash | **`0xa8bbb83700d29d4b2e4b871c680f31165f42c0eb9234071a7948ce79f9fe33a3`** | `TASK.md:20-22` ✓ |
+
+So step 13's stop rule — "1f's prediction equal to Part A's addresses", else send nothing — is met on
+Sepolia, and step 2 is cleared on this chain.
+
+**One measurement-form note, so a later reader does not read a passing gate as a failed one.**
+`RUNBOOK.md:365` gives 1c as `cast code $PROXY \| wc -c` “must be 141 chars”; that 141 counts the
+trailing newline `wc` sees. Measured with `printf '%s'` the same code is **140** characters, which is
+`0x` plus 138 hex digits = **69 bytes**, the figure the gate is actually about, and the keccak matches
+§ 1 exactly. The byte count is right; only the character convention differs.
+
+**1e against the prior reading.** The factory estimate is **16,738,648** against 16,730,843 on
+2026-11-08 (`RUNBOOK.md:1e`), a drift of 7,805 gas on a chain whose pricing moved under #201; the
+`App` estimate of **11,405,803** and the sum of **28,144,451** sit against § Gates' recorded Run A
+total of 28,296,098, so the funding arithmetic there holds unchanged with 0.2020 ETH at a 16 wei base
+fee. Both estimates are far inside the 200,000,000 block limit, and the node's figures — not
+`forge script`'s own cancun-priced simulation — are the ones this chain will charge.
+
+### Sepolia (11155111) — step 2, the factory
+
+**Sent.** `forge script scripts/forge/Deploy.s.sol --rpc-url "$RPC" --broadcast -g 650 $SIGNER`,
+`ONCHAIN EXECUTION COMPLETE & SUCCESSFUL`, forge exit 0.
+
+| step 2 | reading | required |
+|:--|:--|:--|
+| tx hash | **`0xf9da99cd04279a55a58c7be1431b3877d4547c6f5e7451f675f32922be4109bc`** | `cast receipt` ✓ |
+| `status` | **true** | success ✓ |
+| `gasUsed` | **16,797,162** | `cast receipt`, not `run-latest.json` (#140) ✓ |
+| `blockNumber` | **12,173,938** | recorded |
+| `effectiveGasPrice` | **6,250,004 wei** | recorded |
+| logged `DistributionFactory` | **`0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`** | **= 1f's prediction** ✓ |
+| `implementation` logged, and `implementation()` read back | **`0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`** | agree ✓ |
+| runtime length | **1,319 bytes** (2,640 chars), artifact **equal** | same length ✓ |
+| differing bytes | **60** | — |
+| differing bytes **outside** the declared spans | **0** | none ✓ |
+| spans | `{"48267":[{274,32},{864,32},{939,32}]}`, each holding `IMPL` left-padded to 32 | all three ✓ |
+
+**The gas limit had to be raised explicitly, and the figure the runbook tells you to raise it to is
+itself short.** Step 1e's rule is to compare the node's estimate with the dry run's and raise the
+limit when the node's is larger. On Sepolia at this base: the dry run printed **3,482,636** (not
+m04-t03's 3,482,636-era 3,287,625 — the bytes moved under #201) and the node's `cast estimate` read
+**16,738,648**, a factor of 4.81, so the broadcast carried `-g 650`, giving a limit of about
+22,637,134. **The transaction then used 16,797,162 — 58,514 gas *more* than the node's own
+estimate.** A limit set exactly at the node's figure, which is the literal reading of step 1e, would
+have failed for gas and burned most of it: a gas failure creates nothing and is not a #22 collision,
+but it is not free. So the rule wants a margin over the node's estimate rather than equality with
+it, and `-g` is the flag that applies it (`forge script` on 1.7.1-dev offers `-g/--gas-estimate-multiplier`
+as a percentage; it has no `--gas-limit`). Recommend amending step 1e to say so.
+
+### Sepolia (11155111) — step 3, `App`: one failed attempt, then the deploy
+
+**The first attempt failed for gas and created nothing.** Recorded before the retry was sent, per
+§ 2's rule, because a transaction that sent something must be written down before the next one.
+
+| failed attempt | reading |
+|:--|:--|
+| tx hash | **`0x2be31dbb7a2d5f0a6a6e141c8842548b4eddf0fe66362411068cc049b3c86639`** |
+| `status` | **false** |
+| `gasUsed` | **11,075,750** burned |
+| gas **limit as sent** | **11,432,739** |
+| `blockNumber` / `effectiveGasPrice` | 12,173,945 / **50,000,017 wei** |
+| `nonce` | 27, consumed |
+| `cast code $APP` after it | **`0x`** — nothing created, not a #22 collision |
+
+**The defect is in how `-g` is sized, and step 1e as written does not prevent it.** `forge script`
+applies `--gas-estimate-multiplier` to **its own per-transaction estimate**, not to the
+`Estimated total gas used for script` line the dry run prints. Those are different numbers: the dry
+run printed **2,286,547** for `DeployApp.s.sol`, while the per-transaction estimate was
+**1,758,883** — and 1,758,883 × 6.5 = **11,432,739**, the limit as sent, to the gas. The multiplier
+was chosen against the printed script total, so the limit landed ~23% below where it was aimed and
+**under the node's `cast estimate` of 11,405,803 once the 63/64 forwarding rule takes its share**.
+The inner `CREATE2` was handed about 11.23M against ~11.41M needed, burned all of it, and the outer
+frame kept the 1/64 that makes `gasUsed` read just under the limit rather than equal to it — which
+is why this looks like a revert-with-gas-to-spare and is not one.
+
+**Step 2 survived the same mistake by luck of proportion**, not by being sized correctly: its
+per-transaction estimate happened to sit high enough relative to its need that ×6.5 cleared the
+node's figure.
+
+**`cast run` on the failed hash is actively misleading here and should not be used as the
+post-mortem.** Replayed locally it prints `Transaction successfully executed. Gas used: 1655420`
+and a clean trace returning 7,154 bytes of code — because the replay prices creation under
+`foundry.toml`'s cancun rules, roughly 7× cheaper than Sepolia charges post-#201. The trace proves
+the constructor is correct and proves nothing about the gas. § Gates' standing caveat — a local
+rehearsal must never be the instrument for a publish estimate — extends to post-mortems of a failed
+publish.
+
+**What the retry uses.** The requirement is that the create *receive* ≥ 11,405,803, so the tx limit
+must clear `11,405,803 × 64/63 + intrinsic` ≈ 11.61M, plus a margin for the
+**step-2 lesson that actual can exceed the node's estimate** (there, by 58,514). `-g 900` gives
+1,758,883 × 9 = **15,829,947**, about 36% over the node's figure and far inside the 200,000,000
+block limit. Recommend step 1e be amended to name the per-transaction estimate as the multiplicand
+and to require a margin over the node's estimate rather than equality with it.
+
+**The retry succeeded.** `-g 900`, forge exit 0, `ONCHAIN EXECUTION COMPLETE & SUCCESSFUL`.
+
+| step 3 | reading | required |
+|:--|:--|:--|
+| tx hash | **`0xa3748d963f39e1a7c6747d832103ec8f7b1d22613f6a8fa6e5da0783f7bb3261`** | `cast receipt` ✓ |
+| `status` | **true** | success ✓ |
+| `gasUsed` | **11,505,124** | `cast receipt`, not `run-latest.json` (#140) ✓ |
+| `blockNumber` / `effectiveGasPrice` | **12,173,956** / 50,000,017 wei | recorded |
+| logged `App` | **`0x00a9F390A6010d045e0d34856048DdD6910d25BA`** | **= 1f's prediction** ✓ |
+| `owner()` | **`0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`** | `= $OWNER`, the Ops vault ✓ |
+| `version()` | **`"v0.1"`** | `= $APP_VERSION` ✓ |
+| `locked()` | **false** | false, and never sent ✓ |
+| runtime vs `forge inspect App deployedBytecode` | **`cmp` EQUAL**, 14,310 chars = **7,154 bytes** | equal outright ✓ |
+
+**The margin was load-bearing, measured twice now.** `gasUsed` of **11,505,124** is **99,321 above**
+the node's `cast estimate` of 11,405,803 — so a limit set at the node's figure would have failed a
+second time. With step 2's +58,514 that is two for two on the same side, which makes "the node's
+estimate is a floor, not a target" a measured rule on this chain rather than a precaution.
+
+### Sepolia (11155111) — step 5, explorer verification
+
+**Etherscan, run one at a time per `:1086`.** All three exit **0** with `Response: OK` /
+`Details: Pass - Verified` / `Contract successfully verified`. **All three were verified by this
+run**, not already verified — the runbook asks which of the two each address was, and none reported
+`is already verified. Skipping verification.`, which is what a pre-existing verification prints.
+
+One reading that looks like a failure and is not: each log also contains `Response: NOTOK` with
+`Details: Pending in queue`. That is the intermediate poll of `--watch`, not an outcome; the final
+response in every log is `OK`. Worth naming because grepping a verify log for `NOTOK` — which is how
+the rate-limit failure at `:1086` is detected — matches the queue message too.
+
+| `getsourcecode` `ContractName` | address |
+|:--|:--|
+| **`DistributionFactory`** | `0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E` |
+| **`Distribution`** | `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A` |
+| **`App`** | `0x00a9F390A6010d045e0d34856048DdD6910d25BA` |
+
+`#code` URLs: `https://sepolia.etherscan.io/address/<address>#code` for each of the three.
+
+**Sourcify, with `ETHERSCAN_API_KEY` unset for all three verifies per `:1107`.** Each exits 0, and
+the gate — the asserting loop, not the operator's eye (#207) — prints **three `exact_match` lines**
+and **exits 0**:
+
+| address | `match` |
+|:--|:--|
+| `0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E` | **`exact_match`** |
+| `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A` | **`exact_match`** |
+| `0x00a9F390A6010d045e0d34856048DdD6910d25BA` | **`exact_match`** |
+
+**OpenChain signatures, 2026-11-20:** `cast upload-signature` over
+`Distribution.json`, `DistributionFactory.json` and `App.json` returns **82 `Duplicated:`** and
+**0 `Imported:`** — all 82 of this ABI's signatures were already present, which is the expected
+reading for an unchanged ABI on a new deployment and confirms no ABI moved under #201's re-pin.
+
+### Base Sepolia (84532) — step 1, preflight
+
+Same branch, same toolchain, same commands. Differences from Sepolia only:
+
+| 1 | reading | required |
+|:--|:--|:--|
+| `cast chain-id` | **84532** | `= $CHAIN_ID` ✓ |
+| 1c proxy | **69 bytes**, keccak `0x2fa86add…f7e4989` | § 1's value ✓ |
+| 1e runtime | **1,319 bytes** | 1,319 ✓ |
+| 1e `cast estimate` factory | **2,396,446** | recorded |
+| 1e `cast estimate` `App` | **1,666,007** | recorded |
+| 1e block `gasLimit` | **120,000,000** | estimates fit ✓ |
+| 1e `cast base-fee` | **5,000,000 wei** (0.005 gwei) | re-read ✓ |
+| 1g `cast code` at `FACTORY` / `APP` | **`0x`** / **`0x`** | `0x` ✓ |
+
+**1f predicts the same two addresses as Sepolia** — `FACTORY
+0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`, `APP 0x00a9F390A6010d045e0d34856048DdD6910d25BA`, both
+init-code hashes identical — which is what CREATE2 through the same proxy at the same salts is for,
+and both equal Part A. **The repricing is the whole difference between the chains:** the factory
+estimate is 2,396,446 here against Sepolia's 16,738,648, a factor of **6.98**, which is #201's
+code-deposit repricing measured a third time on this task's own bytes.
+
+### Base Sepolia (84532) — step 2, the factory, after one submission the node refused
+
+**The first submission was rejected by the node and never broadcast.** `-g 900` — the multiplier
+Sepolia's step 3 needed — asked for a limit of **24,110,559** here (forge's per-transaction estimate
+on this chain is 2,678,951), and the RPC answered
+`error code -32003: gas limit too high` after 4 attempts. **Nothing was sent:** no transaction hash,
+no nonce consumed, no gas burned, `cast code` still `0x` at both addresses. This is a cheaper failure
+than Sepolia's step 3 and a different one — refused at submission rather than reverted on chain.
+
+**So the multiplier is per chain, and the two chains want opposite corrections.** Sepolia needs a
+large multiplier because the node charges ~7× forge's cancun pricing for a code deposit; Base
+Sepolia *refuses* that same multiplier because it enforces a per-transaction gas cap well below its
+120,000,000 block limit, and its node estimate (2,396,446) is already **below** forge's own
+(2,678,951). A single `-g` for a run that spans both chains cannot be correct. `-g 200` here gives
+5,357,902 — 2.2× the node's figure and comfortably under the cap.
+
+| step 2 | reading | required |
+|:--|:--|:--|
+| tx hash | **`0x73e4e918a1420edfa63adcf2ba1435474aef43da98423635d9360652cc61a0ca`** | `cast receipt` ✓ |
+| `status` | **true** | success ✓ |
+| `gasUsed` | **2,381,290** | `cast receipt` (#140) ✓ |
+| gas limit as sent | **5,357,902** | fits the cap ✓ |
+| `blockNumber` / `effectiveGasPrice` | **61,197,280** / 6,000,000 wei | recorded |
+| logged `DistributionFactory` | **`0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`** | **= 1f's prediction** ✓ |
+| `implementation` logged and read back | **`0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`** | agree, and **equal to Sepolia's** ✓ |
+| runtime length | **1,319 bytes**, artifact equal | same length ✓ |
+| differing bytes / outside the spans | **60** / **0** | none outside ✓ |
+| spans | all three hold `IMPL` left-padded to 32 | ✓ |
+
+**Here the node's estimate was not a floor.** `gasUsed` of **2,381,290** came in **15,156 below**
+the estimate of 2,396,446 — the opposite sign to both Sepolia sends. So "the estimate under-reports"
+is a property of the repriced chain, not of `cast estimate`, and the safe rule is a margin in both
+directions rather than a correction factor.
+
+### Base Sepolia (84532) — step 3, `App`
+
+**Sent first time with `-g 200`**, forge exit 0, `ONCHAIN EXECUTION COMPLETE & SUCCESSFUL`.
+
+| step 3 | reading | required |
+|:--|:--|:--|
+| tx hash | **`0xe8f0c7066102ea9e27ee89b52b442faa9cd704deec453b40a74af4e85c47f414`** | `cast receipt` ✓ |
+| `status` | **true** | success ✓ |
+| `gasUsed` | **1,655,420** | `cast receipt` (#140) ✓ |
+| `blockNumber` / `effectiveGasPrice` | **61,197,481** / 6,000,000 wei | recorded |
+| logged `App` | **`0x00a9F390A6010d045e0d34856048DdD6910d25BA`** | **= 1f's prediction**, and equal to Sepolia's ✓ |
+| `owner()` | **`0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`** | the Ops vault ✓ |
+| `version()` | **`"v0.1"`** | `= $APP_VERSION` ✓ |
+| `locked()` | **false** | false, and never sent ✓ |
+| runtime vs artifact | **`cmp` EQUAL**, 7,154 bytes | equal outright ✓ |
+
+**This number closes the argument about local rehearsals, by coincidence worth keeping.** Base
+Sepolia charged **1,655,420** gas — *exactly* the `Gas used: 1655420` that `cast run` printed when it
+replayed Sepolia's **failed** step 3 locally. The replay was right about the gas and wrong about the
+chain: it priced the deposit under `foundry.toml`'s cancun rules, which is what Base Sepolia applies
+and what Sepolia no longer does. So the same bytes cost 1,655,420 here and 11,505,124 there, a factor
+of **6.95**, and a local figure is a correct prediction for an un-repriced chain and a 7×
+under-estimate for a repriced one. That is the sharpest form of § Gates' caveat this task has
+measured.
+
+### Base Sepolia (84532) — step 5, explorer verification
+
+**No `--verifier-url` was needed**, as `:1090` predicts: forge 1.7.1-dev resolves 84532 to Basescan
+through the same Etherscan v2 key.
+
+**Which of the two each address was — and here they differ, which is why `:1093` asks.** The factory
+and the implementation returned `Pass - Verified`, so this run verified them. `App` returned
+`Contract [src/App.sol:App] "0x00a9F390A6010d045e0d34856048DdD6910d25BA" is already verified.
+Skipping verification.` and exit 0 — a pass for the criterion, but **this run cannot claim it**, and
+`getsourcecode` carries no timestamp to settle who did. The likely cause is benign and worth naming:
+the address and bytecode are identical to Sepolia's, which Etherscan v2 serves under one key across
+chains. Recorded rather than smoothed over, because "verified" and "verified by this run" are
+different facts and only one of them is evidence about this deploy.
+
+| `getsourcecode` `ContractName` | address | Etherscan |
+|:--|:--|:--|
+| **`DistributionFactory`** | `0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E` | `Pass - Verified` (this run) |
+| **`Distribution`** | `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A` | `Pass - Verified` (this run) |
+| **`App`** | `0x00a9F390A6010d045e0d34856048DdD6910d25BA` | **already verified** (not this run) |
+
+`#code` URLs: `https://sepolia.basescan.org/address/<address>#code` for each of the three.
+
+**Sourcify, key unset, all three exit 0, and the gate passes:** three **`exact_match`** lines, loop
+exit **0**, at the same three addresses.
+
+**OpenChain** is keyed by selector rather than by chain, so the upload recorded under Sepolia covers
+this chain too: **82 `Duplicated:`, 0 `Imported:`**, 2026-11-20.
+
+### Step 13 closes #288, and the two fixtures now agree
+
+§ Gates recorded that [#288](https://github.com/dnznlabs/rake/issues/288) closes on step 13 and that
+the two suites disagreed until it did: `test/ext.test.mjs:41` pinned Part A's **prediction** while
+`test/build.test.mjs:282-283` pinned the M04 **deployed** factory. They agree now because **landed
+equals predicted** — step 13's own 1f check, measured on both chains, not assumed.
+
+The fixture move this step owes (`TASK.md` step 13: "`test/build.test.mjs:282-285`'s Sepolia fixture
+moves to the new factory and block here"):
+
+| `test/build.test.mjs` | was | now |
+|:--|:--|:--|
+| `SEPOLIA.DISTRIBUTIONFACTORY` | `0x00D18B5b…71B` | **`0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`** |
+| `SEPOLIA.DISTRIBUTIONFACTORY_BLOCK` | `0xb88091` | **`0xb9c272`** (12,173,938) |
+| `SEPOLIA.APP` | `0x00A90943…5BaE` | **`0x00a9F390A6010d045e0d34856048DdD6910d25BA`** |
+| `DEPLOYED.factory` / `.impl` (`:402-405`) | `0x00D18B5b…71B` / `0x31dd18b4…a4b0` | **the landed pair** |
+
+**Two further sites had to move, and neither is in the lines the plan names** — worth stating because
+a reader following `:282-285` alone would leave the suite red:
+
+1. **`:402-405`'s `DEPLOYED`** is a second constant in the same file, used by the negative test at
+   `:449` that bends one hex digit of the factory address and requires the error to quote both the
+   bent value and the computed one. Left at the M04 pair it fails against the real broadcast log,
+   whose input now computes the new factory.
+2. **`:387`'s pinned prefix** in "a `--set` over a value the log already gave says so on stderr".
+   That test passes the log's own value deliberately, so only the address prefix in the expected
+   stderr moved, `0x00D18B5b` → `0x00D19609`; its intent is untouched.
+
+`node --test test/*.test.mjs`: **188 passed, 0 failed**.
+
+## Step 14 — its gate is met, and its first check cannot pass as written
+
+**The gate is satisfied, verified independently against `origin/main` at `aecedbe` rather than from
+§ Gates' earlier table:** m04-t15 [#277](https://github.com/dnznlabs/rake/pull/277) `02d456a` and
+m04-t16 [#286](https://github.com/dnznlabs/rake/pull/286) `3849cb2` are both **MERGED**, and
+`git merge-base --is-ancestor` exits **0** for each against this branch's head. So step 14 is not
+waiting on either PR.
+
+**It is blocked on its own first check, which step 13 made unsatisfiable by construction.** Step 14
+requires the `sha256` of `app/dist/index.html` and `app/dist/widget.js` per chain to **equal**
+m04-t16's § For the next upload figures "before anything else runs", and calls a mismatch a stop.
+Measured at `c7cfe5c`:
+
+| chain | file | m04-t16 § For the next upload | built here, 2026-11-20 | |
+|:--|:--|:--|:--|:--|
+| 11155111 | `widget.js` | `8b6bbc88…bc368` | **`8b6bbc88…bc368`** | **equal** ✓ |
+| 84532 | `widget.js` | `8b6bbc88…bc368` | **`8b6bbc88…bc368`** | **equal** ✓ |
+| 11155111 | `index.html` | `5b298120…40832` | **`4279a0c9cf9de57e284ebddf0ad5bb8e546a14e384f79fb5bc78ae467b2cd0fc`** | **differs** |
+| 84532 | `index.html` | `b081be52…३290e` | **`1e5dbb710b397dbe7d2613deaad6b5849a802b385d20566c737342a4e611a05a`** | **differs** |
+
+**Neither cause the plan names applies, and both were tested rather than assumed.** Step 14 says a
+mismatch means "either `app/` moved after m04-t16 or the build is not reproducible, and both are
+findings, not something to re-hash past":
+
+- **`app/` has not moved.** `git diff --stat 3849cb2..HEAD -- app/` is **empty**.
+- **The build is reproducible.** `make dapp-nodev CHAIN_ID=11155111` run twice in succession gives
+  the identical `index.html` sha256 `4279a0c9…cd0fc` both times.
+
+**The actual cause is a third one the plan does not enumerate: step 13 changes an input the bundle
+embeds.** `make dapp-nodev` reads the factory and its block from the committed broadcast logs — the
+same dependency step 13's own row relies on — so re-pointing the factory necessarily re-writes
+`index.html`. The built bundle contains **`0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`** and the M04
+factory `0x00D18B5b…71B` appears nowhere in it, which is the intended outcome of the redeploy and
+the reason the hash moved.
+
+**The corroboration that this is an address substitution and not a content change:** the raw sizes
+are unchanged, because an address is a fixed-length string. `dapp: raw 150842 · gzip 47659` on
+11155111 is byte-for-byte m04-t16's figure, and `widget: raw 8509 · budget 10240 · 1731 left` is
+unmoved on both chains. Only 84532's gzip differs, by **one byte** (47658 against 47657) — a
+compression artefact of different address bytes at the same length, not a payload change.
+
+**So the check is right about `widget.js` and wrong about `index.html`,** and it is wrong in a way
+that makes step 14 unrunnable on any chain where step 13 has executed — which is every chain step 14
+serves. It needs an amendment from the architect: either the equality is restricted to `widget.js`
+and the figures that are genuinely invariant, or `index.html`'s expected hash is re-baselined from a
+post-step-13 build and recorded here as the new reference. **The engineer does not pick between
+those** — it changes what a criterion asserts.
+
+**Nothing of step 14 was sent.** No bundle was uploaded, `tools/step4-calldata.mjs` was not run, and
+**no proposal exists on either chain** — deliberately, since the vault already carries two inert
+proposal rows from m04-t08's step 7 and adding six more ahead of a ruling would repeat that cost.
+The build artefacts are untracked (`app/dist` is not in the index), so the tree is clean at the
+recorded head.
+
+### Step 14 — the amended hash check, reproduced on both chains
+
+**The amendment landed** as [#307](https://github.com/dnznlabs/rake/pull/307), merged
+2026-11-20 14:18:46Z; `main` is **`ff59ef2`** and this branch is rebased onto it, so `TASK.md` here
+is byte-identical to `main` again. The step's first check is now two comparisons per chain, and
+**both pass**. The architect's figures were re-derived here rather than accepted:
+
+| chain | `widget.js` `sha256` | m04-t16 § For the next upload | |
+|:--|:--|:--|:--|
+| 11155111 | `8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368` | same | **equal** ✓ |
+| 84532 | `8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368` | same | **equal** ✓ |
+
+| chain | `index.html` built (§ Uploads carries this) | substituted per step 14's command | m04-t16 expects | |
+|:--|:--|:--|:--|:--|
+| 11155111 | **`4279a0c9cf9de57e284ebddf0ad5bb8e546a14e384f79fb5bc78ae467b2cd0fc`** | `5b2981205e3f9c36e212793c3e09e66f632d4417248db8c6b5f50229bbd40832` | `5b298120…40832` | **equal** ✓ |
+| 84532 | **`1e5dbb710b397dbe7d2613deaad6b5849a802b385d20566c737342a4e611a05a`** | `b081be5202b06ad53b376c64fb5e878cd111b5ce1e79fced4be674d3c363290e` | `b081be52…3290e` | **equal** ✓ |
+
+**The occurrence check the step requires — each of the four re-pointed values appears exactly once
+in the built page — holds on both chains:** `factory` `0x00D19609…6d7f8E` ×1, `app`
+`0x00a9F390…0d25BA` ×1, `impl` `0xc4eD7EA2…fF8cB0A` ×1, and `factoryBlock` `0xb9c272` ×1 on
+11155111 / `0x3a5cbe0` ×1 on 84532. That is what makes the substitution total rather than
+best-effort: four single occurrences, so nothing else in the page can be absorbing a difference.
+
+**`$FACTORY_BLOCK` was taken from the chain, not from the plan.** Both values are step 2's own
+`cast receipt … blockNumber` on their chain, in lowercase hex: `0xb9c272` = 12,173,938 (Sepolia,
+recorded above) and `0x3a5cbe0` = 61,197,280 (Base Sepolia, recorded above). They agree with the
+architect's.
+
+**Build sizes are unmoved from m04-t16 on both chains** — `raw 150842 · gzip 47659` on 11155111 and
+`raw 150840 · gzip 47658` on 84532, `widget: raw 8509 · budget 10240 · 1731 left` on each — with the
+same one-byte gzip difference on 84532 noted earlier. So the only delta between this bundle and
+m04-t16's is the four deployment values, now demonstrated by hash rather than argued.
+
+### Step 14 — calldata, and the fork proof before any signature
+
+**Calldata generated per chain** with `tools/step4-calldata.mjs --chain $CHAIN_ID --rpc "$RPC"
+--out calldata`, at the generating commit **`9d3f94f`**. All three proposals fit the coordination
+service's 65,536-character cap on both chains, with the spare stated so a future `app/` growth has a
+budget rather than a surprise:
+
+| proposal | chars | spare |
+|:--|--:|--:|
+| `1-addChunk-0.hex` | 48,138 | 17,398 |
+| `2-addChunk-1.hex` | 47,498 | 18,038 |
+| `batch345.hex` | 19,018 | 46,518 |
+
+**One defect found before it could do damage, and it is a tooling defect rather than a plan one.**
+`tools/step4-calldata.mjs:67` hard-codes `--app`'s default to
+**`0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE`** — the **M04** `App` — and step 14's command as
+written omits `--app`. Run verbatim after step 13, it would have built the entire upload against the
+superseded contract, silently, because every later check in the step compares the calldata to the
+build rather than to the target address. The tool's own comment is sound reasoning on a stale value:
+`App` *is* one address on every chain (decision 35), so a default rather than a per-chain table is
+right — it is simply the previous deployment's. **Every file here was generated with
+`--app 0x00a9F390A6010d045e0d34856048DdD6910d25BA` passed explicitly.** The `--vault` default
+`0x00c0e887…F3790` is still correct and was left alone. This wants fixing before any mainnet cut,
+where the same default would point at a testnet address.
+
+**Cross-chain shape, which is its own check:** `3-addWidgetChunk.hex`, `4-setChunks.hex`,
+`5-setWidgetChunks.hex` and `batch345.hex` are **byte-identical across the two chains** (same
+`sha256`), while `1-addChunk-0.hex` and `2-addChunk-1.hex` differ — exactly the four-value delta in
+`index.html` and nothing more. The three SSTORE2 pointers are the same on both chains
+(`0x029E4004…`, `0x87eE9c5C…`, `0x295fF302…`), as they must be: they derive from `App`'s address and
+nonce, which match, while the bytes they will hold differ per chain. And the widget call's
+`bytes arg sha256` is **`8b6bbc88…bc368`**, equal to `app/dist/widget.js`'s own hash, so the argument
+is the built file rather than a re-encoding of it.
+
+**The fork proof passed on both chains — the upload will serve the right bytes, established before a
+signature exists.** Both chunks and the five-call batch executed on an anvil fork with the vault
+impersonated, and `chain-doc` then read the document back off the fork:
+
+| | Sepolia `11155111` | Base Sepolia `84532` |
+|:--|:--|:--|
+| live `cast estimate` call 1 / call 2 | **37,858,862** / **37,327,517** | **5,343,480** / **5,269,032** |
+| fork `gasUsed` call 1 / call 2 | 5,300,127 / 5,209,461 | 5,300,247 / 5,209,285 |
+| `batch345` fork estimate / `gasUsed` | 2,083,631 / **2,005,037** | 2,083,631 / **2,005,037** |
+| all five calls | **status 1** | **status 1** |
+| `chain-doc` `inflated sha256` | **`4279a0c9…cd0fc`** | **`1e5dbb71…1a05a`** |
+| `sha256sum app/dist/index.html` | `4279a0c9…cd0fc` — **equal** ✓ | `1e5dbb71…1a05a` — **equal** ✓ |
+| `inflated bytes` / build raw | 150,842 / 150,842 ✓ | 150,840 / 150,840 ✓ |
+| `chain-doc` `widget sha256` | `8b6bbc88…bc368` — **equal** ✓ | `8b6bbc88…bc368` — **equal** ✓ |
+| `widget status` / bytes | 200 / 8,509 | 200 / 8,509 |
+
+**The fork's own caveat, measured again here rather than quoted.** `:1018` says anvil prices code
+deposit at ~223 gas/byte — within 2% of Base Sepolia live and ~7× under Sepolia. Confirmed on this
+task's bytes: Base Sepolia's live call 1 of **5,343,480** against the fork's 5,300,127 is **0.8%**
+apart, while Sepolia's live **37,858,862** against the same fork figure is **7.14×**. So the fork
+figures above are authoritative for the batch (which creates no code) and for Base Sepolia, and the
+**live** estimates are the only valid ones for Sepolia's two chunk calls. Anvil was started on port
+8701 and killed by PID, never by pattern (`:1005`).
+
+### Step 14 — the six proposals, written and read back
+
+**Preconditions, read live from the vault per chain and not from the service** (whose `nonce` and
+`owner_count` lag by design, `:4a`): `nonce()` **13**, `threshold()` **2**, `ownerCount()` **4**,
+`isOwner($ENGINEER)` **true**, and `cast nonce $APP` **1** on both chains — `App` is fresh, which is
+what step 14 asserts and what makes the batch's third-CREATE pointer arithmetic hold. The two
+`wallets` rows are per chain with different ids, as `:4a` warns: Sepolia
+`eea4803e-1228-496d-9d19-d3a56ab45364`, Base Sepolia `79632e21-9dc4-4c9a-b136-2627021f5c33`, both
+found only with the address lowercased.
+
+**Three proposals per chain, nonce order, value 0, each with exactly one `ecdsa` signature from
+`$ENGINEER`. Calldata generated at `9d3f94f` for `--app-nonce 1`.**
+
+| # | file | target | nonce | Sepolia digest | Base Sepolia digest |
+|--:|:--|:--|--:|:--|:--|
+| 1 | `1-addChunk-0.hex` | `$APP` | **13** | `0x9c0dbbd40da1f21e516edd6988c0bb0593bd9d706fa9f959c8b08056c20fa86e` | `0xdc19356867c174cf300a4428d7184551b284bdb6d8aa8510b60c1968a00a9cc2` |
+| 2 | `2-addChunk-1.hex` | `$APP` | **14** | `0x8dc6d8b42a4282980d3ee265633c154a5a04da524874a843c083ff567a8b9df0` | `0xe2deb8b268b8c0d951e6a21787d84c38b9413f4be24eeadeade318766ae957c2` |
+| 3 | `batch345.hex` | `$OWNER` (the vault) | **15** | `0x4c14791021a4da1bc6d64cd8c780e918fb980190c8c9fcff4dc0769e69cb84f0` | `0xbb693f0b6bb0e7226b57058f6fad95db3f415acc7ba9a1bd069ee8c9f723104e` |
+
+Every signature was verified locally with `cast wallet verify --address $ENGINEER --no-hash` before
+its POST — all six `Validation succeeded` — and the run stops before POSTing if one does not.
+
+**Verified by reading back through `tx_summary`, not by the POST's `200`** (`:4a`). All six rows:
+`status` `proposed`, `value` **0**, `threshold` **2**, **exactly one** signature and it is the
+engineer's `ecdsa`, `call_data` lengths **48,138 / 47,498 / 19,018** matching the committed files,
+`tx_hash` equal to the digest signed, and targets `0x00a9f390a6…` for 1 and 2 against
+`0x00c0e88778…` for 3. `sig_count` was not read (`:4a`: it reads `0` for signed and unsigned alike).
+
+**One departure from the runbook's own expectation, in the harmless direction.** `:4a` says to
+expect more rows than this upload proposed, because earlier uploads' rows linger — "six rows per
+chain today for three new proposals". The filter returned **exactly three per chain**, all dated
+2026-11-20T14:44Z. So nothing is lingering in `proposed`, `executing` or `queued` on either chain,
+and in particular **the two inert m04-t08 step-7 rows no longer appear on Sepolia**. Recorded as an
+observation rather than a claim about who cleared them; the pruning was not done here.
+
+### Step 13a, and step 14 re-run on top of it
+
+**Step 13a is `424c12d`, one commit, two files.** Its own check: `git diff --stat HEAD~1 HEAD` names
+`app/src/index.html` and `test/docs.test.mjs` and nothing else, and `node --test test/docs.test.mjs`
+exits **0** with the new case named in its output — *the docs widget section leads with the data-rpc
+snippet and offers the wallet form second* — 12 of 12 passing there, **189** across the suite
+(188 before).
+
+**Criterion 18g rows 1–5.** (1) With a `PUBLIC_RPC` entry the first `pre.snip` carries `data-rpc`
+and the second does not; the test asserts the order from the source, as the rest of that file does.
+(2) The wallet form stays, introduced with "To read through the visitor's wallet instead, omit
+`data-rpc`", and still names both failure states — no wallet, and a wallet on another chain.
+(3) With no `PUBLIC_RPC` entry the wallet form is shown alone and the prose says the chain has no
+known public endpoint, so the omission is explained rather than silent. (4) The endpoint prose is
+kept: the endpoint is the host's to choose, and the one shown is a public one included so the
+example works as pasted. (5) `app/src/widget.js` is untouched — `sha256sum app/dist/widget.js` is
+**`8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368`** on both chains, equal to
+m04-t16's figure, and `widget: raw 8509 · budget 10240 · 1731 left` is unmoved. Row 6 is after step
+16. Closes [#309](https://github.com/dnznlabs/rake/issues/309).
+
+**The amended step 14 comparison, as `TASK.md` at `ef2ad20` now frames it.** The `index.html`
+equality with m04-t16 stays as the row recorded at `2df6b8e`, before 13a existed. The page actually
+uploaded carries 13a, so its substituted hash is a new figure, and what separates it from m04-t16's
+page is step 13a's commit alone: **`git diff --stat 3849cb2..HEAD -- app/` names
+`app/src/index.html` and no other file**, and that file's diff is the one `424c12d` carries.
+
+| chain | built `index.html` (§ Uploads) | substituted `index.html` | `widget.js` |
+|:--|:--|:--|:--|
+| 11155111 | **`59c24c98a1bc60fa82be18acb290b4a5df29e406f00f22d643c969acffdd2010`** | **`743270df1e09bc508ca24d05494e0c01d7899d16a36b796b0c32ae1293a8de49`** | `8b6bbc88…bc368` — **equal to m04-t16** ✓ |
+| 84532 | **`59ef3a4e21d585e623f54861d54aa8fd8d10135691747d1f23ebb03dce20df28`** | **`5b754b075b66656d65d2f9608b336713283b84c6e5d472087146553d108aa1ed`** | `8b6bbc88…bc368` — **equal to m04-t16** ✓ |
+
+Each of the four re-pointed values still occurs exactly once in the built page on both chains.
+Builds are `raw 151232 · gzip 47720` on 11155111 and `raw 151230 · gzip 47720` on 84532.
+
+**The fork proof was re-run on the new bundle and passes on both chains:** all five calls `status 1`,
+and `chain-doc` read back `inflated sha256` **`59c24c98…dd2010`** on Sepolia and
+**`59ef3a4e…20df28`** on Base Sepolia, each equal to that chain's build, at 151,232 and 151,230
+bytes, with the widget hash equal on both.
+
+**Calldata regenerated at `557a405`**, again with `--app` passed explicitly. Sizes against the
+65,536-character cap: `1-addChunk-0.hex` 48,138 (17,398 spare), `2-addChunk-1.hex` **47,626**
+(17,910 spare), `batch345.hex` 19,018 (46,518 spare).
+
+## For Denizen — step 14's 4b checklist, per chain
+
+**Read the digest first. There are four rows per chain, not three, and two of them sit at nonce 14.**
+Step 13a changed one chunk, so one proposal per chain was replaced and its predecessor cannot be
+withdrawn from the coordination service (§ Deviations 0). The live set is below; the two rows never
+to be signed are **`0x8dc6d8b4…8b9df0`** on Sepolia and **`0xe2deb8b2…e957c2`** on Base Sepolia, both
+at nonce 14, both 47,498 calldata characters against the live row's 47,626.
+
+| # | file | target | nonce | Sepolia digest — **sign these** | Base Sepolia digest — **sign these** |
+|--:|:--|:--|--:|:--|:--|
+| 1 | `1-addChunk-0.hex` | `App` | **13** | `0x9c0dbbd40da1f21e516edd6988c0bb0593bd9d706fa9f959c8b08056c20fa86e` | `0xdc19356867c174cf300a4428d7184551b284bdb6d8aa8510b60c1968a00a9cc2` |
+| 2 | `2-addChunk-1.hex` | `App` | **14** | `0x3f1b294e00e57125031374130ed7efb0ee7fa5c5c3716e964997e36690125939` | `0x673590fb892c778f278603ecadaea8ee8815eb362c714b564ad8f8087a4d1d5e` |
+| 3 | `batch345.hex` | the vault | **15** | `0x4c14791021a4da1bc6d64cd8c780e918fb980190c8c9fcff4dc0769e69cb84f0` | `0xbb693f0b6bb0e7226b57058f6fad95db3f415acc7ba9a1bd069ee8c9f723104e` |
+
+Proposals 1 and 3 are the **same rows** as before 13a, not re-proposals: the service returned their
+original ids unchanged, because their calldata is byte-identical.
+
+**What is waiting:** three live proposals on **each** chain, each already carrying the engineer's
+signature and needing **one more** to reach `threshold()` 2. Check them against a checkout of
+**`557a405`**, the commit the calldata was generated at.
+
+Before signing each one (`:4b`):
+
+1. **Proposals 1 and 2 — target is `App` `0x00a9F390A6010d045e0d34856048DdD6910d25BA`, value 0.** A
+   proposal whose target is the vault is proposal 3 or not this upload. **Note the address: it is
+   the `App` step 13 deployed, not M04's `0x00A90943…5BaE`** — the two differ after the fourth
+   character, so read past the `0x00a9`.
+2. **The data is the committed file.** `sha256sum` of the proposal's data equals that of
+   `calldata/$CHAIN_ID/1-addChunk-0.hex` or `…2-addChunk-1.hex`.
+3. **It decodes to one `addChunk(bytes)`**, whose `bytes` argument's `sha256` is this handoff's
+   figure for that chunk.
+4. **The nonce and digest** are the table's row above for that chain.
+5. **Proposal 3 — target is the vault `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`, value 0**, and it
+   decodes to `batch(address[],uint256[],bytes[])` with three targets all `App`, three values all 0,
+   and the three `bytes` equal to `3-addWidgetChunk.hex`, `4-setChunks.hex`,
+   `5-setWidgetChunks.hex` **in that order**. `batch` is a vault self-call, which the review
+   checklist marks high risk — confirm it outside the channel that requested it.
+
+Then (`:4b`, `:4c`):
+
+- **Sign all three before submitting any.** A gap in the nonce sequence stalls the ones behind it.
+- **Submit back to back in nonce order 13, 14, 15.** The vault hashes against `nonce++`, so
+  submitting 14 before 13 is refused as `InvalidSig` — nothing lost but the gas.
+- **Then wait the `delay()` the chain answers, which is 900 s — 15 minutes, not one hour.** You
+  confirmed this setting on 2026-11-20 and `TASK.md` records it; 3,600 s stays the mainnet figure.
+  All three queue within seconds of each other, so one wait covers them.
+- **Nothing reaches `App` until `executeQueued`.** Until then the document is not on chain and the
+  dapp serves nothing new.
+
+**What is already proven, so the sitting does not need to re-establish it:** the five-call sequence
+executed end to end on a fork of each chain and `chain-doc` then read the document back with
+`inflated sha256` **equal to the build** on both — so the upload serves the right bytes. The fork
+establishes encoding, order and gas only; the authority readings are the live `isOwner`/`threshold`
+above.
+
+### Step 16 — 4c and 4d on Sepolia (11155111): the upload is live and verified
+
+**Pre-send gates, read from the chain and not from the record.** The committed calldata at
+`f5e081b` reproduced all three queued digests exactly — `0x9c0dbbd4…0fa86e` at nonce 13,
+**`0x3f1b294e…125939`** at 14 (the `557a405` re-run) and `0x4c147910…cb84f0` at 15 — each with a
+non-zero `queued` eta, all matured. The dead `0x8dc6d8b4…8b9df0` read **0**, so the wrong piece was
+never executable on this chain. Pointer agreement held both ways: `setChunks` names
+`0x029E4004…`, `0x87eE9c5C…` and `setWidgetChunks` names `0x295fF302…`, which are exactly `App`'s
+CREATEs at nonces 1, 2 and 3 computed independently with `cast compute-address`.
+
+**Executed `1 → 2 → batch`, one at a time, waiting for each receipt, with `estimate + 30%` per send.**
+
+| piece | tx hash | `status` | `gasUsed` | estimate | block |
+|:--|:--|:--|--:|--:|--:|
+| 1 `addChunk` doc 0 | `0x3bc0b3c089e592445381f5a070ce9d4a4883bfa5180912b84effffc2040e8fea` | **true** | 37,591,184 | 38,202,006 | 12,176,209 |
+| 2 `addChunk` doc 1 | `0xf25b0128de45130661da12b4bae1b8cf02cfc2642e9c54b847665615ca0f75a5` | **true** | 37,060,412 | 38,048,346 | 12,176,211 |
+| batch (calls 3–5) | `0x194caf5e4a39e914d566b0f599ee690676799f2e5bfb1ecedf1fd2e798e7a8eb` | **true** | 13,762,835 | 14,608,000 | 12,176,213 |
+
+`effectiveGasPrice` 50,000,013 wei on all three. Every estimate came back above the gas used, by
+**1.6%**, **2.7%** and **6.1%** — inside the 2.62–7.62% band § Uploads records for the 2026-11-17
+upload, so the `+30%` margin was never close to binding. The batch was estimated **between** piece 2
+and itself, as `:838` requires, since `setChunks` cannot be estimated before its pointers exist.
+
+**The content gate was read from the chain between pieces, which is what proves the order held** —
+not the nonce, which cannot tell one chunk from another:
+
+| after | pointer | code bytes | SSTORE2 content vs committed calldata | payload `sha256` |
+|:--|:--|--:|:--|:--|
+| piece 1 | `0x029E4004a2Be5fd03db9aDCee825898Ef70D98F4` | 24,001 | **byte-equal** ✓ | `0e73ef88…82ce` |
+| piece 2 | `0x87eE9c5C1857f57C941A880be4BbC036471780A3` | 23,721 | **byte-equal** ✓ | `fcf702ae…5b3e` |
+
+That second payload hash is the **`557a405`** generation's figure, so Sepolia demonstrably carries
+the post-13a chunk 1 on chain rather than the superseded one. This is the check that would have
+caught a `2 before 1` swap, which reverts nowhere.
+
+**4d against the live chain — both equalities hold:**
+
+| reading | live chain | build at `f5e081b` | |
+|:--|:--|:--|:--|
+| `inflated sha256` | **`59c24c98a1bc60fa82be18acb290b4a5df29e406f00f22d643c969acffdd2010`** | same | **equal** ✓ |
+| `inflated bytes` | **151,232** | 151,232 | equal ✓ |
+| `widget sha256` | **`8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368`** | same, and m04-t16's | **equal** ✓ |
+| `widget` status / bytes | 200 / 8,509 | — | ✓ |
+| served payload | 64,305 bytes, `sha256 009003a2…` | — | recorded |
+| `cast nonce $APP` | **4** | the step's check names 4 | **equal** ✓ |
+| `locked()` | **false** | false, never sent | ✓ |
+
+**The hosted gateway fails on the new address, and by the runbook that is carried rather than
+fixed.** `make gateway-check` against
+`https://0x00a9f390a6010d045e0d34856048ddd6910d25ba.11155111.w3link.io/` exits **2** with
+`status: 400` on `GET /` and every expected ERC-5219 header absent
+(`web3-resolve-mode`, `web3-mode-auto-method`, `web3-contract-return-processing`), and no
+`web3urlgateway-cache-status` or `age` header at all. **The upload is sound regardless:** `:898-901`
+makes the chain the reference and says a gateway mismatch while `chain-doc` matches the build is a
+documented third-party condition, "not a failed upload", recorded and carried and **never
+re-uploaded**. `chain-doc` matched on both hashes above, off the live chain.
+
+**Our own build of the same software serves Sepolia correctly, so the fault is w3link's deployment
+and not ours.** This was the weakest claim in the handoff — the project's own gateway is named as
+Sepolia's fallback in two places and nothing had run it — so it was measured, 2026-11-20, against
+`tools/gateway.sh`'s pin **`c5826718855a9ece2b71abfee2f4e548a83b9d16`** (`temp skip qkcl2 (#117)`)
+of `ethstorage/web3url-gateway`, started with `GATEWAY_CHAIN_ID=11155111
+GATEWAY_RPC=https://ethereum-sepolia-rpc.publicnode.com GATEWAY_PORT=8799` — the invocation
+`tools/gateway.sh`'s own header documents — and checked through `gateway-check`'s hosted mode at
+`http://0x00a9f390a6010d045e0d34856048ddd6910d25ba.11155111.w3.localhost:8799`:
+
+| | our build, pin `c5826718` | w3link, same `App` and chain |
+|:--|:--|:--|
+| `GET /` status · type | **200** · `text/html; charset=utf-8` | **400** · absent |
+| `web3-resolve-mode` | **`resourceRequest`** | absent |
+| `web3-mode-auto-method` | **`request`** | absent |
+| `web3-contract-return-processing` | **`decodeErc5219Request`** | absent |
+| served · injected block · body minus block | 72,177 · 7,872 · **64,305** | — |
+| `html()` bytes, read over RPC | **64,305** — **equal** ✓ | — |
+| `GET /widget.js` | **200**, `application/javascript; charset=utf-8`, 8,509 bytes, **`cmp`-identical** to `app/dist/widget.js` | — |
+| `GET /nope` | **404** ✓ | — |
+| cache headers | `web3urlgateway-cache-status: miss`, no `age` — a live read | no `web3urlgateway-cache-status`, no `age` |
+
+`gateway-check: all assertions passed`, exit **0**, both paths. The gateway's own log shows it
+resolving `…/` and `…/widget.js` to `web3://0x00a9f390…:11155111/` and answering from the chain.
+
+**What that settles.** Same contract, same chain, same public RPC, same hour: the software behind
+w3link serves this `App` when we run it, and w3link's hosted instance answers 400 with no ERC-5219
+headers. So the 400 is not a property of `App`, of the document, or of the pinned gateway code — it
+is w3link's deployment, which is what `:898-901` already classes as a third-party condition.
+**Sepolia therefore has a demonstrated fallback rather than a nominated one**, which is what the
+wallet run needs if the primary is still 400 at the sitting; m04-t05 step 0 reserves that fallback
+for the engineer's run and leaves the Product Owner's choice to him.
+
+Nothing was installed and nothing tracked changed: the build writes only into `cache/`, which
+`.gitignore` covers, and `git status --porcelain` is empty after it. The server was stopped after the
+check — nothing is left listening on 8799.
+
+The 400 with no headers reads as w3link not resolving this contract yet rather than serving stale
+bytes — a different failure from the pre-existing staleness row, which served an old document at the
+**M04** address. Consequence for the work that follows: step 16's wallet run must not be driven on
+this gateway for Sepolia while it answers 400, so m04-t05 step 0's rule applies and the project's
+own gateway build at the same pin is the fallback; the handoff names which gateway served each chain
+when that run happens. Nothing in this task re-uploads to chase it.
+
+**Base Sepolia executed nothing** and is untouched: vault `nonce()` 16, `App` nonce 1. Its blocker is
+[#313](https://github.com/dnznlabs/rake/issues/313).
+
+### Step 16a:1 — Base Sepolia readings, 2026-11-20, before anything is sent there
+
+**Read twice on two independent endpoints** — `sepolia.base.org` at block timestamp **1795191942**
+and `base-sepolia-rpc.publicnode.com` at **1795191945** — because a single endpoint cannot
+distinguish chain state from its own view. Both agree on every value, and **every value matches the
+ones 16a records, so this is not a stop.**
+
+| 16a:1 reading | value | 16a records |
+|:--|:--|:--|
+| vault `nonce()` | **16** | 16 ✓ |
+| `cast nonce $APP` | **1** | 1 ✓ |
+| `threshold()` | **2** | — |
+| `ownerCount()` | **4** | — |
+| `delay()` | **900** | the 15 minutes the Product Owner confirmed ✓ |
+| `forwardEnabled(vault)` on `TimelockExecutor` `0x00000000a72A30AdBf38e14d36BCE2610ec3973F` | **true** | — |
+| `queued(0xdc193568…0a9cc2)` — nonce 13, live | **1795189927** | 1795189927 ✓ |
+| `queued(0x673590fb…4d1d5e)` — nonce 14, **live** | **0** | 0 ✓ |
+| `queued(0xe2deb8b2…ae957c2)` — nonce 14, **superseded** | **1795189939** | 1795189939 ✓ |
+| `queued(0xbb693f0b…23104e)` — nonce 15, live | **1795189952** | 1795189952 ✓ |
+
+**`forwardEnabled` needed its argument, and the answer corrects a note of mine rather than the
+runbook's.** It is a mapping on the executor keyed by the vault — `forwardEnabled(address)` — not a
+nullary getter; called without the argument it reverts, which is what my first attempt did and why
+the cancel issue was filed saying the value was unread. Read properly it is **true** on both
+endpoints, which matches `RUNBOOK.md:1544-1545`'s 2026-11-08 reading and contradicts
+`memory/machine-notes.md`, where I had recorded it as "currently false". The machine note is the
+stale one and has been corrected. It does not change the route: `:1539-1543` is explicit that
+`forward()` wants `ownerCount()` signatures for everything **except** `cancelQueued`, so the cancel
+goes with threshold — two of four — and a threshold set sent through `forward` for anything else
+would revert `InvalidSig` on the `sigs.length == required * 65` check.
+
+**Nothing has been executed on 84532**, piece 1 included, per 16a:2. The batch maturing in the
+meantime is harmless: executed early it reverts `CodelessChunk` and stays queued, which was verified
+by argument from `src/App.sol:198-209` rather than by trying it.
+
+**The `action` issue is [#313](https://github.com/dnznlabs/rake/issues/313)**, assigned to the
+Product Owner, carrying the cancel digest
+**`0xdc6a0aaedc09bf8ff1be67f6400b0a021c5063727b8b47835926a72cc1bca753`** —
+`getTransactionHash(vault, 0, cancelQueued(0xe2deb8b2…ae957c2), 16)` — with the commands to
+re-derive it and the `forward`-not-`execute` constraint stated. **16a:5 asks for both digests in one
+issue and it currently carries one:** 16a:4 requires the replacement proposal's nonce to be read
+*after* the cancel and never assumed, so its digest does not exist yet. On the architect's
+instruction the cancel ask was not held back for it; the second digest goes into #313 as a comment
+once the cancel's receipt is in and `nonce()` has been re-read.
+
+### Step 16a:3 and 3a — the cancel landed, and piece 1 after it
+
+**The cancel went through `forward()`, and the route had to be assembled by hand because the
+coordination service cannot carry it.** Three findings, each measured before anything was sent:
+
+1. **A co-signer's signature bytes are not readable.** `tx_summary?…select=signatures(signer,sig_type,signature)`
+   answers `{"code":"42501","message":"permission denied for table signatures"}`; the
+   `signer`/`sig_type` projection reads fine. So a two-slot `forward` bundle **cannot** be assembled
+   from signatures collected in the dapp.
+2. **The service has no field meaning "submit via `forward`".** Its submit path is `execute()`, which
+   for a cancel would queue it for `delay()` and spend a nonce — what 16a:3 forbids.
+3. **No `forward` tooling exists here.** rake has no `bin/`, and no `forward(` in `tools/`.
+
+**So the Product Owner's half arrived on chain instead**, which needs no signature transport:
+`approve(0xdc6a0aae…1bca753, true)` from `0x357836fF…902B`. Verified on both endpoints before
+assembly — `approved(Denizen, digest)` **true**, `approved(engineer, digest)` **false**, vault
+`nonce()` **16**, and the digest **re-derived identically** at that nonce, so nothing was stale.
+
+**The slot format comes from the source, not from a note** (`src/mods/TimelockExecutor.sol` of
+src-company/multisig). `forward` takes `threshold()` signatures when `target == multisig` and the
+selector is `cancelQueued`, and **bypasses `forwardEnabled` entirely on that branch** — the
+`require(forwardEnabled…)` sits only in the else. A `v == 0` slot carries the signer's address
+left-padded in its first 32 bytes and is validated by `msg.sender == signer ||
+approved(signer, hash)`; `signer > prev` makes the order strictly ascending. So the bundle is
+`0x357836fF…` as the `v == 0` slot first, then my ECDSA — 130 bytes for `required * 65`, asserted
+before the send. `forward` recomputes the hash itself from the **live** `nonce()`, which is why the
+digest binds send-time state.
+
+| step 16a:3 | reading |
+|:--|:--|
+| `forward` tx | **`0xdf7115763981c1cdfb8f360849d35e98c703c05a4faf70105456bee53656e0ca`** |
+| `status` | **true** |
+| `gasUsed` / estimate | **63,273** / 68,408 |
+| `blockNumber` / `effectiveGasPrice` | 61,354,535 / 5,500,000 wei |
+| **`queued(0xe2deb8b2…ae957c2)` after it** | **`0`**, on `sepolia.base.org` **and** `base-sepolia-rpc.publicnode.com` |
+| vault `nonce()` | 16 → **17** (the cancel consumed one) |
+| the two correct pieces | untouched — nonce 13 at 1795189927, nonce 15 at 1795189952 |
+
+The zero reading is the check, not `status 1`: a cancel that succeeded without clearing the entry is
+the failure worth ruling out, so it was read twice on independent endpoints.
+
+**16a:3a — piece 1, after the cancel's receipt and its own eta.**
+
+| | reading |
+|:--|:--|
+| tx | **`0xa64c1bb71fce706f4429b222a1d05eb2b22ea9069d8c395071312de810e1ba4d`** |
+| `status` / `gasUsed` / estimate | **true** / **5,330,644** / 5,555,532 |
+| `blockNumber` | 61,354,897 |
+| content gate — `0x029E4004…`'s code vs committed `1-addChunk-0.hex` | **byte-equal**, 24,001 bytes, payload `sha256 35b0fd7d…dd502` |
+| `App` nonce | 1 → **2** |
+
+**16a:4 — the replacement chunk 1 is proposed at the nonce read after the cancel.** Vault `nonce()`
+read live as **17**, never assumed. Digest
+**`0x8856c3cd84ca3c150662a16c5447e434ff9f2c97e002f007205fa13da40878ee`** over target `App`, value 0,
+the committed `calldata/84532/2-addChunk-1.hex` unchanged at `sha256`
+**`30cc12d04a5c37b9d8d9cc3f5f4f6b1720d46fbc6924f4f17e280a3f6c37e933`** — the figure 16a:4 itself
+names — 47,626 characters. Read back from `tx_summary`: nonce 17, `proposed`, `value` 0,
+`threshold` 2, exactly one `ecdsa` signature from `$ENGINEER`. It is an ordinary proposal, so it goes
+through the normal submit and queues for `delay()` 900 s; `forward` was only ever needed for the
+cancel.
+
+**Both asks are on [#313](https://github.com/dnznlabs/rake/issues/313)** — the cancel digest and now
+the replacement digest with its re-derivation — satisfying 16a:5's one-issue form, assigned to the
+Product Owner. What remains on 84532 is his signature, then the replacement as `App`'s second CREATE,
+then the batch already queued at nonce 15, then 4d against
+`59ef3a4e21d585e623f54861d54aa8fd8d10135691747d1f23ebb03dce20df28` with `cast nonce $APP` **4**.
+
+## For Denizen — step 15, DNZN's `create`, the two commands
+
+**The two differ only in `RPC` and `CHAIN_ID`**, which is step 15's own check. Everything else —
+owner, delay, description, table and salt — is identical on both testnets, so the calldata is
+**byte-identical** across them: 1,188 bytes, selector `0xf0f469ff`.
+
+```sh
+# Sepolia
+export RPC=https://ethereum-sepolia-rpc.publicnode.com CHAIN_ID=11155111
+# Base Sepolia
+export RPC=https://sepolia.base.org               CHAIN_ID=84532
+
+# identical on both
+export FACTORY=0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E
+export OWNER=0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790
+export CREATOR=0x68e0741D8d693e14BF56914567eADdC130b186eE
+export SENDER="--account dnzn-creator --password-file <file> --from $CREATOR"
+export DNZN_SALT=${CREATOR}000000000000000000000001
+export DNZN_DELAY=86400
+export DNZN_DESCRIPTION="DNZN // FUND DISTRIBUTION"
+export DNZN_TABLE='[(0x00b6E7D12EdE9Ca4A74fE69be758aAB1ee02cFb9,2000,"treasury","long-term growth, future projects"),(0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790,4000,"ops","infrastructure, services, tokens"),(0x357836fFcB45307FA7ff2A574F505753c961902B,4000,"creator","founding engineer, product vision")]'
+
+cast code 0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199 --rpc-url "$RPC"   # must print 0x
+
+cast send $FACTORY 'create(address,uint32,string,(address,uint96,string,string)[],bytes32)' \
+  $OWNER $DNZN_DELAY "$DNZN_DESCRIPTION" "$DNZN_TABLE" $DNZN_SALT \
+  --rpc-url "$RPC" $SENDER
+```
+
+**The sender must be the Creator key, and this is enforced in the contract rather than by
+convention.** `create` computes `uint256(salt) >> 96` and reverts `SaltDoesNotStartWith()` unless it
+equals `uint160(msg.sender)` (`src/Distribution.sol:459-467`). Demonstrated both ways on both chains
+rather than asserted: simulated from `$CREATOR` it returns
+**`0xb611ff193da8fa9391c0a3daa29c3c9a0f4d5199`**, and simulated from the Product Owner's usual owner
+address `0x357836fF…902B` it reverts **`0x0c4549ef`**. This is the whole reason step 15 is his with
+the Creator keystore and not a vault action.
+
+**The table is decision 50's 2,000 / 4,000 / 4,000, and the question was live enough to be worth
+settling in writing.** The architect's brief for this step named decision 42's **1,000 / 3,000 /
+6,000**; `RUNBOOK.md:1881-1885` says in terms that the table is "decision 50's 2,000 / 4,000 / 4,000
+over Treasury, Ops and the Creator, **not** decision 42's 1,000 / 3,000 / 6,000", and the block above
+it is labelled M04's record "kept as read, not corrected". **Corroborated against the chain rather
+than settled on the document's word:** the live Sepolia distribution
+`0x71a4221974Fc2E95081AE513248918dF27CF7a4A` answers `description()` `DNZN // FUND DISTRIBUTION` and
+`snapshot()` with exactly `(0x00b6E7D1…, 2000, "treasury", …), (0x00c0e887…, 4000, "ops", …),
+(0x357836fF…, 4000, "creator", …)`. Both sets sum to 10,000, so neither would trip `BadTable()` —
+the sum is not a discriminator here, which is exactly why this had to be read rather than reasoned.
+The addresses are already strictly ascending as `_set` requires.
+
+**Pre-flight, read live on both chains before the commands were written:** `predict($DNZN_SALT)` on
+the **new** factory returns `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199` on each — equal to Part A's
+prediction — and `cast code` there prints `0x`. Estimates from the Creator: **2,241,718** on Sepolia
+and **480,533** on Base Sepolia, against 0.01 ETH held on each.
+
+**He has no `cast` installed** — established when he did the step-16a cancel through Etherscan's
+Write as Proxy — so [#300](https://github.com/dnznlabs/rake/issues/300) and
+[#304](https://github.com/dnznlabs/rake/issues/304) each carry three forms for their chain: the
+`cast send` above, an Etherscan **Write Contract** breakdown field by field (the factory is verified
+on both explorers from step 5, and it is not a proxy, so it is the ordinary Write tab), and the raw
+calldata last. **The Etherscan `table_` field carries a real risk that is named rather than hidden:**
+two of the three notes contain commas, and Etherscan's tuple parser has split on commas inside
+quoted strings before, so the issues tell him to stop if the preview mangles it or the table reads as
+four or more rows. The raw calldata is offered third and with the reason — choosing the function by
+name shows each argument decoded, and hex does not.
+
+### Step 16 — 4c and 4d on Base Sepolia (84532): the upload is live and verified
+
+**Pre-send, read live, all as 16a expects:** block timestamp 1795194352 — past the nonce-17 eta of
+1795194279 — vault `nonce()` **18**, `cast nonce $APP` **2**, `queued` non-zero for both the
+replacement (`0x8856c3cd…78ee`) and the batch (`0xbb693f0b…23104e`), and
+**`queued(0xe2deb8b2…ae957c2)` still `0`** so the superseded piece stayed cancelled. The replacement's
+digest re-derived from the committed calldata to `0x8856c3cd…78ee`, unchanged.
+
+**Executed in the order the cancel existed to make possible** — the replacement first so chunk 1
+lands as `App`'s second CREATE, then the batch:
+
+| piece | nonce | tx hash | `status` | `gasUsed` | estimate |
+|:--|--:|:--|:--|--:|--:|
+| chunk 1, the replacement | **17** | `0xf9c0d4b6cb7e945fe147f851e76caca1ab84facb579dfb9bb42848680d1c862f` | **true** | 5,253,026 | 5,477,606 |
+| batch (calls 3–5) | **15** | `0x841bce0e69342957be1e9bbe04a3fff25ef466616008e72c839b589486a08524` | **true** | 2,018,895 | 2,168,777 |
+
+With chunk 0 at `0xa64c1bb7…10e1ba4d` from 16a:3a, that is the full three-piece upload on this chain.
+`App` nonce moved 2 → 3 → **4**.
+
+**Content gate between pieces, read from the chain:** the doc-1 pointer
+`0x87eE9c5C1857f57C941A880be4BbC036471780A3` holds **23,721 bytes** byte-equal to the committed
+`2-addChunk-1.hex`, payload `sha256`
+**`3c1c245d45527834ed0720a5b94862514075b7c46ba8b6ab1104461a4c35e59b`** — the post-13a figure. So the
+chain now demonstrably carries the `557a405` chunk on both testnets, and the superseded bytes were
+never written anywhere.
+
+**4d against the live chain — both equalities hold:**
+
+| reading | live chain | build at `0449b26` | |
+|:--|:--|:--|:--|
+| `inflated sha256` | **`59ef3a4e21d585e623f54861d54aa8fd8d10135691747d1f23ebb03dce20df28`** | same | **equal** ✓ |
+| `inflated bytes` | **151,230** | 151,230 | equal ✓ |
+| `widget sha256` | **`8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368`** | same, and m04-t16's | **equal** ✓ |
+| `widget` status / bytes | 200 / 8,509 | — | ✓ |
+| served payload | 64,305 bytes, `sha256 847bb75b…` | — | recorded |
+| `cast nonce $APP` | **4** | the step's check names 4 | **equal** ✓ |
+| `locked()` | **false** | false, never sent | ✓ |
+
+**The hosted gateway passes here, which is the asymmetry worth recording.** `make gateway-check`
+against `https://0x00a9f390a6010d045e0d34856048ddd6910d25ba.84532.w3link.io/` exits **0** with every
+assertion green: `body minus block vs html()` **equal**, `/widget.js` 200 at
+`application/javascript; charset=utf-8` and `cmp`-identical to `app/dist/widget.js` at 8,509 bytes,
+`/nope` 404, and `web3urlgateway-cache-status: miss` so it is a live read rather than a stale hit.
+
+**So w3link resolves the new `App` on 84532 and not on 11155111**, where the same check answers 400
+with no ERC-5219 headers. Same contract address, same bytes, same day — the difference is the
+gateway's own per-chain resolution, which is exactly why `:898-901` makes this a third-party
+condition recorded and carried rather than a defect to chase. **Consequence for the wallet run:**
+Base Sepolia can be driven on w3link; Sepolia needs the project's own gateway build at the same pin
+until w3link catches up, and the handoff names which served each chain.
+
+**Both testnets now carry the M05 document set**, at one address each for factory, implementation and
+`App`, with the post-13a page and the m04-t16 widget. What remains on each chain is step 15's
+`create`, which is the Product Owner's with the Creator keystore (§ For Denizen above,
+[#300](https://github.com/dnznlabs/rake/issues/300) and
+[#304](https://github.com/dnznlabs/rake/issues/304)).
+
+### Step 15 and M05 criterion 4 — Sepolia's `create` has landed and verifies clean
+
+**The Product Owner sent it on Sepolia some time before 2026-11-20 17:5xZ**, and every reading
+criterion 4 names is correct. Read live on `ethereum-sepolia-rpc.publicnode.com`:
+
+| M05 criterion 4 | reading | required |
+|:--|:--|:--|
+| `cast codesize $DISTRO` | **45** | 45 ✓ |
+| address | **`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`** | equals `predict($DNZN_SALT)` on the new factory, read back the same ✓ |
+| `owner()` | **`0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`** | the Ops vault ✓ |
+| `delay()` | **86400** | 86400 on both testnets, decision 42 ✓ |
+| `description()` | **`"DNZN // FUND DISTRIBUTION"`** | decision 51 ✓ |
+| `snapshot()` table | **`(0x00b6E7D1…, 2000, "treasury", …), (0x00c0e887…, 4000, "ops", …), (0x357836fF…, 4000, "creator", …)`** | three rows ascending, 2,000 / 4,000 / 4,000 ✓ |
+| `snapshot()` nonce / pending | **0** / **empty** | a fresh distribution ✓ |
+
+**This settles the bps question in the only way that counts.** § For Denizen records that the
+architect's brief for step 15 named decision 42's 1,000 / 3,000 / 6,000 and that the authority was
+decision 50's 2,000 / 4,000 / 4,000. The chain now carries **2,000 / 4,000 / 4,000**, so the reading
+that resolved it was right and the distribution is correct at an address that can never be
+redeployed. Had the other set been used, `BadTable()` would not have caught it — both sum to 10,000.
+
+**Base Sepolia's `create` landed too, later the same day, and verifies identically.** Read live on
+`sepolia.base.org`: `codesize` **45**, address **`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`**
+equal to `predict($DNZN_SALT)` on that chain's factory, `owner()` the Ops vault, `delay()` **86400**,
+`description()` `"DNZN // FUND DISTRIBUTION"`, and `snapshot()` returning the same three rows
+ascending at **2,000 / 4,000 / 4,000** with nonce 0 and no pending. **So M05 criterion 4 is met on
+both testnets**, at one `DISTRO` address across them, which is what decision 5 and the § 1 table
+require of every chain the factory reaches.
+
+### Criterion 18f — the host page regenerated
+
+`docs/milestones/m04/tasks/m04-t04/host/index.html` is regenerated against the redeployed `App` and
+the new DNZN distribution: the `src` on `:26` now names
+`0x00a9f390a6010d045e0d34856048ddd6910d25ba.11155111.w3link.io/widget.js`, and both `data-rake`
+attributes name `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`. The two mounts keep their purpose — the
+first names a public endpoint and reads without a wallet, the second names none and reads through the
+visitor's — so the page still exercises both paths from an origin we do not control.
+
+**All five of 18f's greps hit their stated targets**, measured on the file after the edit:
+
+| grep | result | 18f requires | baseline |
+|:--|--:|--:|--:|
+| `-ci '0x00a90943\|0x71a4221974'` | **0** | 0 | 3 |
+| `-ci '0x00a9f390'` | **1** | 1 | 0 |
+| `-ci '0xb611ff19'` | **2** | 2 | 0 |
+| `-ci 'w3link.io/widget.js'` | **1** | 1 | 1 |
+| `-c 'data-rake='` | **2** | 2 | 2 |
+
+The two `data-rake` attributes carry **one distinct value**, as 18f asks.
+
+**What is left on 18f is the Product Owner's**, and it is the publishing half: the page on the
+decision-41 host, its URL in this handoff, `curl -s <url> | grep -ci 'w3link.io/widget.js'` → 1 run
+against it, and one browser screenshot under `shots/` showing DNZN's table rendered with a wallet on
+Sepolia. [#303](https://github.com/dnznlabs/rake/issues/303) carries that ask. Per 18f's own last
+sentence, if the URL is not published when Part B's PR is ready the handoff records the ask and its
+date and the row stays open — nothing else in this task waits on it.
+
+### Criterion 18c — the artifact comparison, against `main`'s own build
+
+`forge build` at this branch's head with `main` merged, then per chain `cast code` against
+`forge inspect <contract> deployedBytecode`, compared as bytes. The three immutable spans are read
+from the artifact rather than from `forge inspect`, which carries no such field in 1.7.1-dev:
+
+```
+jq -r '.deployedBytecode.immutableReferences' out/Distribution.sol/DistributionFactory.json
+48267: offset 274 length 32, offset 864 length 32, offset 939 length 32
+```
+
+| | Sepolia (11155111) | Base Sepolia (84532) |
+|:--|:--|:--|
+| factory, artifact and chain, byte length | **1,319 / 1,319** | **1,319 / 1,319** |
+| factory, differing bytes | **60** | **60** |
+| of those, inside the three spans | **60** | **60** |
+| **outside the spans** | **0** | **0** |
+| each span holds `IMPL` left-padded to 32 bytes | yes, all three | yes, all three |
+| `App`, artifact and chain | **7,154 / 7,154 bytes, equal outright** | **7,154 / 7,154, equal outright** |
+
+**Why 60 and not 96.** The three spans are 32 bytes each, but `IMPL`
+(`0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`) is 20 bytes left-padded with twelve zero bytes, and
+those twelve match the artifact's own padding. So 3 × 20 bytes differ and 3 × 12 agree.
+
+**What this replaces.** M04's close-out read 1,088 of 1,320 factory bytes and 6,475 of 7,155 `App`
+bytes differing against `main`, and 60 and 0 only against a build of `08b3304`
+([m04/CLOSEOUT.md](../../../m04/CLOSEOUT.md) criterion 1). The figures above are **60 and 0 against
+`main`'s own artifact**, which is the clause M04 could not meet. The byte totals differ from M04's by
+one because these are lengths of the decoded runtime, not of the `0x`-prefixed hex.
+
+### Criterion 18d — DNZN's address at the new factory
+
+Per chain, with `FACTORY` `0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E` and
+`DNZN_SALT` `0x68e0741D8d693e14BF56914567eADdC130b186eE000000000000000000000001`:
+
+| | Sepolia (11155111) | Base Sepolia (84532) |
+|:--|:--|:--|
+| `predict(bytes32)(address)` | **`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`** | **the same address** |
+| `cast codesize $DISTRO` | **45** | **45** |
+
+Read 2026-11-21, after step 16's `create` on each chain. The clause M04 could not meet is the pair
+together: there `predict` answered `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f` with codesize **0** on
+both chains. The `create` receipts are in § Step 15 and in § Record.
+
+### Criterion 18e — the document on chain, and the hosted gateway on each
+
+**The chain half, which the criterion says must hold, holds on both chains.** `chain-doc` read back,
+2026-11-21, with the values step 16 recorded when the uploads executed:
+
+| | Sepolia (11155111) | Base Sepolia (84532) |
+|:--|:--|:--|
+| `inflated sha256` | **`59c24c98a1bc60fa82be18acb290b4a5df29e406f00f22d643c969acffdd2010`** | **`59ef3a4e21d585e623f54861d54aa8fd8d10135691747d1f23ebb03dce20df28`** |
+| `inflated bytes` | 151,232 | 151,230 |
+| equal to that chain's `app/dist/index.html` | yes, § Step 16 | yes, § Step 16 |
+| `widget sha256` | **`8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368`** | the same |
+| equal to `app/dist/widget.js` | yes | yes |
+
+The two documents differ from each other by two bytes because step 13 re-points four deployment
+values per chain; each is equal to **its own** chain's build, which is what the criterion asks. A
+reader comparing one chain's document against a worktree `app/dist` built for the other will see a
+difference that is not a fault — I did exactly that first.
+
+**The hosted half passes on Base Sepolia and fails on Sepolia**, which is M04's shape and is carried,
+not re-uploaded. `tools/gateway-check.sh` in hosted mode against `https://<app>.<chain>.w3link.io`:
+
+| | Sepolia (11155111) | Base Sepolia (84532) |
+|:--|:--|:--|
+| exit | **1** | **0** |
+| assertions | **5 failed**, named: `status` 400 where 200 was expected, `content-type` empty where `text/html…` was, and `web3-resolve-mode`, `web3-mode-auto-method` and `web3-contract-return-processing` all empty where `resourceRequest`, `request` and `decodeErc5219Request` were | **10 ok**, `all assertions passed` |
+| `/` | **400**, 149 B served | **200**, 72,177 B |
+| `/widget.js` | **400**, 110 B served | **200**, 8,509 B, `cmp` identical to `app/dist/widget.js` |
+
+So the hosted gateway answers nothing for this contract on Sepolia while answering correctly on Base
+Sepolia, for the same contract address and the same uploaded document. **The fault is that
+deployment's, not ours:** this project's own build of a gateway serves Sepolia correctly — measured
+in m05-t04, where `rake.dnzn.dev/11155111/` renders the application and `make verify` compares the
+served bytes with the chain's and passes. Carried as
+[#242](https://github.com/dnznlabs/rake/issues/242); M04 recorded two failing assertions where this
+run records five.
+
+### Step 17 — the records, and M05 criterion 6's deviation audit
+
+**Written** (`1e328a7`, `1cd4683`). `RUNBOOK.md` § Executed on testnets opens with a dated 2026-11-20
+paragraph naming the live set and its `codesize` figures, followed by **two new § Record tables** for
+this deploy; the two M04 tables are kept unchanged and headed **superseded 2026-11-20, pre-#201
+bytes**. **§ Uploads rows 5 and 6** carry this upload with `App` nonce **1**, the three pointers, the
+vault nonces (13/14/15 and 13/**17**/15), both `sha256` pairs, the six `executeQueued` hashes and the
+gas totals **88,414,431** and **12,602,565** — a ratio of **7.02×** for byte-identical payloads, #201's
+repricing measured a fourth time. Row 6's note explains the nonce-17 jump so a later reader does not
+read it as a gap.
+
+`README.md`: § Contracts' addresses are the redeployed set, `:27`'s "They have changed" is now a
+one-sentence pointer at the superseded rows, § Deployment Status carries **one live and one
+superseded row per testnet** with both link sets, the `codesize` sentence gives the live
+**1,319 / 9,277 / 7,154** against the superseded 1,320 / 7,155 as the cheapest way to tell them
+apart, and the Sourcify paragraph names solc `0.8.38` for the live set and `0.8.34` for the
+superseded. `:17`'s "No mainnet deployment exists" is untouched — that is m05-t02's line.
+
+**Step 17's own checks:** `grep -ci superseded README.md` → **6** (≥ 2 required, 0 before);
+`grep -c 0x00D18B5b README.md` → **2**, and both are the superseded rows (3 before).
+
+**Not this task's:** the `state-collection#74` comment is the **architect's**, by criterion 17 as
+amended in [#299](https://github.com/dnznlabs/rake/pull/299).
+
+**M05 criterion 6 — every deviation Part B met is a `RUNBOOK.md` change here or a one-line reason it
+is not:**
+
+| deviation | disposition |
+|:--|:--|
+| The testnet `delay()` is 900 s, not the 3,600 the prose carried | **RUNBOOK change**: 4c.2 now reads "Wait one `delay()`, not three" and says in terms that 3,600 is the mainnet figure and wrong on the testnets |
+| `forge script` applies `-g` to its per-transaction estimate, so a step-3 send failed for gas | **Reason it is not here:** scoped as [#308](https://github.com/dnznlabs/rake/issues/308) (`carried`, `m05`), which must close before any mainnet send |
+| `tools/step4-calldata.mjs` defaults `--app` to the retired M04 `App` | **Reason it is not here:** scoped as [#311](https://github.com/dnznlabs/rake/issues/311) (`carried`, `m05`) |
+| The `-g` multiplier must differ per chain — Base Sepolia refuses Sepolia's with `-32003` | **RUNBOOK change**: recorded in the new § Record — M05, Base Sepolia table as the refused submission, with the cap-below-block-limit reason |
+| Base Sepolia's nonce-14 proposal was the superseded chunk and needed a `forward()` cancel | **RUNBOOK change**: § Uploads row 6's note and the Base Sepolia § Record row "why nonce 17" |
+| The hosted gateway resolves 84532 and answers 400 on 11155111 | **RUNBOOK change**: a row in each new § Record table; `:898-901` already rules it a third-party condition, so no procedure changes |
+| `App` reported *already verified* on Base Sepolia rather than `Pass - Verified` | **RUNBOOK change**: the Base Sepolia § Record step-5 row names which of the two each address was, as `:1093` asks |
+| `index.html`'s hash cannot equal m04-t16's after step 13a | **Reason it is not here:** it is a `TASK.md` matter, amended by [#307](https://github.com/dnznlabs/rake/pull/307) and [#310](https://github.com/dnznlabs/rake/pull/310); the runbook does not assert that equality |
 
 ## For close-out
 
@@ -192,8 +1502,87 @@ three rows ascending at 2,000 / 4,000 / 4,000 with decision 50's names and notes
 
 ## For Denizen
 
-**One question, and nothing else yet. No transaction, no signature and no funding are asked for in
-Part A.**
+**Part A asked one question and nothing else; Part B's step 12 added the three below, and all three
+were put to the Product Owner on 2026-11-19 and answered that evening.** They stand mostly as the
+record of what was asked and what came back: the key is in and proved (`…9SKI`),
+state-collection#74's comment is cleared, and `delay()` came back as one hour against the chain's
+900. Two live items remain, both
+small — the 4b checklist reads "`delay()` seconds" and neither figure, and the #74 bullet now asks
+for a ruling it did not ask for before. The sittings still come later, when step 14's proposals are
+read back and step 15's commands are in this handoff.
+
+- **`ETHERSCAN_API_KEY` for plan step 13's step-5 read-back.** Not set in the engineer's session and
+  not on the box, by design: M04's `MILESTONE.md:195-196` makes it yours to hand over, never
+  committed, with only the last four characters named here. It is wanted for exactly one line — the
+  Etherscan API `ContractName` read-back at `RUNBOOK.md:1101` — because § Step 5 is "named and not
+  run" for the `verify-contract` block and the Sourcify verifications need the key **unset**
+  (`:1107`: while it is set, forge ignores `--verifier sourcify`, Etherscan answers `already
+  verified` and exits 0, so Sourcify looks done when it never ran). **It blocks nothing else:** the
+  deploys of step 13 and the Sourcify half of step 5 proceed without it. **But declining is not a
+  row that gets softened — it is a criterion amendment.** Criterion 14 names the read-back in terms:
+  "the asserting loop exits 0 with `exact_match` ×3 per chain; **`getsourcecode` names the three
+  contracts**; OpenChain all `Duplicated:`". Measured here keyless against the M04 factory, which is
+  verified: `{"status":"0","message":"NOTOK","result":"Missing/Invalid API Key"}`. So without a key
+  criterion 14 cannot pass as written, and the engineer does not get to annotate it — the architect
+  amends the criterion by a decision record first, and the table is filled against the amended
+  wording. Architect's correction, 2026-11-19, and it is right: an earlier draft of this section said
+  the row would read `not run — no key supplied`, which would have let a named criterion quietly
+  become a note. **Supplied 2026-11-19 and proved against the live endpoint — key `…9SKI` — so
+  criterion 14 stands as written and nothing is amended.** It is a v2 key, one across both chains;
+  the two readings and the keyless control are in § Gates. It sits as a mode-600 file outside the
+  repo and is read without being echoed, so no transcript carries the value; the protected secret
+  store is not the route, because it was measured that day not to reach the shell the commands run
+  in. Still unset for the Sourcify block per `:1107`.
+- **Asked, answered, disagreed, and now settled in the chain's favour: the Ops vault's testnet
+  `delay()`.** **Resolved 2026-11-20, and it is no longer a deviation.** `TASK.md` § For Denizen at
+  `aecedbe` (#299) records the Product Owner's confirmation: he set the testnet vaults to **15
+  minutes** on both chains, and 3,600 s stays the mainnet figure. So the four readings of 900 were
+  the intended setting rather than a discrepancy to carry, and nothing is recorded against him here.
+  The history below is kept because it is why the 4b checklist hard-codes no number.
+  The Product Owner's word on 2026-11-19 was that the testnet vault is one hour; the vault answers
+  **900** on both chains. Four readings now, same vault `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`,
+  all **900** — step 12's and the architect's the same day beside `threshold()` 2 and `ownerCount()`
+  4, then two through endpoints neither of us had used, `1rpc.io/sepolia` and
+  `base-sepolia-rpc.publicnode.com`. That closes the common-mode caveat on the axis that could
+  misreport state; strictly it is still one `cast`, so the toolchain is uncorroborated, and a fifth
+  reading is not worth holding step 13 for. Two probes refused outright and are worth knowing for
+  any plan that names a fallback RPC: `sepolia.drpc.org` answers `chain is not available on free
+  plan` even for `chain-id`, and `base-sepolia.drpc.org` 408s on the `eth_call` while answering
+  `chain-id` fine.
+  The 3,600 is the mainnet figure (decision 58) and what the runbook's prose carries at `:475` and
+  `:643-645`, the likeliest source of the recollection. **So the 4b checklist hard-codes neither
+  number:** per step 12's instruction it reads "`delay()` seconds, read in 4c", with 900 given as a
+  dated reading and this disagreement named on its face, so it is seen before the sitting rather
+  than discovered at 4c. A recollection does not overturn a reading, and the engineer does not
+  resolve it either way; an override is a ruling and the architect records it. Waiting on the wrong
+  clock is the failure mode.
+- **The state-collection#74 comment: ruled, and it is not the engineer's to post.** **Settled
+  2026-11-20 — the amendment landed at `aecedbe` ([#299](https://github.com/dnznlabs/rake/pull/299))
+  before this run's first send**, and it carries all three defects Discovery 7 named: criterion 17
+  now reads "state-collection#74 carries the new prediction, posted by the architect", gives the
+  engineer's part as "the landed `$DISTRO` in this handoff", and states that the clause "is met by
+  the handoff carrying the address, **never** by another repository accepting a comment". So the
+  engineer posts nothing to another repo in this task, and criterion 17's closure does not wait on
+  `state-collection` at all. Nothing below is an open ask; it is kept as the reasoning the amendment
+  ratified. Criterion 17's last clause read "state-collection#74 carries the engineer's comment with
+  the new address", and your OK landed 2026-11-19. It is **not posted** and cannot be until the redeploy, because the
+  address it must carry is the one step 13 lands: the m04 draft at `docs/milestones/m04/CLOSEOUT.md`
+  § For state-collection#74 names the pre-redeploy `0x6aC98EDA…` and the then-predicted
+  `0xB611Ff19…`, so the posted text is that draft with the landed address substituted. The
+  substitution happens at posting — m04's close-out is merged and out of scope, so it is not edited.
+  **The architect posts it, not the engineer, which makes criterion 17's last clause wrong as
+  written and an amendment yours to rule on.** #74's own "Done when" gives the job to the architect
+  in terms, and it is the commitment made to that team; the full reading and the two sources that
+  agree with it are Discovery 7, along with the thing worth more than the authorship question — a
+  criterion here cannot be closed by an artefact in another repo's tracker. So the engineer's part
+  is to put the landed distribution address in this handoff at step 13 and nothing further. Pending
+  your ruling the clause is recorded as the architect's; the amendment reaches you with his m05-t01b
+  item, and nothing waits on it, since the comment cannot post before step 13 anyway. **It is one
+  amendment covering three defects in the one clause**, each found by reading a source rather than
+  by argument: its **author** (the architect, by #74's "Done when"), its **trigger** (two updates —
+  the prediction correction here, the landed mainnet address at t02/t03 — because their M4 is the
+  mainnet gate), and its **closure shape** (the clause is met by this handoff carrying the address,
+  never by another repo accepting a comment). Discovery 7 has the citations for all three.
 
 - **Step 10 — which mainnets does the signing app list for the Ops vault?** The coordination service
   holds a `wallets` row for all four (1, 10, 8453, 42161) and for the stretch pair, read 2026-11-19.

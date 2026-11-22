@@ -18,21 +18,26 @@
 <h1>A test page for the rake widget</h1>
 
 <p>This page is not part of the app and runs on a host the app's authors do not control. It carries
-the embed snippet the app's own documentation prints for Sepolia, twice and nothing else: the first
-mount names a public endpoint, so it reads the distribution without a wallet; the second names none,
-so it reads through the visitor's wallet and shows its failure state when there is no wallet on
-Sepolia.</p>
+the embed snippet the app's own documentation prints for Base Sepolia, twice and nothing else: the
+first mount names a public endpoint, so it reads the distribution without a wallet; the second names
+none, so it reads through the visitor's wallet and shows its failure state when there is no wallet on
+Base Sepolia.</p>
 
-<script src="https://0x00a90943f58b6ab7fde05aae01c13a80e6995bae.11155111.w3link.io/widget.js"></script>
+<p>Base Sepolia rather than Sepolia because the hosted gateway answers 400 for this contract on
+Sepolia and 200 on Base Sepolia, so a page whose script came from the Sepolia host would load nothing
+and render nothing. The fault is that deployment's, not the contract's: the project's own build of
+the same gateway serves Sepolia correctly. The distribution is at the same address on both chains.</p>
+
+<script src="https://0x00a9f390a6010d045e0d34856048ddd6910d25ba.84532.w3link.io/widget.js"></script>
 <div
-  data-rake="0x71a4221974Fc2E95081AE513248918dF27CF7a4A"
-  data-chain="11155111"
+  data-rake="0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199"
+  data-chain="84532"
   data-link
-  data-rpc="https://ethereum-sepolia-rpc.publicnode.com"
+  data-rpc="https://sepolia.base.org"
 ></div>
 <div
-  data-rake="0x71a4221974Fc2E95081AE513248918dF27CF7a4A"
-  data-chain="11155111"
+  data-rake="0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199"
+  data-chain="84532"
   data-link
 ></div>
 

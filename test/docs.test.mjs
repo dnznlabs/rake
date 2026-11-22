@@ -180,3 +180,43 @@ test('the page has one version substitution and both paint sites read it', () =>
      that dropped the span would leave the paint site reading correctly into nothing. */
   assert.ok(LAYOUT.includes('id="ver"'), 'the layout carries no #ver span for the footer paint to write into');
 });
+
+/* Decision 65 ([#309](https://github.com/dnznlabs/rake/issues/309)): in `#/docs` § the widget the
+   `data-rpc` snippet is presented first and the wallet form second. A page host pasting the snippet
+   cannot rely on a wallet being in the visitor's browser, so the form that works for every visitor
+   leads. Read from the source as the rest of this file does: the order the page paints is the order
+   the two `pre.snip` interpolations appear in `widgetDocs`'s `snippets`. */
+test('the docs widget section leads with the data-rpc snippet and offers the wallet form second', () => {
+  const at = PAGE.indexOf('const snippets = rpc');
+  assert.ok(at >= 0, 'widgetDocs no longer builds its two snippets in one `snippets` const');
+  const block = PAGE.slice(at, PAGE.indexOf('return `<div class="wdemo">', at));
+  const parts = block.split(/\n\s*:\s*`/);
+  assert.equal(parts.length, 2, 'the snippets const is not a two-branch conditional on `rpc`');
+  const [withRpc, noRpc] = parts;
+  const snipsOf = s => [...s.matchAll(/<pre class="snip">\$\{(tag\([^)]*\))\}<\/pre>/g)].map(m => m[1]);
+
+  /* (1) A chain with a PUBLIC_RPC entry: data-rpc first, wallet second, and exactly two snippets. */
+  assert.deepEqual(
+    snipsOf(withRpc),
+    ['tag(rpc)', 'tag()'],
+    'the data-rpc snippet must be the first pre.snip and the wallet form the second',
+  );
+  /* (2) The wallet form stays, introduced as the alternative, still naming both failure states. */
+  assert.match(withRpc, /omit <code>data-rpc<\/code>/);
+  assert.match(withRpc, /no wallet is present or the wallet is on another chain/);
+  /* (4) The endpoint prose decision 65 keeps verbatim in substance. */
+  assert.match(withRpc, /the host's to choose/);
+  assert.match(withRpc, /works as pasted/);
+
+  /* (3) A chain with no entry: the wallet form alone, and the prose says why rather than leaving the
+     omission unexplained. */
+  assert.deepEqual(snipsOf(noRpc), ['tag()'], 'a chain with no PUBLIC_RPC entry must show the wallet form alone');
+  assert.match(noRpc, /no known public endpoint/);
+  assert.match(noRpc, /no wallet is present or the wallet is on another chain/);
+
+  /* (5) `widget.js` is not edited by this change: `tag()` is what emits data-rpc, and it is shared. */
+  assert.ok(
+    PAGE.includes("(rpc ? at('data-rpc', esc(rpc)) : '')"),
+    'tag() no longer gates data-rpc on its argument, so the two forms are no longer one builder',
+  );
+});

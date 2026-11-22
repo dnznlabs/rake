@@ -818,11 +818,18 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
    order: `execute` hashes against `nonce++` (`src/Multisig.sol:136` of src-company/multisig at
    `62eb905`), so proposal 2's signatures, made over the digest at *N* + 1, are `InvalidSig` while the
    nonce is still *N*. Submit 2 before 1 and it is refused; nothing is lost but the gas.
-2. **Wait one hour, not three.** Each submit queues its digest at its own
+2. **Wait one `delay()`, not three.** Each submit queues its digest at its own
    `eta = block.timestamp + _delay` (`:165-166`), and the three submits are seconds apart, so the
-   three 3,600 s windows run **concurrently**: one wait of 3,600 s from the third submit, then three
-   `executeQueued` in a row. "Three timelocks" is the natural misreading and it is wrong; the delay
-   is per proposal, not cumulative.
+   three windows run **concurrently**: one wait of `delay()` seconds from the third submit, then
+   three `executeQueued` in a row. "Three timelocks" is the natural misreading and it is wrong; the
+   delay is per proposal, not cumulative.
+
+   **Read `delay()`; do not type an hour.** This step said "one hour" and "3,600 s" throughout until
+   2026-11-20, which is the mainnet figure (decision 58) and **wrong on the testnets**: the Ops vault
+   answers **900 s — 15 minutes** on both 11155111 and 84532, read four times on 2026-11-18 and again
+   on 11-20, and the Product Owner confirmed he set it there. m05-t01 Part B waited 900 s on each
+   chain. Step 12 already requires the value to be read rather than assumed; this corrects the prose
+   that contradicted it.
 3. **`executeQueued()` three times** (anyone), **in the order 1 → 2 → batch**, each after the one
    before it has succeeded. **The vault does not enforce this order; the operator does.** `queued` is
    keyed by digest, not by nonce (`mapping(bytes32 txHash => uint256) public queued;`, `:29`), and
@@ -1469,6 +1476,27 @@ head, where `--rpc` would read today's nonce and emit different pointers.
 | 2 | 2026-11-17 | Base Sepolia | `9fdf0f1` | 4 | the same three — the pointers are a function of `App`'s address and nonce, and both are identical per chain | 6, 7, 8 | `1111b791…0920e17` · `07e808ed…d51b8ca` | in full below | **11,947,862** |
 | 3 | 2026-11-18 | Sepolia | `3751211` | 7 | `0x3C4C7D4E…5C06` · `0xcEaA7F17…7396` · `0x1Affb52C…F45D` | 9, 10, 11 | `b1fc3b96…e5ef1e86` · `8b6bbc88…108bc368` | in full below | **85,666,566** |
 | 4 | 2026-11-18 | Base Sepolia | `3751211` | 7 | the same three | 9, 10, 11 | `6f0225bb…ff45336f` · `8b6bbc88…108bc368` | in full below | **12,206,026** |
+| 5 | 2026-11-20 | Sepolia | `557a405` | **1** | `0x029E4004…98F4` · `0x87eE9c5C…80A3` · `0x295fF302…9227` | 13, 14, 15 | `59c24c98…cffdd2010` · `8b6bbc88…108bc368` | `0x3bc0b3c0…40e8fea` · `0xf25b0128…ca0f75a5` · `0x194caf5e…98e7a8eb` | **88,414,431** |
+| 6 | 2026-11-20 | Base Sepolia | `557a405` | **1** | the same three | 13, **17**, 15 | `59ef3a4e…ce20df28` · `8b6bbc88…108bc368` | `0xa64c1bb7…10e1ba4d` · `0xf9c0d4b6…0d1c862f` · `0x841bce0e…86a08524` | **12,602,565** |
+
+**Rows 5 and 6 are the first upload to the redeployed `App`** `0x00a9F390A6010d045e0d34856048DdD6910d25BA`
+(m05-t01 Part B). Three things about them differ from rows 1–4 and are the reason this note exists:
+
+- **`App` nonce is 1, not 4 or 7**, because the contract is new — so `--app-nonce 1` is what
+  reproduces this calldata, and the three pointers are `App`'s CREATEs at 1, 2 and 3.
+- **Row 6's middle vault nonce is 17 rather than 14.** On Base Sepolia the proposal submitted at
+  nonce 14 was the pre-step-13a chunk 1; it was cancelled through
+  `TimelockExecutor.forward()` (`0xdf711576…3656e0ca`, `queued` → `0`) and the correct chunk
+  re-proposed at the then-live nonce 17. Nonce 14 is spent and carries nothing. The full account is
+  in m05-t01's handoff § Deviations 0 and § Step 16a.
+- **The `inflated sha256` differs per chain**, as in every row, but here the two builds also differ
+  from m04-t16's recorded page by step 13a's commit alone (decision 65). Criterion 18's equality is
+  shown by substituting the four deployment values back to the M04 set; see the task's § Step 14.
+
+Gas across the three is the sum of the `executeQueued` receipts, not of the proposals: Sepolia
+37,591,184 + 37,060,412 + 13,762,835, Base Sepolia 5,330,644 + 5,253,026 + 2,018,895. Sepolia's is
+**7.02×** Base Sepolia's for byte-identical chunk payloads, which is #201's code-deposit repricing
+measured a fourth time.
 
 **Rows 3 and 4 are complete — 4a through 4d all ran.** The product owner co-signed and submitted all
 six proposals on 2026-11-18 at 16:42–16:44 UTC; the engineer ran the six `executeQueued` calls once
@@ -1712,6 +1740,57 @@ bytes) and will not match the chain's hash — which is exactly why step 4 check
 immediately after `dapp-nodev` and `chunks`, and why this document says `dapp-nodev`, never `dapp`.
 
 ## Executed on testnets
+
+**Redeployed 2026-11-20 (m05-t01 Part B, [#202](https://github.com/dnznlabs/rake/pull/202)).** Both
+testnets were taken through steps 1, 2, 3, 5 and then 4 again on the re-mined salts, because #201's
+solc re-pin to `0.8.38` moved every init-code hash and so every address. The live set is one address
+per contract on both chains — factory `0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`, implementation
+`0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`, `App`
+`0x00a9F390A6010d045e0d34856048DdD6910d25BA` — with `codesize` 1,319 / 9,277 / 7,154 against the
+superseded set's 1,320 and 7,155. DNZN's distribution is at
+`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`, **live on Sepolia** and not yet created on Base
+Sepolia. § Record — M05 below carries the per-step readings for this deploy; § Uploads rows 5 and 6
+carry the document; the two **superseded** M04 tables further down are kept unchanged as that
+milestone's record. Nothing of the M04 set was touched: its factory is unowned and its `App` is
+vault-owned and still serves its own document.
+
+### § Record — M05, Sepolia (11155111), 2026-11-20
+
+| | Step | What | Value |
+|--:|:--|:--|:--|
+| | 1a | commit · forge · node | `b77827f` · 1.7.1-dev · v24.12.0 |
+| | 1b | files compiled · tests · snapshot | 42 · 124 forge / 188 node · exit 0 |
+| | 1c | proxy bytes · keccak | 69 · `0x2fa86add…f7e4989`, equal to § 1 |
+| | 1e | factory runtime bytes · `cast estimate` | 1,319 · **16,738,648** (factory), 11,405,803 (`App`); block gas limit 200,000,000; base fee 16 wei |
+| | 1f | `FACTORY` · `APP` · init-code hashes | `0x00D19609…6d7f8E` · `0x00a9F390…0d25BA` · `0x9778c358…bd2d8945` and `0xa8bbb837…f9fe33a3`, both equal to the task's premise |
+| 1 | 2 | `DistributionFactory` CREATE2 | tx: `0xf9da99cd04279a55a58c7be1431b3877d4547c6f5e7451f675f32922be4109bc` · gas: **16,797,162** · addr: `0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E` · block 12,173,938 |
+| | 2 | `implementation()` · immutable spans | `IMPL`: `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A` (9,277 bytes) · 60 differing bytes, **0 outside** the three declared spans |
+| 2 | 3 | `App` CREATE2 | tx: `0xa3748d963f39e1a7c6747d832103ec8f7b1d22613f6a8fa6e5da0783f7bb3261` · gas: **11,505,124** · addr: `0x00a9F390A6010d045e0d34856048DdD6910d25BA` · block 12,173,956 · runtime `cmp`-equal to the artifact |
+| | 3 | one failed attempt, recorded | `0x2be31dbb…49b3c86639` status **false**, 11,075,750 burned at a limit of 11,432,739 — out of gas, created nothing, no #22 collision. Cause: `forge script` applies `-g` to its **per-transaction** estimate, not to the printed script total. Amending § 1e to say so is [#308](https://github.com/dnznlabs/rake/issues/308), which must close before any mainnet send; the arithmetic is in m05-t01's handoff § Step 14 |
+| | 3 | `owner()` · `version()` · `locked()` | `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790` · `v0.1` · false |
+| 3 | 4 | the document, via the Ops vault | chunk 0 tx `0x3bc0b3c0…40e8fea` gas **37,591,184** · chunk 1 tx `0xf25b0128…ca0f75a5` gas **37,060,412** · `batch345` tx `0x194caf5e…98e7a8eb` gas **13,762,835** · vault nonces 13, 14, 15 |
+| | 4d | `inflated sha256` · `widget sha256` · `App` nonce | `59c24c98…cffdd2010` · `8b6bbc88…108bc368`, both equal to the build · **4** |
+| | 4d | hosted gateway | **fails**: `status: 400`, no ERC-5219 headers. Third-party condition, carried, never re-uploaded — the chain is the reference |
+| 4 | 5 | explorer · Sourcify | all three `Pass - Verified` **by this run** · three `exact_match`, asserting loop exit 0 · OpenChain 82 `Duplicated:` |
+| 5 | 6 | DNZN `create` | **landed**, `0xB611Ff19…0F4D5199` · `codesize` **45** · `owner()` the Ops vault `0x00c0e887…F3790` · `delay()` **86400** · `nonce()` 0 · `snapshot()` table treasury **2,000** / ops **4,000** / creator **4,000**, ascending, description `DNZN // FUND DISTRIBUTION`. Sent by Denizen from the Creator keystore; #300's pre-flight estimated **2,241,718** gas. The transaction hash is not recorded here, for the reason given in Base Sepolia's row. Re-read live on 2026-11-21 |
+
+### § Record — M05, Base Sepolia (84532), 2026-11-20
+
+| | Step | What | Value |
+|--:|:--|:--|:--|
+| | 1a–1c | commit · toolchain · proxy | as Sepolia's row — one branch, one build; proxy 69 bytes, keccak equal to § 1 |
+| | 1e | factory runtime bytes · `cast estimate` | 1,319 · **2,396,446** (factory), 1,666,007 (`App`); block gas limit 120,000,000; base fee 5,000,000 wei |
+| | 1f | `FACTORY` · `APP` | identical to Sepolia's — CREATE2 through the same proxy at the same salts |
+| 1 | 2 | `DistributionFactory` CREATE2 | tx: `0x73e4e918a1420edfa63adcf2ba1435474aef43da98423635d9360652cc61a0ca` · gas: **2,381,290** · block 61,197,280 · limit as sent 5,357,902 |
+| | 2 | one submission the node refused | `-g 900` asked 24,110,559 and the RPC answered `-32003: gas limit too high`. **Nothing sent** — no hash, no nonce, no gas. The per-transaction cap here sits well under the block limit, so the multiplier is per chain |
+| 2 | 3 | `App` CREATE2 | tx: `0xe8f0c7066102ea9e27ee89b52b442faa9cd704deec453b40a74af4e85c47f414` · gas: **1,655,420** · block 61,197,481 · runtime `cmp`-equal |
+| | 3 | the gas number worth keeping | 1,655,420 here against 11,505,124 on Sepolia for the same bytes — **6.95×** — and exactly what a local `cast run` replay predicts, because anvil and this chain price code deposit alike |
+| 3 | 4 | the document, via the Ops vault | chunk 0 tx `0xa64c1bb7…10e1ba4d` gas **5,330,644** · chunk 1 tx `0xf9c0d4b6…0d1c862f` gas **5,253,026** · `batch345` tx `0x841bce0e…86a08524` gas **2,018,895** · vault nonces 13, **17**, 15 |
+| | 4 | why nonce 17 | the proposal at nonce 14 was the pre-13a chunk 1; cancelled by `forward()` `0xdf711576…3656e0ca` (`queued` → `0`, two endpoints) and re-proposed at the live nonce. Nonce 14 is spent and carries nothing |
+| | 4d | `inflated sha256` · `widget sha256` · `App` nonce | `59ef3a4e…ce20df28` · `8b6bbc88…108bc368`, both equal to the build · **4** |
+| | 4d | hosted gateway | **passes**, exit 0 — body-minus-block equal to `html()`, `/widget.js` 200 and `cmp`-identical at 8,509 bytes, `/nope` 404, cache-status `miss` |
+| 4 | 5 | explorer · Sourcify | factory and implementation `Pass - Verified` by this run; **`App` reported *already verified***, so that one is not attributable here · three `exact_match`, loop exit 0 |
+| 5 | 6 | DNZN `create` | **landed**, `0xB611Ff19…0F4D5199` · `codesize` **45** · `owner()` the Ops vault `0x00c0e887…F3790` · `delay()` **86400** · `nonce()` 0 · `snapshot()` table treasury **2,000** / ops **4,000** / creator **4,000**, ascending, description `DNZN // FUND DISTRIBUTION` — identical to Sepolia's reading. Sent by Denizen from the Creator keystore after #304's pre-flight, which estimated **480,533** gas. **The transaction hash is not recorded here**: it is his send, it is not in #304, and the factory's `Created` event is outside the `eth_getLogs` range this endpoint serves, so recovering it is a lookup on the explorer rather than a figure I measured. Row read live on 2026-11-21 |
 
 Steps 1, 2, 3 and 5 were executed on **Sepolia (11155111)** and then **Base Sepolia (84532)** in
 m04-t03, with Elanik's agent wallet `0x5A158aF8DC28FE756dB81Ef669e4Db2536bBC50d`. **Step 4 was not
@@ -1976,7 +2055,7 @@ exit **0** with 0 results. `forge test` **102 passed**, `node --test` **90 passe
 `forge snapshot --check` exit 0, `forge build --force` 41 files with **0** `warning[` and **0**
 `Warning (`.
 
-### § Record — Sepolia (11155111)
+### § Record — Sepolia (11155111) — **superseded 2026-11-20, pre-#201 bytes**
 
 | | Step | What | Value |
 |--:|:--|:--|:--|
@@ -2005,7 +2084,7 @@ nonce 1, gas limit 3,287,625, status 0, 2,833,494 gas burned, block 12,091,513**
 attempt that failed on gas, for the reason step 1e now writes down. It created nothing, so it is not
 a collision and the successful send that followed it is not a resend.
 
-### § Record — Base Sepolia (84532)
+### § Record — Base Sepolia (84532) — **superseded 2026-11-20, pre-#201 bytes**
 
 | | Step | What | Value |
 |--:|:--|:--|:--|
