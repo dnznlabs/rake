@@ -37,6 +37,16 @@ test('the strip applied here is the one app/build.mjs applies', () => {
   );
 });
 
+test('the shipped bundle has no phone switch', () => {
+  /* `?phone=1` / `?phone=0` exist for the preview sitting of m05-t01c step 7a, where a desktop has to
+     be shown the phone path and a phone the desktop one. A document on chain is permanent, and a
+     query parameter that changes which wallet links a page offers is not something to make permanent,
+     so it lives inside the fence. */
+  assert.equal(count(SHIPPED, "phone="), 0, 'the phone switch survived the strip and would ship on chain');
+  assert.equal(count(SHIPPED, "Q.get('phone')"), 0);
+  assert.equal(count(PAGE, "Q.get('phone')"), 2, 'the switch is gone from the source, so the preview cannot show both looks');
+});
+
 test('the shipped bundle keeps rpcProvider and drops capped', () => {
   assert.equal(
     count(SHIPPED, 'const rpcProvider ='),

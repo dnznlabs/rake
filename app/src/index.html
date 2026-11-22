@@ -198,6 +198,12 @@ async function connect() {
    where it exists, then the user-agent's own words, then an iPad — which reports a Mac user-agent and
    is told apart only by having more than one touch point. */
 function isPhone() {
+  /*DEV*/
+  /* A desktop look on a phone and a phone look on a desktop, for the preview sitting of step 7a:
+     `?phone=1` takes the phone path, `?phone=0` the desktop one. Inside the fence, so the document
+     that ships cannot be talked into either. */
+  if (Q.get('phone')) return Q.get('phone') !== '0';
+  /*DEV*/
   const n = navigator, u = n.userAgent || '';
   if (n.userAgentData && typeof n.userAgentData.mobile === 'boolean') return n.userAgentData.mobile;
   if (/Android|iPhone|iPad|iPod/.test(u)) return true;
