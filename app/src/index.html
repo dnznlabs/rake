@@ -251,6 +251,10 @@ function phoneLinks() {
 /* The menu's rows, one per announced wallet. A wallet's name is the wallet's own string, so it goes
    in through `textContent` and never as markup, and its icon is not rendered at all: an `<img>` whose
    src a third party chooses is a request this page does not need to make. */
+function noWalletMenu() {
+  km.innerHTML = '<div class="k">no wallet found — open this page in a browser with a wallet to send transactions.</div>'
+    + phoneLinks().map(([n, href]) => `<a href="${esc(href)}" target="_blank" rel="noopener">open in ${esc(n)}</a>`).join('');
+}
 function walletMenu() {
   km.textContent = '';
   for (const w of WALLETS) {
@@ -828,7 +832,9 @@ function who() {
     : WALLET ? connect
     /* Several announced and none remembered: Connect is a choice, not a connection. */
     : WALLETS.length > 1 ? e => { e.stopPropagation(); walletMenu(); toggle(km); }
-    : e => { e.stopPropagation(); toggle(nm); if (!nm.hidden) liveCheck(); };
+    /* No wallet at all: Connect says so under its own button, with the phone links, rather than
+       opening the network menu, which is a list of networks. */
+    : e => { e.stopPropagation(); noWalletMenu(); toggle(km); };
   // Not awaited: the short address is on the button before any round trip, and `who()` stays
   // synchronous for `accountsChanged`, `connect` and `disconnect`, which each already call it.
   if (ACC) nameWho(ACC);
@@ -843,8 +849,7 @@ function who() {
   nm.innerHTML = netRows()
     + (!WALLET && read ? `<div class="k">reads go through ${new URL(read).host}</div>` : '')
     + '<div class="h sep">wallet</div>'
-    + (!WALLET ? '<div class="k">none found — open this page in a browser with a wallet to send transactions.</div>'
-        + phoneLinks().map(([n, href]) => `<a href="${esc(href)}" target="_blank" rel="noopener">open in ${esc(n)}</a>`).join('')
+    + (!WALLET ? '<div class="k">none found</div>'
       : !CHAIN ? '<div class="k">not reachable</div>'
       : !wrong ? `<div class="k">on ${cname(CHAIN)}</div>`
       : `<div class="k">on ${cname(CHAIN)}. Transactions go through your wallet, so it has to be on ${cname(CFG.chainId)} too.</div>`
