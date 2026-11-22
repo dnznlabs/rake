@@ -471,3 +471,30 @@ conventional readings of those abbreviations — Polygon's native-asset predeplo
 precompile slot — and both read **codesize 0**, so the gate's conclusion does not depend on which of
 the plausible full forms was meant. **The architect is asked to confirm them** before this is treated
 as the complete four.
+
+## Part B — Ethereum (1), step 2: the factory
+
+Every gate re-read on chain 1 immediately before this send, not carried from the 08:3xZ column:
+chain id **1**; both predictions equal § 0's; `0x` at `FACTORY`, `IMPL`, `APP` and `DISTRO`; the proxy
+**69 bytes** with § 1's keccak; block `gasLimit` **60,000,000**; `E` **2,396,446 / 1,666,007**;
+balance **0.025093601 ETH** against **0.002171** needed, **11.6×**; and the alias gate re-read as § 1
+now requires — `0`, **1,582**, `0`, `0`, with `balanceOf` still reverting.
+
+`G` = **179** from the same arithmetic as Base (`P` = 3,482,636, `P ÷ 1.3` = 2,678,951, limit
+**4,795,322** — above 2 × `E`, above 1.3 × `E`, under half of a 60,000,000 block). **Base fee read
+immediately before the send: 126,882,335 wei ≈ 0.127 gwei**, against the **1 gwei** stop, by the same
+script that exits rather than sends.
+
+| reading | value |
+|:--|:--|
+| transaction | **`0x5cfd85b738dad390dfc0b43f7aa29e8883265d9b58cb3db87f14ad19dd4a8f50`** |
+| status | **1** |
+| block | **26,469,801** |
+| `gasUsed` | **2,381,290** of 4,795,322 (49.7%) — the same figure as Base, to the gas |
+| effective gas price | 118,800,946 wei |
+| `DistributionFactory` | **`0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`** — equal to step 1f's prediction |
+| `implementation()` | **`0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`** — the same on all four chains now |
+| runtime against the artifact | **1,319 bytes** each side, **60 differing bytes**, **none outside a span**, each of the three holding `IMPL` |
+
+The engineer's key went from 0.025093601 to **0.024810701795026610 ETH** — **282,899,700,340 wei**,
+about **0.000283 ETH**, for this send.
