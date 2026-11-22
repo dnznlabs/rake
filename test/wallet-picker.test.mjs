@@ -666,3 +666,160 @@ test('picking the same wallet twice does not double its handlers', async () => {
     `one pair per provider, got ${a.handlers.length} handlers`,
   );
 });
+
+/* ---- a pick the wallet never answers ----------------------------------------------------------
+   Found by hand by the Product Owner on 2026-11-21, dev build, MetaMask and Trust Wallet both
+   installed: picking a wallet wrote `rake.wallet` before the wallet had said anything, so rejecting
+   or closing its prompt left the choice remembered. Every later Connect went straight back to that
+   wallet, and the only control that forgets a pick is Disconnect, which the page shows only once an
+   account is connected — so the way out was editing localStorage by hand. The pick is now written
+   after the account comes back, and these cases are the three ways it can fail to. */
+
+// Rejects everything it is asked, the way a wallet reports a dismissed prompt (EIP-1193, 4001).
+const refuser = (rdns, { chainId = '0xaa36a7' } = {}) => ({
+  rdns,
+  calls: [],
+  handlers: [],
+  on(ev, fn) { this.handlers.push([ev, fn]); },
+  emit(ev, arg) { for (const [e, fn] of this.handlers) if (e === ev) fn(arg); },
+  async request({ method }) {
+    this.calls.push(method);
+    if (method === 'eth_chainId') return chainId;
+    const e = new Error('User rejected the request.');
+    e.code = 4001;
+    throw e;
+  },
+});
+
+test('a rejected prompt leaves nothing remembered and the menu on offer', async () => {
+  const a = refuser('io.metamask');
+  const b = prov('com.rainbow', { accounts: [OTHER_ACCOUNT] });
+  const page = load({ announce: [announced(a), announced(b)] });
+
+  await page.discover();
+  const read = page.state().P;
+
+  await page.pickWallet('io.metamask');
+
+  const s = page.state();
+  assert.equal(s.ACC, null, 'the refusing fixture connected, so the test proves nothing');
+  assert.equal(page.stored.get('rake.wallet'), undefined, 'the refused pick was remembered');
+  assert.equal(s.PICK, '', 'the refused pick is still the page\'s choice');
+  assert.equal(s.WALLET, false, 'the page still holds the refusing wallet as the one in use');
+  assert.equal(s.P, read, 'reads did not go back to the public endpoint');
+  /* What the visitor sees next: `who()` offers the menu on exactly this state — no account, no
+     wallet in use, more than one announced. */
+  assert.ok(s.WALLETS.length > 1 && !s.ACC && !s.WALLET, 'the next Connect would not offer the menu');
+});
+
+test('a reload after a rejected prompt still offers the menu', async () => {
+  const a = refuser('io.metamask');
+  const b = prov('com.rainbow', { accounts: [OTHER_ACCOUNT] });
+  const first = load({ announce: [announced(a), announced(b)] });
+
+  await first.discover();
+  await first.pickWallet('io.metamask');
+
+  // The storage is the only thing that crosses a reload, which is the whole of the defect.
+  const second = load({ announce: [announced(a), announced(b)], kv: first.stored });
+  await second.discover();
+
+  assert.equal(second.state().PICK, '', 'the reload picked up the wallet whose prompt was refused');
+  assert.equal(second.state().ACC, null);
+  assert.ok(!a.calls.includes('eth_accounts'), `the refused wallet was asked for accounts: ${a.calls.join(', ')}`);
+});
+
+test('a prompt that never answers stores nothing while it hangs', async () => {
+  /* Closing the window on a prompt is not a rejection: the promise simply never settles. Nothing
+     may be written before it does. */
+  const hanging = {
+    rdns: 'io.metamask',
+    handlers: [],
+    on(ev, fn) { this.handlers.push([ev, fn]); },
+    async request({ method }) {
+      if (method === 'eth_chainId') return '0xaa36a7';
+      return new Promise(() => {});
+    },
+  };
+  const b = prov('com.rainbow', { accounts: [OTHER_ACCOUNT] });
+  const page = load({ announce: [announced(hanging), announced(b)] });
+
+  await page.discover();
+  const pick = page.pickWallet('io.metamask');
+  // Several turns of the microtask queue: enough for anything that was going to be written.
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+
+  assert.equal(page.stored.get('rake.wallet'), undefined, 'the pick was remembered before the wallet answered');
+  assert.equal(page.state().ACC, null);
+  void pick;
+});
+
+test('a wallet that throws on connect leaves nothing remembered either', async () => {
+  /* The fallback path: `wallet_requestPermissions` unsupported, then `eth_requestAccounts` fails
+     with something that is not a refusal, so the error leaves `connect` and `pickWallet`. The pick
+     must be forgotten on the way out, and the error must still reach the caller. */
+  const a = {
+    rdns: 'io.metamask',
+    handlers: [],
+    on(ev, fn) { this.handlers.push([ev, fn]); },
+    async request({ method }) {
+      if (method === 'eth_chainId') return '0xaa36a7';
+      if (method === 'wallet_requestPermissions') {
+        const e = new Error('Method not supported');
+        e.code = -32601;
+        throw e;
+      }
+      const e = new Error('Already processing eth_requestAccounts.');
+      e.code = -32002;
+      throw e;
+    },
+  };
+  const b = prov('com.rainbow', { accounts: [OTHER_ACCOUNT] });
+  const page = load({ announce: [announced(a), announced(b)] });
+
+  await page.discover();
+  await assert.rejects(() => page.pickWallet('io.metamask'), /Already processing/, 'the error was swallowed');
+
+  assert.equal(page.stored.get('rake.wallet'), undefined, 'the failed pick was remembered');
+  assert.equal(page.state().PICK, '');
+  assert.equal(page.state().WALLET, false);
+});
+
+test('a pick the wallet answers is remembered', async () => {
+  // The control: the three cases above must not pass by never storing a choice at all.
+  const a = prov('io.metamask', { accounts: [ACCOUNT] });
+  const b = prov('com.rainbow', { accounts: [OTHER_ACCOUNT] });
+  const page = load({ announce: [announced(a), announced(b)] });
+
+  await page.discover();
+  await page.pickWallet('io.metamask');
+
+  assert.equal(page.state().ACC, ACCOUNT);
+  assert.equal(page.state().PICK, 'io.metamask');
+  assert.equal(page.stored.get('rake.wallet'), 'io.metamask', 'a wallet that connected was not remembered');
+});
+
+test('Disconnect after a pick offers the menu again, and a reload does not reconnect', async () => {
+  /* The half of the Product Owner's report that was reasoned from the code and not run: the control
+     that forgets a pick is there once an account is connected, and it reaches the store. */
+  const a = prov('io.metamask', { accounts: [ACCOUNT] });
+  const b = prov('com.rainbow', { accounts: [OTHER_ACCOUNT] });
+  const first = load({ announce: [announced(a), announced(b)] });
+
+  await first.discover();
+  await first.pickWallet('io.metamask');
+  assert.equal(first.state().ACC, ACCOUNT, 'the pick never connected, so the test proves nothing');
+
+  await first.disconnect();
+
+  const s = first.state();
+  assert.equal(s.PICK, '', 'Disconnect kept the pick');
+  assert.equal(first.stored.get('rake.wallet'), '', 'Disconnect left the pick in the store');
+  assert.equal(s.WALLET, false);
+  assert.equal(s.ACC, null);
+
+  const second = load({ announce: [announced(a), announced(b)], kv: first.stored });
+  await second.discover();
+  assert.equal(second.state().PICK, '', 'the reload reconnected the wallet that was disconnected');
+  assert.equal(second.state().ACC, null);
+});
