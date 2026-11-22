@@ -689,7 +689,7 @@ is what to follow when the count differs:
   and the gas per piece, so it is a plan question. `tools/step4-calldata.mjs` refuses it.
 - Measured for the three-chunk document of m05-t01c, against `App`
   `0x00a9F390A6010d045e0d34856048DdD6910d25BA` at its nonce **4** on both testnets: proposals 1 and
-  2 are 48,138 characters each and the batch is **20,682** against the 65,536 cap, 44,854 spare. The
+  2 are 48,138 characters each and the batch is **20,874** against the 65,536 cap, 44,662 spare. The
   two-chunk batch it replaces was 19,018. A size quoted here means nothing without the `App` and the
   nonce it was cut for — the pointers are that contract's CREATE addresses.
 
