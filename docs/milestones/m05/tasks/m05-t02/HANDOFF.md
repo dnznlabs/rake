@@ -440,7 +440,7 @@ missing it.
 |:--|:--|
 | `cast chain-id` | **42220** |
 | `cast codesize` of `GoldToken` `0x471EcE3750Da237f93B8E339c536989b8978a438` | **2,585 bytes** |
-| probe (the same address, which holds CELO) | native balance **457,156,951,045,076,936,137** wei |
+| probe — **`0x471EcE3750Da237f93B8E339c536989b8978a438`, the token's own address**, named because the architect's control used three other funded accounts | native balance **457,156,951,045,076,936,137** wei |
 | `balanceOf(probe)` | **457,156,951,045,076,936,137** — **equal to the native balance** |
 
 So the probe fires on the case § 1 records. A clean Ethereum row below therefore means the check ran
@@ -460,7 +460,11 @@ and missed, not that it failed to run.
 holds code answers nothing at all — and it is **not** Celo's `GoldToken`, which is 2,585 bytes on
 Celo against 1,582 here.
 
-**Two of the four addresses are inferred, and that is flagged rather than hidden.** § 1 writes
+**The two abbreviated addresses are confirmed** by the architect on 2026-11-22 as exactly the two
+read here, and § 1 now writes all four out in full so nobody has to infer them again. What follows is
+kept because it records why the question arose:
+
+**Two of the four addresses were inferred when first read, and that was flagged rather than hidden.** § 1 writes
 `LegacyERC20ETH` and `GoldToken` in full but gives the other two as `0x…1010` and `0x…0001`
 (`RUNBOOK.md:323`), and no full form appears anywhere in the repository. The two above are the
 conventional readings of those abbreviations — Polygon's native-asset predeploy and the first
