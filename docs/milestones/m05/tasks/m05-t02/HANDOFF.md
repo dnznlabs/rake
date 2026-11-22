@@ -427,3 +427,43 @@ commas, Etherscan's tuple parser has split on commas inside quoted strings befor
 **stop and say so** if the preview mangles it or the table reads as four or more rows.
 
 **Ethereum's `create` is explicitly not in that issue** — it follows its own deploy.
+
+## Part B — the amended native-balance gate on Ethereum
+
+Taken 2026-11-22 09:3xZ, after #368 put the amended gate on `main`. **The control first**, as the
+amendment orders, because a probe that cannot see the case it is looking for proves nothing by
+missing it.
+
+### The control: Celo mainnet, where the alias is real
+
+| reading | value |
+|:--|:--|
+| `cast chain-id` | **42220** |
+| `cast codesize` of `GoldToken` `0x471EcE3750Da237f93B8E339c536989b8978a438` | **2,585 bytes** |
+| probe (the same address, which holds CELO) | native balance **457,156,951,045,076,936,137** wei |
+| `balanceOf(probe)` | **457,156,951,045,076,936,137** — **equal to the native balance** |
+
+So the probe fires on the case § 1 records. A clean Ethereum row below therefore means the check ran
+and missed, not that it failed to run.
+
+### Ethereum (chain 1), probe `0x5A158aF8…bBC50d` holding 25,093,601,299,726,950 wei
+
+| alias § 1 names | address | `cast codesize` | calls |
+|:--|:--|--:|:--|
+| OP `LegacyERC20ETH` | `0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000` | **0** | none to make |
+| Celo `GoldToken` | `0x471EcE3750Da237f93B8E339c536989b8978a438` | **1,582** | `name()`, `symbol()`, `decimals()`, `totalSupply()`, `balanceOf(probe)` and `transfer(probe,1)` **all revert with empty data** |
+| Polygon's `0x…1010` | `0x0000000000000000000000000000000000001010` | **0** | none to make |
+| `0x…0001` | `0x0000000000000000000000000000000000000001` | **0** | none to make |
+
+**The gate holds, by the amendment's own test:** no alias address on chain 1 is a token whose
+`balanceOf` answers an account's native balance, and none whose `transfer` moves it. The one that
+holds code answers nothing at all — and it is **not** Celo's `GoldToken`, which is 2,585 bytes on
+Celo against 1,582 here.
+
+**Two of the four addresses are inferred, and that is flagged rather than hidden.** § 1 writes
+`LegacyERC20ETH` and `GoldToken` in full but gives the other two as `0x…1010` and `0x…0001`
+(`RUNBOOK.md:323`), and no full form appears anywhere in the repository. The two above are the
+conventional readings of those abbreviations — Polygon's native-asset predeploy and the first
+precompile slot — and both read **codesize 0**, so the gate's conclusion does not depend on which of
+the plausible full forms was meant. **The architect is asked to confirm them** before this is treated
+as the complete four.
