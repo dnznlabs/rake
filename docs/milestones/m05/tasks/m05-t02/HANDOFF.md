@@ -327,9 +327,24 @@ exits 0, so a Sourcify verification that never ran looks done.
 
 The asserting loop printed **three `exact_match` lines and exited 0**. Which of the two each address
 was is recorded above because § 5 says to: `getsourcecode` carries no verification timestamp, so a
-re-run cannot tell a verification this run submitted from one that already existed. Two of the three
-were already held — the same bytes and metadata as the testnets — and only the implementation was
-submitted here.
+re-run cannot tell a verification this run submitted from one that already existed.
+
+**"Already verified" here means minutes after its own deploy, not on an earlier day**, and Sourcify's
+own `verifiedAt` says so. The timeline, all 2026-11-22 UTC, each figure read rather than recalled —
+block times from `cast block --field timestamp`, verification times from Sourcify's
+`/v2/contract/8453/<address>`:
+
+| | deployed | verified on Sourcify | by |
+|:--|:--|:--|:--|
+| `DistributionFactory` | **08:35:44Z** (block 60,730,845) | **08:38:35Z** — 2m51s later | not this run's loop |
+| `App` | **08:37:09Z** (block 60,731,271) | **08:40:25Z** — 3m16s later | not this run's loop |
+| `Distribution` (implementation) | inside the factory's constructor, so no transaction of its own | **08:47:37Z** | **this run**, which is also what forge reported |
+
+So two of the three were picked up within about three minutes of their deploys by something other
+than my loop — consistent with Sourcify already holding these exact bytes and metadata from the
+testnets — and only the implementation was submitted here. `creationMatch` is `exact_match` for the
+factory and `App` and absent for the implementation, which is what a constructor-created contract
+with no creation transaction of its own should look like.
 
 **The loop was also run against an address Sourcify cannot hold**
 (`0x0000…dEaD`), which answered `null`, the reading that would exit 1. The gate therefore
@@ -349,6 +364,19 @@ CREATE2 input set means in practice.
 `deploy/chains.json`. The reason is a side effect worth avoiding: `deploy/chains.json` is the
 **gateway's** chain list, so adding a mainnet to it in order to attest would change what the gateway
 serves. A deployment record should carry everything needed to check it.
+
+**The field is a convenience and not evidence, and that is enforced rather than asserted.** The chain
+is asked who it is before anything is read from it, so pointing a record at the wrong endpoint fails
+instead of attesting the wrong chain's bytes. Measured, with Base's record pointed at Ethereum's
+endpoint in a scratch copy:
+
+```
+attest: FAIL chain 8453 · -: https://ethereum-rpc.publicnode.com answered chain id 1
+attest: 1 failure(s)
+exit=1
+```
+
+The workflow passes no key and reads nothing but these endpoints, mainnet and testnet alike.
 
 `cast call $APP "chunkCount()(uint256)"` prints **0** on Base. **Step 4 was not run** and no mainnet
 document exists.
