@@ -37,9 +37,13 @@ const CHAINS = { 1: 'mainnet', 10: 'op mainnet', 8453: 'base', 42161: 'arbitrum'
 // Every chain rake intends to be on: M05's four mainnets, its stretch row, and the two testnets.
 // Listed whether or not it is live yet; `ENABLED` says which are.
 const NETWORKS = [1, 8453, 42161, 10, 4326, 4663, 11155111, 84532];
-/* The chains known live when this bundle was built, linked with no read. The rest of `NETWORKS` is
-   pending deployment until `liveCheck` finds a document on one. */
-const ENABLED = [11155111, 84532];
+/* Linked with no read. **Not "known live": the Product Owner's ruling of 2026-11-22 puts Base and
+   Ethereum here before either has a document**, so this document — which goes to the testnets first
+   and to those two mainnets after — links all four from the day it ships. What he accepted with it:
+   until a mainnet carries its own document and the gateway carries that chain, its menu link leads
+   nowhere and the `#/docs` contracts table reads it as live. The rest of `NETWORKS` stays pending
+   deployment until `liveCheck` finds a document on one. */
+const ENABLED = [1, 8453, 11155111, 84532];
 const TESTNETS = [11155111, 84532];
 // The same route on another chain. The rewriters are `Model.GATEWAYS`: a new gateway is an entry there.
 const chainHref = to => Model.chainHref(location.href, CFG.chainId, to);
@@ -2379,7 +2383,7 @@ function docs() {
 
   <h2 id="s-credits">Credits</h2>
   <p>The design of these contracts derives from <a href="https://multisig.software" target="_blank" rel="noopener noreferrer">multisig.software</a> by Src Co / z0r0z: the timelock, the self-call setters, the PUSH0 clones and the sender-bound salt. The low-level patterns follow <a href="https://github.com/Vectorized/solady" target="_blank" rel="noopener noreferrer">Solady</a>.</p>
-  <p>Rake is a fully on-chain contract-hosted dapp, also after z0r0z's work: this page is served by the <code>html()</code> view of a contract, as <a href="https://github.com/ethereum/ERCs/pull/1712" target="_blank" rel="noopener noreferrer">ERC-8244</a> proposes, and gateways reach the same contract through ERC-5219. There is no server behind it; the widget is served the same way.</p>
+  <p>Rake is a fully on-chain contract-hosted dapp, also after z0r0z's work: this page is served by the <code>html()</code> view of a contract, as <a href="https://eip.tools/eip/8244" target="_blank" rel="noopener noreferrer">ERC-8244</a> proposes, and gateways reach the same contract through ERC-5219. There is no server behind it; the widget is served the same way.</p>
 
   <h2 id="s-why">Purpose</h2>
   <p>Where a fee or a revenue share goes is ordinarily stated off chain, and that statement can be revised without notice. A distribution places it on record. The allocation is public, the owner is public, and a change to either is visible for the full length of the delay before it can be applied. A payer can verify where funds will go; a beneficiary can rely on the share it has been allocated.</p>
