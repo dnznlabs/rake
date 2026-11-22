@@ -160,13 +160,27 @@ async function discover() {
   if (WALLET && !store.get(OFF_KEY)) { try { const a = await P.request({ method: 'eth_accounts' }); ACC = a[0] || null; } catch (e) {} }
   wire();
 }
-/* The provider's two events, wired in one place because `pickWallet` wires the same pair. */
+/* The provider's two events, wired in one place because `pickWallet` wires the same pair.
+
+   **Each handler belongs to the provider it was attached to, and does nothing unless that provider is
+   still the one in use.** An extension cannot be un-subscribed from reliably — EIP-1193's
+   `removeListener` is optional and some wallets do not implement it — so the guard is the provider's
+   own identity, captured here and compared when the event arrives. Without it, picking wallet A and
+   then wallet B leaves A able to set `ACC` to its account while sends go through B: the page would
+   show one wallet's address and transact with another's. `readProvider` passes a wallet's object
+   through unchanged, so `p !== P` is exactly "this is not the wallet in use".
+
+   `WIRED` makes it at most once per provider, because picking the same wallet twice would otherwise
+   attach a second pair and act on every event twice. */
+const WIRED = new WeakSet();
 function wire() {
-  if (!P || !P.on) return;
+  const p = P;
+  if (!p || !p.on || WIRED.has(p)) return;
+  WIRED.add(p);
   /* Ignored while disconnected: a wallet that cannot revoke keeps reporting the account, and acting
      on that would reconnect the visitor who just asked not to be. */
-  P.on('accountsChanged', a => { if (store.get(OFF_KEY)) return; ACC = a[0] || null; who(); route(); });
-  P.on('chainChanged', chainChanged);
+  p.on('accountsChanged', a => { if (p !== P || store.get(OFF_KEY)) return; ACC = a[0] || null; who(); route(); });
+  p.on('chainChanged', id => { if (p !== P) return; chainChanged(id); });
 }
 /* Reload only when the chain actually changed (#341). Phantom's in-app browser emits `chainChanged`
    on load with the chain the page is already reading, and reloading on every event is a page that

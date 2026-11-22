@@ -95,12 +95,14 @@ function load({ announce = [], stored = {}, injected = null, kv = null }) {
     line('let WALLETS = [], PICK'),
     line('const WALLET_KEY ='),
     line('const OFF_KEY ='),
+    line('const WIRED ='),
     block('async function discover'),
     block('function wire'),
+    block('async function pickWallet'),
     block('function chainChanged'),
     block('async function connect'),
     block('async function disconnect'),
-    'return { discover, connect, disconnect, chainChanged, state: () => ({ P, ACC, CHAIN, WALLET, WALLETS, PICK }) };',
+    'return { discover, connect, disconnect, chainChanged, pickWallet, state: () => ({ P, ACC, CHAIN, WALLET, WALLETS, PICK }) };',
   ].join('\n');
 
   const made = new Function(
@@ -578,4 +580,89 @@ test('the list is capped at eight and the newest address leads', () => {
   const got = h.recents();
   assert.equal(got.length, 8);
   assert.equal(got[0], addrs[9]);
+});
+
+/* ---- a wallet that is no longer in use (review of #347 at cff988b) ---------------------------- */
+
+/* `wire` attaches `accountsChanged` and `chainChanged` to whatever provider is in use, and an
+   extension cannot be reliably un-subscribed from: EIP-1193's `removeListener` is optional. So after
+   picking wallet A and then wallet B, A is still talking. The page would show A's account while
+   sending through B — one wallet's address with another's transactions — and A's `chainChanged`
+   would reload a page reading through B. */
+
+const OTHER_ACCOUNT = '0x00000000219ab540356cBB839Cbe05303d7705Fa';
+
+test('a wallet that was picked and then replaced cannot set the account', async () => {
+  const a = prov('io.metamask', { accounts: [ACCOUNT] });
+  const b = prov('com.rainbow', { accounts: [OTHER_ACCOUNT] });
+  const page = load({ announce: [announced(a), announced(b)] });
+
+  await page.discover();
+  assert.equal(page.state().PICK, '', 'two wallets and none remembered should hold no wallet');
+
+  await page.pickWallet('io.metamask');
+  assert.equal(page.state().ACC, ACCOUNT, 'picking A did not connect A, so the test proves nothing');
+
+  await page.disconnect();
+  await page.pickWallet('com.rainbow');
+  assert.equal(page.state().ACC, OTHER_ACCOUNT, 'picking B did not connect B');
+
+  /* A is still subscribed, and now reports an account change of its own. */
+  a.emit('accountsChanged', [ACCOUNT]);
+
+  assert.equal(
+    page.state().ACC,
+    OTHER_ACCOUNT,
+    'a wallet that is no longer in use set the account: the page would show its address and send through the other',
+  );
+});
+
+test('a replaced wallet cannot reload the page either', async () => {
+  const a = prov('io.metamask', { accounts: [ACCOUNT] });
+  const b = prov('com.rainbow', { accounts: [OTHER_ACCOUNT] });
+  const page = load({ announce: [announced(a), announced(b)] });
+
+  await page.discover();
+  await page.pickWallet('io.metamask');
+  await page.disconnect();
+  await page.pickWallet('com.rainbow');
+  page.reloads.length = 0;
+
+  a.emit('chainChanged', '0x1');
+
+  assert.deepEqual(page.reloads, [], 'a wallet that is no longer in use reloaded the page');
+});
+
+test('the wallet in use still reaches the page', async () => {
+  /* The control: the same mechanism must not ignore events from the provider that *is* in use, or
+     the guard above would pass by breaking the feature. */
+  const a = prov('io.metamask', { accounts: [ACCOUNT] });
+  const b = prov('com.rainbow', { accounts: [OTHER_ACCOUNT] });
+  const page = load({ announce: [announced(a), announced(b)] });
+
+  await page.discover();
+  await page.pickWallet('com.rainbow');
+
+  b.emit('accountsChanged', [ACCOUNT]);
+  assert.equal(page.state().ACC, ACCOUNT, 'the wallet in use can no longer report an account change');
+
+  page.reloads.length = 0;
+  b.emit('chainChanged', '0x1');
+  assert.deepEqual(page.reloads, [1], 'the wallet in use can no longer move the page to another chain');
+});
+
+test('picking the same wallet twice does not double its handlers', async () => {
+  const a = prov('io.metamask', { accounts: [ACCOUNT] });
+  const b = prov('com.rainbow', { accounts: [OTHER_ACCOUNT] });
+  const page = load({ announce: [announced(a), announced(b)] });
+
+  await page.discover();
+  await page.pickWallet('io.metamask');
+  await page.pickWallet('io.metamask');
+
+  assert.deepEqual(
+    a.handlers.map(([e]) => e).sort(),
+    ['accountsChanged', 'chainChanged'],
+    `one pair per provider, got ${a.handlers.length} handlers`,
+  );
 });
