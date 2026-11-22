@@ -963,6 +963,28 @@ that key is both signer and owner, so it works there and reverts `Unauthorized` 
 chain. It stays for `make deploy`; it is never the public-chain route. That collapse is also why no
 rehearsal caught this — a dev chain cannot tell the two roles apart.
 
+#### What the upload does to the network menu
+
+**The upload is what enables the chain in the dapp, on every chain (decision 69).** A page on any
+other chain asks this chain's `App` for `chunkCount()` when its network menu or `#/docs` opens, and
+once 4c has executed it answers above zero, so those pages stop showing this chain as "pending
+deployment" and link to it. Nothing is uploaded anywhere else for that. The
+read the dapp makes, by hand:
+
+```sh
+cast call $APP "chunkCount()(uint256)" --rpc-url "$RPC"   # above 0 once the document is up
+```
+
+- **Run § The gateway next, without a gap.** On `rake.dnzn.dev` the link the other chains now show
+  is `/<chain id>/`, and the gateway serves that path only once the chain is in `deploy/gw44.json`.
+  Between this step and that dispatch the link leads to a chain the gateway has no contract for.
+- **`ENABLED` is housekeeping, not a step.** `ENABLED` in `app/src/index.html` is the set of chains
+  a bundle links to with no read. When a bundle is next cut for any other reason, add every chain
+  whose document is up, so that bundle's visitors ask about fewer chains. Never cut or upload a
+  bundle for this alone: the menu is already right without it.
+- **There is no way to upload and stay off the menu.** A chain that must not be offered yet does
+  not get its document yet.
+
 #### The five calls, and their order
 
 `tools/step4-calldata.mjs` writes them to **`calldata/$CHAIN_ID/`** at the repository root — § 4a's

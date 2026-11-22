@@ -88,7 +88,11 @@ Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which
    disambiguate on two contracts, and `Distro` is a product word that would land in the ABI).
 4. **Chains.** The overview's four mainnets are the M05 acceptance criterion; MegaETH and Robinhood
    Chain, which multisig.software also serves, are a stretch row in the same milestone. Same bytecode,
-   same deployer; no `.mega` or `.base.eth` name resolution in v1.
+   same deployer; no `.mega` or `.base.eth` name resolution in v1. *Amended 2026-11-21:* the dapp
+   lists all six, with the two testnets, as the chains rake intends to be on, and shows each one
+   that is not yet enabled as "pending deployment" (decision 69). The stretch chains are therefore
+   named in the dapp before m05-t05 runs, and stay named if that row closes as not reached, until
+   an upload takes them off the list.
 5. **The primitive is not upgradeable; `App` is, until `lock()`.** A distribution is pinned to the
    factory that made it. A new significant version is a new factory, and old distributions run
    unchanged forever. Rejected: a movable implementation pointer for new creates only, because the
@@ -1145,6 +1149,56 @@ convention. Numbered 45 because 44 is taken by
     served under their own prefixes. Unchanged: the first mainnet chain added takes `/` (gw44
     decision 11, and `RUNBOOK.md` § The gateway), and which mainnet holds it once all four are
     live is still m05-t04's open question, with Base as its default. Built as m05-t04a.
+
+69. **A chain is enabled in the dapp by a short hand-kept list, by being the chain the page reads, or
+    by its `App` holding a document; every other intended chain is shown as "pending deployment".**
+    Ruled by Denizen on 2026-11-21, in session, and built in
+    [#349](https://github.com/dnznlabs/rake/pull/349); recorded from
+    [#350](https://github.com/dnznlabs/rake/issues/350). The dapp carries two lists
+    (`app/src/index.html`). `NETWORKS` is every chain rake intends to be on: the four M05 mainnets,
+    MegaETH (4326), Robinhood Chain (4663) and the two testnets. `ENABLED` is the subset known live
+    when the bundle was built, Sepolia and Base Sepolia today. A chain is enabled when any one of
+    three things holds: it is in `ENABLED`; it is the chain the bundle itself reads; or
+    `chunkCount()` at the `App` address answers above zero through that chain's public RPC
+    (`liveCheck`). The rest of `NETWORKS` is greyed. The answer is used in four places: the network
+    menu, where enabled chains link to the same route on that chain; the `#/docs` contracts table,
+    whose status column reads "live" or "pending deployment"; the wrong-network notice; and the
+    links offered when a distribution address holds nothing on the page's chain. **The lookup** is
+    one `eth_call` per chain outside `ENABLED`, six today, sent once per page load and only when the
+    network menu or `#/docs` first opens. A yes is kept in `localStorage` under `rake.live` and that
+    chain is not asked again in that browser. A failed read, or an address with no code, leaves the
+    chain pending. **Why:** `ENABLED` ships inside each chain's document, so a list alone would mean
+    an upload on every live chain each time one more chain is enabled, on Ethereum an upload to
+    refresh a menu. With the lookup, uploading a chain's document is what enables it, on every
+    chain's menu, with no upload elsewhere. `ENABLED` is only the set that needs no read: any later
+    upload can extend it, and once it holds all of `NETWORKS` the dapp asks nothing.
+    **Accepted with it:**
+    - The order of the M05 uploads no longer matters to the menu, and adding a chain to `ENABLED`
+      is housekeeping for the next bundle, never a reason to upload (`RUNBOOK.md` § Step 4).
+    - A chain cannot have its document uploaded and be kept out of the menu. "Deployed but not
+      enabled" is the state where the contracts are placed and no document is up.
+    - Once a chain's upload has executed, the other chains' pages link to it. On
+      `rake.dnzn.dev` that link is `/<chain id>/`, which serves the chain only once it is in the
+      gateway's configuration (decision 66, `RUNBOOK.md` § The gateway), so the gateway step
+      follows the upload directly.
+    - "Live" in the `#/docs` table means the `App` there serves a document. The factory is no
+      longer read, so an `App` with a document and no factory beside it would read as live. The
+      per-contract `eth_getCode` read the table made before is gone.
+    - The dapp depends, for the menu only, on the public RPCs of chains other than its own. The
+      endpoints for MegaETH and Robinhood Chain answered a browser-origin request on 2026-11-21
+      (review on #349).
+    - A yes is remembered without expiry. A document later removed with `setChunks([])` still
+      shows as enabled in a browser that saw it.
+    - The stretch chains are listed as pending deployment whether or not m05-t05 reaches them
+      (decision 4 as amended).
+
+    **Not verified:** no automated test covers `liveCheck`, and neither the menu nor the table has
+    had a headless browser run. The read was made by hand on 2026-11-21: Sepolia answers `2`; Base
+    and Robinhood Chain, where no `App` is placed, answer `0x`. **Rejected:** the hand-kept list
+    alone, as #349 first built it (an upload on every live chain per chain enabled); a live lookup
+    alone (a read per chain for every visitor for good, and it treats placed contracts as offered).
+    Changing network is a link and never `wallet_switchEthereumChain`, in the same change; the
+    link's form per gateway is `Model.GATEWAYS` (`app/src/model.js`).
 
 ## Findings carried forward
 
