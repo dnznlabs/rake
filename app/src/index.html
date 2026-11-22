@@ -35,7 +35,7 @@ const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTR
 const CONTRACTS = [['DistributionFactory', CFG.factory]];
 const CHAINS = { 1: 'mainnet', 10: 'op mainnet', 8453: 'base', 42161: 'arbitrum', 4326: 'megaeth', 4663: 'robinhood', 11155111: 'sepolia', 84532: 'base sepolia', 31337: 'anvil', 31338: 'anvil-b' };
 // Every chain rake intends to be on: M05's four mainnets, its stretch row, and the two testnets.
-// Listed whether or not it is live yet; #/docs reads which are.
+// Listed whether or not it is live yet; `ENABLED` says which are.
 const NETWORKS = [1, 8453, 42161, 10, 4326, 4663, 11155111, 84532];
 /* The chains the network menu links to. Hand-kept and not read from the chain on purpose: a chain is
    enabled when it is deployed *and* meant to be offered, and code at an address answers only the
@@ -58,7 +58,7 @@ const chainHref = to => {
   return GATEWAY_HOME + to + '/' + location.hash;
 };
 /* A dev chain has no explorer, so `ext()` prints plain text with the full value in the title. */
-const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.io', 8453: 'https://basescan.org', 42161: 'https://arbiscan.io', 11155111: 'https://sepolia.etherscan.io', 84532: 'https://sepolia.basescan.org' };
+const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.io', 8453: 'https://basescan.org', 42161: 'https://arbiscan.io', 4326: 'https://megaeth.blockscout.com', 4663: 'https://robinhoodchain.blockscout.com', 11155111: 'https://sepolia.etherscan.io', 84532: 'https://sepolia.basescan.org' };
 /* Two readers. It is what the widget snippet in #/docs puts in `data-rpc` — the embedding page's
    developer picks their own endpoint; these are only known public ones, so the example works when
    pasted — and it is this page's own read path when `discover` found no injected provider (#273), by
@@ -2293,33 +2293,14 @@ const DEPLOYED = { factory: '0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E', app: '
 const DEV_CHAIN = ['31337', '31338'].includes(String(CFG.chainId));
 const contractChains = () => NETWORKS.map(id => ({ id, ...DEPLOYED }))
   .concat(DEV_CHAIN ? [{ id: CFG.chainId, factory: CFG.factory, app: CFG.app }] : []);
-/* Status is read, never written down: a hand-kept column is what left the testnets "not deployed" while
-   they were live. One `eth_getCode` per contract per chain, sent once per page load and only when the
-   table scrolls into view, so opening the docs is not six chains' worth of requests. Code at the
-   address is presence, not proof of the current bytes. */
-const CSTAT = {};
-const codeAt = async (id, a) => {
-  const p = String(id) === String(CFG.chainId) && P ? P : PUBLIC_RPC[id] ? rpcProvider(PUBLIC_RPC[id]) : null;
-  if (!p) throw 0;
-  return (await p.request({ method: 'eth_getCode', params: [a, 'latest'] })).length > 2;
-};
-const chainStatus = c => CSTAT[c.id] ||= Promise.all([codeAt(c.id, c.factory), codeAt(c.id, c.app)])
-  .then(([f, a]) => f && a ? ['live', ''] : f ? ['factory only', 'warn'] : a ? ['app only', 'warn'] : ['not deployed', 'dim'])
-  .catch(() => ['unreachable', 'dim']);
-const contractRows = () => contractChains().map(c => `<tr><td>${cname(c.id)}</td>`
-  + ['factory', 'app'].map(k => `<td>${ext('address', c[k], esc(short(c[k])), false, c.id)}</td>`).join('')
-  + `<td class="dim" data-cstat="${c.id}">checking…</td></tr>`).join('');
-function contractsCheck() {
-  const t = document.getElementById('ctab');
-  if (!t) return;
-  const fill = () => contractChains().forEach(c => chainStatus(c).then(([s, cls]) => {
-    const td = document.querySelector(`[data-cstat="${c.id}"]`);
-    if (td) { td.textContent = s; td.className = cls; }
-  }));
-  if (!self.IntersectionObserver) return fill();
-  const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); fill(); } });
-  io.observe(t);
-}
+/* Status follows `ENABLED`, the same hand-kept list the network menu links from, so the two never
+   disagree and the docs send no request per chain. A dev chain's own row is the chain being read. */
+const contractRows = () => contractChains().map(c => {
+  const on = ENABLED.includes(Number(c.id)) || isHere(c.id);
+  return `<tr${on ? '' : ' class="off"'}><td>${cname(c.id)}</td>`
+    + ['factory', 'app'].map(k => `<td>${ext('address', c[k], esc(short(c[k])), false, c.id)}</td>`).join('')
+    + `<td>${on ? 'live' : 'pending deployment'}</td></tr>`;
+}).join('');
 /* `widget.js` is the second document `App` serves, so on an http(s) page it sits beside this one.
    Anywhere else the snippet names an ERC-5219 gateway (#68): `html()`-only clients such as Freedom
    answer every web3:// path with this page, so a bare web3:// src is offered only as the alternative. The address is the distribution its owner arrived from (the owner bar links here), else
@@ -2439,12 +2420,11 @@ function docs() {
 
   <h2 id="s-contracts">Contracts</h2>
   <p>Two contracts are deployed: <code>DistributionFactory</code>, which creates every distribution and is unowned, and <code>App</code>, which serves this page and the widget. Each is placed by a salted <code>CREATE2</code>, so it has the same address on every chain it is deployed to. A distribution has no fixed address; each one is created through the factory.</p>
-  <p>The status column is read from each chain when this table is shown: <i>live</i> means both addresses hold code.</p>
+  <p>Chains marked <i>pending deployment</i> are planned; the addresses shown are where the contracts will be placed.</p>
   <div class="scroll"><table class="dtab" id="ctab"><tr><th>chain</th><th>factory</th><th>app</th><th>status</th></tr>${contractRows()}</table></div>
   </article></div>`;
   widgetDemo();
   giveBind();
-  contractsCheck();
 }
 /* The support form under Economics: a plain payment to the featured distribution, any amount, nothing
    pre-filled (decision 1). It goes through `tx` like every write, so it is preflighted and confirmed. */

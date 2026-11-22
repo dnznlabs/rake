@@ -134,7 +134,8 @@
   current URL (gw44's `/<id>/` path, then a `.<id>.` host label), falling back to `GATEWAY_HOME`.
   The other chains are greyed out under "pending deployment". `ENABLED` is hand-kept and never
   read from the chain: enabling a chain is a decision, so a deployed chain stays greyed until it is
-  added there. A new gateway, such as an ENS one, is one more entry in `GATEWAYS`.
+  added there. A new gateway, such as an ENS one, is one more entry in `GATEWAYS`. The `#/docs` contracts
+  table follows `ENABLED` too, greying the rest, and reads nothing from the chain.
 - `app/src/model.js` is everything that needs no DOM and no provider: `pct`, `countdown`,
   `decodePending`, `supersededBy`, `salt` and the `snapshot()` type string `SNAPSHOT_T`. It is tested
   under node in `test/model.test.mjs` and inlined unchanged, so it reads an ambient `Eth` rather than

@@ -247,7 +247,7 @@ footer{display:flex;justify-content:space-between;border-top:1px solid var(--rul
 .dtab th{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);text-align:left;padding:10px 16px 10px 0;border-bottom:1px solid var(--rule)}
 .dtab td{padding:11px 16px 11px 0;border-bottom:1px solid var(--rule);vertical-align:baseline;white-space:nowrap}
 .dtab a,.doc a{border-bottom:1px solid var(--rule)}
-.dtab td.dim{color:var(--dim)}.dtab td.warn{color:var(--amber)}
+.dtab tr.off td,.dtab tr.off a{color:var(--dim)}
 /* Small widths. The nav's two links stay: a header whose only destinations vanish on a phone is a
    header with no navigation, so the row pays for them in gap and type size instead. The network pill
    drops its name, the widget goes under the prose, and the fee path swaps to its tall drawing, whose
