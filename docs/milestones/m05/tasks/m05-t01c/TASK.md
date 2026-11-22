@@ -202,10 +202,33 @@ chains later.
    executed as that section has it. Check: `make chain-doc` reports `inflated sha256` equal to
    the build's on both chains, and `make verify` from a gw44 checkout at the gateway's pin prints
    `ok` for the root and `widget.js` on both chains against `https://rake.dnzn.dev`.
-9. **The wallet run**, on the Product Owner, against `https://rake.dnzn.dev`: every `UAT.md` row,
-   the new ones included, one screenshot per row under `shots/`, and M04 criterion 6's signoff
-   line in his words. This is m05-t01's criterion 18b, moved here. Any row that cannot reach its
-   expected state is an issue linked from the handoff.
+9. **The acceptance run**, against `https://rake.dnzn.dev` on both testnets, in two parts.
+   **Amended 2026-11-22:** this step read "the wallet run, on the Product Owner: every `UAT.md`
+   row". The rows divide by what can vouch for them, and each part takes the rows it can vouch
+   for. Any row that cannot reach its expected state is an issue linked from the handoff.
+   - **9a, the engineer: a committed driver takes the rows that are about the page.** Rows (a),
+     (c) to (l) and (w3), headless, with an injected EIP-1193 provider whose
+     `eth_sendTransaction` signs with the engineer's key. It lives in `tools/uat/` with its
+     own pinned `playwright-core` and lockfile, takes the chain as an argument, reads the key
+     from the keystore and never from a file in the tree, and is its own PR, reviewed before
+     its output is used. **Every row is an assertion in code** on the expected state `UAT.md`
+     names, the run exits non-zero on the first miss or on any page error, and it writes the
+     row's screenshot to `shots/<chainId>/` only when the assertion holds. Before the real run,
+     one control: row (c) pointed at an address with no code must fail. A driver that cannot
+     fail has shown nothing. The transactions are real, on the testnets, from the engineer's
+     key, and the distributions it creates are its own.
+   - **9b, the Product Owner: the rows only a wallet can vouch for.** (b), (w1), (w2), (w4),
+     (w5) and (w6), plus **row (f) on one chain from his own wallet**, so that one write on the
+     uploaded document has been shown to a real wallet, estimated by it and signed in it. One
+     screenshot per row under `shots/`. He reads 9a's screenshots, and M04 criterion 6's
+     signoff line is in his words and says which rows he drove and which he read. This is
+     m05-t01's criterion 18b, moved here.
+   - **What this gives up, accepted:** no real wallet signs `distribute`, `release`, `propose`,
+     `applyQueued` or `cancel` on this document. Those go through the same `tx()` path as
+     `create`, which 9b does show to a wallet. Rejected: the driver replacing every row (an
+     injected provider says nothing about a wallet's prompt, discovery, disconnect or a phone),
+     and the driver as rehearsal only with the full list still his (it costs him the same
+     forty rows and buys only fewer surprises).
 10. **`HANDOFF.md`**, with the two per-chain upload tables, the size before and after, the wallets
     listed and left out with the device each was tried on, and the signoff.
 
@@ -228,11 +251,13 @@ chains later.
   amended; three proposals per chain either way, and a two-chunk payload still produces
   byte-identical calldata to `main`'s tool.
 - M04 criterion 6's signoff is in the handoff, dated, in the Product Owner's words, for this
-  document.
+  document, naming the rows he drove and the rows he read (step 9, amended 2026-11-22).
+- `tools/uat/`'s driver exits 0 on both testnets against `https://rake.dnzn.dev`, exits non-zero
+  on the control of step 9a, and every screenshot of a 9a row was written by that run.
 - The Product Owner's word that the preview of step 7a was good is on its action issue, dated
   before the first proposal of step 8, and `grep -c 'phone=' app/dist/index.html` prints 0 for
   the document uploaded.
-- `git diff --stat main` touches only `app/`, `test/`, `calldata/`, `shots/`,
+- `git diff --stat main` touches only `app/`, `test/`, `calldata/`, `shots/`, `tools/uat/`,
   `docs/milestones/m04/tasks/m04-t05/UAT.md`, `RUNBOOK.md` § Uploads, and this task's directory.
 
 ## Out of scope
