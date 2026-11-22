@@ -1,0 +1,58 @@
+name: attest
+
+# The bytecode attestation (decision 56 d), on a schedule rather than only at a deploy: what it
+# catches is drift *between* deploys — a `src/` change nobody redeployed, a solc pin bumped, an
+# address that stopped holding the bytes the record names. A check that only runs when someone
+# remembers to run it cannot catch that.
+#
+# Nothing here needs a key. Every read goes through the public endpoints in `deploy/chains.json`, so
+# the run is reproducible by a stranger, which is the whole point of attesting rather than asserting.
+on:
+  schedule:
+    # Mondays at 07:00 UTC, before the week's work and after any weekend merge.
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+# A scheduled run and a dispatched one do not need to race.
+concurrency:
+  group: attest
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  attest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: devbox
+        uses: jetify-com/devbox-install-action@v0.15.0
+        with:
+          # Pinned to the version devbox.json's $schema names, as ci.yml pins it.
+          devbox-version: 0.18.0
+          enable-cache: true
+
+      - name: cache solc
+        uses: actions/cache@v5
+        with:
+          path: ~/.svm
+          key: svm-${{ runner.os }}-${{ hashFiles('foundry.toml') }}
+
+      # `make attest` builds first and then reads each chain. A failure here is a real finding: it
+      # means a recorded address no longer holds the bytes this tree builds.
+      - name: attest
+        run: devbox run -- make attest
+
+      - name: working tree clean
+        shell: bash
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --porcelain
+            exit 1
+          fi
