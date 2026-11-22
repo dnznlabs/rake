@@ -1147,9 +1147,9 @@ convention. Numbered 45 because 44 is taken by
     [#342](https://github.com/dnznlabs/rake/issues/342) and
     [#341](https://github.com/dnznlabs/rake/issues/341) close
     ([#334](https://github.com/dnznlabs/rake/issues/334)). On Android, in an emulator and not on
-    a device, he reported that both listed links worked
-    ([#352](https://github.com/dnznlabs/rake/issues/352)); the emulated device, the Android
-    version and the wallet versions were not recorded, and Samsung's own browser is untried. He
+    a device (`sdk_gphone64_arm64`, Android 17), both listed links opened the wallet, showed rake
+    in its browser and connected ([#352](https://github.com/dnznlabs/rake/issues/352)); the
+    wallet versions were not recorded, and Samsung's own browser is untried. He
     ruled the same day that the Android reading comes before the first mainnet upload, in place
     of the plan's default of shipping on the iPhone readings alone.
 
