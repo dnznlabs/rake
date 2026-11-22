@@ -287,3 +287,28 @@ was read only for the hash to ask the receipt about.
 864 and 939 — holds `IMPL` left-padded to 32 bytes. Sixty is three times twenty, which is the
 address itself: the twelve pad bytes of each span match the artifact's zeros, so only the twenty
 address bytes differ per span.
+
+## Part B — Base (8453), step 3: `App`
+
+`E` = **1,666,007**, `P` = **2,286,547** (so `P ÷ 1.3` = 1,758,882), `G` = **190**, limit sent
+**3,341,876** gas — again above 2 × `E`, above 1.3 × `E`, and under half a block. Base fee re-read
+before the send at **5,758,940 wei**, under the 0.05 gwei stop.
+
+| reading | value | required |
+|:--|:--|:--|
+| transaction | **`0x96a64bcb5a59f1812efd68fb952fe97f6b013876b7f5e103ba3789b82fd58b19`** | — |
+| status | **1** | — |
+| block | **60,731,271** | — |
+| `gasUsed` | **1,655,420** of 3,341,876 (49.5%) | — |
+| effective gas price | 6,746,681 wei | — |
+| `App` | **`0x00a9F390A6010d045e0d34856048DdD6910d25BA`** | equal to step 1f's prediction ✓ |
+| `owner()` | **`0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790`** | the Ops vault ✓ |
+| `version()` | **`v0.1`** | `APP_VERSION` ✓ |
+| `locked()` | **false** | false, and stays false ✓ |
+| `chunkCount()` | **0** | 0 — step 4 is not run on any mainnet ✓ |
+| `cmp` of `cast code` against `forge inspect App deployedBytecode` | **equal**, 7,154 bytes | equal outright, since `App` takes no immutables ✓ |
+
+**Both sends landed first time: no failure, no `-32003` refusal, no retry.** Together they used
+**4,036,710** gas of the 8,137,198 limits asked for, and the engineer's key went from
+0.005000000 ETH to **0.004973603667288535 ETH** — **26,396,332,711,465 wei, about 0.0000264 ETH**, for
+the pair. The 0.002 ETH Base ask was therefore about **76×** what the chain charged.
