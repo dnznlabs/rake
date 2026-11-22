@@ -110,11 +110,33 @@ there, `DNZN_DELAY=604800`. `RPC` per chain from `RUNBOOK.md` § 1's table.
    | `cast code` at `FACTORY`, `APP`, the implementation `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A` and `DISTRO` `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199` | `0x` at all four addresses, on both chains | `0x` at `FACTORY`, `APP`, `DISTRO` on both; the implementation not read |
    | step 1c, the proxy | 141 characters and § 1's keccak | 141 on both; keccak not re-read |
    | the native-balance check of § 1 | § 1's rows for Base and Ethereum reproduced | not re-read |
+   | **Ethereum only, amended 2026-11-22** | see the note under this table | § 1's row does not reproduce |
    | `cast estimate --create`, factory / `App` | recorded; it is `E` of step 1e | 2,396,446 / 1,666,007 on both |
    | block `gasLimit` | recorded | 40,000,000; 59,999,943 |
    | `cast base-fee` against the stop | under the stop below | 0.005 gwei; 0.117 gwei |
    | `cast balance $ENGINEER` | at least the two limits of step 1e times twice the base fee read | 0; 0.0051 ETH |
    | `ETHERSCAN_API_KEY` answers for the chain | the `getsourcecode` read of step 5 against any verified contract on that `chainid` answers `status` 1 | not read |
+
+   **The native-balance gate on Ethereum (amended 2026-11-22, after the engineer's gate reading).**
+   `RUNBOOK.md` § 1 records all four alias addresses as holding no code on Ethereum. One does:
+   `0x471EcE3750Da237f93B8E339c536989b8978a438` holds 1,582 bytes there (read by the engineer and
+   by the architect that day; the engineer reports every call to it reverting). So the row cannot
+   be reproduced as written, and "reproduced" is replaced for Ethereum by the reading the row
+   exists for (`SECURITY.md` F12): **no alias address on the chain is a token whose `balanceOf`
+   answers an account's native balance or whose `transfer` moves it.** Before Ethereum's first
+   send, committed and pushed with the other gates:
+   - the four alias addresses § 1 names, each written out in full, each with its `cast codesize`
+     on chain 1;
+   - for each one that holds code: `name()`, `symbol()`, `decimals()`, `totalSupply()`,
+     `balanceOf` of an account holding a known non-zero native balance, and a `cast call` of
+     `transfer` from that account, each with what it returned or that it reverted. The gate holds
+     if `balanceOf` does not answer that account's native balance and `transfer` does not succeed;
+   - `RUNBOOK.md` § 1's Ethereum row corrected to say what was measured and when, the old cell
+     kept beside it as superseded.
+
+   If any alias with code answers a native balance or accepts a transfer, **stop and do not send
+   on Ethereum**; that is a ruling for the Product Owner, as OP Mainnet's was (#127). Base is not
+   affected: its row reproduced.
 
    **Stops, base fee, before every send:** Ethereum **1 gwei** (§ 0); Base **0.05 gwei**, this
    plan's figure, ten times the reading above. A stop defers a send; it does not widen a budget.
