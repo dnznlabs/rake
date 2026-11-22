@@ -1141,7 +1141,17 @@ convention. Numbered 45 because 44 is taken by
     receives is one a wallet has been run against. **Rejected:** WalletConnect in the first upload
     (about three to four days, an estimate, ahead of launch, for a case he does not need at
     launch); WalletConnect inside the document; a static host of ours for its code, in favour of
-    the shared contract he proposed.
+    the shared contract he proposed. *Readings, 2026-11-21:* on his iPhone, each link tapped in
+    Chrome, MetaMask and Coinbase Wallet opened rake and are the list; Trust Wallet's link is a
+    dead format, and Rainbow and Phantom are left off until
+    [#342](https://github.com/dnznlabs/rake/issues/342) and
+    [#341](https://github.com/dnznlabs/rake/issues/341) close
+    ([#334](https://github.com/dnznlabs/rake/issues/334)). On Android, in an emulator and not on
+    a device, he reported that both listed links worked
+    ([#352](https://github.com/dnznlabs/rake/issues/352)); the emulated device, the Android
+    version and the wallet versions were not recorded, and Samsung's own browser is untried. He
+    ruled the same day that the Android reading comes before the first mainnet upload, in place
+    of the plan's default of shipping on the iPhone readings alone.
 
 68. **While rake is testnet-only, `rake.dnzn.dev/` lands on Sepolia.** Ruled by Denizen on
     2026-11-21 (Telegram, 17:22 CST), on seeing the deployed site. m05-t04 was planned and accepted
