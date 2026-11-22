@@ -595,3 +595,31 @@ newline in one of the files and not a difference in the data.
 
 Etherscan's Write Contract form is unavailable for chain 1 as well, for the same queued-verification
 reason, and the `table_` comma warning is repeated with it.
+
+## Part B — Base's DNZN `create`, sent by the Product Owner
+
+He sent it on 2026-11-22 from the Creator key. **M05 criterion 4 is met on Base**, and not yet on
+Ethereum. Read back from `https://mainnet.base.org` by a sibling session first and **re-read
+independently here**, because this handoff's record should not rest on another session's report:
+
+| reading | value | required |
+|:--|:--|:--|
+| transaction | **`0x589b14dc65d280a251e181f4fc3ff0159ea57ca1e71a61eb937b3ee582cc4e7b`** | — |
+| status | **1** | — |
+| block | **60,747,680** | — |
+| `from` | `0x68e0741d…186ee` — **the DNZN Creator**, the one key that can sign this | the Creator's alone |
+| `to` / value | the factory `0x00d19609…d7f8e` / **0** | — |
+| `gasUsed` | **463,727** at 6,000,000 wei (0.006 gwei) | under the 480,533 estimated |
+| `cast codesize` at `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199` | **45 bytes** | 45 ✓ |
+| `owner()` | `0x00c0e88778E3e3d17AcaaBC7550deC7Ab61F3790` | the Ops vault ✓ |
+| `delay()` | **604800** | 604800 on a mainnet, decision 50 ✓ |
+| `description()` | `DNZN // FUND DISTRIBUTION` | § 0's ✓ |
+| `beneficiaries()` | `0x00b6E7D1…2cFb9` **2000** `treasury`, `0x00c0e887…F3790` **4000** `ops`, `0x357836fF…1902B` **4000** `creator` | the three rows of decision 50, **ascending by account** ✓ |
+| `nonce()` / `pendingCount()` | **0** / **0** | nothing queued on a fresh distribution ✓ |
+
+The distribution is at **the same address as Sepolia's**, which is the point of the sender-bound
+salt: one address for DNZN's fund on every chain it is created on.
+
+**Ethereum's `create` is prepared and has not been sent.** Its command is on
+[#363](https://github.com/dnznlabs/rake/issues/363) in the same three forms, so the issue is back
+with the Product Owner.
