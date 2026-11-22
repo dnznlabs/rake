@@ -414,7 +414,9 @@ before that chain's run and is not this task's to place yet.
 | chain | address | deploy hash | `setAccepting(true)` hash |
 |:--|:--|:--|:--|
 | 11155111 | `0xC5593d2aa5f89fDaBE6e298b4AC38ad1E50D7C95` | `0x365e2edd1a68562ee09a48518535994d04999b35ce112e6bf1ac06414935bd05` | `0x145f3ae78c1866609c65a12ee71209b89f434e3147e24635a7a9111d2101b3f5` |
-| 84532 | | | |
+| 84532 | `0x869DFe837B8dB2819027E53d75C20bE31f13acD2` | `0x65aa3cb36266a890ef6b134b613d833f44d1fb0fc84bf976285911738f73f418` | — |
+
+**Added 2026-11-22 (m05-t01c step 9):** Base Sepolia's receiver was deployed for the Product Owner's run, 227 bytes, `accepting()` **false**. Sepolia's was set back to **false** the same day in `0xa01fa076796a708d40af27fbfdffe3842d7cabe8c902bf5ba9013bccb7d4f0a5`. Both read from the chain by the architect.
 
 `cast codesize` **227**, `accepting()` **false** at construction and **true** after the flip, so the
 escrow in (g) and the release in (h) each had the state they needed. **Denizen's Sepolia run will find
