@@ -112,6 +112,25 @@ const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.
    reached, never a figure from here. */
 const PUBLIC_RPC = { 1: 'https://ethereum-rpc.publicnode.com', 10: 'https://mainnet.optimism.io', 8453: 'https://base-rpc.publicnode.com', 42161: 'https://arb1.arbitrum.io/rpc', 4326: 'https://mainnet.megaeth.com/rpc', 4663: 'https://robinhood-rpc.publicnode.com', 11155111: 'https://ethereum-sepolia-rpc.publicnode.com', 84532: 'https://base-sepolia-rpc.publicnode.com', 31337: 'http://127.0.0.1:8545', 31338: 'http://127.0.0.1:8546' };
 const ZERO = '0x' + '0'.repeat(40);
+/* The window each of those endpoints is **known** to answer, which is where a walk through the
+   page's own read provider starts (#391, step 5 amended). `logs()` starts at `WINDOW_START` 10,000
+   and only ever shrinks, so without this an endpoint serving 50,000 a query is read 10,000 at a time
+   — five times the requests for the same blocks — and one serving less spends its first windows
+   being refused before it finds the width. Chain 1 is the clearest: a 10,000-block span there is an
+   *archive* refusal, so every walk began with four refusals it could have skipped.
+
+   Each figure is the `reliable` column of `docs/milestones/m05/tasks/m05-t01d/rpc-depth.md`, read
+   2026-11-23T04:39Z — the span answered on **every** one of three attempts. Never the `ever` column:
+   a width that worked once is a backend that happened to answer, and a hostname is a pool.
+
+   A chain absent here starts at 10,000, which is also what a **wallet's** provider gets: its cap
+   belongs to whichever endpoint the wallet chose and is not ours to know. The window still shrinks
+   on a refusal, so a figure that goes stale costs the walk a window, not the read. */
+const PUBLIC_WINDOW = { 1: 1_000, 8453: 50_000, 11155111: 10_000, 84532: 50_000 };
+/* Set only by the DEV `?win=` override below, which has to beat the table above or the windowing
+   affordance cannot reach a narrower window on a chain that has an entry. Always false in a shipped
+   build, where neither `Q` nor the override exists. */
+let WINDOW_FROM_QUERY = false;
 /*DEV*/
 const Q = new URLSearchParams(location.search);
 /* Every windowed `eth_getLogs` the page issues, for the browser check's per-kind count (#76). */
@@ -163,7 +182,11 @@ const OFF_KEY = 'rake.off';
 // require a wallet; writes always do.
 let WRPC = '';
 // The page's read path when there is no wallet, and the transport behind the dev `?rpc=` override.
-const rpcProvider = url => ({
+const rpcProvider = (url, logWindow) => ({
+  /* The widest `eth_getLogs` span this endpoint is known to answer, read by `logs()` as the window to
+     start at. Undefined for an endpoint nobody measured — the `?rpc=` override's — and absent
+     entirely from an injected wallet provider, both of which start at `WINDOW_START`. */
+  logWindow,
   request: async ({ method, params }) => {
     const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
     /* A public endpoint answers a rate limit or an outage with a status and often an HTML body, so the
@@ -179,7 +202,7 @@ const rpcProvider = url => ({
 // Which transport reads the chain: the injected provider when there is one, else this chain's public
 // endpoint, else nothing. This is the seam #275's settings page reuses to insert a user RPC URL and a
 // route choice; none of that page is here.
-const readProvider = injected => { const u = PUBLIC_RPC[CFG.chainId]; return injected || (u ? rpcProvider(u) : null); };
+const readProvider = injected => { const u = PUBLIC_RPC[CFG.chainId]; return injected || (u ? rpcProvider(u, WINDOW_FROM_QUERY ? undefined : PUBLIC_WINDOW[CFG.chainId]) : null); };
 /* The page's own chain, never the wallet's (#375). Three reads are questions about the chain this
    document was built for, not about wherever the wallet happens to be pointed: whether a salt is
    already taken, whether the call about to be sent would revert, and what name an address has. They
@@ -542,7 +565,7 @@ let MAX_WINDOWS = 40;          // per log kind, per pass — 40 × 200 is 8,000 
 /* The windowing exercised against anvil, which caps nothing: `?win=` starts smaller and `?maxwin=`
    shrinks the budget, so the partial line and `load older` are reachable on a chain a few hundred
    blocks long. `?cap=` is the other half — see `capped` above. */
-if (Q.get('win')) WINDOW_START = Number(Q.get('win'));
+if (Q.get('win')) { WINDOW_START = Number(Q.get('win')); WINDOW_FROM_QUERY = true; }
 if (Q.get('maxwin')) MAX_WINDOWS = Number(Q.get('maxwin'));
 /*DEV*/
 /* Read once per route entry, and shared: the three queries of one history have to measure their
@@ -592,7 +615,9 @@ function window1(address, topics, a, b) {
 async function logs(address, topics, fromBlock, toBlock) {
   const from = Number(BigInt(fromBlock));
   let hi = toBlock == null ? await head() : Number(toBlock);
-  let size = WINDOW_START, spent = 0;
+  /* The transport's own figure when it has one (#391): `P` is the page's read provider for a visitor
+     with no wallet, and a wallet's provider otherwise, where 10,000 is the only safe guess. */
+  let size = (P && P.logWindow) || WINDOW_START, spent = 0;
   const out = [];
   /* Windows answered, which is **not** `out.length`. An endpoint can answer forty windows that
      happen to hold no events; that is a read history with nothing in it, and the sections should say
