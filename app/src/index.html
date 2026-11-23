@@ -432,6 +432,20 @@ async function tx(to, sig, args, opts) {
 function txError(e) {
   if (e && e.code === 4001) return 'rejected in wallet';
   const d = typeof (e && e.data) === 'string' ? e.data : e && e.data && e.data.data;
+  /* No revert bytes means the **node** refused, not the contract, and it nearly always says why:
+     out of funds, a used nonce, a fee under the floor, a rate limit. The page used to print the bare
+     word `reverted` for every one of them (#373) — blaming the contract and discarding the only
+     sentence that told the reader what to do. `e.message` was read for nothing except code 4001.
+
+     The decode still comes first where there are bytes, so a contract revert reads as before. */
+  if (!d || d === '0x') {
+    /* Both depths, outer first, because either can be the useful one: a wallet wraps the node's
+       object and puts `Internal JSON-RPC error.` on the outside, which `nodeSentence` discards — so
+       taking the outer message *or* the inner one is wrong, and it has to be the outer one **if it
+       says anything**, else the inner. */
+    const said = Model.nodeSentence(e && e.message) || Model.nodeSentence(e && e.data && e.data.message);
+    if (said) return esc(said);
+  }
   /* `?? null` and not `S.grace`: the boot read fills it (`:510`) and a revert can be decoded before
      that — the create flow runs before `S.loaded` — so the "no deadline known" case is passed
      explicitly rather than left to whatever `S.grace` happens to hold (#148). */
