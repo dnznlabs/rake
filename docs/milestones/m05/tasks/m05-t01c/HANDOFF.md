@@ -1,6 +1,6 @@
 # m05-t01c — handoff
 
-PR: #<n> · Branch: `m05/t01c-step9b-shots` · 2026-11-22
+PR: #386 · Branch: `m05/t01c-step9b-shots` · 2026-11-22
 
 Connect now offers every wallet the browser announces, remembers the pick, holds a disconnect across
 a reload, and on a phone with no wallet offers the two links that were tapped on a real device. The
@@ -26,7 +26,7 @@ this file.
 | 6 · a test holds the header's network name with no wallet, and an address saved under one chain id is not listed under another | **pass** | `test/wallet-picker.test.mjs`: *the header names the chain with no wallet, in CHAINS lower case*, *the key carries the chain id*, *an address saved under one chain is not listed under another*, *the list a visitor already had is adopted by the chain they return on*. |
 | 7 · `chain-doc`'s `inflated sha256` equals the build on both testnets; two chunks, or three with the third inside the batch; three proposals per chain; a two-chunk payload still byte-identical to `main`'s tool | **pass** | Reconstructed here from the **committed calldata** rather than quoted: the three `addChunk` arguments of each chain are 24,000 + 24,000 + **2,366** bytes, concatenate to **50,366** compressed, and inflate to **159,430** bytes `sha256 190897f5ccc5633bf350cc059de4574af1a09d429cda5c104d45b4c1cf91c10e` on 11155111 and **159,428** bytes `fc61121887df42cca7166e5bc3e31448841f14bf4528b318124af78710cd83e6` on 84532 — the two hashes `chain-doc` read on-chain after the upload ([#377](https://github.com/dnznlabs/rake/issues/377#issuecomment-7085626959)). `4-addWidgetChunk.hex` carries `widget.js` uncompressed, **8,525** bytes, `sha256 044139b7…1b37f1`, identical on both chains. Three proposals per chain, the third chunk inside the batch: § The upload. The two-chunk equivalence is #347's, proven against `main`'s tool. |
 | 8 · M04 criterion 6's signoff in the handoff, dated, in the Product Owner's words, naming the rows he drove and the rows he read | **pass** | § The signoff, quoted verbatim from [#302](https://github.com/dnznlabs/rake/issues/302#issuecomment-7090598901). |
-| 9 · the driver exits 0 on Sepolia against `https://rake.dnzn.dev`, non-zero on step 9a's control, every 9a screenshot written by that run; on 84532 the amended set | **pass** | [#384](https://github.com/dnznlabs/rake/pull/384): Sepolia fifteen rows exit 0 nothing skipped; both chains' control exits **1** and fails on row (c) as it must; Base Sepolia's amended set — `probe`, (a) both passes, (l), (w3) — exits 0. **15** PNGs in `docs/milestones/m04/tasks/m04-t05/shots/11155111/`, **6** in `…/84532/`, each written only after its row's assertions passed. Rows (c), (e) and (g) to (i) on 84532 are **not met, cause [#382](https://github.com/dnznlabs/rake/issues/382)**. |
+| 9 · the driver exits 0 on Sepolia against `https://rake.dnzn.dev`, non-zero on step 9a's control, every 9a screenshot written by that run; on 84532 the amended set | **pass, with (k) pending** | [#384](https://github.com/dnznlabs/rake/pull/384): on Sepolia **fourteen** rows ran and exit 0 — `probe`, (a), (c), (c)'s first-load console figure, (e), (d), (l), (f), (g), (h), (i), (j), (a) with no wallet, (w3) — and **(k) reported itself pending rather than running** (§ Deviations 5), which the driver keeps in `rowsPending` so that `rowsRun` cannot absorb it (`tools/uat/run.mjs:112-115`, `:155`). Both chains' control exits **1** and fails on row (c) as it must. Base Sepolia's amended set — `probe`, (a) both passes, (l), (w3) — exits 0, with (k) in `rowsSkipped` as Sepolia's row by the script's own wording. **15** PNGs in `docs/milestones/m04/tasks/m04-t05/shots/11155111/` against those fourteen rows, because (l) writes two (`l-docs` from inside the row, `l-docs-widget` after it) and (k) writes none; **6** in `…/84532/`. Each was written only after its row's assertions passed. Rows (c), (e) and (g) to (i) on 84532 are **not met, cause [#382](https://github.com/dnznlabs/rake/issues/382)**. |
 | 10 · the Product Owner's word on the step 7a preview is on its action issue, dated before the first proposal of step 8, and `grep -c 'phone=' app/dist/index.html` prints 0 for the document uploaded | **pass** | His word was given in chat at **12:48 CST (18:48Z)** on 2026-11-22 and recorded on [#345](https://github.com/dnznlabs/rake/issues/345), which was closed at 19:23Z; the bytes that were proposed were cut from `main` and merged in #376 at **19:36:50Z**, after it. `grep -c 'phone=' app/dist/index.html` → **0**. |
 | 11 · `git diff --stat main` touches only the paths the task lists | **pass** | This branch, excluding this file: `git diff --name-only main -- . ':!docs/milestones/m05/tasks/m05-t01c/HANDOFF.md'` → **14** paths, 13 PNGs under `docs/milestones/m04/tasks/m04-t05/shots/` (6 on 11155111, 7 on 84532) and `docs/milestones/m04/tasks/m04-t05/UAT.md`. The task's code and calldata are in the four merged PRs named above; a handoff cannot count itself, so it is named rather than counted. |
 
@@ -52,10 +52,32 @@ in the order 1 → 2 → batch with each receipt read before the next was sent. 
 | 2 · `addChunk` chunk 1 | 5,313,784 | `0xd6f9e8425eaa0fd33332046c78abd82202596124eac3ad27f3817a29ef7585d6` |
 | 3 · the batch | 2,538,035 | `0xdaa700db06a43688b323dc4859abb0b19536538aaf04bb695f6ea5867690ee7c` |
 
-Through the gateway, `make verify` against `https://rake.dnzn.dev` printed `ok` for the root and
-`widget.js` on both chains. One stage of that command did not run: its browser stage builds with
+**What `make verify` proved, and what it did not.** The four lines quoted on #377 are its `config`
+lines — `11155111 config root ok`, `11155111 config widget ok`, and the same pair on 84532 — and that
+stage resolves `https://pinned.invalid/` and `/widget.js` through a **locally built, configured
+gateway** and compares the result with the bytes `cast` read from the chain (`tools/verify.sh:205-243`
+in gw44). It is a statement about the chain's bytes and the gateway build in that checkout. The stage
+that reads a deployed host is a different one, `site`, and it runs only when `VERIFY_SITE` is set
+(`:168-193`); no `site` line is in the record, so **nothing in that run was a measurement of
+`https://rake.dnzn.dev`**. One further stage did not run at all: the browser stage builds with
 `esbuild`, whose postinstall is held back by the gw44 checkout's `allowScripts` policy, so it exited
 before opening a browser.
+
+**And the deployed gateway does not serve the `widget.js` that was uploaded** — found by the architect
+at review and measured again here on 2026-11-22:
+
+| | bytes | sha256 |
+|:--|--:|:--|
+| on chain, both chains (`4-addWidgetChunk.hex`, and `chain-doc`) | 8,525 | `044139b751a901df06e106d3b8a4c307c745427c3e210ea8f8467f28961b37f1` |
+| served at `https://rake.dnzn.dev/11155111/widget.js` and `/84532/widget.js` | **8,509** | **`8b6bbc8892657a888d6f9d522f49246e1519182d7f3850e7ec464b15108bc368`** |
+
+Identical on both chains and 16 bytes short of the uploaded file, so what is served is the deployed
+gateway's own older copy rather than the chain's. **The redeploy belongs to m05-t04b**, not to this
+task, and nothing in this task's criteria depends on it: the rows the Product Owner and the driver
+drove are the document's, and the document is current. One caution for whoever measures next: a plain
+`curl` of `https://rake.dnzn.dev/<chain>/` returns **9,299 bytes**, byte-identical on both chains —
+the bootstrap, not the document, which the service worker resolves — so the root cannot be checked
+that way, and only `widget.js` answers a flat fetch with the asset itself.
 
 ## Size
 
@@ -117,8 +139,19 @@ his name; it is his word, posted by another hand, and the issue says so.
    add it there first` (`app/src/index.html:306-310`), because that phone's MetaMask has no Base
    Sepolia network. The wallet's state, not the page's behaviour; no issue filed. The row stands on
    Sepolia for MetaMask and on 84532 for Coinbase Wallet.
-4. **`make verify`'s browser stage did not run** at step 8 (§ The upload). The four byte-comparisons
-   it exists for did run and printed `ok`.
+4. **`make verify`'s browser stage did not run** at step 8, and its `site` stage did not run either,
+   so the command proved the chain's bytes against a local configured build and said nothing about
+   the deployed host — § The upload, where the served `widget.js` is recorded as 16 bytes and one
+   hash away from the uploaded one.
+5. **Row (k) was not driven; it reports itself pending.** The plan's step 9a lists (k) among the
+   driver's rows. There is no published URL for m04-t04's host page — its publication is
+   [#303](https://github.com/dnznlabs/rake/issues/303) — and the committed file names **84532's**
+   w3link base rather than a `dnzn.dev` one, so even published it would not be the page the row
+   describes. The driver asserts what the committed file does carry (two mounts, one with its own
+   endpoint, a `widget.js` from a gateway) and returns `pending: true` with the reason, which keeps
+   it out of `rowsRun` instead of letting it read as a pass (`tools/uat/run.mjs:112-115`). On 84532
+   it is skipped outright as Sepolia's row. **It is run when #303 publishes the page**, and this is
+   the only row of step 9a's list that no run has covered.
 
 ## Decisions
 
