@@ -240,6 +240,11 @@ export async function rowC(page, { base, addr = DNZN, patience = 120000, relatio
     /* Counted as elements. A text pattern over a section that also carries help sentences and stop
        lines is a guess about wording; `.hrow` is what a row is. */
     activityRows: document.querySelectorAll('#h-funds .hrow').length,
+    /* The three absences row (c) now also asserts (UAT.md (c), amended 2026-11-23). The driver's
+       injected provider makes this a wallet page, so the 24-hour wording must not appear — if it
+       does, the provider was not seen as a wallet and the whole run is measuring the wrong path. */
+    heads: [...document.querySelectorAll('.sechead')].map(n => n.textContent.trim()).join(' | '),
+    presses: document.querySelectorAll('.older').length,
     queueButton: !!document.getElementById('queue'),
     ownerBar: ([...document.querySelectorAll('.actions .status')].map(n => n.textContent.trim())[0]) || '',
     ownsText: (document.getElementById('view')?.innerText || '').includes('you own this distribution'),
@@ -249,6 +254,11 @@ export async function rowC(page, { base, addr = DNZN, patience = 120000, relatio
   falsy('c', '`activity` is not the #382 notice', new RegExp(PATTERNS.unavailable, 'i').test(r.activity));
   falsy('c', '`changes` is not the #382 notice', new RegExp(PATTERNS.unavailable, 'i').test(r.changes));
   truthy('c', `\`activity\` carries at least one row (${r.activityRows} \`.hrow\` elements)`, r.activityRows > 0);
+  /* A wallet page, because the driver injects a provider. These three say so, and catch the one
+     regression this row could otherwise pass through: the wallet path quietly taking the no-wallet
+     branch, which would read a day deep and still show rows. */
+  falsy('c', 'the heads do not say `last 24 hours` — this is a wallet page', /last 24 hours/i.test(r.heads));
+  falsy('c', 'no section offers `connect a wallet to load more`', /connect a wallet to load more/i.test(r.activity + ' ' + r.changes + ' ' + r.funds));
   has('c', '`changes` reads the empty line this distribution has', r.changes, 'no change has been queued yet');
   if (relation) {
     if (relation.expect === 'vault') {
