@@ -205,7 +205,13 @@ const Model = (() => {
    * `RANGEY` matches the bare word `limit`, so most of these would otherwise be read as a complaint
    * about the width of the window and the walk would halve for the rest of its budget, which neither
    * helps nor explains. This has to be asked first. */
-  const THROTTLED = /\brate limit\b|request limit reached|too many requests|\b429\b/i;
+  /* `HTTP 429` anchored, not a bare `429`: a refusal can carry that number as a *figure* — a range
+   * cap, a result count — and `CAPS` reads digits out of the same strings, so a loose match would
+   * turn a width complaint into a throttle and keep a press that cannot help. `too many requests`
+   * was in the first draft of this and is gone: no endpoint measured in step 1 said it, and the rule
+   * for this list is measured shapes only. The status code is still read from the object, where it
+   * is unambiguous. */
+  const THROTTLED = /\brate limit\b|request limit reached|HTTP 429\b/i;
   function isThrottle(text, e) {
     const status = e && e.data && e.data.httpStatus;
     if (status === 429) return true;

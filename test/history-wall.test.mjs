@@ -247,6 +247,28 @@ test('a throttle after some answered windows keeps the press and names the limit
   }
 });
 
+/* The negative case for the recogniser, because the digits in a refusal are not ours to control and
+   `CAPS` reads numbers out of the same sentences. A width complaint that happens to carry 429 as a
+   *figure* must stay a width complaint: classified as a throttle it would keep a press that cannot
+   help and stop halving, which is the one move that does. */
+test('429 as a figure in a width complaint is still a width complaint', async () => {
+  for (const says of [
+    '-32614 eth_getLogs is limited to a 429 range',
+    'more than 429 results, use a narrower range',
+    '-32701 exceed maximum block range: 42900',
+  ]) {
+    assert.equal(Model.isThrottle(says, {}), false, `"${says}" is about width, not rate`);
+
+    // And through the walk: it halves and ends on the budget, with the press that a budget earns.
+    const w = walk({ refuseAllSaying: says, refuseAfter: 8, head: 1_000_000 });
+    const r = await w.logs('0xabc', [['0xaa']], 0);
+    assert.notEqual(r.wall && r.wall.kind, 'throttle', `"${says}" must not be read as a rate limit`);
+  }
+
+  // The status code, where it is unambiguous, is still a throttle whatever the text says.
+  assert.equal(Model.isThrottle('eth_getLogs is limited to a 429 range', { data: { httpStatus: 429 } }), true);
+});
+
 test('a throttle on every window is still nothing answered', async () => {
   for (const says of THROTTLE_TEXTS) {
     const w = walk({ refuseAllSaying: says, refuseAfter: 0, head: 1_000_000 });

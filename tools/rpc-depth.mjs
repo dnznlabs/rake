@@ -120,7 +120,9 @@ const statedRate = why => {
   const perSecond = /(\d+)\s*\/\s*second/i.exec(s) || /(\d+)\s+(?:requests?\s+)?per\s+second/i.exec(s);
   if (perSecond) return `${perSecond[1]}/second`;
   // Named but unnumbered, which is still worth knowing: it says a limit exists and we cannot plan to it.
-  if (/\brate limit\b|request limit reached|too many requests|\b429\b/i.test(s)) return 'stated, no number';
+  // Same two corrections as the page's reader: `HTTP 429` anchored rather than a bare number, and
+  // no `too many requests`, which nothing measured in step 1 ever said.
+  if (/\brate limit\b|request limit reached|HTTP 429\b/i.test(s)) return 'stated, no number';
   return null;
 };
 
@@ -352,6 +354,9 @@ function selftest() {
     ['the RPC endpoint answered HTTP 429', 'stated, no number'],
     ['100 requests per second allowed', '100/second'],
     ['-32701 exceed maximum block range: 50000', null],
+    // 429 as a figure in a width complaint is not a throttle.
+    ['-32614 eth_getLogs is limited to a 429 range', null],
+    ['more than 429 results, use a narrower range', null],
     ['4444 pruned history unavailable', null],
     ['35 ranges over 100 blocks are not supported on free plan', null],
     ['', null],
