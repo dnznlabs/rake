@@ -579,6 +579,46 @@ let HEAD = null;
    re-makes it. Written wherever the head resolves, which is every route that reads one. */
 const stamp = n => { const el = document.getElementById('asof'); if (el) el.textContent = `as of block ${n}`; };
 const head = () => HEAD ?? (HEAD = P.request({ method: 'eth_blockNumber' }).then(h => { const n = parseInt(h, 16); stamp(n); return n; }));
+/* **The last 24 hours, for a visitor with no wallet** (step 5, amended by the Product Owner's ruling
+   of 2026-11-23). The aim is no longer to read as deep as the endpoint allows: it is to read a day and
+   say so. A day is a span of *time*, and these chains do not agree on what a block costs — Ethereum
+   spends about 12 seconds a block and Base about **0.2**, so a figure in blocks that is a day on one
+   is five minutes on the other, and the amendment forbids assuming one at all.
+
+   So the floor is found from timestamps, by secant steps: each guess uses the rate **measured across
+   the current bracket** from two real headers, never a constant. Typically two to four reads — a plain
+   bisection over a million-block range costs about twenty, which is more than the read it precedes.
+
+   The tolerance is a minute. "The last 24 hours" is a statement about a day, and a block either side
+   of the mark changes nothing a reader can see, so paying extra reads to land exactly is waste. */
+const DAY_SECONDS = 86_400;
+const TS_TOLERANCE = 60;
+const tsOf = async n => Number(BigInt((await P.request({
+  method: 'eth_getBlockByNumber', params: ['0x' + n.toString(16), false],
+})).timestamp));
+/** The first block at or after `hi`'s timestamp minus a day, never below `floor`. */
+async function dayFloor(hi, floor) {
+  const target = (await tsOf(hi)) - DAY_SECONDS;
+  let a = floor, ta = await tsOf(floor), b = hi, tb = target + DAY_SECONDS;
+  // The whole history is younger than a day, so there is nothing to cut: read all of it.
+  if (ta >= target) return floor;
+  for (let i = 0; i < 8 && b - a > 1; i++) {
+    const rate = (tb - ta) / (b - a);
+    let guess = rate > 0 ? Math.round(b - (tb - target) / rate) : Math.floor((a + b) / 2);
+    guess = Math.min(b - 1, Math.max(a + 1, guess));
+    const tg = await tsOf(guess);
+    if (Math.abs(tg - target) <= TS_TOLERANCE) return guess;
+    if (tg >= target) { b = guess; tb = tg; } else { a = guess; ta = tg; }
+  }
+  return b;
+}
+/* Where a history read starts: the distribution's own first block, and for a visitor with no wallet
+   the later of that and a day ago. A wallet reads as before, with its press — its endpoint is its
+   own business and its depth is not ours to ration. */
+async function readFloor(d, hi) {
+  const own = Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock));
+  return WALLET ? own : Math.max(own, await dayFloor(hi, own));
+}
 /* A refusal, wherever the wallet put the text: MetaMask wraps the provider's JSON-RPC error and the
    message naming the cap can sit a level or two down from `message`. */
 const errText = e => [e && e.message, e && e.data && e.data.message, e && e.cause && e.cause.message]
@@ -1404,25 +1444,36 @@ const row = (k, sub, n, cls) => `<div class="row${cls ? ' ' + cls : ''}"><div><b
    in hand — the logs arrive whole — so the cap is for reading, and opening it costs no call. */
 const HIST_SHOW = 10;
 function histFill(id, items, empty) {
-  const tail = partialLine();
+  /* `moreLine` rides with the stop line rather than replacing it: "this read stopped short of a day"
+     and "connect a wallet to load more" are two different facts and a reader may need both. */
+  const tail = partialLine() + moreLine();
   if (!items.length) { fill(id, notice(empty) + tail); bindOlder(); return; }
   const more = items.length - HIST_SHOW;
   fill(id, histRows(items.slice(0, HIST_SHOW)) + (more > 0 ? `<button class="link more" id="${id}-more">show all ${items.length}</button>` : '') + tail);
   const b = document.getElementById(id + '-more');
-  if (b) b.onclick = () => { fill(id, histRows(items) + partialLine()); bindOlder(); };
+  if (b) b.onclick = () => { fill(id, histRows(items) + partialLine() + moreLine()); bindOlder(); };
   bindOlder();
 }
 /* One line under a section whose logs do not reach back to the distribution's first block (#76): what
    arrived is on the page, and the rest is one control away. The boundary is a block number because
    that is the only honest unit — the page cannot know how many rows it has *not* read. */
+/* **No press without a wallet** (step 5, amended): a no-wallet read is a day deep by design, not by
+   accident, so there is nothing for a press to continue — `moreLine` carries the one route onward
+   instead. The stop lines stay, because a read that fell short of its day still has to say why. */
+const press = () => WALLET ? ' · <button class="link older">load older</button>' : '';
+/* The one line a no-wallet reader gets instead of a press, under both history sections. Not
+   conditional on the read having stopped short: the day is the limit even when the day read cleanly,
+   and a reader is owed the route to the rest either way. */
+const moreLine = () => WALLET ? '' : '<div class="help">connect a wallet to load more</div>';
 function partialLine() {
   if (!DS.h || DS.h.partial == null) return '';
   const w = DS.h.wall;
   /* Out of budget: everything above is read, the rest is one press away. Unchanged, and #165's
      budget is untouched by this task. */
   if (!w) {
-    return `<div class="notice">history before block ${DS.h.partial} not loaded · `
-      + '<button class="link older">load older</button></div>';
+    return WALLET
+      ? `<div class="notice">history before block ${DS.h.partial} not loaded${press()}</div>`
+      : `<div class="notice">this read stopped at block ${DS.h.partial}, short of a full day</div>`;
   }
   /* A wall, so **no `load older`**: the endpoint has said it will not serve what is below, and a
      button that cannot work is worse than no button. Two wordings, because the evidence differs.
@@ -1436,7 +1487,7 @@ function partialLine() {
      rate limit does not tell us. */
   if (w.kind === 'throttle') {
     return `<div class="notice">this endpoint is limiting requests · history before block ${w.block}`
-      + ' is not loaded yet · <button class="link older">load older</button></div>';
+      + ` is not loaded yet${press()}</div>`;
   }
   const where = `history before block ${DS.h.wall.block} not loaded`;
   const why = w.stated != null
@@ -1932,8 +1983,10 @@ async function detail(addr) {
   // Progressive, and after the paint above: a slow or failed logs call never holds back the table.
   // The token list, the escrow rows and the `queued in <tx>` links come out of it, so those say so
   // until it lands rather than reading as absence. The apply buttons do not wait on it (#215).
-  const from = FIRST.get(d.addr) || CFG.factoryBlock;
-  history(addr, from).then(h => absorb(t, d, h)).catch(() => {
+  /* The head is read first so the floor can be a day behind it. `head()` caches its promise, so the
+     three reads below still make one `eth_blockNumber` between them. */
+  head().then(hi => readFloor(d, hi).then(from => history(addr, from, hi)))
+    .then(h => absorb(t, d, h)).catch(() => {
     if (stale(t)) return;
     DS.failed = true;
     paintFailed();
@@ -1981,6 +2034,8 @@ async function absorb(t, d, h) {
    would spend a second budget on the same blocks. */
 async function older() {
   const t = TOKEN, d = DS.d, prev = DS.h.raw, to = DS.h.partial - 1;
+  /* Unreachable without a wallet — no press is painted — so this is the wallet's own floor, the
+     distribution's first block, and not the 24-hour one. */
   const from = Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock));
   if (!(to >= from)) return;
   for (const b of V.querySelectorAll('.older')) { b.disabled = true; b.textContent = 'loading older…'; }
@@ -2037,8 +2092,11 @@ function paintDetail() {
     + ownerBar(d)
     + (DRAWER ? drawerHTML(d) : '')
     + `<div class="sechead"><b>funds</b><span>moves by the table, permissionlessly — no approval involved</span></div><div id="funds">${notice('reading the balances and the escrow…')}</div>`
-    + `<div class="sechead"><b>changes</b><span>every configuration change this contract has seen</span></div><div id="h-changes">${notice('loading…')}</div>`
-    + `<div class="sechead"><b>activity</b><span>funds in, and every split and escrow since</span></div><div id="h-funds">${notice('loading…')}</div></div>`;
+    /* The head says what was read, not what exists: with no wallet these two sections are a day deep
+       (step 5, amended), and a head promising "every change this contract has seen" over a day's worth
+       of rows is the same wrong answer as an empty list stated as fact. */
+    + `<div class="sechead"><b>changes</b><span>${WALLET ? 'every configuration change this contract has seen' : 'last 24 hours'}</span></div><div id="h-changes">${notice('loading…')}</div>`
+    + `<div class="sechead"><b>activity</b><span>${WALLET ? 'funds in, and every split and escrow since' : 'last 24 hours'}</span></div><div id="h-funds">${notice('loading…')}</div></div>`;
   const q = document.getElementById('queue');
   if (q) q.onclick = () => { DRAWER = !DRAWER; if (DRAWER && !PROPOSE) PROPOSE = { rows: rowsFrom(d.table) }; paintDetail(); };
   if (DRAWER) bindDrawer(d);

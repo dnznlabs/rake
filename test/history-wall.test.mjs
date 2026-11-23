@@ -45,6 +45,8 @@ const line = (anchor, from = SHIPPED) => {
 
 const LOGS = block('async function logs(address, topics, fromBlock, toBlock) {');
 const PARTIAL_LINE = block('function partialLine() {');
+const PRESS = line('const press = () =>');
+const MORE_LINE = line('const moreLine = () =>');
 const STATED_FLOOR = block('const statedFloor = text =>', '\n};\n');
 const CAPPED = block('const capped = (p, cap, prune, wrap) => ({', '\n});\n', PAGE);
 const RANGEY = line('const RANGEY =');
@@ -125,10 +127,15 @@ function walk({ cap = NO_CAP, prune = 0, rate = 0, head = 1_000_000, events = tr
     Model, EVENT, cap, prune, rate, head, events, pruneSays, refuseAllSaying, refuseAfter);
 }
 
-/** `partialLine` over a given history result, so the assertion is the sentence, not a flag. */
-function lineFor(h) {
-  const src = `${PARTIAL_LINE}\nreturn partialLine;`;
-  return new Function('DS', src)({ h })();
+/** `partialLine` over a given history result, so the assertion is the sentence, not a flag.
+ *
+ *  `wallet` defaults to **true**, which is the case these tests were written for: the four outcomes
+ *  and their presses. The no-wallet page is a day deep by design and offers no press at all, which is
+ *  `test/day-read.test.mjs`'s subject.
+ */
+function lineFor(h, wallet = true) {
+  const src = `${PRESS}\n${MORE_LINE}\n${PARTIAL_LINE}\nreturn partialLine;`;
+  return new Function('DS', 'WALLET', src)({ h }, wallet)();
 }
 
 test('a 200-block cap alone is the budget, not a wall: the line offers load older', async () => {

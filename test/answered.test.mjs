@@ -40,6 +40,8 @@ const line = (anchor, from = SHIPPED) => {
 
 const LOGS = block('async function logs(address, topics, fromBlock, toBlock) {');
 const PARTIAL_LINE = block('function partialLine() {');
+const PRESS = line('const press = () =>');
+const MORE_LINE = line('const moreLine = () =>');
 const STATED_FLOOR = block('const statedFloor = text =>', '\n};\n');
 const RANGEY = line('const RANGEY =');
 const ERRTEXT = block('const errText = e =>', ".join(' · ');\n");
@@ -85,7 +87,8 @@ function walk({ refuseAbove, saying = 'pruned history unavailable', code = 4444,
   return { logs, asked, from, head };
 }
 
-const lineFor = h => new Function('DS', 'Model', `${PARTIAL_LINE}\nreturn partialLine;`)({ h }, Model)();
+const lineFor = (h, wallet = true) =>
+  new Function('DS', 'Model', 'WALLET', `${PRESS}\n${MORE_LINE}\n${PARTIAL_LINE}\nreturn partialLine;`)({ h }, Model, wallet)();
 
 test('a window answered below a refusal counts as answered, though its logs are dropped', async () => {
   /* The newest window of the first batch is refused and the three below it succeed. Before the fix
@@ -139,7 +142,7 @@ test("the sentence for a real wall still names the block and offers no press", a
 const HIST_FILL = block('function histFill(id, items, empty) {');
 
 /** `histFill` over a given history, returning the HTML it would have written into the section. */
-function fillFor(h, items) {
+function fillFor(h, items, wallet = true) {
   const written = {};
   const src = `
     const HIST_SHOW = 10;
@@ -148,11 +151,13 @@ function fillFor(h, items) {
     const histRows = xs => xs.map(() => '<div class="row">a row</div>').join('');
     const bindOlder = () => {};
     const document = { getElementById: () => null };
+    ${PRESS}
+    ${MORE_LINE}
     ${PARTIAL_LINE}
     ${HIST_FILL}
     return histFill;
   `;
-  new Function('DS', 'Model', 'WRITTEN', src)({ h }, Model, written)('h-funds', items, 'nothing has arrived at this address yet.');
+  new Function('DS', 'Model', 'WRITTEN', 'WALLET', src)({ h }, Model, written, wallet)('h-funds', items, 'nothing has arrived at this address yet.');
   return written['h-funds'];
 }
 
