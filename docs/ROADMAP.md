@@ -1258,6 +1258,17 @@ convention. Numbered 45 because 44 is taken by
     upload ([#345](https://github.com/dnznlabs/rake/issues/345)). **Rejected:** re-cutting at each
     commit, which costs a rebuild, a fork proof and a preview sitting every time.
 
+72. **With no wallet, the page reads as much history as its free endpoint serves, and says where it
+    stopped.** Ruled by Denizen on 2026-11-22 by merging m05-t01d's plan
+    ([#388](https://github.com/dnznlabs/rake/pull/388)), whose default it was
+    ([#387](https://github.com/dnznlabs/rake/issues/387)). No free endpoint read that day served
+    deep log history to a browser: Ethereum's refused 50,000 blocks back, Sepolia's pruned there,
+    Base's capped each query, one sample each. The table, the balances and the escrow are read
+    from state and stay current; history is the part that degrades. A connected wallet may read
+    further through its own provider. **Leaves standing:** decision 62, the log cache carried
+    post-mainnet. **Rejected:** building that cache before mainnet, and an endpoint DNZN pays for
+    with its key in a public document.
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
