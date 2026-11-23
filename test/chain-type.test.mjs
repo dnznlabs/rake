@@ -47,9 +47,24 @@ const NAMES_HERE = line('const namesHere =');
    anchor matching, so the file failed at the lift and every behavioural assertion was skipped — a
    failure that cannot tell a renamed line from a reintroduced bug. Lifting whatever the line now
    assigns means the bug comes back *into the harness*, and the type and name assertions below are
-   what fail. */
-const PICK_ASSIGN = line('  try { CHAIN = ');
-const LOAD_ASSIGN = line('  CHAIN = ');
+   what fail.
+
+   **And each is anchored inside its own function** (#403). `load()`'s call used to be the unguarded
+   one, which made `  CHAIN = ` unique to it; now both are guarded and the two lines differ only in
+   their catch bodies, so shape cannot tell them apart. A lift that distinguishes two sites by their
+   spelling breaks the moment they come to agree — this file broke exactly that way, and a test
+   written an hour later in `wallet-allowlist.test.mjs` broke the same way against correct code. */
+const assignIn = fn => {
+  const at = SHIPPED.indexOf(fn);
+  assert.ok(at >= 0, `app/src/index.html no longer declares \`${fn}\` — this test lifts its CHAIN assignment`);
+  const end = SHIPPED.indexOf('\n}\n', at);
+  const hit = SHIPPED.indexOf('CHAIN = ', at);
+  assert.ok(hit > at && hit < end, `\`${fn}\` no longer assigns CHAIN`);
+  const bol = SHIPPED.lastIndexOf('\n', hit) + 1;
+  return SHIPPED.slice(bol, SHIPPED.indexOf('\n', hit));
+};
+const PICK_ASSIGN = assignIn('async function pickWallet(');
+const LOAD_ASSIGN = assignIn('async function load() {');
 
 const ACC = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
 const SEPOLIA_HEX = '0xaa36a7';

@@ -172,6 +172,40 @@ test('the boot has no chain gate: a wallet elsewhere does not stop the page read
     'it still records which chain the wallet is on — that is what the write refusal and the bar need');
 });
 
+test('a wallet that cannot say which chain it is on does not stop the boot', async () => {
+  /* The last place a wallet could still take the page down (the architect's review of #403). `load()`
+     awaited this one call unguarded, so a wallet that answers `eth_chainId` with an error rejected the
+     boot, the route set `S.error`, and the page painted `could not read the factory at …` and nothing
+     else — blaming the factory for the wallet, on a page that reads nothing through it. `pickWallet`
+     has guarded the same call all along.
+
+     The line is lifted and run rather than matched, so what is asserted is that the rejection is
+     swallowed and `CHAIN` is left `null` — which every reader of it treats as "not read yet" and not as
+     a mismatch, so the bar stays hidden and `tx()` re-reads the chain before any write. */
+  /* **Scoped to `load()`.** `pickWallet` guards the same call with a line that differs only in its
+     catch body, and the first version of this test matched *that* one — it read `catch (e) {}`, found
+     `CHAIN` untouched, and failed against page code that was correct. A lift has to be anchored to the
+     function it is about, not to the shape of the statement. */
+  const LINE = (() => {
+    const fn = SHIPPED.indexOf('async function load() {');
+    assert.ok(fn > 0, 'app/src/index.html no longer declares `load` — this test reads it');
+    const at = SHIPPED.indexOf("try { CHAIN = asChain(await P.request({ method: 'eth_chainId' })); }", fn);
+    assert.ok(at > fn && at < SHIPPED.indexOf('\n}\n', fn),
+      'load() must guard the wallet\'s eth_chainId, as pickWallet does');
+    return SHIPPED.slice(at, SHIPPED.indexOf('\n', at));
+  })();
+  const run = async provider => new Function('P', 'asChain', `
+    let CHAIN = 'untouched';
+    return (async () => { ${LINE} return CHAIN; })();
+  `)(provider, id => (id == null ? null : Number(id)));
+
+  const threw = await run({ request: async () => { throw { code: -32603, message: 'internal error' }; } });
+  assert.equal(threw, null, 'a wallet that cannot answer leaves CHAIN null, and the boot carries on');
+
+  const answered = await run({ request: async () => '0x14a34' });
+  assert.equal(answered, 84532, 'and a wallet that can answer is still recorded — the write path needs it');
+});
+
 test('the press and the mine scan are the wallet\'s, and say so where they are written', () => {
   /* The two deep reads the rule keeps on the wallet. Asserted so that a later sweep of `P` out of the
      page does not take them with it: they are the exception that #400 and #391 are built on. */

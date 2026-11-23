@@ -1318,7 +1318,14 @@ function who() {
 /* ---- reading the chain ---------------------------------------------------------------------- */
 const S = { featured: null, featuredLie: null, impl: null, maxRows: null, grace: null, loaded: false, error: null, tab: 'recent' };
 async function load() {
-  CHAIN = asChain(await P.request({ method: 'eth_chainId' }));
+  /* **Guarded, like the same call in `pickWallet` (`:417`)** — the architect's review of #403. This is
+     the last place a wallet could still stop the page: `load()` rejecting sets `S.error`, and the route
+     then paints `could not read the factory at …` and nothing else, which blames the factory for a
+     wallet that could not say what chain it is on — on a page that reads nothing through it. `CHAIN`
+     stays `null`, which every reader of it already treats as "not read yet" rather than as a mismatch:
+     the bar stays hidden, the pill says `not reachable`, and `tx()` re-reads the chain itself before
+     any write and refuses there. */
+  try { CHAIN = asChain(await P.request({ method: 'eth_chainId' })); } catch (e) { CHAIN = null; }
   /* **No chain gate here any more** (#403). “The same address on another network is another contract,
      or none: do not read it” was true while these reads went through the wallet — they would have been
      asking the wallet's chain about this document's addresses. They go through the page's own provider

@@ -64,3 +64,8 @@ run "a distribution's code read through the wallet" \
   const code = await pageRead().request" \
     "async function loadDistro(addr) {
   const code = await P.request"
+
+# The architect's review of #403: the one place a wallet could still stop the page.
+run "load()'s eth_chainId unguarded again, so a wallet blanks the page" \
+    "  try { CHAIN = asChain(await P.request({ method: 'eth_chainId' })); } catch (e) { CHAIN = null; }" \
+    "  CHAIN = asChain(await P.request({ method: 'eth_chainId' }));"

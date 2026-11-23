@@ -18,6 +18,10 @@
  *   present      the same wallet, on this chain, answering normally. Here the figure matters rather
  *                than the paint: how many requests reach **our** endpoint per first paint, which is
  *                what moving eighteen `call()` sites onto it changes.
+ *   nochainid    a wallet that cannot say what chain it is on — `eth_chainId` throws. The last place a
+ *                wallet could stop the page: `load()` awaited that call unguarded, so the route painted
+ *                `could not read the factory at …` and nothing else, blaming the factory for the
+ *                wallet (the architect's review of #403).
  *   nowallet     no `window.ethereum` at all — the control. Anything the three cases above paint
  *                differently from this one is a wallet changing a read, which is the thing #403 says
  *                cannot happen.
@@ -47,7 +51,7 @@ const chain = Number(arg('chain', 84532));
 const addr = arg('addr', DNZN);
 const patience = Number(arg('patience', 35_000));
 const only = arg('case', 'all');
-const CASES = ['hostile', 'wrongchain', 'present', 'nowallet'];
+const CASES = ['hostile', 'wrongchain', 'present', 'nochainid', 'nowallet'];
 const cases = only === 'all' ? CASES : [only];
 for (const c of cases) if (!CASES.includes(c)) { console.error(`own-reads: --case must be all or one of ${CASES.join(', ')}`); process.exit(2); }
 if (!existsSync(EXEC)) { console.error(`own-reads: no browser at ${EXEC}`); process.exit(2); }
@@ -112,12 +116,16 @@ async function run(kind) {
     const walletChain = kind === 'wrongchain' ? (chain === 84532 ? '0xaa36a7' : '0x14a34') : '0x' + chain.toString(16);
     await page.exposeFunction('__w', async (method, params) => {
       asked.push(method);
+      /* A wallet that cannot answer which chain it is on. Not hypothetical: a locked wallet, an
+         extension mid-upgrade and a mobile in-app browser whose bridge has dropped all do this, and
+         the page reads nothing through the wallet, so it must not care. */
+      if (kind === 'nochainid' && method === 'eth_chainId') throw { code: -32603, message: 'internal error' };
       if (method === 'eth_chainId') return walletChain;
       if (method === 'eth_accounts' || method === 'eth_requestAccounts') return [];   // never connected
       /* `hostile` is the limit case: a wallet that serves its own two answers and nothing else, which
          is what a rate-limited endpoint amounts to from the page's side. `present` relays to our own
          endpoint so the figure below is about volume rather than about a second endpoint's quirks. */
-      if (kind === 'hostile' || kind === 'wrongchain') throw { code: 4100, message: 'this wallet serves only accounts and chainId' };
+      if (kind === 'hostile' || kind === 'wrongchain' || kind === 'nochainid') throw { code: 4100, message: 'this wallet serves only accounts and chainId' };
       const res = await fetch(OUR, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
       const body = await res.json().catch(() => null);
       if (body && body.error) { const e = new Error(body.error.message); e.code = body.error.code; throw e; }
@@ -183,6 +191,9 @@ for (const r of results) {
      clause's own words. Any other method is a read that belongs to our endpoint. */
   if (extra.length) fails.push(`the wallet was asked ${[...new Set(extra)].join(', ')}`);
   if (!r.landing.featured) fails.push('the landing painted no featured widget');
+  /* The shape of the defect this case was added for: the route's own error notice standing in for the
+     page. Checked on the text rather than on the absence of a widget, so the failure names itself. */
+  if (/could not read the factory/.test(r.landing.text)) fails.push('the landing blamed the factory for the wallet');
   if (/history unavailable/.test(r.distro.changes + r.distro.activity)) fails.push('a history section read `history unavailable`');
   if (!/distribute/.test(r.distro.funds)) fails.push('the funds block offered no distribute');
   if (!r.distro.rows) fails.push('the distribution painted no table rows');

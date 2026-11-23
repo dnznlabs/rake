@@ -264,6 +264,19 @@ const out = await page.evaluate(() => {
     heads: [...document.querySelectorAll('.sechead span')].map(s => s.innerText.trim()),
     distribute: [...document.querySelectorAll('button')].filter(x => /^distribute$/i.test(x.textContent.trim())).length,
     older: [...document.querySelectorAll('button.older')].length,
+    /* **Where** the presses are, not just how many. The architect read `3 after a press where it read
+       2 before` and inferred the third was the funds block; an instrument that makes a reviewer infer
+       is an instrument with a missing column. Reported by the container each press sits in. */
+    olderWhere: (() => {
+      const names = { 'h-changes': 'changes', 'h-funds': 'activity', funds: 'funds block', view: 'elsewhere in the view' };
+      const out = {};
+      for (const b of document.querySelectorAll('button.older')) {
+        let el = b, key = 'elsewhere in the view';
+        while (el && el !== document.body) { if (names[el.id]) { key = names[el.id]; break; } el = el.parentElement; }
+        out[key] = (out[key] || 0) + 1;
+      }
+      return out;
+    })(),
   };
 });
 
@@ -309,7 +322,8 @@ console.log(`  changes              : ${out.changes.slice(0, 90)}`);
 console.log(`  activity             : ${out.activity.slice(0, 90)}`);
 console.log(`  history unavailable  : ${unavailable.length ? unavailable.join(', ') : 'none'}`);
 console.log(`  DISTRIBUTE buttons   : ${out.distribute}`);
-console.log(`  load older presses   : ${out.older}${noPress ? '   ← a wallet page with history below the day must offer one' : ''}`);
+const where = Object.entries(out.olderWhere || {}).map(([k, n]) => `${n} in ${k}`).join(', ');
+console.log(`  load older presses   : ${out.older}${where ? ` (${where})` : ''}${noPress ? '   ← a wallet page with history below the day must offer one' : ''}`);
 console.log(`  claims a 24h window  : ${/covers the last 24 hours/.test(out.funds)}`);
 if (pressed && pressed.skipped) console.log(`  press                : ${pressed.skipped}`);
 else if (pressed) {
