@@ -153,6 +153,71 @@ const Model = (() => {
 
   /** Revert bytes as the one line the page shows. `now` is seconds, for `NotReady`'s countdown, and
      `grace` is `GRACE()` as the page read it, for `Expired`'s date. */
+  /** What a node said, when it said something and sent no revert bytes (#373).
+   *
+   *  A failure with no `data` is not a contract revert — it is the node refusing, and it usually
+   *  explains itself: out of gas, a nonce already used, a fee below the floor, a rate limit. The page
+   *  printed the bare word `reverted` for all of it, which names the wrong culprit (the contract) and
+   *  throws away the one sentence that would have told the reader what to do. So the sentence is kept.
+   *
+   *  Kept, but not kept whole. These strings carry things a status line should not: a JSON body, a
+   *  stack, an upgrade link, the same clause twice. So: one line, the prefix that says nothing
+   *  dropped, cut at a clause rather than mid-word, and capped. `null` when there is nothing left
+   *  worth printing, which is the caller's signal to fall back to `reverted`. */
+  function nodeSentence(message) {
+    let s = String(message == null ? '' : message).replace(/\s+/g, ' ').trim();
+    if (!s) return null;
+    // A wrapped JSON-RPC body: take the inner message rather than printing braces at a reader.
+    const inner = /"message"\s*:\s*"([^"]{3,})"/.exec(s);
+    if (inner) s = inner[1].trim();
+    // `Internal JSON-RPC error.` and friends say only that something went wrong.
+    if (/^internal (json-?rpc )?error\.?$/i.test(s)) return null;
+    // The prefix is what the bare word already said; what follows it is the part worth reading.
+    s = s.replace(/^(execution )?reverted:?\s*/i, '').trim();
+    if (!s) return null;
+    // A URL in a status line is noise a reader cannot click usefully, and it is usually an upsell.
+    s = s.replace(/https?:\/\/\S+/g, '').trim();
+    // Cut at the end of a clause if there is one in range, so the line does not stop mid-word.
+    if (s.length > 100) {
+      const cut = s.slice(0, 100);
+      const at = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf(', '), cut.lastIndexOf('; '));
+      s = (at > 40 ? cut.slice(0, at) : cut.replace(/\s+\S*$/, '')) + '…';
+    }
+    s = s.replace(/[\s.,;:]+$/, '');
+    return s.length > 2 ? s : null;
+  }
+
+  /* A refusal about **how often**, not about how much or how old. Every shape here was measured in
+   * m05-t01d step 1 against a real endpoint; none is guessed:
+   *
+   *   `25/second request limit reached`            sepolia.base.org, under an HTTP 429
+   *   `-32011 request limit reached`               mainnet.base.org, which answers nothing else
+   *   `-32005 rate limit exceeded`                 sepolia.gateway.tenderly.co
+   *   `-32016 over rate limit`                     rpc.flashbots.net
+   *   `You reached Public endpoint rate limit`     eth.drpc.org and base.drpc.org
+   *   `the RPC endpoint answered HTTP 429`         what `rpcProvider` raises when the body carries
+   *                                                no JSON-RPC error to read, as Base's does not
+   *
+   * It matters that this is its own question. A throttle is **not** a wall: a depth refusal cannot be
+   * passed by asking again, and a rate limit can. So the page keeps `load older` for this one, and
+   * says the endpoint is limiting requests rather than implying it has no history to give.
+   *
+   * `RANGEY` matches the bare word `limit`, so most of these would otherwise be read as a complaint
+   * about the width of the window and the walk would halve for the rest of its budget, which neither
+   * helps nor explains. This has to be asked first. */
+  /* `HTTP 429` anchored, not a bare `429`: a refusal can carry that number as a *figure* — a range
+   * cap, a result count — and `CAPS` reads digits out of the same strings, so a loose match would
+   * turn a width complaint into a throttle and keep a press that cannot help. `too many requests`
+   * was in the first draft of this and is gone: no endpoint measured in step 1 said it, and the rule
+   * for this list is measured shapes only. The status code is still read from the object, where it
+   * is unambiguous. */
+  const THROTTLED = /\brate limit\b|request limit reached|HTTP 429\b/i;
+  function isThrottle(text, e) {
+    const status = e && e.data && e.data.httpStatus;
+    if (status === 429) return true;
+    return THROTTLED.test(String(text == null ? '' : text));
+  }
+
   function revertMessage(data, now, grace) {
     const d = String(data == null ? '' : data);
     if (!d || d === '0x') return 'reverted';
@@ -322,6 +387,6 @@ const Model = (() => {
     return '0x' + node;
   }
 
-  return { SNAPSHOT_T, BENEFICIARY_T, GATEWAYS, chainHref, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt, revertMessage, tableFrom, parseDelay, wei, namehash, plainName, windows, rangeCap, isPruned, isWrappedRefusal, nonceOf };
+  return { SNAPSHOT_T, BENEFICIARY_T, GATEWAYS, chainHref, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt, revertMessage, nodeSentence, isThrottle, tableFrom, parseDelay, wei, namehash, plainName, windows, rangeCap, isPruned, isWrappedRefusal, nonceOf };
 })();
 export default Model;

@@ -31,7 +31,7 @@
    mk/15-seed.mk: the address is `factory.predict(salt)`, which the page reads at boot rather than
    carrying a token per chain. `factoryBlock` is the block the factory was created in, so a `Created` scan never starts at
    genesis on a real chain. */
-const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTRIBUTIONFACTORY__', factoryBlock: '__DISTRIBUTIONFACTORY_BLOCK__', featuredSalt: '__FEATURED_SALT__', app: '__APP__', impl: '__DISTRIBUTION__' };
+const CFG = { chainId: '__CHAIN_ID__', version: '__VERSION__', factory: '__DISTRIBUTIONFACTORY__', factoryBlock: '__DISTRIBUTIONFACTORY_BLOCK__', featuredSalt: '__FEATURED_SALT__', app: '__APP__', impl: '__DISTRIBUTION__', widgetSri: '__WIDGET_SRI__' };
 const CONTRACTS = [['DistributionFactory', CFG.factory]];
 const CHAINS = { 1: 'mainnet', 10: 'op mainnet', 8453: 'base', 42161: 'arbitrum', 4326: 'megaeth', 4663: 'robinhood', 11155111: 'sepolia', 84532: 'base sepolia', 31337: 'anvil', 31338: 'anvil-b' };
 // Every chain rake intends to be on: M05's four mainnets, its stretch row, and the two testnets.
@@ -54,8 +54,83 @@ const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.
    pasted — and it is this page's own read path when `discover` found no injected provider (#273), by
    way of the read-provider helper below. A chain absent from this table has no read path without a
    wallet, which is the one case `route()`'s no-provider notice is still reached on. */
-const PUBLIC_RPC = { 1: 'https://ethereum-rpc.publicnode.com', 10: 'https://mainnet.optimism.io', 8453: 'https://mainnet.base.org', 42161: 'https://arb1.arbitrum.io/rpc', 4326: 'https://mainnet.megaeth.com/rpc', 4663: 'https://robinhood-rpc.publicnode.com', 11155111: 'https://ethereum-sepolia-rpc.publicnode.com', 84532: 'https://sepolia.base.org', 31337: 'http://127.0.0.1:8545', 31338: 'http://127.0.0.1:8546' };
+/* Measured, and from an operator that can be named. `tools/rpc-depth.mjs` and the table in
+   m05-t01d's handoff: each of the four chains was read against three or four candidates, every span
+   and depth attempted three times, and the entry here is the deepest history a browser is served on
+   *every* attempt by an operator with public terms. The second half of that rule is not decoration
+   — since #375 these endpoints also answer the preflight, the salt-taken check and name resolution,
+   so a page with no wallet shows whatever they say.
+
+     chain  endpoint                          operator   its stated limit, in its own words
+     1      ethereum-rpc.publicnode.com       Allnodes   `Archive requests require a personal token`
+     8453   base-rpc.publicnode.com           Allnodes   `exceed maximum block range: 50000`
+     11155111 sepolia.gateway.tenderly.co     Tenderly   `rate limit exceeded` past ~19 of 40
+     84532  base-sepolia-rpc.publicnode.com   Allnodes   `exceed maximum block range: 50000`
+
+   What they replaced, and why (read 2026-11-23):
+
+     1         — kept. See below: every deeper candidate failed to paint the page
+     8453      mainnet.base.org             answers nothing: `-32011 request limit reached`
+     11155111  — kept. See below: Tenderly measured deeper and could not paint the page
+     84532     sepolia.base.org             a 200-block window, which is #382: a walk back over
+                                            1.17M blocks cannot be made of 200-block steps
+
+   **Sepolia is unchanged, and the reason is worth more than the measurement that argued for moving
+   it.** `sepolia.gateway.tenderly.co` serves 100,000-block windows and 5,000,000 blocks of depth
+   against this endpoint's 10,000, and on that table it was the obvious choice. Driven in a real page
+   it **never filled the landing panel**: still empty after 60 seconds, every time, where the endpoint
+   here fills it on the first try. The page's boot is a burst of parallel `eth_call`s, and Tenderly
+   answered 19 of 40 under that kind of pressure; single `cast` calls against it all succeed, which is
+   why a flat request count was the wrong instrument. Depth that cannot paint is worth nothing.
+
+   **Precisely what was driven, because it bounds the claim:** the page ran at
+   `rake.dnzn.dev/11155111/`, which serves the *previous* document, and the reads went through the
+   UAT driver's **injected** provider — `window.ethereum` relaying to node, which called Tenderly. So
+   what is measured is Tenderly under the page's own burst **as relayed from node**, not a browser's
+   own connections with their per-host limits. The burst is the page's; the transport was not. A
+   browser-native comparison across all four chains is `tools/rpc-cold.mjs`, and its table is in the
+   handoff.
+
+   **Chain 1 is also unchanged, and three candidates were tried in a browser before it stayed.**
+   `0xrpc.io` measured best of anything — 10,000-block spans, 5,000,000 deep, 40 of 40 under pressure
+   — and names **no operator** on its own site, which calls itself a public good funded by donations
+   to an address, runs on GitHub Pages, and logs a run of endpoints disabled for load. Not a
+   dependency for the one document real users read. Of the operators that can be named, measured over
+   ten cold loads each with no wallet (`tools/uat/cold.mjs`):
+
+     eth.drpc.org          panel fills, and **every one of ten loads read no history at all**: its
+                           free plan serves 100-block windows and then rate-limits the walk, so not
+                           one window is answered and all three sections say so
+     rpc.flashbots.net     **the panel did not fill at all**, 0 of 5
+     this one              10 of 10, history read, no section ever empty-handed
+
+   So the deepest endpoint is not the one that paints, twice over. What makes this one viable *now* is
+   step 5: its archive refusal used to kill the read and now ends it on a **boundary**, with a line
+   saying the endpoint serves no history before that block and a connected wallet may go further.
+
+   A hostname is a pool, so none of this is a promise: the line the page paints is what *this* walk
+   reached, never a figure from here. */
+const PUBLIC_RPC = { 1: 'https://ethereum-rpc.publicnode.com', 10: 'https://mainnet.optimism.io', 8453: 'https://base-rpc.publicnode.com', 42161: 'https://arb1.arbitrum.io/rpc', 4326: 'https://mainnet.megaeth.com/rpc', 4663: 'https://robinhood-rpc.publicnode.com', 11155111: 'https://ethereum-sepolia-rpc.publicnode.com', 84532: 'https://base-sepolia-rpc.publicnode.com', 31337: 'http://127.0.0.1:8545', 31338: 'http://127.0.0.1:8546' };
 const ZERO = '0x' + '0'.repeat(40);
+/* The window each of those endpoints is **known** to answer, which is where a walk through the
+   page's own read provider starts (#391, step 5 amended). `logs()` starts at `WINDOW_START` 10,000
+   and only ever shrinks, so without this an endpoint serving 50,000 a query is read 10,000 at a time
+   — five times the requests for the same blocks — and one serving less spends its first windows
+   being refused before it finds the width. Chain 1 is the clearest: a 10,000-block span there is an
+   *archive* refusal, so every walk began with four refusals it could have skipped.
+
+   Each figure is the `reliable` column of `docs/milestones/m05/tasks/m05-t01d/rpc-depth.md`, read
+   2026-11-23T04:39Z — the span answered on **every** one of three attempts. Never the `ever` column:
+   a width that worked once is a backend that happened to answer, and a hostname is a pool.
+
+   A chain absent here starts at 10,000, which is also what a **wallet's** provider gets: its cap
+   belongs to whichever endpoint the wallet chose and is not ours to know. The window still shrinks
+   on a refusal, so a figure that goes stale costs the walk a window, not the read. */
+const PUBLIC_WINDOW = { 1: 1_000, 8453: 50_000, 11155111: 10_000, 84532: 50_000 };
+/* Set only by the DEV `?win=` override below, which has to beat the table above or the windowing
+   affordance cannot reach a narrower window on a chain that has an entry. Always false in a shipped
+   build, where neither `Q` nor the override exists. */
+let WINDOW_FROM_QUERY = false;
 /*DEV*/
 const Q = new URLSearchParams(location.search);
 /* Every windowed `eth_getLogs` the page issues, for the browser check's per-kind count (#76). */
@@ -73,6 +148,21 @@ document.getElementById('flinks').innerHTML = '<a href="https://eip.tools/eip/82
 
 /* ---- provider ------------------------------------------------------------------------------ */
 let P = null, ACC = null, CHAIN = null;
+/* `CHAIN` is a **number**, or `null` before anything has been read, and this helper is the only
+   place that decides so (#379). It used to be assigned three ways: `parseInt(…, 16)` in `load()` and
+   `String(Number(…))` in both `pickWallet` and `chainChanged`. The three name gates compare it
+   strictly against numbers (`:725`, `:762`, `:782`), so after a wallet was picked from the menu — or
+   after the same-chain `chainChanged` that Phantom emits on load — both comparisons were true on
+   every chain, `resolveName` returned `null` before asking any registry, and the page printed "names
+   resolve on mainnet and Sepolia" *while on* Sepolia. Nothing restored the number: `load()` runs once
+   from the boot IIFE and `pickWallet` → `connect()` never reaches it, so the string survived for the
+   life of the page. `eth_chainId` answers a hex string, which `Number` reads; anything unreadable
+   becomes `null` rather than `NaN`, so `CHAIN === null` stays the single "not read yet". */
+const asChain = id => {
+  if (id == null) return null;
+  const n = Number(id);
+  return Number.isFinite(n) ? n : null;
+};
 // True only when `discover` found an injected provider: the one thing `who()` reads to tell a visitor
 // with no wallet from a wallet that is there but not connected.
 let WALLET = false;
@@ -92,7 +182,11 @@ const OFF_KEY = 'rake.off';
 // require a wallet; writes always do.
 let WRPC = '';
 // The page's read path when there is no wallet, and the transport behind the dev `?rpc=` override.
-const rpcProvider = url => ({
+const rpcProvider = (url, logWindow) => ({
+  /* The widest `eth_getLogs` span this endpoint is known to answer, read by `logs()` as the window to
+     start at. Undefined for an endpoint nobody measured — the `?rpc=` override's — and absent
+     entirely from an injected wallet provider, both of which start at `WINDOW_START`. */
+  logWindow,
   request: async ({ method, params }) => {
     const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
     /* A public endpoint answers a rate limit or an outage with a status and often an HTML body, so the
@@ -108,7 +202,30 @@ const rpcProvider = url => ({
 // Which transport reads the chain: the injected provider when there is one, else this chain's public
 // endpoint, else nothing. This is the seam #275's settings page reuses to insert a user RPC URL and a
 // route choice; none of that page is here.
-const readProvider = injected => { const u = PUBLIC_RPC[CFG.chainId]; return injected || (u ? rpcProvider(u) : null); };
+const readProvider = injected => { const u = PUBLIC_RPC[CFG.chainId]; return injected || (u ? rpcProvider(u, WINDOW_FROM_QUERY ? undefined : PUBLIC_WINDOW[CFG.chainId]) : null); };
+/* The page's own chain, never the wallet's (#375). Three reads are questions about the chain this
+   document was built for, not about wherever the wallet happens to be pointed: whether a salt is
+   already taken, whether the call about to be sent would revert, and what name an address has. They
+   went through `P`, which is the wallet when there is one — so a wallet on Ethereum answered them
+   for a page built for Sepolia. Measured on 2026-11-22: MetaMask mobile **ignores the `chainId`
+   field in the call object**, so a page cannot tag a read with the chain it means and must choose
+   the transport instead.
+
+   The consequence was not a wrong message but a wrong answer: `createPredict` asked the wallet's
+   chain whether the salt was free, found it free there, and enabled **Deploy** for an address
+   already taken on the chain the document targets.
+
+   Built once, lazily, and from `readProvider(null)` so it is the same URL the no-wallet page reads.
+   A chain with no `PUBLIC_RPC` entry has nothing better to offer than the wallet, so that case falls
+   back to it rather than failing the read. */
+let PAGEP = null;
+const pageRead = () => (PAGEP ||= readProvider(null)) || P;
+const pcall = async (to, sig, args, types) =>
+  Eth.dec(types, await pageRead().request({ method: 'eth_call', params: [{ to, data: Eth.enc(sig, args) }, 'latest'] }));
+/* Which chains have a registry this page can ask. It is a property of the **document's** chain, so
+   a wallet on another chain neither unlocks nor blocks resolution here (#375). */
+const NAME_CHAINS = [1, 11155111];
+const namesHere = () => NAME_CHAINS.includes(Number(CFG.chainId));
 /*DEV*/
 /* A provider that refuses a wide `eth_getLogs` the way `sepolia.base.org` does, so #76's window
    shrink can be driven in a browser against anvil, which caps nothing: `?cap=200` answers the
@@ -200,8 +317,8 @@ function wire() {
    reloads for ever. `CHAIN` is the chain last read; before anything has been read there is nothing to
    re-read, so the first event only records it. */
 function chainChanged(id) {
-  const n = id == null ? null : String(Number(id));
-  if (n === null || CHAIN === null || n === String(CHAIN)) { if (n !== null) CHAIN = n; return; }
+  const n = asChain(id);
+  if (n === null || CHAIN === null || n === CHAIN) { if (n !== null) CHAIN = n; return; }
   location.reload();
 }
 /* `wallet_requestPermissions` first: it is what makes a wallet that supports it show its own prompt
@@ -290,7 +407,7 @@ async function pickWallet(rdns) {
   PICK = rdns;
   P = readProvider(w.provider); WALLET = true;
   wire();
-  try { CHAIN = String(Number(await P.request({ method: 'eth_chainId' }))); } catch (e) {}
+  try { CHAIN = asChain(await P.request({ method: 'eth_chainId' })); } catch (e) {}
   /* `finally`, not a plain sequence: a wallet whose `eth_requestAccounts` throws must not leave the
      pick behind either, and the error still reaches the caller after the revert. */
   try {
@@ -350,19 +467,27 @@ async function tx(to, sig, args, opts) {
      which chain it is for rather than relying on the wallet's current one. Its effect in MetaMask
      is not measured here — the re-read below is the check this page makes. */
   const params = { from: ACC, to, data: sig ? Eth.enc(sig, args) : '0x', chainId: '0x' + Number(CFG.chainId).toString(16), ...(o.value ? { value: '0x' + BigInt(o.value).toString(16) } : {}) };
-  txSay(label, 'checking the call against the chain…');
-  try { await P.request({ method: 'eth_call', params: [params, 'latest'] }); }
-  catch (e) { const text = txError(e); txSay(label, text, 'bad'); return { ok: false, stage: 'preflight', text }; }
-  /* The chain, re-read immediately before the send (R17, `AUDIT.md:377-385`). `wrongChain()` at
-     boot still stands, but it only runs at boot: a provider with no event emitter never fires
-     `chainChanged`, so a mid-session switch sent the write to the same address on the other chain,
-     where it is another contract or none. This is that same test, at the moment it matters. */
-  const on = parseInt(await P.request({ method: 'eth_chainId' }), 16);
+  /* The chain the wallet is on, **before the preflight** and not after it (#375). It was read after,
+     and the order cost two things. A wallet on another chain had its own chain simulate the call, so
+     the answer said nothing about the chain the transaction was for — and when that simulation failed
+     the page reported the revert rather than the mismatch, which is a true sentence about the wrong
+     chain. Now a mismatch is named as a mismatch and nothing is simulated until the chains agree.
+
+     Still read here rather than trusted from `CHAIN` (R17, `AUDIT.md:377-385`): `wrongChain()` runs
+     at boot, and a provider with no event emitter never fires `chainChanged`, so a mid-session switch
+     would otherwise send the write to the same address on another chain. */
+  const on = asChain(await P.request({ method: 'eth_chainId' }));
   if (String(on) !== String(CFG.chainId)) {
     const text = `your wallet is on ${cname(on)} — this app lives on ${cname(CFG.chainId)}`;
     txSay(label, text, 'bad');
     return { ok: false, stage: 'chain', text };
   }
+  /* The preflight goes through the page's chain, not the wallet's. The two agree by the check above,
+     so this is belt and braces for the case the wallet switches between the two calls — and it means
+     the simulation is answered by the endpoint whose behaviour the rest of the page is built on. */
+  txSay(label, 'checking the call against the chain…');
+  try { await pageRead().request({ method: 'eth_call', params: [params, 'latest'] }); }
+  catch (e) { const text = txError(e); txSay(label, text, 'bad'); return { ok: false, stage: 'preflight', text }; }
   let hash;
   try { hash = await P.request({ method: 'eth_sendTransaction', params: [params] }); }
   catch (e) { const text = txError(e); txSay(label, text, 'bad'); return { ok: false, stage: 'send', text }; }
@@ -386,6 +511,20 @@ async function tx(to, sig, args, opts) {
 function txError(e) {
   if (e && e.code === 4001) return 'rejected in wallet';
   const d = typeof (e && e.data) === 'string' ? e.data : e && e.data && e.data.data;
+  /* No revert bytes means the **node** refused, not the contract, and it nearly always says why:
+     out of funds, a used nonce, a fee under the floor, a rate limit. The page used to print the bare
+     word `reverted` for every one of them (#373) — blaming the contract and discarding the only
+     sentence that told the reader what to do. `e.message` was read for nothing except code 4001.
+
+     The decode still comes first where there are bytes, so a contract revert reads as before. */
+  if (!d || d === '0x') {
+    /* Both depths, outer first, because either can be the useful one: a wallet wraps the node's
+       object and puts `Internal JSON-RPC error.` on the outside, which `nodeSentence` discards — so
+       taking the outer message *or* the inner one is wrong, and it has to be the outer one **if it
+       says anything**, else the inner. */
+    const said = Model.nodeSentence(e && e.message) || Model.nodeSentence(e && e.data && e.data.message);
+    if (said) return esc(said);
+  }
   /* `?? null` and not `S.grace`: the boot read fills it (`:510`) and a revert can be decoded before
      that — the create flow runs before `S.loaded` — so the "no deadline known" case is passed
      explicitly rather than left to whatever `S.grace` happens to hold (#148). */
@@ -426,7 +565,7 @@ let MAX_WINDOWS = 40;          // per log kind, per pass — 40 × 200 is 8,000 
 /* The windowing exercised against anvil, which caps nothing: `?win=` starts smaller and `?maxwin=`
    shrinks the budget, so the partial line and `load older` are reachable on a chain a few hundred
    blocks long. `?cap=` is the other half — see `capped` above. */
-if (Q.get('win')) WINDOW_START = Number(Q.get('win'));
+if (Q.get('win')) { WINDOW_START = Number(Q.get('win')); WINDOW_FROM_QUERY = true; }
 if (Q.get('maxwin')) MAX_WINDOWS = Number(Q.get('maxwin'));
 /*DEV*/
 /* Read once per route entry, and shared: the three queries of one history have to measure their
@@ -440,14 +579,156 @@ let HEAD = null;
    re-makes it. Written wherever the head resolves, which is every route that reads one. */
 const stamp = n => { const el = document.getElementById('asof'); if (el) el.textContent = `as of block ${n}`; };
 const head = () => HEAD ?? (HEAD = P.request({ method: 'eth_blockNumber' }).then(h => { const n = parseInt(h, 16); stamp(n); return n; }));
+/* **The last 24 hours, for a visitor with no wallet** (step 5, amended by the Product Owner's ruling
+   of 2026-11-23). The aim is no longer to read as deep as the endpoint allows: it is to read a day and
+   say so. A day is a span of *time*, and these chains do not agree on what a block costs — Ethereum
+   spends about 12 seconds a block and Base about **0.2** — so the floor cannot be a constant.
+
+   **Seed, then confirm** (the architect's ruling, 2026-11-23): a nominal block time is allowed as a
+   first guess and never as the answer. So the search starts at `head - a day / nominal`, reads the
+   timestamp there, and corrects by secant steps that use the rate **measured between two real
+   headers**. At most `DAY_STEPS` secant steps; if those have not converged it falls back to bisection,
+   which cannot fail to, rather than iterating a secant that is not settling.
+
+   **What a step costs, worst case, because `DAY_STEPS` is steps and not reads.** Each step asks
+   `near()` for a readable header, and against a pool returning nulls that walks outward to ±4 blocks:
+   **at most 9 reads in free space** (`n`, then ±1 to ±4), and **5 when clamped against one end of the
+   bracket**, which is what the two anchor lookups are — so the anchors alone cost **10** in the
+   all-null case. Both figures are asserted in `test/day-read.test.mjs` rather than left as a claim
+   here: a first version of this comment said 9 for the anchors and was wrong, because each is clamped
+   and walks one way only. Four secant attempts and a bisection probe on top of that is 55 reads in
+   the pathological case. When headers answer normally it is **4 to 6 a load**, which is what all
+   four chains measured. The bisection behind the steps is bounded by the bracket, not by `DAY_STEPS`.
+
+   The tolerance is a minute. "The last 24 hours" is a statement about a day, and a block either side
+   of the mark changes nothing a reader can see, so paying extra reads to land exactly is waste. */
+const DAY_SECONDS = 86_400;
+const TS_TOLERANCE = 60;
+const DAY_STEPS = 4;
+/* A **seed only**. Wrong by a factor of ten on either Base chain if ever stale, which is why the
+   search confirms it against a real timestamp and corrects; `test/day-read.test.mjs` proves a seed
+   that is wrong tenfold still lands inside the bound. 12 is the fallback for a chain not listed. */
+const NOMINAL_SEC = { 1: 12, 8453: 0.2, 11155111: 12, 84532: 0.2 };
+/* The seed as a block, which is both the search's first guess **and its fallback**. If no header can
+   be read the floor is this, unconfirmed — never the distribution's own block, which with no wallet is
+   the deep walk this amendment exists to replace: on Base that is 40 windows a kind against a day's 9,
+   and it reads far past what was ruled. An unconfirmed floor is a day's *estimate*, so the heading
+   says "about". */
+const seedFloor = hi => Math.max(1, hi - Math.round(DAY_SECONDS / (NOMINAL_SEC[Number(CFG.chainId)] || 12)));
+/* False while the floor in use is the unconfirmed seed. Read by `dayHead`, so the claim and the
+   evidence cannot drift apart. */
+let DAY_EXACT = true;
+/* **`null` is an answer here, not a failure.** A pooled hostname is many backends and they are not
+   always on the same block, so a number one backend has another answers `null` for — measured on
+   `ethereum-sepolia-rpc.publicnode.com` on 2026-11-23, where exactly that took the whole history down:
+   `null.timestamp` threw, the floor search rejected, and all three sections painted
+   `history unavailable`, which is the outcome reserved for an endpoint that answered nothing at all.
+   A missing block is now a `null` the caller steps around. */
+const tsOf = async n => {
+  const b = await P.request({ method: 'eth_getBlockByNumber', params: ['0x' + n.toString(16), false] });
+  return b && b.timestamp != null ? Number(BigInt(b.timestamp)) : null;
+};
+/** The first block at or after `hi`'s timestamp minus a day, never below `floor`. */
+async function dayFloor(hi, floor) {
+  /* A block a backend does not have is stepped around rather than fatal: a few blocks either way
+     cannot matter to a figure whose tolerance is a minute. */
+  const near = async (n, lo, up) => {
+    /* Nine distinct blocks at most: `n`, then ±1 to ±4. `k === 0` is asked once rather than twice —
+       `n - 0` and `n + 0` are the same block, so the pair would have spent a second request
+       re-confirming the same null. */
+    for (let k = 0; k <= 4; k++) for (const m of (k === 0 ? [n] : [n - k, n + k])) {
+      if (m < lo || m > up) continue;
+      const t = await tsOf(m);
+      if (t != null) return [m, t];
+    }
+    return [null, null];
+  };
+  const [hiN, tHi] = await near(hi, floor, hi);
+  const [flN, tFl] = await near(floor, floor, hi);
+  // No anchor to measure from, so the seed stands unconfirmed rather than the whole history opening up.
+  if (tHi == null || tFl == null) { DAY_EXACT = false; return Math.max(floor, seedFloor(hi)); }
+  const target = tHi - DAY_SECONDS;
+  let a = flN, ta = tFl, b = hiN, tb = tHi;
+  // The whole history is younger than a day, so there is nothing to cut: read all of it.
+  if (ta >= target) return floor;
+  const nominal = NOMINAL_SEC[Number(CFG.chainId)] || 12;
+  let guess = Math.min(b - 1, Math.max(a + 1, hi - Math.round(DAY_SECONDS / nominal)));
+  for (let i = 0; i < DAY_STEPS; i++) {
+    const [gN, tg] = await near(guess, a + 1, b - 1);
+    if (tg == null) break;                       // nothing readable in this bracket; bisect below
+    guess = gN;
+    if (Math.abs(tg - target) <= TS_TOLERANCE) return guess;
+    if (tg >= target) { b = guess; tb = tg; } else { a = guess; ta = tg; }
+    if (b - a <= 1) return b;
+    // The next guess uses the rate between the two headers now bracketing the target, not the seed's.
+    const rate = (tb - ta) / (b - a);
+    guess = rate > 0 ? Math.round(b - (tb - target) / rate) : Math.floor((a + b) / 2);
+    guess = Math.min(b - 1, Math.max(a + 1, guess));
+  }
+  /* Not converged inside the bound — a chain whose rate changed sharply inside the bracket. Bisection
+     is slower per step and cannot fail, which is the right trade once the cheap method has had its
+     four tries. The bracket is already narrowed, so this is short. */
+  while (b - a > 1) {
+    const [mN, tm] = await near(Math.floor((a + b) / 2), a + 1, b - 1);
+    /* The bracket holds nothing this backend will serve. `b` is a real block whose timestamp was read
+       and is at or after the target, so it is a sound floor — but it was not narrowed to the
+       tolerance, so it is not the exact day either. */
+    if (tm == null) { DAY_EXACT = false; break; }
+    if (tm >= target) { b = mN; } else { a = mN; }
+  }
+  return b;
+}
+/* Found once per page load and shared by all three log kinds: the floor is a property of the head,
+   and the head is read once per route entry. `route` clears it with `HEAD`, so a route entry searches
+   again rather than serving a floor computed against an older head. */
+let DAYFLOOR = null;
+/* Where a history read starts: the distribution's own first block, and for a visitor with no wallet
+   the later of that and a day ago. A wallet reads as before, with its press — its endpoint is its
+   own business and its depth is not ours to ration. */
+async function readFloor(d, hi) {
+  const own = Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock));
+  if (WALLET) return own;
+  /* **The floor search may never cost the page its history** — before this, a single `null` block
+     rejected here and `paintFailed` wrote `history unavailable` over all three sections. But the
+     fallback is **the seed, not the distribution's own block**: with no wallet that block is the deep
+     walk this amendment replaces, 40 windows a kind against a day's nine on Base, reading far past
+     what was ruled. The seed is an unconfirmed day, which still bounds the walk and which `DAY_EXACT`
+     makes the heading admit to. */
+  try {
+    return Math.max(own, await (DAYFLOOR ||= dayFloor(hi, own)));
+  } catch {
+    /* The search threw outright. The seed is still a day's estimate and still bounds the walk; the
+       distribution's own block would not bound it at all. */
+    DAYFLOOR = null;
+    DAY_EXACT = false;
+    return Math.max(own, seedFloor(hi));
+  }
+}
 /* A refusal, wherever the wallet put the text: MetaMask wraps the provider's JSON-RPC error and the
    message naming the cap can sit a level or two down from `message`. */
 const errText = e => [e && e.message, e && e.data && e.data.message, e && e.cause && e.cause.message]
   .filter(Boolean).join(' · ');
 /* A refusal about the *size* of the range rather than its content. `Model.rangeCap` reads the two
    shapes that name their number; these are the ones that complain without naming one, where halving
-   is the only move left. Anything else is a real failure and is thrown to the caller, which paints it. */
+   is the only move left. Anything else is a real failure and is thrown to the caller, which paints it.
+
+   **One measured shape here is not a cap at all, and should not later be read as one.** `base-rpc.
+   publicnode.com` answered `block range extends beyond current head block: requested 61125860, head
+   61125859` once in ten cold loads on 2026-11-23: a pooled hostname whose backends are one block
+   apart, so the head this page read came from a backend one ahead of the one that served the query.
+   It matches `\brange\b` and the walk halves for it, which costs a window and then succeeds — the
+   right behaviour by accident, and worth leaving alone. What it must not become is an entry in
+   `rangeCap`'s list of endpoints that cap a span, because no endpoint capped anything here. */
 const RANGEY = /\brange\b|too many|more than \d+ results|response size|\blimit/i;
+/* The first block an endpoint admits to keeping, when its refusal says so — `4444 pruned history
+   unavailable: requested 360085, earliest available 1000000`. Taken in preference to any boundary a
+   walk arrives at by shrinking: the endpoint is describing itself, and a window answered *below* a
+   floor like that proves nothing, since an index can answer "no logs here" without reading the
+   pruned bodies it would have needed. */
+const statedFloor = text => {
+  const m = /earliest available (\d+)/i.exec(String(text || ''));
+  return m ? Number(m[1]) : null;
+};
 // A null `address` is left out of the filter, not sent as null: that is the query over every contract.
 function window1(address, topics, a, b) {
   /*DEV*/
@@ -467,8 +748,31 @@ function window1(address, topics, a, b) {
 async function logs(address, topics, fromBlock, toBlock) {
   const from = Number(BigInt(fromBlock));
   let hi = toBlock == null ? await head() : Number(toBlock);
-  let size = WINDOW_START, spent = 0;
+  /* The transport's own figure when it has one (#391): `P` is the page's read provider for a visitor
+     with no wallet, and a wallet's provider otherwise, where 10,000 is the only safe guess. */
+  let size = (P && P.logWindow) || WINDOW_START, spent = 0;
   const out = [];
+  /* Windows answered, which is **not** `out.length`. An endpoint can answer forty windows that
+     happen to hold no events; that is a read history with nothing in it, and the sections should say
+     "nothing has arrived at this address yet". `history unavailable` is for an endpoint that answered
+     nothing **at all** (step 5, #382), and this counter is the difference between the two. Confusing
+     them is the same error as reading an empty `[]` below a prune floor as "no events". */
+  let answered = 0;
+  /* The last refusal that was about *old blocks* rather than about the width of the window.
+
+     It is kept because the walk usually runs out of budget before it finishes bisecting toward a
+     prune floor: shrinking 10,000 down to 1 takes about fourteen halvings at up to four windows
+     each, against `MAX_WINDOWS` of 40. So the `size === 1` case below, which was the only place a
+     prune became a boundary, is rarely the one that fires — the budget return fires instead, and the
+     cause was thrown away with it. A reader then saw "not loaded · load older" for history the
+     endpoint had already refused to serve, and the press could only fail the same way.
+
+     So the cause is recorded the moment it is seen, and whichever return happens carries it. */
+  let wall = null;
+  // The last refusal seen, for the "nothing was answered" check at the end: a walk can be refused
+  // from the first window to the last without ever reaching the one-block case, if the budget runs
+  // out while it is still halving.
+  let lastText = null;
   while (hi >= from && spent < MAX_WINDOWS) {
     /* The next few windows at the current size, newest-first and contiguous, so everything above `hi`
        has been read and the boundary below it is a single number rather than a set of holes. */
@@ -480,29 +784,103 @@ async function logs(address, topics, fromBlock, toBlock) {
     /* Kept only as far as the first refusal: the batch is contiguous from the top, so keeping a
        success from below a failure would leave a hole that no single boundary could describe. */
     const i = res.findIndex(r => r.err);
+    /* **Two questions, and they were one variable.** Which logs may be *kept* is about contiguity:
+       only an unbroken run from the top, or a hole would sit below a boundary no single number could
+       describe. Whether the endpoint *answered* is about the endpoint. A window below a refusal is
+       discarded for the first reason while the endpoint answered it perfectly well — and counting
+       that as unanswered is what made a Sepolia load paint `history unavailable` over three sections
+       after the endpoint had returned both a log array and an empty one
+       (`docs/milestones/m05/tasks/m05-t01d/evidence/nothing-11155111-load7.json`, requests 4 and 5).
+       Step 5 reserves that sentence for an endpoint that answered **nothing at all**, so it is
+       counted over the whole batch and the keeping is left alone. */
+    for (const r of res) if (!r.err) answered++;
     for (const r of (i < 0 ? res : res.slice(0, i))) out.push(...r.ok);
     if (i < 0) { hi = batch[batch.length - 1][0] - 1; continue; }
     const top = batch[i][1], text = res[i].err, cap = Model.rangeCap(text);
+    lastText = text;
+    /* **Asked first, and before anything about the width of the window.** A throttle is a refusal
+       about how often rather than how much: `RANGEY` matches the bare word `limit`, so
+       `request limit reached` and `rate limit exceeded` would otherwise read as complaints about the
+       range and the walk would spend the rest of its budget halving, which neither helps nor
+       explains. And unlike a depth wall it **can** be passed by asking again later, so the walk stops
+       here, keeps what it read, and the page keeps `load older`. */
+    if (Model.isThrottle(text, res[i].e)) {
+      if (!answered) throw new Error(text);
+      return { logs: out, partial: top + 1, wall: { block: top + 1, why: text, kind: 'throttle', stated: null } };
+    }
     /* The fourth clause reads the error *object*, not the text: a wallet can replace a provider's
        range refusal with one of its own that says only `RPC endpoint returned HTTP client error.`,
        and nothing above matches that sentence, so before this clause existed the first window of
        the first kind threw and the history read ended there (#215). `cap` is `null` for that shape,
        so it falls through and halves like any other nameless refusal. */
-    if (!Model.isPruned(text) && cap == null && !RANGEY.test(text) && !Model.isWrappedRefusal(res[i].e)) throw new Error(text);
+    /* A refusal nobody recognises used to throw here, and the whole history read died with it —
+       all three sections replaced by `history unavailable`, the funds block with them (#382). The
+       shape that did it on Base Sepolia was a **rate limit**: four windows in flight against an
+       endpoint allowing 25 a second, answered `HTTP 429` whose body is a bare `{code, message}`
+       rather than a JSON-RPC `{"error":{…}}`, so `rpcProvider` never sees `j.error` and raises its own
+       sentence instead. `rangeCap` is null for it, `isPruned` false, `RANGEY` does not match, and
+       `isWrappedRefusal` reads 413 alone.
+
+       It is now a **wall**: the walk stops, keeps everything above it, and the line says where and
+       why. A wall is only a failure when nothing was read at all — that case still throws, below, and
+       is the one `history unavailable` is left for. */
+    if (!Model.isPruned(text) && cap == null && !RANGEY.test(text) && !Model.isWrappedRefusal(res[i].e)) {
+      if (!answered) throw new Error(text);
+      return { logs: out, partial: top + 1, wall: { block: top + 1, why: text, kind: 'refusal', stated: statedFloor(text) } };
+    }
+    /* A refusal of old blocks, named as such. Where it also names the first block it keeps, that
+       number is the boundary and there is nothing left to discover by shrinking — the endpoint has
+       described itself, and a window answered below such a floor proves nothing anyway, since an
+       index can report "no logs" without reading pruned bodies. */
+    const named = statedFloor(text);
+    if (Model.isPruned(text) || named != null) {
+      wall = { block: named ?? (top + 1), why: text, kind: 'prune', stated: named };
+      if (named != null) return { logs: out, partial: named, wall };
+    }
     /* A pruned refusal names no window either, but a *smaller* one can still fit above the block the
        provider stopped keeping — the refused range straddled it — so it shrinks like any other
        nameless refusal and the shrinking bisects toward that boundary, which is exactly "the first
        block the provider still serves". At one block wide there is nothing left to shrink: that block
        is not served, and the history stops above it. */
-    if (size === 1) return { logs: out, partial: top + 1 };
+    /* One block wide and still refused: that block is not served and the history stops above it.
+       A pruned refusal is a wall rather than a budget: `load older` cannot pass it, because the
+       endpoint has said it does not keep what is below. Where it named the first block it does keep,
+       that number is the boundary — better evidence than the one this bisection happened to reach. */
+    if (size === 1) {
+      // Refused all the way down to a single block without one window answered: nothing was read
+      // here, which is the one case `history unavailable` is for.
+      if (!answered) throw new Error(text);
+      return { logs: out, partial: (wall && wall.block) ?? (top + 1), wall: wall ?? { block: top + 1, why: text, kind: 'refusal', stated: null } };
+    }
     /* Strictly smaller every time, so the loop cannot sit still: a cap is only taken when it is
        narrower than what already failed, and anything else halves. A provider that names a cap it is
        already honouring is refusing for some other reason, and halving is the move that makes
        progress. */
-    size = cap != null && cap < size ? cap : Math.max(1, Math.floor(size / 2));
+    /* `cap > 0`, not just `cap < size`: an endpoint answering `limited to a 0 range` — broken, or
+       hostile — set `size` to 0, `Model.windows` then yielded no windows, and the next line read
+       `batch[-1][0]` and threw a `TypeError` out of the walk. A crash is the one failure the page
+       cannot describe, so a nonsense cap is treated as a refusal that named nothing and halves. */
+    size = cap != null && cap > 0 && cap < size ? cap : Math.max(1, Math.floor(size / 2));
     hi = top;
   }
-  return { logs: out, partial: hi >= from ? hi + 1 : null };
+  /* Out of budget, or the whole range was read — but carrying `wall` if one was seen on the way,
+     because a walk that was refused old blocks and then ran out of windows stopped for both reasons
+     and the refusal is the one a reader can act on. `wall: null` is explicit otherwise: every caller
+     distinguishes "ran out of windows" from "the endpoint refused", and an absent key reads as
+     neither. */
+  /* Windows were attempted and not one was answered: that is the "nothing at all" case, wherever the
+     walk happened to stop. It reached here rather than the one-block case because halving 10,000
+     down to 1 costs more windows than the budget holds — so without this, an endpoint that refused
+     every single window returned a boundary and a wall as though something had been read, and the
+     sections would have painted an empty history as fact. Found by the test for a nonsense cap. */
+  /* The arithmetic worth naming, because it has hidden a case twice: halving from `WINDOW_START` of
+     10,000 to a single block takes about fourteen steps, and each step costs up to `WINDOW_INFLIGHT`
+     windows out of `MAX_WINDOWS` — about 56 against 40. So a walk being refused all the way down
+     **runs out of budget before it ever reaches the one-block case**, and any rule written only at
+     that case will not fire in practice. Both the "nothing was answered" check here and the carried
+     `wall` above exist for that reason. */
+  if (!answered && spent) throw new Error(lastText || 'no window was answered');
+  return { logs: out, partial: hi >= from ? hi + 1 : null, wall };
 }
 
 /* ---- text ---------------------------------------------------------------------------------- */
@@ -694,18 +1072,18 @@ const same = (a, b) => a && b && String(a).toLowerCase() === String(b).toLowerCa
    printing a short address. Both paths return null rather than an unconfirmed name. */
 async function ensName(acc) {
   const at = NAMES[0].at, node = Model.namehash(acc.slice(2).toLowerCase() + '.addr.reverse');
-  const [res] = await call(at, 'resolver(bytes32)', [node], ['address']);
+  const [res] = await pcall(at, 'resolver(bytes32)', [node], ['address']);
   if (res === ZERO) return null;
-  const [name] = await call(res, 'name(bytes32)', [node], ['string']);
+  const [name] = await pcall(res, 'name(bytes32)', [node], ['string']);
   if (!name) return null;
   const f = Model.namehash(name);
-  const [fres] = await call(at, 'resolver(bytes32)', [f], ['address']);
+  const [fres] = await pcall(at, 'resolver(bytes32)', [f], ['address']);
   if (fres === ZERO) return null;        // offchain / CCIP-read names land here by design
-  const [owner] = await call(fres, 'addr(bytes32)', [f], ['address']);
+  const [owner] = await pcall(fres, 'addr(bytes32)', [f], ['address']);
   return same(owner, acc) ? name : null;
 }
 async function regName(reg, acc) {
-  const [name] = await call(reg.at, 'reverseResolve(address)', [acc], ['string']);
+  const [name] = await pcall(reg.at, 'reverseResolve(address)', [acc], ['string']);
   if (!name) return null;                // an absent record and an address with no code both decode to ''
   return same(await regAddr(reg, name), acc) ? name : null;
 }
@@ -714,15 +1092,19 @@ async function regAddr(reg, name) {
   // argument and throws on a string. Hand-built, as the probe builds it.
   const u = Eth.utf8(name), body = [...u].map(x => x.toString(16).padStart(2, '0')).join('');
   const data = '0x' + Eth.sel('computeId(string)') + Eth.pad(32) + Eth.pad(u.length) + body.padEnd(Math.ceil(u.length / 32) * 64, '0');
-  const [id] = Eth.dec(['uint256'], await P.request({ method: 'eth_call', params: [{ to: reg.at, data }, 'latest'] }));
-  const [owner] = await call(reg.at, 'resolve(uint256)', [id], ['address']);
+  const [id] = Eth.dec(['uint256'], await pageRead().request({ method: 'eth_call', params: [{ to: reg.at, data }, 'latest'] }));
+  const [owner] = await pcall(reg.at, 'resolve(uint256)', [id], ['address']);
   return owner;
 }
-/* `call` goes through `P`, so this reads whichever chain the WALLET is on — CHAIN, not CFG.chainId.
-   Only mainnet and Sepolia can answer, and anvil must spend no round trips. A registry absent from a
-   chain returns 0x, which the string decode already reads as "no record", so no per-chain table. */
+/* Every read here goes through `pcall`, so it asks the chain **the document was built for** —
+   `CFG.chainId`, not whatever the wallet is on (#375). Only mainnet and Sepolia have a registry, and
+   anvil must spend no round trips. A registry absent from a chain returns 0x, which the string decode
+   already reads as "no record", so no per-chain table.
+
+   Accepted cost, named in the plan: a wallet whose only name lives on another chain shows its short
+   address here. The alternative is worse — a name read off a chain the page is not showing. */
 async function resolveName(acc) {
-  if (CHAIN !== 1 && CHAIN !== 11155111) return null;
+  if (!namesHere()) return null;
   for (const reg of NAMES) {
     try { const n = reg.id === 'ens' ? await ensName(acc) : await regName(reg, acc); if (n) return n; } catch (e) {}
   }
@@ -759,14 +1141,14 @@ async function nameSweep() {
    answers null and the field says where names work. */
 const SUFFIX = { wei: NAMES[1], gwei: NAMES[2] };
 async function resolveAddr(name) {
-  if (CHAIN !== 1 && CHAIN !== 11155111) return null;
+  if (!namesHere()) return null;
   try {
     const n = String(name).trim().toLowerCase(), reg = SUFFIX[n.split('.').pop()];
     if (reg) { const a = await regAddr(reg, n); return a === ZERO ? null : a; }
     const node = Model.namehash(n);
-    const [res] = await call(NAMES[0].at, 'resolver(bytes32)', [node], ['address']);
+    const [res] = await pcall(NAMES[0].at, 'resolver(bytes32)', [node], ['address']);
     if (res === ZERO) return null;
-    const [a] = await call(res, 'addr(bytes32)', [node], ['address']);
+    const [a] = await pcall(res, 'addr(bytes32)', [node], ['address']);
     return a === ZERO ? null : a;
   } catch (e) { return null; }
 }
@@ -779,7 +1161,7 @@ async function addrField(value, res) {
   if (res) res.classList.remove('bad');
   if (isAddr(v)) { if (res) res.textContent = ''; return Eth.checksum(v); }
   if (!v) { if (res) res.textContent = ''; return null; }
-  if (CHAIN !== 1 && CHAIN !== 11155111) { if (res) res.textContent = 'names resolve on mainnet and Sepolia'; return null; }
+  if (!namesHere()) { if (res) res.textContent = 'names resolve on mainnet and Sepolia'; return null; }
   if (res) res.textContent = 'resolving…';
   const a = await resolveAddr(v);
   if (res) res.textContent = a ? '→ ' + short(a) : 'no such name';
@@ -864,7 +1246,7 @@ function who() {
 /* ---- reading the chain ---------------------------------------------------------------------- */
 const S = { featured: null, featuredLie: null, impl: null, maxRows: null, grace: null, loaded: false, error: null, tab: 'recent' };
 async function load() {
-  CHAIN = parseInt(await P.request({ method: 'eth_chainId' }), 16);
+  CHAIN = asChain(await P.request({ method: 'eth_chainId' }));
   // The same address on another network is another contract, or none: do not read it.
   if (wrongChain()) return;
   await readClock();
@@ -1007,12 +1389,24 @@ function histOf(raw) {
      The address-less `Transfer` query is excluded — a provider that refuses it outright leaves
      `other` null already, and its budget says nothing about the two queries that carry the history. */
   const floors = [raw.changes.partial, raw.funds.partial].filter(n => n != null);
+  /* The wall travels with the boundary, and the same rule picks it: the most conservative of the two
+     queries that carry the history. A wall beats a budget when both are present — if either query was
+     refused older blocks, `load older` cannot pass that point for the group, and offering it would be
+     a button that does nothing. */
+  /* A depth wall outranks a throttle, whatever the blocks say. If either query was refused *old
+     blocks*, the group cannot read past that point however often it asks, so offering the press
+     because the other query merely hit a rate limit would be offering one that cannot finish. Among
+     walls of the same standing the most conservative block wins, as the boundary does. */
+  const allWalls = [raw.changes.wall, raw.funds.wall].filter(Boolean);
+  const deep = allWalls.filter(w => w.kind !== 'throttle');
+  const walls = deep.length ? deep : allWalls;
   return {
     raw,
     changes: ch.sort(newest),
     funds: [...fe, ...(tin || []).filter(e => known.has(e.token))].sort(newest),
     other: tin && tin.filter(e => !known.has(e.token)).sort(newest),
     partial: floors.length ? Math.max(...floors) : null,
+    wall: walls.length ? walls.reduce((a, b) => (b.block > a.block ? b : a)) : null,
   };
 }
 const newest = (a, b) => b.block - a.block || b.index - a.index;
@@ -1030,7 +1424,18 @@ function entry(log) {
     e.what = `${e.desc} · nonce ${nonce} · ${Model.countdown(eta, secs())}`;
   } else if (kind === 'applied' || kind === 'cancelled') {
     e.hash = log.topics[1];
-    e.what = ext('hash', log.topics[1], short(log.topics[1]));
+    /* Named, because the one value in this row that is **not** an address looked exactly like one
+       (#385). It is `keccak256(abi.encode(action, nonce))` (`src/Distribution.sol:224`) — the handle
+       `applyQueued` and `cancel` take, not a party to anything. The Product Owner read a row of this
+       shape on Base Sepolia and asked who `0x6688…5e5e` was, in a row whose other `0x…` values are
+       beneficiaries.
+
+       `ext`'s `hash` kind already keeps it unlike an address — no `data-addr`, so no name sweep
+       rewrites it, and no explorer link, since a queued action's hash is no transaction and links
+       nowhere. What was missing was the word, and the word is the fix. When the `Queued` this closes
+       is inside the window, `histOf` prefixes its description; when it is not — which a wall or a
+       budget makes common — this label is the whole row, and it should still say what it is. */
+    e.what = `action hash ${ext('hash', log.topics[1], short(log.topics[1]))}`;
   } else if (kind === 'accepted') {
     // The nomination's `Applied` is not the handover; this is, and it is the only log the nominee's call leaves.
     e.what = `owner · ${ext('address', at(1), short(at(1)))} → ${ext('address', at(2), short(at(2)))}`;
@@ -1124,21 +1529,76 @@ const row = (k, sub, n, cls) => `<div class="row${cls ? ' ' + cls : ''}"><div><b
    in hand — the logs arrive whole — so the cap is for reading, and opening it costs no call. */
 const HIST_SHOW = 10;
 function histFill(id, items, empty) {
-  const tail = partialLine();
+  /* `moreLine` rides with the stop line rather than replacing it: "this read stopped short of a day"
+     and "connect a wallet to load more" are two different facts and a reader may need both. */
+  const tail = partialLine() + moreLine();
   if (!items.length) { fill(id, notice(empty) + tail); bindOlder(); return; }
   const more = items.length - HIST_SHOW;
   fill(id, histRows(items.slice(0, HIST_SHOW)) + (more > 0 ? `<button class="link more" id="${id}-more">show all ${items.length}</button>` : '') + tail);
   const b = document.getElementById(id + '-more');
-  if (b) b.onclick = () => { fill(id, histRows(items) + partialLine()); bindOlder(); };
+  if (b) b.onclick = () => { fill(id, histRows(items) + partialLine() + moreLine()); bindOlder(); };
   bindOlder();
 }
 /* One line under a section whose logs do not reach back to the distribution's first block (#76): what
    arrived is on the page, and the rest is one control away. The boundary is a block number because
    that is the only honest unit — the page cannot know how many rows it has *not* read. */
+/* **No press without a wallet** (step 5, amended): a no-wallet read is a day deep by design, not by
+   accident, so there is nothing for a press to continue — `moreLine` carries the one route onward
+   instead. The stop lines stay, because a read that fell short of its day still has to say why. */
+const press = () => WALLET ? ' · <button class="link older">load older</button>' : '';
+/* The one line a no-wallet reader gets instead of a press, under both history sections. Not
+   conditional on the read having stopped short: the day is the limit even when the day read cleanly,
+   and a reader is owed the route to the rest either way. */
+const moreLine = () => WALLET ? '' : '<div class="help">connect a wallet to load more</div>';
+/* **What the heads may claim** (the architect's ruling, 2026-11-23: the heading must be true when
+   painted). With a wallet the sections are the whole history and keep their descriptive text. Without
+   one they are a day deep — but only if the read actually reached the day. Where it stopped short,
+   whether on a wall inside the day, a throttle or the budget, "last 24 hours" would be a claim the
+   page cannot support, and Ethereum makes that the ordinary case: its endpoint serves about 10,000
+   blocks and a day is about 7,171, so the margin is nine hours and a tightening would cross it.
+   The outcome line under the section names the block; this says only how far was reached. */
+/* **An empty section must say which window was empty** (the same ruling as `dayHead`, one line down).
+   "nothing has arrived at this address yet" was true while the page read all of a distribution's
+   history. Reading a day, it is a claim about all time made from one day's evidence — and on Base
+   Sepolia on 2026-11-23 it was simply false: the address has four funds events, 1.1 million blocks
+   back, and all ten cold loads said nothing had ever arrived. The head above said "last 24 hours"
+   and the line below offered a wallet, but the sentence between them was still wrong, and a reader
+   who read only the rows would have been misled. */
+const emptyLine = (all, day) => WALLET ? all : day;
+const dayHead = full => WALLET ? full
+  : (DS.h && DS.h.partial != null) ? 'as far back as this endpoint served'
+  : DAY_EXACT ? 'last 24 hours'
+  : 'about the last 24 hours';
 function partialLine() {
   if (!DS.h || DS.h.partial == null) return '';
-  return `<div class="notice">history before block ${DS.h.partial} not loaded · `
-    + '<button class="link older">load older</button></div>';
+  const w = DS.h.wall;
+  /* Out of budget: everything above is read, the rest is one press away. Unchanged, and #165's
+     budget is untouched by this task. */
+  if (!w) {
+    return WALLET
+      ? `<div class="notice">history before block ${DS.h.partial} not loaded${press()}</div>`
+      : `<div class="notice">this read stopped at block ${DS.h.partial}, short of a full day</div>`;
+  }
+  /* A wall, so **no `load older`**: the endpoint has said it will not serve what is below, and a
+     button that cannot work is worse than no button. Two wordings, because the evidence differs.
+     Where the endpoint named the first block it keeps, that is a fact about the endpoint and the line
+     says so. Where it only refused, the line says it *may* not serve history that far back — it must
+     not claim to have read to a boundary it merely stopped at. Either way the next sentence is the
+     one a reader can act on: their own wallet's endpoint may go further. */
+  /* A throttle keeps the press, because asking again later can succeed and `older()` resumes from
+     this boundary rather than restarting the walk. The sentence says what happened — the endpoint is
+     limiting requests — rather than implying it has no older history to give, which is the thing a
+     rate limit does not tell us. */
+  if (w.kind === 'throttle') {
+    return `<div class="notice">this endpoint is limiting requests · history before block ${w.block}`
+      + ` is not loaded yet${press()}</div>`;
+  }
+  const where = `history before block ${DS.h.wall.block} not loaded`;
+  const why = w.stated != null
+    ? `this endpoint serves no history before block ${w.stated}`
+    : 'this endpoint refused older blocks, and may not serve history that far back';
+  return `<div class="notice">${where} · ${why}. A connected wallet reads through its own endpoint,`
+    + ' which may go further.</div>';
 }
 const bindOlder = () => V.querySelectorAll('.older').forEach(b => { b.onclick = older; });
 const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow${e.kind === 'escrowed' ? ' err' : e.kind === 'queued' && !e.closed ? ' amber' : e.kind === 'applied' || e.kind === 'accepted' ? ' done' : ''}"><b>${e.kind}</b><span class="w">${e.what}</span><span class="t">block ${e.block} · ${ext('tx', e.tx, short(e.tx))}</span></div>`).join('')}</div>`;
@@ -1559,7 +2019,7 @@ const closeDrawer = () => { PROPOSE = null; DRAWER = false; OWNOPEN = false; ACK
 /* After a write lands the view is re-read as the refresh control re-reads it, minus the scroll: the
    head is pulled again, or the history scan stops at the block before the write and its own row is
    missing until a manual refresh. */
-const bindAll = () => bindWrites(w => { if (w.sig === 'propose(bytes)') closeDrawer(); HEAD = null; TOKEN++; track(detail(DS.d.addr)); });
+const bindAll = () => bindWrites(w => { if (w.sig === 'propose(bytes)') closeDrawer(); HEAD = null; DAYFLOOR = null; TOKEN++; track(detail(DS.d.addr)); });
 
 /* Decision 7: who this page is for is decided once per load. The owner's own account sends directly;
    a contract owner that answers `isOwner(ACC)` gets the same view with every owner write rendered as
@@ -1627,8 +2087,10 @@ async function detail(addr) {
   // Progressive, and after the paint above: a slow or failed logs call never holds back the table.
   // The token list, the escrow rows and the `queued in <tx>` links come out of it, so those say so
   // until it lands rather than reading as absence. The apply buttons do not wait on it (#215).
-  const from = FIRST.get(d.addr) || CFG.factoryBlock;
-  history(addr, from).then(h => absorb(t, d, h)).catch(() => {
+  /* The head is read first so the floor can be a day behind it. `head()` caches its promise, so the
+     three reads below still make one `eth_blockNumber` between them. */
+  head().then(hi => readFloor(d, hi).then(from => history(addr, from, hi)))
+    .then(h => absorb(t, d, h)).catch(() => {
     if (stale(t)) return;
     DS.failed = true;
     paintFailed();
@@ -1676,6 +2138,8 @@ async function absorb(t, d, h) {
    would spend a second budget on the same blocks. */
 async function older() {
   const t = TOKEN, d = DS.d, prev = DS.h.raw, to = DS.h.partial - 1;
+  /* Unreachable without a wallet — no press is painted — so this is the wallet's own floor, the
+     distribution's first block, and not the 24-hour one. */
   const from = Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock));
   if (!(to >= from)) return;
   for (const b of V.querySelectorAll('.older')) { b.disabled = true; b.textContent = 'loading older…'; }
@@ -1688,7 +2152,10 @@ async function older() {
   if (stale(t)) return;
   /* `add` is the older half, so it goes in front, and the boundary that remains is its own. `ins` is
      dropped unless both halves have it: a half-read `other` list cannot be told from a complete one. */
-  const join = (older_, newer_) => ({ logs: [...older_.logs, ...newer_.logs], partial: older_.partial });
+  /* The older half's boundary **and its wall**: it is the half that walked further back, so it is the
+     one that met whatever stopped the read. Dropping the wall here would turn a depth refusal into a
+     plain budget boundary on the next paint, and put back a `load older` that cannot work. */
+  const join = (older_, newer_) => ({ logs: [...older_.logs, ...newer_.logs], partial: older_.partial, wall: older_.wall });
   await absorb(t, d, histOf({
     changes: join(add.changes, prev.changes),
     funds: join(add.funds, prev.funds),
@@ -1699,10 +2166,12 @@ async function older() {
 /* The log-built sections, painted from DS so a repaint of the page — the drawer opening, a mode switch —
    puts back what has already arrived instead of leaving "loading…" that nothing will replace. */
 function paintChanges() {
-  histFill('h-changes', DS.h.changes, 'no change has been queued yet.');
+  histFill('h-changes', DS.h.changes,
+    emptyLine('no change has been queued yet.', 'no change has been queued in the last 24 hours.'));
   fill('pending', pendingBlock(DS.d, true));
 }
-const paintActivity = () => histFill('h-funds', DS.h.funds, 'nothing has arrived at this address yet.');
+const paintActivity = () => histFill('h-funds', DS.h.funds,
+  emptyLine('nothing has arrived at this address yet.', 'nothing has arrived in the last 24 hours.'));
 function paintFunds() {
   /* The escrow rows and the token list are built from the same logs the sections are, so a partial
      history is a caveat on this block too, not only on the two lists below it. */
@@ -1729,8 +2198,11 @@ function paintDetail() {
     + ownerBar(d)
     + (DRAWER ? drawerHTML(d) : '')
     + `<div class="sechead"><b>funds</b><span>moves by the table, permissionlessly — no approval involved</span></div><div id="funds">${notice('reading the balances and the escrow…')}</div>`
-    + `<div class="sechead"><b>changes</b><span>every configuration change this contract has seen</span></div><div id="h-changes">${notice('loading…')}</div>`
-    + `<div class="sechead"><b>activity</b><span>funds in, and every split and escrow since</span></div><div id="h-funds">${notice('loading…')}</div></div>`;
+    /* The head says what was read, not what exists: with no wallet these two sections are a day deep
+       (step 5, amended), and a head promising "every change this contract has seen" over a day's worth
+       of rows is the same wrong answer as an empty list stated as fact. */
+    + `<div class="sechead"><b>changes</b><span>${dayHead('every configuration change this contract has seen')}</span></div><div id="h-changes">${notice('loading…')}</div>`
+    + `<div class="sechead"><b>activity</b><span>${dayHead('funds in, and every split and escrow since')}</span></div><div id="h-funds">${notice('loading…')}</div></div>`;
   const q = document.getElementById('queue');
   if (q) q.onclick = () => { DRAWER = !DRAWER; if (DRAWER && !PROPOSE) PROPOSE = { rows: rowsFrom(d.table) }; paintDetail(); };
   if (DRAWER) bindDrawer(d);
@@ -1933,6 +2405,18 @@ function bindDrawer(d) {
    sit under the balance in every view, including a visitor's. The token list is the chain's own: ETH,
    plus every token that has appeared in a `Distributed` or an `Escrowed` log, since nothing on chain
    carries one. What `history` found sent here and never distributed is `readOthers`', read on demand. */
+/* At most `n` of `fn` in flight over `items`, in order. The table may hold 107 rows
+   (`Distribution.MAX_BENEFICIARIES`), and a `Promise.all` over 107 `eth_call`s is nine times the burst
+   that already draws a rate limit out of these endpoints — so the fan-out below is paced even though
+   it only ever runs when something is actually hidden. */
+async function pool(items, n, fn) {
+  const out = new Array(items.length);
+  let i = 0;
+  const worker = async () => { while (i < items.length) { const k = i++; out[k] = await fn(items[k], k); } };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
+  return out;
+}
+const ESCROW_INFLIGHT = 4;
 async function readFunds(d, funds) {
   const tokens = [ZERO, ...new Set(funds.filter(e => e.token && e.token !== ZERO).map(e => e.token))];
   const read = list => Promise.all(list.map(async tk => {
@@ -1959,7 +2443,35 @@ async function readFunds(d, funds) {
     const signs = !!ACC && !same(ACC, ac) && await signsFor(ac);
     return { tk, ac, held, signs, dec: await decimalsOf(tk) };
   }));
-  return { rows, escrows: escrows.filter(e => e.held > 0n) };
+  const found = escrows.filter(e => e.held > 0n);
+  /* **`reserved` is the check on all of the above** (step 5, amended). The rows above are only as
+     complete as the `Escrowed` logs that found them, and with no wallet those logs reach one day back;
+     `_set` never clears `escrowed`, so an escrow also outlives its account's removal from the table.
+     `reserved[token]` is the exact outstanding total — three writers in `Distribution.sol`, each in
+     lockstep with `escrowed`, and the contract fuzz-tests the equality
+     (`test/invariant/Distribution.inv.t.sol` `invariant_reservedEqualsEscrowSum`) — and it is already
+     read above for every token shown. So the difference between it and the rows found is exactly what
+     this read is missing, and it is never a guess.
+
+     Equal, and nothing more is read: the common case costs no calls at all. Larger, and the accounts
+     in the table are asked directly, paced. Larger still after that, and the remainder is stated with
+     its amount rather than left as an absence — an account removed from the table cannot be found from
+     state at all, since there is nothing left to enumerate it from. */
+  const hidden = [];
+  for (const r of rows) {
+    const sumFor = () => found.filter(e => same(e.tk, r.tk)).reduce((a, e) => a + e.held, 0n);
+    if (r.reserved <= sumFor()) continue;
+    const known = new Set(found.filter(e => same(e.tk, r.tk)).map(e => e.ac.toLowerCase()));
+    const ask = (d.table || []).map(b => b[0]).filter(a => a && !known.has(String(a).toLowerCase()));
+    const got = await pool(ask, ESCROW_INFLIGHT, async ac => {
+      const [held] = await call(d.addr, 'escrowed(address,address)', [r.tk, ac], ['uint256']).catch(() => [0n]);
+      return held > 0n ? { tk: r.tk, ac, held } : null;
+    });
+    for (const g of got) if (g) found.push({ ...g, dec: r.dec, signs: !!ACC && !same(ACC, g.ac) && await signsFor(g.ac) });
+    const left = r.reserved - sumFor();
+    if (left > 0n) hidden.push({ tk: r.tk, dec: r.dec, amount: left });
+  }
+  return { rows, escrows: found, hidden };
 }
 /* The unrecognised tokens, read only once their list is opened: each costs a balance and a decimals
    call, and they are the ones anyone can multiply by sending junk. Never distributed or escrowed here,
@@ -2042,6 +2554,13 @@ function fundsHTML(d, f, other) {
     'err',
   )).join('');
   const n = other && new Set(other.map(e => e.token)).size;
+  /* **The token list is built from the funds logs, so it inherits their window.** With no wallet those
+     logs are a day deep, and a token distributed here a week ago is simply not in `rows` — no sentence
+     above says so, and "listed means distributed here at least once" invites the reader to treat the
+     list as complete. Audited with the empty sentences after the Base Sepolia finding: of the seven
+     sentences in this block the other six are safe, because `reserved`, the balances and the escrow
+     amounts are read from **state** and do not narrow with the window. This one is the exception. */
+  const windowed = WALLET ? '' : '<div class="help wide">this list covers the last 24 hours; a token distributed here earlier is not shown. Connect a wallet to read further back.</div>';
   const others = !other ? '<div class="help wide">token payments in could not be read from this provider, so a token never distributed here is not listed.</div>'
     : !n ? ''
     : `<details class="others" id="others"><summary>other tokens received (${n})</summary>`
@@ -2050,7 +2569,18 @@ function fundsHTML(d, f, other) {
          what membership in it means instead of pretending to curate it. */
       + '<div class="status warn">unverified — anyone can send any token to this address. Check a token before distributing it; once distributed it is listed above. listed means distributed here at least once — not checked, not endorsed.</div>'
       + `<div id="others-body">${notice('reading their balances…')}</div></details>`;
-  return `<div class="ledger">${rows}${escrows}</div>${others}`
+  /* **Never a silent absence** (step 5, amended). Whatever `reserved` accounts for and the rows above
+     could not attribute is stated with its amount. It is real money and its owner can always take it
+     — `claim` is `msg.sender`'s own — but nothing on this page can name who, because an account
+     removed from the table leaves no enumerable trace: only the `Escrowed` log that created it. Said
+     as "accounts for" rather than "holds", because for a fee-on-transfer or rebasing token the balance
+     need not cover it (F4, and `invariant_balanceCoversReserved` excludes that class). */
+  const unlisted = (f.hidden || []).filter(h => h.amount > 0n).map(h =>
+    `<div class="status warn">${h.tk === ZERO ? eth(h.amount) : amt(h.amount, h.dec)} ${token(h.tk)} is accounted for in escrow`
+    + ` that this read could not attribute to an account${WALLET
+      ? ' — the account is no longer in the table, and only the log that escrowed it names them.'
+      : ' — connect a wallet to read further back and find it.'}</div>`).join('');
+  return `<div class="ledger">${rows}${escrows}</div>${unlisted}${windowed}${others}`
     + `<div class="help wide">anyone can call distribute() — the contract splits by the table above; you pay the gas.${ACC ? '' : ' connect a wallet to send it.'} paying in from a contract? see <a class="link" href="#/docs#payin">receiving funds</a>.</div>`;
 }
 
@@ -2200,8 +2730,10 @@ async function createPredict() {
   if (!Number.isInteger(n) || n < 1) { slot.innerHTML = notice('salt # is a whole number, 1 or more.', 'err'); paintCreate(); return; }
   paintCreate();
   const salt = Model.salt(ACC, n);
-  const [addr] = await call(CFG.factory, 'predict(bytes32)', [salt], ['address']);
-  const code = await P.request({ method: 'eth_getCode', params: [addr, 'latest'] });
+  const [addr] = await pcall(CFG.factory, 'predict(bytes32)', [salt], ['address']);
+  /* #375: the document's chain decides whether this salt is taken. Asking the wallet's chain found
+     it free on Ethereum for a page built for Sepolia, where it was not, and enabled Deploy. */
+  const code = await pageRead().request({ method: 'eth_getCode', params: [addr, 'latest'] });
   if (stale(t) || Number(D.n) !== n) return;
   D.salt = salt; D.predicted = addr; D.taken = !!code && code !== '0x';
   slot.innerHTML = (D.taken ? `<div class="status bad">a distribution already exists at ${ext('address', addr, esc(addr))} — choose another salt #</div>`
@@ -2333,8 +2865,13 @@ const contractRows = () => contractChains().map(c => {
    snippet says so rather than inventing one. */
 function widgetDocs() {
   const id = CFG.chainId;
-  const http = /^https?:$/.test(location.protocol);
-  const src = http ? new URL('widget.js', location.href.split('#')[0]).href : `https://${CFG.app}.${id}.w3link.io/widget.js`;
+  /* One host for every chain's snippet: the gateway, not this page's own address (step 7, moved here
+     from m05-t04b so the mainnet documents carry it and no chain needs a second upload for it).
+     A pasted snippet goes on somebody else's page, and what it needs is an address that resolves in
+     an ordinary browser without a gateway in the reader's head — which `w3link.io` and a relative
+     `widget.js` both fail at, the first by naming a gateway the host did not choose and the second by
+     resolving against whatever page it was pasted into. */
+  const src = `https://rake.dnzn.dev/${id}/widget.js`;
   const mine = EMBED;
   const addr = mine ? mine.addr : S.featured || '0x…';
   // Spelled as entities: a literal script tag here would trip the build's inline-script check.
@@ -2342,7 +2879,12 @@ function widgetDocs() {
   // One attribute per line. The indent is built here rather than typed: the minifier strips leading
   // whitespace from every source line, template literals included.
   const at = (k, v) => '\n  ' + esc(k) + (v === undefined ? '' : `="${v}"`);
-  const tag = rpc => `&lt;script src="${esc(src)}"&gt;&lt;/script&gt;\n&lt;div` + at('data-rake', `<span class="wd-a">${addr}</span>`)
+  /* `integrity` and `crossorigin` together, and neither is optional: a cross-origin script with an
+     `integrity` attribute and no `crossorigin` is **refused** by the browser rather than checked, so
+     offering the first without the second would be a snippet that does not load. The hash is the
+     build's own, substituted (`app/build.mjs`), so it pins the bytes a host page executes to the
+     bytes this document was built from. */
+  const tag = rpc => `&lt;script src="${esc(src)}"\n  integrity="${esc(CFG.widgetSri)}"\n  crossorigin="anonymous"&gt;&lt;/script&gt;\n&lt;div` + at('data-rake', `<span class="wd-a">${addr}</span>`)
     + at('data-chain', id) + at('data-link') + (rpc ? at('data-rpc', esc(rpc)) : '') + '\n&gt;&lt;/div&gt;';
   const rpc = PUBLIC_RPC[id];
   /* The `data-rpc` form is presented first and the wallet form second (#309, decision 65). A page
@@ -2365,7 +2907,7 @@ function widgetDocs() {
   <p><code>data-link</code> adds a link from the widget to the distribution's page in this app, where a visitor can verify the table, its history and any pending change. Remove the attribute to omit the link, or give it the address of another copy of the app, such as <code>data-link="https://…"</code>.</p>
   <p><code>data-variant="compact"</code> renders the bar and a single line, suited to a footer. <code>data-theme="dark"</code> or <code>"light"</code> overrides the widget's inference from the page background.</p>
   ${mine || S.featured ? '' : `<p>The address is filled in once a wallet on ${cname(id)} is connected.</p>`}
-  <p>The script is served by the contract that serves this page, ${ext('address', CFG.app, esc(short(CFG.app)))}${http ? ', and the <code>src</code> above is resolved against this page\'s own address' : ', through an ERC-5219 gateway'}. A page opened in a web3:// client may load <code class="brk">web3://${esc(CFG.app)}:${id}/widget.js</code> instead; clients that call only <code>html()</code>, such as Freedom, cannot reach the script at that address.</p>`;
+  <p>The script above is the one this contract serves, ${ext('address', CFG.app, esc(short(CFG.app)))}, read through an ERC-5219 gateway at <code>rake.dnzn.dev</code>. The <code>integrity</code> attribute is the gateway's keeper: a browser runs the file only if its bytes hash to that value, which are the bytes this document was built from — so a gateway that served anything else would be refused by the visitor's own browser rather than trusted. A page opened in a web3:// client may load <code class="brk">web3://${esc(CFG.app)}:${id}/widget.js</code> instead; clients that call only <code>html()</code>, such as Freedom, cannot reach the script at that address.</p>`;
 }
 function docs() {
   V.innerHTML = `<div class="docgrid"><nav class="rail" aria-label="sections">${eyebrow('sections')}`
@@ -2542,8 +3084,12 @@ const chrome = on => { for (const id of ['asof', 'refresh']) { const el = docume
 function route() {
   const h = location.hash || '#/';
   TOKEN++;
-  // A route entry re-pulls the head rather than serving the boot value; `refresh` is a route entry.
+  /* A route entry re-pulls the head rather than serving the boot value; `refresh` is a route entry.
+     The 24-hour floor goes with it: it is a block measured against a particular head, and serving one
+     found against an older head would read a window that is no longer the last day. */
   HEAD = null;
+  DAYFLOOR = null;
+  DAY_EXACT = true;
   document.getElementById('nav-distros').className = h.startsWith('#/distros') ? 'on' : '';
   document.getElementById('nav-docs').className = h.startsWith('#/docs') ? 'on' : '';
   chrome(!(h.startsWith('#/docs') || h === '#/create'));

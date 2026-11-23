@@ -1,0 +1,1778 @@
+{
+  "when": "2026-11-23T04:39:19Z",
+  "factory": "0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E",
+  "origin": "https://rake.dnzn.dev",
+  "rows": [
+    {
+      "chain": "1",
+      "url": "https://ethereum-rpc.publicnode.com",
+      "role": "doc",
+      "head": 26475495,
+      "chainIdReported": "1",
+      "spans": [
+        {
+          "span": 50,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 100,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 200,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 1000,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 10000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 50000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 100000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        }
+      ],
+      "span": 1000,
+      "spanEver": 1000,
+      "spanRefusedAt": 10000,
+      "spanRefusedWhy": "-32602 Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode",
+      "headSkewAt": [],
+      "depthAtSpan": 1000,
+      "depthSpanReliable": true,
+      "depths": [
+        {
+          "depth": 10000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode"
+          ]
+        },
+        {
+          "depth": 50000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode"
+          ]
+        },
+        {
+          "depth": 200000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode"
+          ]
+        },
+        {
+          "depth": 1000000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode"
+          ]
+        },
+        {
+          "depth": 5000000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode"
+          ]
+        }
+      ],
+      "depth": null,
+      "depthEver": null,
+      "depthPartial": [],
+      "statedFloor": null,
+      "oldest": null,
+      "rateAnswered": 40,
+      "rateRefused": 0,
+      "rateFirst": null,
+      "rateBand": [
+        26474495,
+        26475495
+      ],
+      "cors": "*",
+      "corsUsable": true,
+      "answersNothing": false
+    },
+    {
+      "chain": "1",
+      "url": "https://0xrpc.io/eth",
+      "role": "other",
+      "head": 26475496,
+      "chainIdReported": "1",
+      "spans": [
+        {
+          "span": 50,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 100,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 200,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 1000,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 10000,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 50000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32601 Request contains invalid block params"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 100000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32601 Request contains invalid block params"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        }
+      ],
+      "span": 10000,
+      "spanEver": 10000,
+      "spanRefusedAt": 50000,
+      "spanRefusedWhy": "-32601 Request contains invalid block params",
+      "headSkewAt": [],
+      "depthAtSpan": 10000,
+      "depthSpanReliable": true,
+      "depths": [
+        {
+          "depth": 10000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 50000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 200000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 1000000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 5000000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        }
+      ],
+      "depth": 5000000,
+      "depthEver": 5000000,
+      "depthPartial": [],
+      "statedFloor": null,
+      "oldest": 21475496,
+      "rateAnswered": 40,
+      "rateRefused": 0,
+      "rateFirst": null,
+      "rateBand": [
+        21485496,
+        26475496
+      ],
+      "cors": "*",
+      "corsUsable": true,
+      "answersNothing": false
+    },
+    {
+      "chain": "1",
+      "url": "https://rpc.flashbots.net",
+      "role": "other",
+      "head": 26475498,
+      "chainIdReported": "1",
+      "spans": [
+        {
+          "span": 50,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 100,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 200,
+          "ok": 2,
+          "of": 3,
+          "whys": [
+            "-32016 over rate limit"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 1000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32016 over rate limit"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 10000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32016 over rate limit"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 50000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32016 over rate limit"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 100000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32016 over rate limit"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        }
+      ],
+      "span": 100,
+      "spanEver": 200,
+      "spanRefusedAt": 200,
+      "spanRefusedWhy": "-32016 over rate limit",
+      "headSkewAt": [],
+      "depthAtSpan": 100,
+      "depthSpanReliable": true,
+      "depths": [
+        {
+          "depth": 10000,
+          "ok": 1,
+          "of": 3,
+          "whys": [
+            "-32016 over rate limit"
+          ]
+        },
+        {
+          "depth": 50000,
+          "ok": 2,
+          "of": 3,
+          "whys": [
+            "4444 pruned history unavailable"
+          ]
+        },
+        {
+          "depth": 200000,
+          "ok": 1,
+          "of": 3,
+          "whys": [
+            "4444 pruned history unavailable"
+          ]
+        },
+        {
+          "depth": 1000000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "4444 pruned history unavailable"
+          ]
+        },
+        {
+          "depth": 5000000,
+          "ok": 1,
+          "of": 3,
+          "whys": [
+            "4444 pruned history unavailable"
+          ]
+        }
+      ],
+      "depth": null,
+      "depthEver": 5000000,
+      "depthPartial": [
+        10000,
+        50000,
+        200000,
+        5000000
+      ],
+      "statedFloor": null,
+      "oldest": null,
+      "rateAnswered": 40,
+      "rateRefused": 0,
+      "rateFirst": null,
+      "rateBand": [
+        26475398,
+        26475498
+      ],
+      "cors": "*",
+      "corsUsable": true,
+      "answersNothing": false
+    },
+    {
+      "chain": "1",
+      "url": "https://eth.drpc.org",
+      "role": "other",
+      "head": 26475499,
+      "chainIdReported": "1",
+      "spans": [
+        {
+          "span": 50,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 100,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 200,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "35 ranges over 100 blocks are not supported on free plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 1000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "35 ranges over 100 blocks are not supported on free plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 10000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "35 ranges over 100 blocks are not supported on free plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 50000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "35 ranges over 100 blocks are not supported on free plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 100000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "35 ranges over 100 blocks are not supported on free plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        }
+      ],
+      "span": 100,
+      "spanEver": 100,
+      "spanRefusedAt": 200,
+      "spanRefusedWhy": "35 ranges over 100 blocks are not supported on free plan",
+      "headSkewAt": [],
+      "depthAtSpan": 100,
+      "depthSpanReliable": true,
+      "depths": [
+        {
+          "depth": 10000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 50000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 200000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 1000000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 5000000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        }
+      ],
+      "depth": 5000000,
+      "depthEver": 5000000,
+      "depthPartial": [],
+      "statedFloor": null,
+      "oldest": 21475499,
+      "rateAnswered": 40,
+      "rateRefused": 0,
+      "rateFirst": null,
+      "rateBand": [
+        21475599,
+        26475499
+      ],
+      "cors": "*",
+      "corsUsable": true,
+      "answersNothing": false
+    },
+    {
+      "chain": "8453",
+      "url": "https://mainnet.base.org",
+      "role": "doc",
+      "head": 61092221,
+      "chainIdReported": "8453",
+      "spans": [
+        {
+          "span": 50,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32011 request limit reached"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 100,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32011 request limit reached"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 200,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32011 request limit reached"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 1000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32011 request limit reached"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 10000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32011 request limit reached"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 50000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32011 request limit reached"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 100000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32011 request limit reached"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        }
+      ],
+      "span": null,
+      "spanEver": null,
+      "spanRefusedAt": 50,
+      "spanRefusedWhy": "-32011 request limit reached",
+      "headSkewAt": [],
+      "answersNothing": true,
+      "why": "-32011 request limit reached"
+    },
+    {
+      "chain": "8453",
+      "url": "https://base-rpc.publicnode.com",
+      "role": "other",
+      "head": 61092257,
+      "chainIdReported": "8453",
+      "spans": [
+        {
+          "span": 50,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 100,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 200,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 1000,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 10000,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 50000,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 100000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32701 exceed maximum block range: 50000"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        }
+      ],
+      "span": 50000,
+      "spanEver": 50000,
+      "spanRefusedAt": 100000,
+      "spanRefusedWhy": "-32701 exceed maximum block range: 50000",
+      "headSkewAt": [],
+      "depthAtSpan": 50000,
+      "depthSpanReliable": true,
+      "depths": [
+        {
+          "depth": 10000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 block range extends beyond current head block: requested 61132257, head 61092292",
+            "-32602 block range extends beyond current head block: requested 61132257, head 61092294",
+            "-32602 block range extends beyond current head block: requested 61132257, head 61092295"
+          ]
+        },
+        {
+          "depth": 50000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 200000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 1000000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 5000000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        }
+      ],
+      "depth": 5000000,
+      "depthEver": 5000000,
+      "depthPartial": [],
+      "statedFloor": null,
+      "oldest": 56092257,
+      "rateAnswered": 40,
+      "rateRefused": 0,
+      "rateFirst": null,
+      "rateBand": [
+        56142257,
+        61092257
+      ],
+      "cors": "*",
+      "corsUsable": true,
+      "answersNothing": false
+    },
+    {
+      "chain": "8453",
+      "url": "https://base.drpc.org",
+      "role": "other",
+      "head": 61092343,
+      "chainIdReported": "8453",
+      "spans": [
+        {
+          "span": 50,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 100,
+          "ok": 2,
+          "of": 3,
+          "whys": [
+            "15 You reached Public endpoint rate limit, please upgrade to paid plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 200,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "35 ranges over 100 blocks are not supported on free plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 1000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "35 ranges over 100 blocks are not supported on free plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 10000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "35 ranges over 100 blocks are not supported on free plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 50000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "35 ranges over 100 blocks are not supported on free plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 100000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "35 ranges over 100 blocks are not supported on free plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        }
+      ],
+      "span": 50,
+      "spanEver": 100,
+      "spanRefusedAt": 100,
+      "spanRefusedWhy": "15 You reached Public endpoint rate limit, please upgrade to paid plan",
+      "headSkewAt": [],
+      "depthAtSpan": 50,
+      "depthSpanReliable": true,
+      "depths": [
+        {
+          "depth": 10000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 50000,
+          "ok": 1,
+          "of": 3,
+          "whys": [
+            "15 You reached Public endpoint rate limit, please upgrade to paid plan"
+          ]
+        },
+        {
+          "depth": 200000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 1000000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "15 You reached Public endpoint rate limit, please upgrade to paid plan"
+          ]
+        },
+        {
+          "depth": 5000000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "15 You reached Public endpoint rate limit, please upgrade to paid plan"
+          ]
+        }
+      ],
+      "depth": 200000,
+      "depthEver": 200000,
+      "depthPartial": [
+        50000
+      ],
+      "statedFloor": null,
+      "oldest": 60892343,
+      "rateAnswered": 0,
+      "rateRefused": 40,
+      "rateFirst": "15 You reached Public endpoint rate limit, please upgrade to paid plan",
+      "rateBand": [
+        60892393,
+        61092343
+      ],
+      "cors": "*",
+      "corsUsable": true,
+      "answersNothing": false
+    },
+    {
+      "chain": "84532",
+      "url": "https://sepolia.base.org",
+      "role": "doc+deploy",
+      "head": 62434942,
+      "chainIdReported": "84532",
+      "spans": [
+        {
+          "span": 50,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 100,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 200,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 1000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32614 eth_getLogs is limited to a 200 range"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 10000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32614 eth_getLogs is limited to a 200 range"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 50000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32614 eth_getLogs is limited to a 200 range"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 100000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32614 eth_getLogs is limited to a 200 range"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        }
+      ],
+      "span": 200,
+      "spanEver": 200,
+      "spanRefusedAt": 1000,
+      "spanRefusedWhy": "-32614 eth_getLogs is limited to a 200 range",
+      "headSkewAt": [],
+      "depthAtSpan": 200,
+      "depthSpanReliable": true,
+      "depths": [
+        {
+          "depth": 10000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 50000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 200000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 1000000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 5000000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        }
+      ],
+      "depth": 5000000,
+      "depthEver": 5000000,
+      "depthPartial": [],
+      "statedFloor": null,
+      "oldest": 57434942,
+      "rateAnswered": 28,
+      "rateRefused": 12,
+      "rateFirst": "HTTP 429 {\"code\":-32007,\"message\":\"25/second request limit reached\"}",
+      "rateBand": [
+        57435142,
+        62434942
+      ],
+      "cors": "https://rake.dnzn.dev",
+      "corsUsable": true,
+      "answersNothing": false
+    },
+    {
+      "chain": "84532",
+      "url": "https://base-sepolia-rpc.publicnode.com",
+      "role": "deploy",
+      "head": 62435005,
+      "chainIdReported": "84532",
+      "spans": [
+        {
+          "span": 50,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 100,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 200,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 1000,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 10000,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 50000,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 100000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32701 exceed maximum block range: 50000"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        }
+      ],
+      "span": 50000,
+      "spanEver": 50000,
+      "spanRefusedAt": 100000,
+      "spanRefusedWhy": "-32701 exceed maximum block range: 50000",
+      "headSkewAt": [],
+      "depthAtSpan": 50000,
+      "depthSpanReliable": true,
+      "depths": [
+        {
+          "depth": 10000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 block range extends beyond current head block: requested 62475005, head 62435042",
+            "-32602 block range extends beyond current head block: requested 62475005, head 62435043",
+            "-32602 block range extends beyond current head block: requested 62475005, head 62435045"
+          ]
+        },
+        {
+          "depth": 50000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 200000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 1000000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 5000000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        }
+      ],
+      "depth": 5000000,
+      "depthEver": 5000000,
+      "depthPartial": [],
+      "statedFloor": null,
+      "oldest": 57435005,
+      "rateAnswered": 40,
+      "rateRefused": 0,
+      "rateFirst": null,
+      "rateBand": [
+        57485005,
+        62435005
+      ],
+      "cors": "*",
+      "corsUsable": true,
+      "answersNothing": false
+    },
+    {
+      "chain": "84532",
+      "url": "https://base-sepolia.drpc.org",
+      "role": "other",
+      "head": 62435080,
+      "chainIdReported": "84532",
+      "spans": [
+        {
+          "span": 50,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "30 Request timeout on the free plan, please upgrade to paid plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 100,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "30 Request timeout on the free plan, please upgrade to paid plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 200,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "35 ranges over 100 blocks are not supported on free plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 1000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "35 ranges over 100 blocks are not supported on free plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 10000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "35 ranges over 100 blocks are not supported on free plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 50000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "35 ranges over 100 blocks are not supported on free plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 100000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "35 ranges over 100 blocks are not supported on free plan"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        }
+      ],
+      "span": null,
+      "spanEver": null,
+      "spanRefusedAt": 50,
+      "spanRefusedWhy": "30 Request timeout on the free plan, please upgrade to paid plan",
+      "headSkewAt": [],
+      "answersNothing": true,
+      "why": "30 Request timeout on the free plan, please upgrade to paid plan"
+    },
+    {
+      "chain": "11155111",
+      "url": "https://ethereum-sepolia-rpc.publicnode.com",
+      "role": "doc+deploy",
+      "head": 12193431,
+      "chainIdReported": "11155111",
+      "spans": [
+        {
+          "span": 50,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 100,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 200,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 1000,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 10000,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 50000,
+          "ok": 2,
+          "of": 3,
+          "whys": [
+            "4444 pruned history unavailable"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 100000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32701 exceed maximum block range: 50000"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        }
+      ],
+      "span": 10000,
+      "spanEver": 50000,
+      "spanRefusedAt": 50000,
+      "spanRefusedWhy": "4444 pruned history unavailable",
+      "headSkewAt": [],
+      "depthAtSpan": 10000,
+      "depthSpanReliable": true,
+      "depths": [
+        {
+          "depth": 10000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 50000,
+          "ok": 1,
+          "of": 3,
+          "whys": [
+            "4444 pruned history unavailable"
+          ]
+        },
+        {
+          "depth": 200000,
+          "ok": 1,
+          "of": 3,
+          "whys": [
+            "4444 pruned history unavailable"
+          ]
+        },
+        {
+          "depth": 1000000,
+          "ok": 1,
+          "of": 3,
+          "whys": [
+            "4444 pruned history unavailable"
+          ]
+        },
+        {
+          "depth": 5000000,
+          "ok": 1,
+          "of": 3,
+          "whys": [
+            "4444 pruned history unavailable"
+          ]
+        }
+      ],
+      "depth": 10000,
+      "depthEver": 5000000,
+      "depthPartial": [
+        50000,
+        200000,
+        1000000,
+        5000000
+      ],
+      "statedFloor": null,
+      "oldest": 12183431,
+      "rateAnswered": 40,
+      "rateRefused": 0,
+      "rateFirst": null,
+      "rateBand": [
+        12183431,
+        12193431
+      ],
+      "cors": "*",
+      "corsUsable": true,
+      "answersNothing": false
+    },
+    {
+      "chain": "11155111",
+      "url": "https://sepolia.gateway.tenderly.co",
+      "role": "other",
+      "head": 12193432,
+      "chainIdReported": "11155111",
+      "spans": [
+        {
+          "span": 50,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 100,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 200,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 1000,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 10000,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 50000,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 100000,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        }
+      ],
+      "span": 100000,
+      "spanEver": 100000,
+      "spanRefusedAt": null,
+      "spanRefusedWhy": null,
+      "headSkewAt": [],
+      "depthAtSpan": 100000,
+      "depthSpanReliable": true,
+      "depths": [
+        {
+          "depth": 10000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 50000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 200000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 1000000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 5000000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        }
+      ],
+      "depth": 5000000,
+      "depthEver": 5000000,
+      "depthPartial": [],
+      "statedFloor": null,
+      "oldest": 7193432,
+      "rateAnswered": 19,
+      "rateRefused": 21,
+      "rateFirst": "-32005 rate limit exceeded",
+      "rateBand": [
+        7293432,
+        12193432
+      ],
+      "cors": "*",
+      "corsUsable": true,
+      "answersNothing": false
+    },
+    {
+      "chain": "11155111",
+      "url": "https://1rpc.io/sepolia",
+      "role": "deploy",
+      "head": 12193433,
+      "chainIdReported": "11155111",
+      "spans": [
+        {
+          "span": 50,
+          "ok": 1,
+          "of": 3,
+          "whys": [
+            "-32001 Block range too large: maximum allowed is 50 blocks on your current plan. Upgrade your subscription at https://no",
+            ""
+          ],
+          "kinds": [
+            "policy",
+            "policy"
+          ]
+        },
+        {
+          "span": 100,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 eth_getLogs is limited to 0 - 50 blocks range"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 200,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 eth_getLogs is limited to 0 - 50 blocks range"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 1000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 eth_getLogs is limited to 0 - 50 blocks range"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 10000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 eth_getLogs is limited to 0 - 50 blocks range"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 50000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 eth_getLogs is limited to 0 - 50 blocks range"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 100000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32602 eth_getLogs is limited to 0 - 50 blocks range"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        }
+      ],
+      "span": null,
+      "spanEver": 50,
+      "spanRefusedAt": 50,
+      "spanRefusedWhy": "-32001 Block range too large: maximum allowed is 50 blocks on your current plan. Upgrade your subscription at https://no / ",
+      "headSkewAt": [],
+      "depthAtSpan": 50,
+      "depthSpanReliable": false,
+      "depths": [
+        {
+          "depth": 10000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 50000,
+          "ok": 1,
+          "of": 3,
+          "whys": [
+            "-32001 Block range too large: maximum allowed is 50 blocks on your current plan. Upgrade your subscription at https://no"
+          ]
+        },
+        {
+          "depth": 200000,
+          "ok": 2,
+          "of": 3,
+          "whys": [
+            "-32029 Too Many Requests, Please apply an OnFinality API key or contact us to receive a higher rate limit"
+          ]
+        },
+        {
+          "depth": 1000000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        },
+        {
+          "depth": 5000000,
+          "ok": 3,
+          "of": 3,
+          "whys": []
+        }
+      ],
+      "depth": 5000000,
+      "depthEver": 5000000,
+      "depthPartial": [
+        50000,
+        200000
+      ],
+      "statedFloor": null,
+      "oldest": 7193433,
+      "rateAnswered": 17,
+      "rateRefused": 23,
+      "rateFirst": "4444 pruned history unavailable",
+      "rateBand": [
+        7193483,
+        12193433
+      ],
+      "cors": "*",
+      "corsUsable": true,
+      "answersNothing": false
+    },
+    {
+      "chain": "11155111",
+      "url": "https://sepolia.rpc.thirdweb.com",
+      "role": "other",
+      "head": 12193435,
+      "chainIdReported": "11155111",
+      "spans": [
+        {
+          "span": 50,
+          "ok": 3,
+          "of": 3,
+          "whys": [],
+          "kinds": []
+        },
+        {
+          "span": 100,
+          "ok": 1,
+          "of": 3,
+          "whys": [
+            "-32005 Rate limit exceeded. Upgrade your plan at https://thirdweb.com/pricing"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 200,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32005 Rate limit exceeded. Upgrade your plan at https://thirdweb.com/pricing"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 1000,
+          "ok": 2,
+          "of": 3,
+          "whys": [
+            "-32005 Rate limit exceeded. Upgrade your plan at https://thirdweb.com/pricing"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 10000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32005 Log response size exceeded. Maximum allowed number of requested blocks is 1000"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 50000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32005 Rate limit exceeded. Upgrade your plan at https://thirdweb.com/pricing"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        },
+        {
+          "span": 100000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32005 Rate limit exceeded. Upgrade your plan at https://thirdweb.com/pricing"
+          ],
+          "kinds": [
+            "policy"
+          ]
+        }
+      ],
+      "span": 50,
+      "spanEver": 1000,
+      "spanRefusedAt": 100,
+      "spanRefusedWhy": "-32005 Rate limit exceeded. Upgrade your plan at https://thirdweb.com/pricing",
+      "headSkewAt": [],
+      "depthAtSpan": 50,
+      "depthSpanReliable": true,
+      "depths": [
+        {
+          "depth": 10000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32005 Rate limit exceeded. Upgrade your plan at https://thirdweb.com/pricing"
+          ]
+        },
+        {
+          "depth": 50000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32005 Rate limit exceeded. Upgrade your plan at https://thirdweb.com/pricing"
+          ]
+        },
+        {
+          "depth": 200000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32005 Rate limit exceeded. Upgrade your plan at https://thirdweb.com/pricing"
+          ]
+        },
+        {
+          "depth": 1000000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32005 Rate limit exceeded. Upgrade your plan at https://thirdweb.com/pricing"
+          ]
+        },
+        {
+          "depth": 5000000,
+          "ok": 0,
+          "of": 3,
+          "whys": [
+            "-32005 Rate limit exceeded. Upgrade your plan at https://thirdweb.com/pricing"
+          ]
+        }
+      ],
+      "depth": null,
+      "depthEver": null,
+      "depthPartial": [],
+      "statedFloor": null,
+      "oldest": null,
+      "rateAnswered": 0,
+      "rateRefused": 40,
+      "rateFirst": "-32005 Rate limit exceeded. Upgrade your plan at https://thirdweb.com/pricing",
+      "rateBand": [
+        12193385,
+        12193435
+      ],
+      "cors": "(none)",
+      "corsUsable": false,
+      "answersNothing": false
+    }
+  ]
+}

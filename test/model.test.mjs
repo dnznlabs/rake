@@ -15,7 +15,7 @@ globalThis.Eth = Eth;
 const { SNAPSHOT_T, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt } = Model;
 const { revertMessage, tableFrom, parseDelay, wei, namehash, plainName } = Model;
 const { windows, rangeCap, isPruned, isWrappedRefusal, nonceOf } = Model;
-const FUNCTIONS = ['chainHref', 'countdown', 'dateText', 'deadline', 'decodePending', 'isPruned', 'isWrappedRefusal', 'namehash', 'nonceOf', 'ownerChange', 'ownerKind', 'parseDelay', 'pct', 'plainName', 'rangeCap', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei', 'windows'];
+const FUNCTIONS = ['chainHref', 'countdown', 'dateText', 'deadline', 'decodePending', 'isPruned', 'isThrottle', 'isWrappedRefusal', 'namehash', 'nodeSentence', 'nonceOf', 'ownerChange', 'ownerKind', 'parseDelay', 'pct', 'plainName', 'rangeCap', 'revertMessage', 'salt', 'supersededBy', 'tableFrom', 'wei', 'windows'];
 const SET_BENEFICIARIES = 'setBeneficiaries((address,uint96,string,string)[])';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/abi');

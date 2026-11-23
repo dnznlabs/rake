@@ -16,7 +16,33 @@ export const DOCS_SECTIONS = 15;
    is how `/block (\d+)/` shipped as `/block (\\d+)/` and left row (e) unable to fail. `selftest.mjs`
    runs these against real lines. */
 export const PATTERNS = {
+  /* One place for every row-kind pattern, so the driver and `selftest.mjs` cannot disagree about
+     what a row looks like (m05-t01d step 8). */
   partialLine: 'history before block \\d+ not loaded',
+  /* A read can stop short in four ways since step 5, and three of them print a line: out of budget
+     ("…not loaded · load older"), a depth refusal ("…not loaded · this endpoint serves no history
+     before block N"), and a throttle ("this endpoint is limiting requests · history before block N
+     is not loaded yet"). The fourth, an endpoint that answered nothing, prints `unavailable` below
+     and is a failure rather than a boundary. This matches the three that are boundaries — note the
+     throttle's wording differs, which is why `partialLine` alone no longer covers them. */
+  /* **Two wordings, because a no-wallet read is a day deep by design.** With a wallet, "history before
+     block N not loaded" is right: the press can fetch it. Without one there is no press, so the page
+     says it stopped short of a day instead — and a pattern that knew only the first wording would
+     classify that as no stop at all, which is the one error that would make an acceptance run on the
+     24-hour ruling meaningless. */
+  boundaryLine: 'history before block \\d+ (?:not loaded|is not loaded yet)|stopped at block \\d+, short of a full day',
+  /* The one line that is never acceptable: the page saying an endpoint answered nothing at all. */
+  unavailable: 'history unavailable',
+  /* **Anchored to the amount, because a bare kind word is a word.** This matched ` in ` anywhere, and
+     the funds block prints "token payments **in** could not be read from this provider" whenever the
+     address-less `Transfer` query is refused — which every endpoint the page ships does — so the help
+     sentence read as an activity row and credited chain 1 with history it has none of. A row always
+     puts its amount straight after its kind (`in Ξ0.0030 from 0x…`, `escrowed Ξ0.0009 · 0x…`,
+     `in 12.5 USDC from 0x…`), which is the form `writes.mjs` has always used. Row (c) counts the row
+     **elements** rather than trusting this; the pattern is for waiting and for classifying. */
+  activityRow: '(^|\\s)(in|distributed|escrowed|released|claimed)\\s+(?:Ξ)?\\d',
+  /* What a history row *is*, for counting. `histRows` emits one `.hrow` per entry inside `.hist`. */
+  activityRowSelector: '#h-funds .hrow',
   blockNumber: 'block (\\d+)',
   loadingNotice: '^(loading…|reading the balances and the escrow…|reading…)$',
 };
@@ -60,7 +86,7 @@ export async function until(label, fn, { ms = 120000, every = 1000 } = {}) {
    the page re-read the view, and during the repaint a row that is still there reads as absent. The
    predicate must hold on two consecutive reads of a section that is itself painted — this section,
    not all three, because requiring the whole page quiet made one row wait out another's churn. */
-export async function settledText(page, sel, test, { label, ms = 300000, every = 2500 } = {}) {
+export async function settledText(page, sel, test, { label, ms = 300000, every = 2500, fatal = PATTERNS.unavailable } = {}) {
   let hits = 0, last = '';
   await until(label || `${sel} settled`, async () => {
     const state = await page.evaluate(([s, pats]) => {
@@ -71,6 +97,14 @@ export async function settledText(page, sel, test, { label, ms = 300000, every =
     }, [sel, PATTERNS]);
     if (state !== 'painted') { hits = 0; return false; }
     last = await text(page, sel);
+    /* **`history unavailable` is final, so it fails here and not in five minutes.** It is the page
+       saying an endpoint answered nothing at all; waiting for that to improve is waiting for a
+       different endpoint. The old behaviour spent the whole 300-second budget on it and then
+       reported "still not true after 301 s", which reads as a slow read rather than as the refusal
+       it is — and three of those in one run is fifteen minutes of a driver telling you nothing. */
+    if (fatal && new RegExp(fatal, 'i').test(last)) {
+      throw new Miss(label || sel, 'the section reads `history unavailable`, which no amount of waiting changes', last.slice(0, 120), 'rows, or a boundary line');
+    }
     hits = test(last) ? hits + 1 : 0;
     return hits >= 2;
   }, { ms, every });
@@ -122,7 +156,21 @@ export async function probe(page, { base }) {
   return r;
 }
 
-export async function rowA(page, { chainName, wallet }) {
+export async function rowA(page, { chainName, wallet, patience = 60000 } = {}) {
+  /* **The featured panel is filled asynchronously, so it is waited for and not merely read.** This
+     row used to read it the instant the load event fired, which passed only because the endpoint it
+     was pointed at happened to answer inside that window. Repointing 11155111 at Tenderly in
+     m05-t01d step 5 made it fail with an empty panel — and the failure was the driver's, not the
+     page's: the panel filled a moment later. A row that depends on which endpoint is fast is not an
+     assertion about the document.
+
+     It is the same gap row (c)'s comment describes: painted is not filled. The timeout is the
+     finding if it expires — an endpoint too slow to fill the landing page inside a minute is worth
+     failing on, and it fails saying so rather than reporting an empty string. */
+  await until('(a) the featured panel fills', async () => {
+    const t = await text(page, '#featured');
+    return t.length > 0 && !/^(loading…|reading…)$/i.test(t);
+  }, { ms: patience, every: 1000 });
   const r = await page.evaluate(() => ({
     title: document.title,
     netname: document.getElementById('netname')?.textContent?.trim() ?? null,
@@ -180,24 +228,42 @@ export async function rowC(page, { base, addr = DNZN, patience = 120000, relatio
      rows, so a single read lands in that gap — which is how `activity carries at least one row` failed
      on a page whose activity, read seconds later, carried six. Each section is read until its own
      predicate holds twice (`settledText`), and only then are the facts taken. */
-  await settledText(page, '#h-funds', t => !/history unavailable/i.test(t) && /(^|\s)(in|distributed|escrowed|released|claimed)\s/i.test(t),
-    { label: '(c) `activity` carries at least one row and is not the #382 notice' });
-  await settledText(page, '#h-changes', t => !/history unavailable/i.test(t) && (/created/i.test(t) || /no change has been queued yet/i.test(t)),
+  /* **A boundary line is accepted, and a row is still required** (step 5, step 8). The page may
+     honestly stop short — out of budget, or refused older blocks, or throttled — and say so; what it
+     may not do is show nothing and call that history. So the predicate asks for an activity row and
+     tolerates whatever stop line sits under it; `settledText` fails at once on `history unavailable`,
+     which is the one state no waiting improves. */
+  await settledText(page, '#h-funds', t => new RegExp(PATTERNS.activityRow, 'i').test(t),
+    { label: '(c) `activity` carries at least one row' });
+  await settledText(page, '#h-changes', t => /created/i.test(t) || /no change has been queued yet/i.test(t),
     { label: '(c) `changes` reads the empty line this distribution has, or a Created row' });
   const r = await page.evaluate(() => ({
     view: (document.getElementById('view')?.innerText || '').replace(/\s+/g, ' ').trim(),
     changes: (document.getElementById('h-changes')?.innerText || '').replace(/\s+/g, ' ').trim(),
     funds: (document.getElementById('funds')?.innerText || '').replace(/\s+/g, ' ').trim(),
     activity: (document.getElementById('h-funds')?.innerText || '').replace(/\s+/g, ' ').trim(),
+    /* Counted as elements. A text pattern over a section that also carries help sentences and stop
+       lines is a guess about wording; `.hrow` is what a row is. */
+    activityRows: document.querySelectorAll('#h-funds .hrow').length,
+    /* The three absences row (c) now also asserts (UAT.md (c), amended 2026-11-23). The driver's
+       injected provider makes this a wallet page, so the 24-hour wording must not appear — if it
+       does, the provider was not seen as a wallet and the whole run is measuring the wrong path. */
+    heads: [...document.querySelectorAll('.sechead')].map(n => n.textContent.trim()).join(' | '),
+    presses: document.querySelectorAll('.older').length,
     queueButton: !!document.getElementById('queue'),
     ownerBar: ([...document.querySelectorAll('.actions .status')].map(n => n.textContent.trim())[0]) || '',
     ownsText: (document.getElementById('view')?.innerText || '').includes('you own this distribution'),
   }));
   has('c', 'the description', r.view, 'DNZN // FUND DISTRIBUTION');
   has('c', 'the table', r.view, 'treasury');
-  falsy('c', '`activity` is not the #382 notice', /history unavailable/i.test(r.activity));
-  falsy('c', '`changes` is not the #382 notice', /history unavailable/i.test(r.changes));
-  truthy('c', '`activity` carries at least one row', /(^|\s)(in|distributed|escrowed|released|claimed)\s/i.test(r.activity));
+  falsy('c', '`activity` is not the #382 notice', new RegExp(PATTERNS.unavailable, 'i').test(r.activity));
+  falsy('c', '`changes` is not the #382 notice', new RegExp(PATTERNS.unavailable, 'i').test(r.changes));
+  truthy('c', `\`activity\` carries at least one row (${r.activityRows} \`.hrow\` elements)`, r.activityRows > 0);
+  /* A wallet page, because the driver injects a provider. These three say so, and catch the one
+     regression this row could otherwise pass through: the wallet path quietly taking the no-wallet
+     branch, which would read a day deep and still show rows. */
+  falsy('c', 'the heads do not say `last 24 hours` — this is a wallet page', /last 24 hours/i.test(r.heads));
+  falsy('c', 'no section offers `connect a wallet to load more`', /connect a wallet to load more/i.test(r.activity + ' ' + r.changes + ' ' + r.funds));
   has('c', '`changes` reads the empty line this distribution has', r.changes, 'no change has been queued yet');
   if (relation) {
     if (relation.expect === 'vault') {
@@ -311,7 +377,7 @@ export async function rowK({ readFile }) {
   };
 }
 
-export async function rowL(page, { base, shot } = {}) {
+export async function rowL(page, { base, chainId, shot } = {}) {
   await page.evaluate(() => { location.hash = '#/docs'; });
   await page.waitForTimeout(1500);
   const r = await page.evaluate(() => ({
@@ -330,10 +396,22 @@ export async function rowL(page, { base, shot } = {}) {
   await page.evaluate(() => { location.hash = '#/docs#widget'; });
   await page.waitForTimeout(1200);
   /* The snippet is in the article, after the `s-widget` heading — the heading itself is three words.
-     The row asks that it carries *this chain's* gateway URL, so both halves are asserted. */
+
+     **It names one fixed host, and no longer the page's own address** (m05-t01d step 7). It used to
+     be asserted against `new URL(base).origin`, which was right while the snippet resolved
+     `widget.js` against whatever served the page — and would now fail on any run whose base is not
+     the gateway, a local preview among them. What a host pasting this needs is an address that
+     resolves in an ordinary browser, so the assertion is the literal host and this chain's id.
+
+     The `integrity` and `crossorigin` attributes are asserted with it: the hash is what makes a
+     cross-origin script safe to paste, and a browser **refuses** a cross-origin script carrying
+     `integrity` without `crossorigin` rather than checking it — so a snippet with one and not the
+     other would not load at all, which no assertion about the URL would catch. */
   const article = await page.evaluate(() => (document.querySelector('article.doc')?.innerText || '').replace(/\s+/g, ' '));
   has('l', 'the widget snippet is in the article', article, 'widget.js');
-  if (base) has('l', 'the snippet carries this chain’s gateway URL', article, new URL(base).origin + new URL(base).pathname);
+  has('l', 'the snippet names the gateway and this chain', article, `https://rake.dnzn.dev/${chainId}/widget.js`);
+  has('l', 'the snippet pins the widget’s bytes', article, 'integrity="sha384-');
+  has('l', 'and carries crossorigin, without which integrity is refused', article, 'crossorigin="anonymous"');
   const snippet = (article.match(/<script[^>]*widget\.js[^>]*>/) || [])[0] || null;
   return { ...r, snippet };
 }

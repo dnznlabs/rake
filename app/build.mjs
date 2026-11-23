@@ -12,6 +12,7 @@
    --dev keeps the DEV-fenced blocks, which hold the ?rpc=&from= overrides. */
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Eth from './src/eth.js';
@@ -138,6 +139,26 @@ function substitute(text, label) {
 const minify = text => text.replace(/\/\*[\s\S]*?\*\//g, '')
   .split('\n').map(l => l.replace(/^\s+/, '')).filter(l => l && !l.startsWith('//')).join('\n');
 
+/* The widget is built **before** the page, so the page can carry the widget's own hash. The
+   `#/docs` snippet offers a cross-origin `script` tag, and an `integrity` attribute is the only thing
+   that makes that safe to paste: it pins the bytes a host page will execute to the bytes this build
+   produced. Computed here and substituted, never typed — a hand-written SRI is a hash of whatever was
+   true once. The order matters and is the whole reason this block moved above the page. */
+/* The widget's budget (M02 criterion 7, DESIGN_HANDOFF § 1) is a gate on every build rather than a
+   figure in a handoff: one SSTORE2 chunk holds 24,000 bytes, so the limit that bites is the design's,
+   and a widget that has quietly grown past it should stop the build that would upload it. */
+const WIDGET_MAX = 10240;
+const widget = minify(substitute(readFileSync(join(here, 'src/widget.js'), 'utf8'), 'app/src/widget.js'));
+const widgetBytes = Buffer.byteLength(widget);
+if (widgetBytes > WIDGET_MAX) {
+  console.error(`build: the widget is ${widgetBytes} bytes, ${widgetBytes - WIDGET_MAX} over the ${WIDGET_MAX}-byte budget`);
+  console.error('       the budget is the design\'s, not the chunk\'s — cut the widget, or re-argue the budget');
+  process.exit(1);
+}
+const widgetSri = 'sha384-' + createHash('sha384').update(widget).digest('base64');
+values.WIDGET_SRI = widgetSri;
+sources.WIDGET_SRI = 'the built widget';
+
 let html = readFileSync(join(here, 'src/index.html'), 'utf8');
 /* An inlined file is a module for node and a plain script for the page, so its export goes. */
 html = html.replace(/\/\*@inline ([\w./-]+)@\*\//g, (_, f) =>
@@ -153,17 +174,6 @@ try {
   process.exit(1);
 }
 
-/* The widget's budget (M02 criterion 7, DESIGN_HANDOFF § 1) is a gate on every build rather than a
-   figure in a handoff: one SSTORE2 chunk holds 24,000 bytes, so the limit that bites is the design's,
-   and a widget that has quietly grown past it should stop the build that would upload it. */
-const WIDGET_MAX = 10240;
-const widget = minify(substitute(readFileSync(join(here, 'src/widget.js'), 'utf8'), 'app/src/widget.js'));
-const widgetBytes = Buffer.byteLength(widget);
-if (widgetBytes > WIDGET_MAX) {
-  console.error(`build: the widget is ${widgetBytes} bytes, ${widgetBytes - WIDGET_MAX} over the ${WIDGET_MAX}-byte budget`);
-  console.error('       the budget is the design\'s, not the chunk\'s — cut the widget, or re-argue the budget');
-  process.exit(1);
-}
 /* The host page is a foil: substituted so its inline script can reach the factory and the chain, and
    otherwise copied byte for byte — its four panels are deliberately unlike the dapp, and nothing
    reads it but a developer's browser. */
@@ -181,4 +191,4 @@ writeFileSync(join(here, 'dist/host.html'), host);
 
 /* byteLength, not length: the document may carry multi-byte characters. */
 console.log(`dapp: raw ${Buffer.byteLength(html)} bytes · gzip ${gz.length} bytes · chain ${chain}${dev ? ' · dev overrides kept' : ''}`);
-console.log(`widget: raw ${widgetBytes} bytes · budget ${WIDGET_MAX} · ${WIDGET_MAX - widgetBytes} left`);
+console.log(`widget: raw ${widgetBytes} bytes · budget ${WIDGET_MAX} · ${WIDGET_MAX - widgetBytes} left · ${widgetSri}`);

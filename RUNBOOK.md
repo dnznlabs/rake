@@ -1074,6 +1074,49 @@ that key is both signer and owner, so it works there and reverts `Unauthorized` 
 chain. It stays for `make deploy`; it is never the public-chain route. That collapse is also why no
 rehearsal caught this — a dev chain cannot tell the two roles apart.
 
+#### 4e — redeploy the gateway, because its `widget.js` copy is now load-bearing
+
+**An upload changes `widget.js`, and the deployed gateway serves its own static copy of it rather
+than the chain's.** `.github/workflows/deploy-gateway.yml` passes `embeds: widget.js`, so each
+chain's widget is fetched at deploy time and published at `/<chain>/widget.js`. Until m05-t01d that
+staleness was a difference; it is now a failure, because `#/docs` emits the embed snippet with
+`integrity="sha384-..."` computed from the same build, and a browser given a copy whose digest does
+not match **refuses to run the script** rather than running the older one. The snippet the page tells
+a visitor to paste is wrong until this step runs.
+
+It is not hypothetical: m05-t01c measured 8,525 bytes on chain against **8,509 served**, byte-identical
+on both chains (`docs/milestones/m05/tasks/m05-t01c/HANDOFF.md`, § What `make verify` proved).
+
+Run § The gateway **steps 3 to 5** — build locally, then dispatch verify-only, then deploy. Steps 1
+and 2 are for a new chain only: a re-upload does not move an `App` address, so `deploy/gw44.json` and
+`deploy/chains.json` are untouched. Step 4 still has to be *looked at*: the local build must print the
+three lines already in `expect`, and a difference means the pin or a config moved, which is not this
+step's business. `record:` the run id, which of its three attempts deployed, and the `integrity`
+snippet the run prints per chain.
+
+#### 4f — `make verify` against the deployed host, whose `site` lines are the record
+
+Once per upload, after both chains, from the same gw44 checkout:
+
+```sh
+devbox run -- env VERIFY_SITE=https://rake.dnzn.dev VERIFY_ADDRESS=$APP \
+  VERIFY_CHAINS="11155111 84532" GW44_CHAINS=<rake>/deploy/chains.json make verify
+```
+
+**Read its first line before its result** — it names the address and the chains it actually checked —
+and then record the **`site`** lines, which are the only ones that touched `https://rake.dnzn.dev`.
+The `config` lines are a different stage: they resolve `https://pinned.invalid/` through a locally
+built gateway in that checkout and compare it with the chain, so they pass whatever the deployed host
+is serving. m05-t01c's step 8 quoted four `config` lines and no `site` line, which is why its record
+contains no measurement of the deployed host at all, and why these two steps exist.
+
+Two things that stage will not do for you. A plain `curl https://rake.dnzn.dev/<chain>/` returns the
+**9,299-byte bootstrap**, byte-identical on both chains, because the service worker resolves the
+document — so the root is not checkable by fetch, and only `/widget.js` answers a flat one with the
+asset itself. And the browser stage builds with `esbuild`, whose postinstall the gw44 checkout's
+`allowScripts` policy holds back, so it exits before opening a browser; `make check-site` in § The
+gateway is the stage that drives engines.
+
 #### What the upload does to the network menu
 
 **The upload is what enables the chain in the dapp, on every chain (decision 69).** A page on any
@@ -1450,6 +1493,10 @@ the workflow pins.
 **Adding a chain is five edits and one dispatch.** m05-t02 and m05-t03 run this section as their last
 step, once their chain's `App` exists.
 
+**A re-upload needs this section too, at steps 3 to 5 only** — see § 4e. The deployable carries a
+static copy of each chain's `widget.js`, so new bytes on chain do not reach `https://rake.dnzn.dev`
+until it is deployed again, and since m05-t01d the embed snippet carries that copy's digest.
+
 1. **`deploy/gw44.json`** — add the chain id and its `App` address to `contracts`. **Ethereum becomes
    `default` when it is added, and no other chain does** (decision 70; gw44 decision 11 gives `/`
    to a mainnet chain once one is live, and the Product Owner ruled on 2026-11-22 that the mainnet
@@ -1506,6 +1553,20 @@ devbox run -- env VERIFY_SITE=https://rake.dnzn.dev VERIFY_ADDRESS=<App> \
 `check-site` is nine cases per engine. `make verify` reads the contract through the endpoints and
 compares what the site serves byte for byte; **read its first line**, which names the address and the
 chains it actually checked, before reading its result.
+
+**And before each mainnet upload, re-read chain 1's horizon:**
+
+```sh
+devbox run -- node tools/rpc-depth.mjs --chain 1
+```
+
+The page promises a visitor with no wallet "last 24 hours", which on Ethereum is about **7,171 blocks**,
+and `ethereum-rpc.publicnode.com` was measured serving about **10,000** before refusing with
+`Archive requests require a personal token` (m05-t01d, 2026-11-23). **That margin is nine hours and
+nothing in this repository can widen it** — if the operator tightens the horizon below ~7,200 blocks,
+the heading stops being true on every load, and the page says what it reached instead (`dayHead`).
+A reading below that is not a reason to stop an upload; it is a reason to say so in the handoff and to
+raise the endpoint choice, because no code change recovers it.
 
 **Two things the caller must not do**, both learned by doing them:
 

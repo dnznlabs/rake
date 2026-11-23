@@ -92,6 +92,7 @@ function load({ announce = [], stored = {}, injected = null, kv = null }) {
   const body = [
     'let P = null, ACC = null, CHAIN = null;',
     'let WALLET = false;',
+    block('const asChain = id => {', '\n};\n'),
     line('let WALLETS = [], PICK'),
     line('const WALLET_KEY ='),
     line('const OFF_KEY ='),
@@ -229,6 +230,7 @@ const chainOnly = chain => {
   const reloads = [];
   const body = [
     `let CHAIN = ${JSON.stringify(chain)};`,
+    block('const asChain = id => {', '\n};\n'),
     block('function chainChanged'),
     'return { chainChanged, read: () => CHAIN };',
   ].join('\n');
@@ -236,7 +238,11 @@ const chainOnly = chain => {
 };
 
 test('an unchanged chain does not reload, whichever way the id is written', () => {
-  for (const [held, event] of [[11155111, '0xaa36a7'], ['11155111', '0xaa36a7'], [84532, '0x14a34'], [11155111, 11155111]]) {
+  /* `CHAIN` held as a string was a real case until #379, when the three assignments became one
+     type; the page cannot produce one now, and `chain-type.test.mjs` fails if a fourth assignment
+     does. So the held values are numbers here, and what this still covers is the *event's* shape:
+     hex, decimal string, or number. */
+  for (const [held, event] of [[11155111, '0xaa36a7'], [11155111, '11155111'], [84532, '0x14a34'], [11155111, 11155111]]) {
     const page = chainOnly(held);
     page.chainChanged(event);
     assert.deepEqual(page.reloads, [], `held ${JSON.stringify(held)}, event ${JSON.stringify(event)} reloaded`);
@@ -257,7 +263,9 @@ test('an event before any chain has been read records it instead of reloading', 
   page.chainChanged('0xaa36a7');
 
   assert.deepEqual(page.reloads, [], 'nothing had been read yet, so there was nothing to re-read');
-  assert.equal(page.read(), '11155111');
+  // A number since #379; this read `'11155111'` when `chainChanged` was one of the two assignments
+  // that stringified it.
+  assert.equal(page.read(), 11155111);
 });
 
 test('a wallet that emits chainChanged on load does not start a reload loop', async () => {
