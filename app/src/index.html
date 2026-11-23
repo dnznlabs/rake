@@ -62,17 +62,14 @@ const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.
    so a page with no wallet shows whatever they say.
 
      chain  endpoint                          operator   its stated limit, in its own words
-     1      eth.drpc.org                      dRPC       `ranges over 100 blocks are not supported
-                                                         on free plan`
+     1      ethereum-rpc.publicnode.com       Allnodes   `Archive requests require a personal token`
      8453   base-rpc.publicnode.com           Allnodes   `exceed maximum block range: 50000`
      11155111 sepolia.gateway.tenderly.co     Tenderly   `rate limit exceeded` past ~19 of 40
      84532  base-sepolia-rpc.publicnode.com   Allnodes   `exceed maximum block range: 50000`
 
    What they replaced, and why (read 2026-11-23):
 
-     1         ethereum-rpc.publicnode.com  no reliable depth: `-32602 Archive requests require a
-                                            personal token`, and a reliable span that moved between
-                                            1,000 and 10,000 blocks between runs
+     1         — kept. See below: every deeper candidate failed to paint the page
      8453      mainnet.base.org             answers nothing: `-32011 request limit reached`
      11155111  — kept. See below: Tenderly measured deeper and could not paint the page
      84532     sepolia.base.org             a 200-block window, which is #382: a walk back over
@@ -94,18 +91,26 @@ const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.
    browser-native comparison across all four chains is `tools/rpc-cold.mjs`, and its table is in the
    handoff.
 
-   **`0xrpc.io` measured best on chain 1 and is deliberately not here.** 10,000-block spans, 5,000,000
-   blocks deep, 40 of 40 under pressure — and no operator named anywhere on its own site, which
-   describes itself as a public good funded by donations to an address, hosted on GitHub Pages, and
-   logs a run of endpoints disabled for load or hardware. That is not a dependency for the one
-   document real users read. **What choosing dRPC instead cost: the window, not the depth.** Its free
-   plan serves 100 blocks at a time against 0xrpc's 10,000, so at `MAX_WINDOWS` the page reads about
-   4,000 blocks a pass rather than 400,000 — roughly half a day of mainnet. It ends on the budget
-   rather than on a wall, which `load older` can continue past; an archive refusal cannot be.
+   **Chain 1 is also unchanged, and three candidates were tried in a browser before it stayed.**
+   `0xrpc.io` measured best of anything — 10,000-block spans, 5,000,000 deep, 40 of 40 under pressure
+   — and names **no operator** on its own site, which calls itself a public good funded by donations
+   to an address, runs on GitHub Pages, and logs a run of endpoints disabled for load. Not a
+   dependency for the one document real users read. Of the operators that can be named, measured over
+   ten cold loads each with no wallet (`tools/uat/cold.mjs`):
+
+     eth.drpc.org          panel fills, and **every one of ten loads read no history at all**: its
+                           free plan serves 100-block windows and then rate-limits the walk, so not
+                           one window is answered and all three sections say so
+     rpc.flashbots.net     **the panel did not fill at all**, 0 of 5
+     this one              10 of 10, history read, no section ever empty-handed
+
+   So the deepest endpoint is not the one that paints, twice over. What makes this one viable *now* is
+   step 5: its archive refusal used to kill the read and now ends it on a **boundary**, with a line
+   saying the endpoint serves no history before that block and a connected wallet may go further.
 
    A hostname is a pool, so none of this is a promise: the line the page paints is what *this* walk
    reached, never a figure from here. */
-const PUBLIC_RPC = { 1: 'https://eth.drpc.org', 10: 'https://mainnet.optimism.io', 8453: 'https://base-rpc.publicnode.com', 42161: 'https://arb1.arbitrum.io/rpc', 4326: 'https://mainnet.megaeth.com/rpc', 4663: 'https://robinhood-rpc.publicnode.com', 11155111: 'https://ethereum-sepolia-rpc.publicnode.com', 84532: 'https://base-sepolia-rpc.publicnode.com', 31337: 'http://127.0.0.1:8545', 31338: 'http://127.0.0.1:8546' };
+const PUBLIC_RPC = { 1: 'https://ethereum-rpc.publicnode.com', 10: 'https://mainnet.optimism.io', 8453: 'https://base-rpc.publicnode.com', 42161: 'https://arb1.arbitrum.io/rpc', 4326: 'https://mainnet.megaeth.com/rpc', 4663: 'https://robinhood-rpc.publicnode.com', 11155111: 'https://ethereum-sepolia-rpc.publicnode.com', 84532: 'https://base-sepolia-rpc.publicnode.com', 31337: 'http://127.0.0.1:8545', 31338: 'http://127.0.0.1:8546' };
 const ZERO = '0x' + '0'.repeat(40);
 /*DEV*/
 const Q = new URLSearchParams(location.search);
