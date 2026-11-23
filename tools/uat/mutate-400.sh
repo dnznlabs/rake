@@ -76,3 +76,14 @@ run "a finished span is read as a finished history" \
     'const readWhole = () => !!(DS.h && DS.h.partial == null);'
 run "the first read claims to have read the whole history" \
     'whole: from <= ownFloor(d)' 'whole: true'
+
+# The seam between the two reads: one block out either way is silent, and nothing downstream can see
+# it. `histOf` sorts and groups; it does not deduplicate and cannot know which blocks were asked for.
+run "the seam overlaps by one block, so an event is listed twice" \
+    'const to = (DS.h.partial != null ? DS.h.partial : DS.h.from) - 1;' \
+    'const to = (DS.h.partial != null ? DS.h.partial : DS.h.from);'
+run "the seam skips one block, so an event is lost" \
+    'const to = (DS.h.partial != null ? DS.h.partial : DS.h.from) - 1;' \
+    'const to = (DS.h.partial != null ? DS.h.partial : DS.h.from) - 2;'
+run "the join puts the halves back in the wrong order" \
+    'logs: [...older_.logs, ...newer_.logs]' 'logs: [...newer_.logs, ...older_.logs]'
