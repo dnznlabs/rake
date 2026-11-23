@@ -57,6 +57,31 @@ with no wallet, and this task does not pretend one does.
    line carries the node's own message, shortened, and not the bare word `reverted`. Check: a
    test for an error with `message` and no `data`, and one with both, which still decodes.
 5. **#382, say what was read.** Three parts, the first chosen from step 1's table.
+   **Amended 2026-11-23 by the Product Owner's ruling (Telegram, 00:51 CST): with no wallet the
+   page reads the last 24 hours of history and says so.** "We don't need to be so catering for
+   non-wallets as far as activity/history goes." This replaces the aim of reading as deep as the
+   endpoint allows, and where it conflicts with a part below, this governs.
+   - **No wallet:** `changes` and `activity` read from the block 24 hours before the head, found
+     from block timestamps and never from an assumed block time (Base Sepolia mints every
+     0.2 s). The section heads say **last 24 hours**, and one line under each says **connect a
+     wallet to load more**. No `load older` is offered. If the read stops short of 24 hours,
+     the four outcomes already built say why.
+   - **Wallet connected, on the page's chain:** as today, through the wallet's provider, with
+     `load older`.
+   - **Escrow does not depend on the scan.** For every account in the table, the page reads
+     `escrowed(token, account)` for native ETH from state and paints the row with its `release`
+     and `claim` controls whenever it is above zero, wallet or not. Escrow found through logs
+     is added to that, not required for it. An escrow of an account no longer in the table, or
+     in a token, is still found only through logs; the funds block says so in one line when no
+     wallet is connected.
+   - **Dropped:** the shared in-flight limit and the full-budget mainnet bound (#392, closed
+     unmerged), and the second `tools/rpc-depth.mjs` table as a gate on the calldata. The
+     endpoints chosen and the start window stay as built.
+   - **Check:** tests for the 24-hour floor from timestamps, both lines, no press without a
+     wallet, and an escrow row painted from state with the log read refused. Then
+     `tools/uat/cold.mjs` on all four chains, ten loads each after two quiet hours: the
+     24-hour read completes in at least 9 of 10, and the handoff gives the request count per
+     load per chain.
    - `PUBLIC_RPC` per chain is the measured endpoint that serves the deepest history to a
      browser, and `deploy/chains.json` agrees with it or the handoff says why not.
    - **Amended 2026-11-23: the walk starts at the window its own endpoint is known to serve.**
@@ -122,8 +147,10 @@ with no wallet, and this task does not pretend one does.
 ## Acceptance criteria
 
 - `devbox run -- make test` passes with the tests of steps 2 to 7 in it.
-- On all four chains the handoff's table names the endpoint chosen and the depth it serves, and
-  the page built for each paints its boundary line at that depth in a browser, with a screenshot.
+- On all four chains, with no wallet, a distribution page reads its last 24 hours in at least
+  9 of 10 cold loads in a browser, says **last 24 hours** and **connect a wallet to load more**,
+  and shows an escrow held for a table account with the log read refused. A screenshot per
+  chain. (Amended 2026-11-23; it read "paints its boundary line at that depth".)
 - `tools/uat/`'s driver exits 0 on Sepolia **and on Base Sepolia** against
   `https://rake.dnzn.dev`, full list, and exits 1 on the control on both. This closes the rows
   m05-t01c recorded as not met on 84532.
