@@ -1,0 +1,13 @@
+{
+  "name": "rake-uat-driver",
+  "private": true,
+  "type": "module",
+  "description": "m05-t01c step 9a: the UAT rows that are about the page, as assertions.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "uat": "node run.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "1.63.0"
+  }
+}
