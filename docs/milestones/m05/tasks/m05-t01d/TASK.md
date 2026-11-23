@@ -122,7 +122,8 @@ with no wallet, and this task does not pretend one does.
 
 ## Open questions
 
-- **Is a page that reads only recent history without a wallet acceptable at launch?** *Options:*
+- **Is a page that reads only recent history without a wallet acceptable at launch?**
+  ([#387](https://github.com/dnznlabs/rake/issues/387)) *Options:*
   (1) yes, stated on the page as step 5 has it — costs nothing more, and a visitor with no
   wallet sees days or weeks of history, depending on the chain, and a line saying so; (2) no —
   the log cache of #221, or an endpoint DNZN pays for with its key in a public document, either
