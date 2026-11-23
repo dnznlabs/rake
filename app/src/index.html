@@ -1235,7 +1235,18 @@ function entry(log) {
     e.what = `${e.desc} · nonce ${nonce} · ${Model.countdown(eta, secs())}`;
   } else if (kind === 'applied' || kind === 'cancelled') {
     e.hash = log.topics[1];
-    e.what = ext('hash', log.topics[1], short(log.topics[1]));
+    /* Named, because the one value in this row that is **not** an address looked exactly like one
+       (#385). It is `keccak256(abi.encode(action, nonce))` (`src/Distribution.sol:224`) — the handle
+       `applyQueued` and `cancel` take, not a party to anything. The Product Owner read a row of this
+       shape on Base Sepolia and asked who `0x6688…5e5e` was, in a row whose other `0x…` values are
+       beneficiaries.
+
+       `ext`'s `hash` kind already keeps it unlike an address — no `data-addr`, so no name sweep
+       rewrites it, and no explorer link, since a queued action's hash is no transaction and links
+       nowhere. What was missing was the word, and the word is the fix. When the `Queued` this closes
+       is inside the window, `histOf` prefixes its description; when it is not — which a wall or a
+       budget makes common — this label is the whole row, and it should still say what it is. */
+    e.what = `action hash ${ext('hash', log.topics[1], short(log.topics[1]))}`;
   } else if (kind === 'accepted') {
     // The nomination's `Applied` is not the handover; this is, and it is the only log the nominee's call leaves.
     e.what = `owner · ${ext('address', at(1), short(at(1)))} → ${ext('address', at(2), short(at(2)))}`;
