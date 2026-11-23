@@ -223,6 +223,11 @@ chains later.
      screenshot per row under `shots/`. He reads 9a's screenshots, and M04 criterion 6's
      signoff line is in his words and says which rows he drove and which he read. This is
      m05-t01's criterion 18b, moved here.
+   - **Base Sepolia, amended 2026-11-22 (#382):** 9a's history rows cannot pass there on this
+     document; the criterion below says what runs and how the rest is recorded. Nothing in
+     `app/` changes in this task for it: a fix is a new document, a new preview and a new
+     upload, and it rides the next one. **No mainnet document is uploaded before #382 is
+     fixed and the same walk is measured on every chain it ships to.**
    - **What this gives up, accepted:** no real wallet signs `distribute`, `release`, `propose`,
      `applyQueued` or `cancel` on this document. Those go through the same `tx()` path as
      `create`, which 9b does show to a wallet. Rejected: the driver replacing every row (an
@@ -252,8 +257,16 @@ chains later.
   byte-identical calldata to `main`'s tool.
 - M04 criterion 6's signoff is in the handoff, dated, in the Product Owner's words, for this
   document, naming the rows he drove and the rows he read (step 9, amended 2026-11-22).
-- `tools/uat/`'s driver exits 0 on both testnets against `https://rake.dnzn.dev`, exits non-zero
-  on the control of step 9a, and every screenshot of a 9a row was written by that run.
+- `tools/uat/`'s driver exits 0 on Sepolia against `https://rake.dnzn.dev`, exits non-zero on the
+  control of step 9a, and every screenshot of a 9a row was written by that run. **Amended
+  2026-11-22 ([#382](https://github.com/dnznlabs/rake/issues/382)):** this read "on both
+  testnets". On Base Sepolia the uploaded document cannot paint a distribution's history: its
+  public endpoint for 84532 serves `eth_getLogs` 200 blocks at a time and the factory is over a
+  million blocks behind the head. So on 84532 the driver runs the rows that read no history,
+  (a), (l), (w3) and the probe, and those exit 0; rows (c), (e) and (g) to (i) are recorded in
+  the handoff as **not met on 84532, cause #382**, not as passed and not as skipped. They are
+  run on Base Sepolia by the task that fixes #382, after its upload, and that task's criteria
+  say so. The signoff of step 9b names this.
 - The Product Owner's word that the preview of step 7a was good is on its action issue, dated
   before the first proposal of step 8, and `grep -c 'phone=' app/dist/index.html` prints 0 for
   the document uploaded.
