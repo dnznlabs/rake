@@ -102,6 +102,15 @@ async function rpc(url, method, params, { origin = null } = {}) {
 
 const one = s => String(s).replace(/\s+/g, ' ').trim().slice(0, 120);
 
+/* A refusal is not always about the question asked. A pooled hostname answers `eth_blockNumber` from
+ * one backend and `eth_getLogs` from another, and when the second is a block or two behind, a window
+ * that ends at the head is refused as "beyond current head" — nothing to do with how wide it was.
+ * The first table had `50: block range extends beyond current head block` in the column for span
+ * limits, which reads as "this endpoint refuses 50 blocks" and is false. So refusals are classified,
+ * and only a policy refusal is allowed to characterise a span. */
+const HEAD_SKEW = /beyond current head|requested \d+,? head \d+|header not found|unknown block/i;
+const kindOf = why => (HEAD_SKEW.test(why || '') ? 'head-skew' : 'policy');
+
 const getLogs = (url, from, to) =>
   rpc(url, 'eth_getLogs', [{ address: FACTORY, fromBlock: hex(from), toBlock: hex(to) }]);
 
@@ -125,12 +134,15 @@ async function spanProfile(url, head, spans) {
       if (r.ok) ok++; else whys.add(r.why);
       await sleep(250);
     }
-    per.push({ span, ok, of: ATTEMPTS, whys: [...whys] });
+    const whysArr = [...whys];
+    per.push({ span, ok, of: ATTEMPTS, whys: whysArr, kinds: whysArr.map(kindOf) });
   }
   const reliable = per.filter(p => p.ok === p.of).map(p => p.span).pop() ?? null;
   const everAnswered = per.filter(p => p.ok > 0).map(p => p.span).pop() ?? null;
-  const firstRefused = per.find(p => p.ok < p.of) || null;
-  return { per, reliable, everAnswered, firstRefused };
+  // Only a policy refusal characterises a span; a head skew is reported separately.
+  const firstRefused = per.find(p => p.ok < p.of && p.kinds.includes('policy')) || null;
+  const skewed = per.filter(p => p.kinds.includes('head-skew')).map(p => p.span);
+  return { per, reliable, everAnswered, firstRefused, skewed };
 }
 
 /** The depth profile: fixed depths back from the head, each attempted `ATTEMPTS` times.
@@ -248,7 +260,10 @@ async function measure(chain, cand, spans, depths) {
   row.span = s.reliable;                 // the width a page may count on
   row.spanEver = s.everAnswered;         // the width that sometimes works
   row.spanRefusedAt = s.firstRefused ? s.firstRefused.span : null;
-  row.spanRefusedWhy = s.firstRefused ? s.firstRefused.whys.join(' / ') : null;
+  row.spanRefusedWhy = s.firstRefused
+    ? s.firstRefused.whys.filter(w => kindOf(w) === 'policy').join(' / ')
+    : null;
+  row.headSkewAt = s.skewed;
   if (row.spanEver == null) {
     // Every span refused on every attempt: it answers `eth_blockNumber` but serves this page no
     // logs at all. That is the silence the task wants a non-zero exit for.
@@ -292,8 +307,9 @@ function markdown(rows, when) {
       lines.push(`| ${r.chain} | \`${r.url}\` | ${r.role} | **nothing** | ${r.why || r.spanRefusedWhy || '—'} | — | — | — | — | ${r.cors || '—'} |`);
       continue;
     }
-    const refused = r.spanRefusedAt == null ? 'nothing wider tried' : `${n(r.spanRefusedAt)}: ${r.spanRefusedWhy}`;
-    const span = `${r.span == null ? 'none' : '**' + n(r.span) + '**'} / ${n(r.spanEver)}`;
+    const refused = r.spanRefusedAt == null ? 'nothing wider refused' : `${n(r.spanRefusedAt)}: ${r.spanRefusedWhy}`;
+    const span = `${r.span == null ? 'none' : '**' + n(r.span) + '**'} / ${n(r.spanEver)}`
+      + (r.headSkewAt && r.headSkewAt.length ? ' · head skew seen' : '');
     const depth = r.depth == null ? 'none' : `**${n(r.depth)}**`;
     const partial = r.depthPartial && r.depthPartial.length
       ? r.depthPartial.map(d => n(d)).join(', ')
