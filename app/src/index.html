@@ -2095,6 +2095,26 @@ async function detail(addr) {
     DS.failed = true;
     paintFailed();
     bindAll();
+    /* **A failed log read may not take the funds block with it.** The ETH row and its `distribute`
+       are read from **state** — `reserved(address)` and the balance — and `distribute` is
+       permissionless, so it is the one control every visitor can use and the one this page exists
+       for. Found by the Product Owner on Base Sepolia on 2026-11-23: his wallet's default endpoint
+       caps `eth_getLogs` at 200 blocks and rate-limits the walk, so the history threw, `paintFailed`
+       replaced the whole block, and a page showing `waiting to distribute Ξ0.0100` offered no way to
+       do it.
+
+       So the same read runs again with **no logs at all**: `readFunds(d, [])` gives the ETH row from
+       state, and the `reserved` comparison then states any escrow it cannot attribute rather than
+       hiding it. Only if *this* fails is the block replaced by the notice. */
+    readFunds(d, []).then(f => {
+      if (stale(t)) return;
+      DS.f = f;
+      paintFunds();
+      bindAll();
+    }).catch(() => {
+      if (stale(t)) return;
+      fill('funds', notice('the funds could not be read from this endpoint at all — neither the logs nor the balances answered.', 'err'));
+    });
   });
   /* Phase 2, the heir and the probe — started after the history above and not before it, so a slow
      `isOwner` never holds the logs back. `paintDetail` repaints the whole view from `DS`, which is
@@ -2174,16 +2194,25 @@ const paintActivity = () => histFill('h-funds', DS.h.funds,
   emptyLine('nothing has arrived at this address yet.', 'nothing has arrived in the last 24 hours.'));
 function paintFunds() {
   /* The escrow rows and the token list are built from the same logs the sections are, so a partial
-     history is a caveat on this block too, not only on the two lists below it. */
-  fill('funds', fundsHTML(DS.d, DS.f, DS.h.other) + partialLine());
-  bindOthers(DS.d, DS.h.other, TOKEN);
+     history is a caveat on this block too, not only on the two lists below it.
+
+     `DS.h` is **null** when the history failed outright and this is the state-only repaint, so the
+     incoming-token list is `null` — which is exactly the case `fundsHTML` already describes as "could
+     not be read from this provider". Reading `DS.h.other` unguarded threw here and left the block
+     empty, which is the defect this path exists to fix. */
+  const other = DS.h ? DS.h.other : null;
+  fill('funds', fundsHTML(DS.d, DS.f, other) + partialLine());
+  bindOthers(DS.d, other, TOKEN);
   bindClaims();
   bindOlder();
 }
 function paintFailed() {
   for (const id of ['h-changes', 'h-funds']) fill(id, notice('history unavailable', 'err'));
   fill('pending', pendingBlock(DS.d, true));
-  fill('funds', notice('history unavailable — the token list and the escrow rows are read from the logs.', 'err'));
+  /* **The funds block is deliberately not touched here.** It used to be replaced by a notice saying
+     the token list and escrow rows come from the logs — true of those two, and false of the ETH row
+     and its `distribute`, which come from state. The caller re-reads the funds with no logs and
+     paints them; `fundsHTML` says for itself that token payments could not be read. */
 }
 
 function paintDetail() {
