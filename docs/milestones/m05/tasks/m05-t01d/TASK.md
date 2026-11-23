@@ -74,8 +74,9 @@ with no wallet, and this task does not pretend one does.
      is added to that, not required for it. An escrow of an account no longer in the table, or
      in a token, is still found only through logs; the funds block says so in one line when no
      wallet is connected.
-   - **Dropped:** the shared in-flight limit and the full-budget mainnet bound (#392, closed
-     unmerged), and the second `tools/rpc-depth.mjs` table as a gate on the calldata. The
+   - **Withdrawn:** the two parts below headed "one in-flight limit" and "mainnet at full
+     budget" ([#392](https://github.com/dnznlabs/rake/pull/392), merged the same day, before
+     this ruling): a 24-hour read does not make the burst they answer. Also withdrawn: the second `tools/rpc-depth.mjs` table as a gate on the calldata. The
      endpoints chosen and the start window stay as built.
    - **Check:** tests for the 24-hour floor from timestamps, both lines, no press without a
      wallet, and an escrow row painted from state with the log read refused. Then
@@ -93,7 +94,7 @@ with no wallet, and this task does not pretend one does.
      still shrinks on a refusal, and `MAX_WINDOWS` and #165 are untouched. Check: a test that the
      first request of a walk through the read provider asks for the chain's figure, that a
      refusal still shrinks it, and that a wallet provider's first request is 10,000.
-   - **Amended 2026-11-23: one in-flight limit for the page's own provider.** A distribution
+   - **Withdrawn 2026-11-23 by the 24-hour ruling above. Was: one in-flight limit for the page's own provider.** A distribution
      page walks three log kinds at once, four windows in flight each, straight after the
      landing's reads, and the free endpoints meet that burst with a rate limit: measured in a
      browser, a first read ended on a throttle in 8 of 10 cold loads on Sepolia and 4 of 10 on
@@ -106,7 +107,7 @@ with no wallet, and this task does not pretend one does.
      ending on a throttle in no more than 2 of 10 on every chain. If four does not reach that,
      the handoff says what figure does and what it costs in time to paint, and the architect
      rules before the calldata is cut.
-   - **Amended 2026-11-23: mainnet at full budget.** Chains 1 and 8453 read cleanly today only
+   - **Withdrawn 2026-11-23 by the 24-hour ruling above. Was: mainnet at full budget.** Chains 1 and 8453 read cleanly today only
      because their distributions are a day old. Each is also built with `factoryBlock` set back
      by 40 times its start window and cold-loaded ten times, so the walk a visitor meets in
      three months is measured before the upload and not after. Same bound.
