@@ -57,6 +57,39 @@ with no wallet, and this task does not pretend one does.
    line carries the node's own message, shortened, and not the bare word `reverted`. Check: a
    test for an error with `message` and no `data`, and one with both, which still decodes.
 5. **#382, say what was read.** Three parts, the first chosen from step 1's table.
+   **Amended 2026-11-23 by the Product Owner's ruling (Telegram, 00:51 CST): with no wallet the
+   page reads the last 24 hours of history and says so.** "We don't need to be so catering for
+   non-wallets as far as activity/history goes." This replaces the aim of reading as deep as the
+   endpoint allows, and where it conflicts with a part below, this governs.
+   - **No wallet:** `changes` and `activity` read from the block 24 hours before the head, found
+     from block timestamps and never from an assumed block time (Base Sepolia mints every
+     0.2 s). The section heads say **last 24 hours**, and one line under each says **connect a
+     wallet to load more**. No `load older` is offered. If the read stops short of 24 hours,
+     the four outcomes already built say why.
+   - **Wallet connected, on the page's chain:** as today, through the wallet's provider, with
+     `load older`.
+   - **Hidden escrow is detected exactly, from state.** The amount of an escrow is already
+     read from state; only finding which account holds one comes from `Escrowed` logs, and
+     `_set` never clears `escrowed`, so an escrow outlives its account's removal from the
+     table. `reserved[token]` is the exact outstanding total and the page already reads it. So,
+     for native ETH and for each token the page already shows: compare `reserved` with the sum
+     of the escrow rows found. When they are equal nothing more is read. When `reserved` is
+     larger, read `escrowed(token, account)` for the accounts in the table, at most four calls
+     in flight (the table can hold 107 rows), and paint a row with its `release` and `claim`
+     controls for each above zero. Whatever is still unaccounted for is stated with its amount:
+     that much is held in escrow that this endpoint cannot list, and a connected wallet can.
+     Never a silent absence, and never the fan-out when nothing is hidden.
+   - **Withdrawn:** the two parts below headed "one in-flight limit" and "mainnet at full
+     budget" ([#392](https://github.com/dnznlabs/rake/pull/392), merged the same day, before
+     this ruling): a 24-hour read does not make the burst they answer. Also withdrawn: the second `tools/rpc-depth.mjs` table as a gate on the calldata. The
+     endpoints chosen and the start window stay as built.
+   - **Check:** tests for the 24-hour floor from timestamps, both lines, no press without a
+     wallet; and for escrow with the log read refused: equal totals make no extra call, a
+     table account's escrow is painted with its controls, a removed account's is stated by
+     amount, and no more than four calls are in flight on a 107-row table. Then
+     `tools/uat/cold.mjs` on all four chains, ten loads each after two quiet hours: the
+     24-hour read completes in at least 9 of 10, and the handoff gives the request count per
+     load per chain.
    - `PUBLIC_RPC` per chain is the measured endpoint that serves the deepest history to a
      browser, and `deploy/chains.json` agrees with it or the handoff says why not.
    - **Amended 2026-11-23: the walk starts at the window its own endpoint is known to serve.**
@@ -68,6 +101,23 @@ with no wallet, and this task does not pretend one does.
      still shrinks on a refusal, and `MAX_WINDOWS` and #165 are untouched. Check: a test that the
      first request of a walk through the read provider asks for the chain's figure, that a
      refusal still shrinks it, and that a wallet provider's first request is 10,000.
+   - **Withdrawn 2026-11-23 by the 24-hour ruling above. Was: one in-flight limit for the page's own provider.** A distribution
+     page walks three log kinds at once, four windows in flight each, straight after the
+     landing's reads, and the free endpoints meet that burst with a rate limit: measured in a
+     browser, a first read ended on a throttle in 8 of 10 cold loads on Sepolia and 4 of 10 on
+     Base Sepolia, and one load was refused after its eighth request. Through the page's own
+     read provider the three kinds share one limit of four `eth_getLogs` in flight. A wallet's
+     provider keeps today's behaviour. `MAX_WINDOWS` and #165 are untouched: the same windows
+     are asked for, not all at once. Check: a test that no more than four are in flight across
+     kinds through the read provider and that a wallet provider is unchanged; then
+     `tools/uat/cold.mjs`, ten loads a chain, twice at least an hour apart, with a first read
+     ending on a throttle in no more than 2 of 10 on every chain. If four does not reach that,
+     the handoff says what figure does and what it costs in time to paint, and the architect
+     rules before the calldata is cut.
+   - **Withdrawn 2026-11-23 by the 24-hour ruling above. Was: mainnet at full budget.** Chains 1 and 8453 read cleanly today only
+     because their distributions are a day old. Each is also built with `factoryBlock` set back
+     by 40 times its start window and cold-loaded ten times, so the walk a visitor meets in
+     three months is measured before the upload and not after. Same bound.
    - A refusal of old blocks ends the walk at that block as a boundary, as running out of budget
      does today. The section paints what was read, then one line naming the block and the cause:
      the endpoint does not serve history before it, and a connected wallet may. No `load older`
@@ -105,8 +155,10 @@ with no wallet, and this task does not pretend one does.
 ## Acceptance criteria
 
 - `devbox run -- make test` passes with the tests of steps 2 to 7 in it.
-- On all four chains the handoff's table names the endpoint chosen and the depth it serves, and
-  the page built for each paints its boundary line at that depth in a browser, with a screenshot.
+- On all four chains, with no wallet, a distribution page reads its last 24 hours in at least
+  9 of 10 cold loads in a browser, says **last 24 hours** and **connect a wallet to load more**,
+  and never shows less escrow than `reserved` says is held without stating the difference. A screenshot per
+  chain. (Amended 2026-11-23; it read "paints its boundary line at that depth".)
 - `tools/uat/`'s driver exits 0 on Sepolia **and on Base Sepolia** against
   `https://rake.dnzn.dev`, full list, and exits 1 on the control on both. This closes the rows
   m05-t01c recorded as not met on 84532.
