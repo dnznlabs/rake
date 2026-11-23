@@ -2238,11 +2238,28 @@ async function older() {
   /* The press walks from the distribution's own first block, so this read's floor **is** the bottom of
      the history: `whole` is true here whatever it meets on the way, and a walk that stopped short
      says so through its own `partial`. */
-  await absorb(t, d, { ...histOf({
-    changes: join(add.changes, prev.changes),
-    funds: join(add.funds, prev.funds),
-    ins: prev.ins && add.ins ? join(add.ins, prev.ins) : null,
-  }), from, whole: true });
+  /* **The repaint is inside the handler's own guard too** (the architect's review of #400). `absorb`
+     re-reads the token decimals, the symbols and then the funds **from state**, and `readFunds` goes
+     through `call()`, which is the wallet's provider when one is connected. On an endpoint the press
+     has just sent seventy log queries to, one of those state reads comes back `HTTP 429` — and it was
+     rejecting out of a click handler, where nobody was waiting: an uncaught `unhandledrejection`
+     carrying `{"message":"HTTP 429"}`, which is what the driver was reporting as the word `Object`.
+     The first read's own path has had this catch since #382 (`detail`, two screens up); the press had
+     only the `histLogs` one above. Found by the architect in one run; measured here as one in three.
+
+     What a reader gets is the same as a failed walk: whatever is painted stays — the day especially —
+     and the press comes back saying the read failed, because asking the same endpoint again later is
+     exactly the thing that may work. */
+  try {
+    await absorb(t, d, { ...histOf({
+      changes: join(add.changes, prev.changes),
+      funds: join(add.funds, prev.funds),
+      ins: prev.ins && add.ins ? join(add.ins, prev.ins) : null,
+    }), from, whole: true });
+  } catch (e) {
+    if (stale(t)) return;
+    for (const b of V.querySelectorAll('.older')) { b.disabled = false; b.textContent = 'load older — that read failed, try again'; }
+  }
 }
 
 /* The log-built sections, painted from DS so a repaint of the page — the drawer opening, a mode switch —

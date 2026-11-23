@@ -98,3 +98,11 @@ run "the chain head is read through the wallet again" \
     "HEAD = P.request({ method: 'eth_blockNumber' })"
 run "the mine tab is moved to the page, where it cannot see far enough" \
     "CFG.factoryBlock, null, P);" "CFG.factoryBlock, null, pageRead());"
+
+# The architect's second review: the press's repaint rejects out of a click handler on a throttling
+# endpoint, which was an uncaught HTTP 429 and a page error the driver passed anyway.
+run "the press's repaint is left outside the handler's guard" \
+    '  try {
+    await absorb(t, d, { ...histOf({' \
+    '  {
+    await absorb(t, d, { ...histOf({'

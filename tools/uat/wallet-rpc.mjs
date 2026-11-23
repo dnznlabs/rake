@@ -154,15 +154,37 @@ const browser = await chromium.launch({ executablePath: EXEC, headless: true });
 const ctx = await browser.newContext();
 const page = await ctx.newPage();
 const errors = [];
-/* A thrown value that is not an `Error` has no `message`, and `String()` of it reads `Object` — which
-   is what this printed the first time something rejected with a JSON-RPC error body. The shape of a
-   page error is part of the finding, so it is serialised rather than coerced. */
+/* **A page error has to name itself.** A thrown value that is not an `Error` has no `message`, and
+   `String()` of it reads `Object`, which is all this printed for two runs — a finding reported as the
+   word `Object` is not a finding. `pageerror` hands node a *serialised* value, so the keys are read
+   inside the page instead, at the moment of the rejection, where the reason and its stack still
+   exist. Both channels are kept: `pageerror` for throws that reach the top, and an
+   `unhandledrejection` listener for promises nobody caught, which is the shape a refused JSON-RPC
+   call takes. */
 const describeErr = e => {
-  if (e instanceof Error || (e && e.stack)) return String(e.message || e).slice(0, 200);
-  try { return JSON.stringify(e).slice(0, 200); } catch { return Object.prototype.toString.call(e); }
+  if (e instanceof Error || (e && e.stack)) return String(e.message || e).slice(0, 300);
+  try { return JSON.stringify(e).slice(0, 300); } catch { return Object.prototype.toString.call(e); }
 };
-page.on('pageerror', e => errors.push(describeErr(e)));
-page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text().slice(0, 200)); });
+page.on('pageerror', e => errors.push('pageerror: ' + describeErr(e)));
+page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text().slice(0, 300)); });
+await page.exposeFunction('__unhandled', (what) => { errors.push('unhandledrejection: ' + what); });
+await page.addInitScript(() => {
+  const show = v => {
+    if (v == null) return String(v);
+    if (typeof v !== 'object') return typeof v + ' ' + String(v);
+    const own = {};
+    for (const k of Object.getOwnPropertyNames(v)) { try { own[k] = typeof v[k] === 'object' ? JSON.stringify(v[k]) : String(v[k]); } catch { own[k] = '<unreadable>'; } }
+    let out = (v.constructor && v.constructor.name) + ' ' + JSON.stringify(own).slice(0, 400);
+    if (v.stack) out += ' | stack: ' + String(v.stack).split('\n').slice(0, 4).join(' / ');
+    return out;
+  };
+  window.addEventListener('unhandledrejection', ev => {
+    try { window.__unhandled(show(ev.reason)); } catch (e) {}
+  });
+  window.addEventListener('error', ev => {
+    try { window.__unhandled('window.onerror ' + show(ev.error || ev.message)); } catch (e) {}
+  });
+});
 
 /* The page's own traffic, counted at the browser: whatever it sends to its own endpoint is a request
    the wallet did not serve, which is the whole point of #400. */
@@ -268,7 +290,11 @@ const byMethod = [...wallet.byMethod].sort((a, b) => b[1] - a[1]).map(([m, n]) =
    below it and a wallet must be offered the press. Judged only on the post-#400 page: `--pre-400`
    paints no history at all, where the absence of a press is a consequence and not the finding. */
 const noPress = !pre400 && unavailable.length === 0 && out.older === 0;
-const ok = unavailable.length === 0 && out.distribute > 0 && !noPress
+/* **Any page error is a failure** (the architect's review of #400), as it is in `run.mjs` and
+   `cold.mjs`. This exited 0 twice while printing one — an uncaught `HTTP 429` out of the press's
+   repaint — and an instrument that reports a defect and passes anyway is the reason it survived two
+   of my runs and one of his. */
+const ok = unavailable.length === 0 && out.distribute > 0 && !noPress && errors.length === 0
   && (!pressed || !!pressed.skipped || pressed.dayKept);
 
 console.log(`\n  chain                : ${chain}${pre400 ? '   (--pre-400: the first read routed through the wallet)' : ''}`);
@@ -292,7 +318,7 @@ else if (pressed) {
   console.log(`  press → line now     : ${pressed.line}`);
 }
 console.log(`  funds block          : ${out.funds.slice(0, 200)}`);
-if (errors.length) console.log(`  page errors          : ${errors.join(' | ')}`);
+console.log(`  page errors          : ${errors.length ? errors.join(' | ') : 'none'}`);
 console.log(`\n  verdict              : ${ok ? 'the wallet did not make the page worse' : 'the wallet made the page worse'}`
   + `${pre400 ? ` — and with --pre-400 that is the expected result` : ''}`);
 if (flag('keep')) console.log(`  served from          : ${dir}`);
