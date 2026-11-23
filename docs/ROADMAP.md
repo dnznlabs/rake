@@ -1268,6 +1268,15 @@ convention. Numbered 45 because 44 is taken by
     further through its own provider. **Leaves standing:** decision 62, the log cache carried
     post-mainnet. **Rejected:** building that cache before mainnet, and an endpoint DNZN pays for
     with its key in a public document.
+    **Amended 2026-11-23 by Denizen (Telegram, 00:51 CST; m05-t01d's plan as merged in
+    [#394](https://github.com/dnznlabs/rake/pull/394)): with no wallet the page reads the last
+    24 hours of activity and changes, says so, and says a connected wallet loads more.** "We
+    don't need to be so catering for non-wallets as far as activity/history goes." Measured
+    first: Ethereum's free endpoint serves about 1.4 days and no more, and Base mints a block
+    every 0.2 s, so no reach that could be promised was worth tuning for. Escrow is exempt:
+    the contract's own total says exactly how much is held, so the page never shows less
+    without stating the difference. **Withdrawn with it:** the request pacing of
+    [#392](https://github.com/dnznlabs/rake/pull/392), unless Base misses its 24 hours.
 
 ## Findings carried forward
 
