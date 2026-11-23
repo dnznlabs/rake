@@ -682,11 +682,16 @@ async function dayFloor(hi, floor) {
    and the head is read once per route entry. `route` clears it with `HEAD`, so a route entry searches
    again rather than serving a floor computed against an older head. */
 let DAYFLOOR = null;
-/* Where a history read starts: the distribution's own first block, and for a visitor with no wallet
-   the later of that and a day ago. A wallet reads as before, with its press — its endpoint is its
-   own business and its depth is not ours to ration. */
+/* The oldest block a distribution can have anything in: its own first block when the `Created` scan
+   found it, else the factory's. The floor of a *whole* read, and the one figure that says whether a
+   read that finished its span finished the **history** — a day read that completed is complete and
+   still has history below it. Used by `readFloor`, by `older()` and by `readWhole`'s bookkeeping, so
+   it is one expression rather than three. */
+const ownFloor = d => Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock));
+/* Where a history read starts: the later of the distribution's own first block and a day ago, for
+   everyone since #400. A wallet's extra reach is the press, and nothing else. */
 async function readFloor(d, hi) {
-  const own = Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock));
+  const own = ownFloor(d);
   /* **No wallet exemption any more** (#400): the first read is the last 24 hours for everyone,
      because it is the page's own provider that serves it. A wallet's extra reach is the press. */
   /* **The floor search may never cost the page its history** — before this, a single `null` block
@@ -1554,10 +1559,25 @@ function histFill(id, items, empty) {
    accident, so there is nothing for a press to continue — `moreLine` carries the one route onward
    instead. The stop lines stay, because a read that fell short of its day still has to say why. */
 const press = () => WALLET ? ' · <button class="link older">load older</button>' : '';
+/* Whether anything is left below what has been read: a boundary, or a floor above the distribution's
+   own first block. `whole` is recorded by whoever did the read, because only the caller knows which
+   floor it asked for — a read that completed its span tells you nothing about which span it was. */
+const readWhole = () => !!(DS.h && DS.h.partial == null && DS.h.whole);
 /* The one line a no-wallet reader gets instead of a press, under both history sections. Not
    conditional on the read having stopped short: the day is the limit even when the day read cleanly,
    and a reader is owed the route to the rest either way. */
-const moreLine = () => WALLET ? '' : '<div class="help">connect a wallet to load more</div>';
+/* The way onward, when there is one. Three cases, and the middle one was missing until #400's own
+   first head: a wallet whose day read **completed** has no stop line to hang the press on, and the
+   day is no longer the bottom of the history — so it was offered nothing at all while the token list
+   beside it said "use load older to read further back". A sentence pointing at a control that is not
+   painted is the same defect as "connect a wallet to load more" on a page where a wallet changed
+   nothing, which is what #400 exists to fix. */
+const moreLine = () => {
+  if (readWhole()) return '';
+  if (!WALLET) return '<div class="help">connect a wallet to load more</div>';
+  /* A boundary of its own: `partialLine` carries the press there, and two would be one too many. */
+  return (DS.h && DS.h.partial == null) ? `<div class="help">this read covers the last 24 hours${press()}</div>` : '';
+};
 /* **What the heads may claim** (the architect's ruling, 2026-11-23: the heading must be true when
    painted). With a wallet the sections are the whole history and keep their descriptive text. Without
    one they are a day deep — but only if the read actually reached the day. Where it stopped short,
@@ -1575,7 +1595,6 @@ const moreLine = () => WALLET ? '' : '<div class="help">connect a wallet to load
 /* Did this read reach the distribution's own first block? Only a press can, now that every first read
    is a day deep — so `pressed` with a boundary of `null` is the one state in which the page may speak
    about all of a distribution's history. */
-const readWhole = () => !!(DS.h && DS.h.pressed && DS.h.partial == null);
 /* "nothing has arrived at this address **yet**" is a claim about all time, and only a read that
    reached the first block may make it. */
 const emptyLine = (all, day) => readWhole() ? all : day;
@@ -2106,7 +2125,12 @@ async function detail(addr) {
   // until it lands rather than reading as absence. The apply buttons do not wait on it (#215).
   /* The head is read first so the floor can be a day behind it. `head()` caches its promise, so the
      three reads below still make one `eth_blockNumber` between them. */
-  head().then(hi => readFloor(d, hi).then(from => history(addr, from, hi, pageRead())))
+  /* `whole` is this read's own answer to "was there anything below me": the floor it asked for against
+     the oldest block this distribution can have anything in. The heads, the empty sentences and the
+     press all hang off it, and it cannot be inferred later — `partial == null` says the span
+     finished, not which span it was. */
+  head().then(hi => readFloor(d, hi).then(from =>
+    history(addr, from, hi, pageRead()).then(h => ({ ...h, from, whole: from <= ownFloor(d) }))))
     .then(h => absorb(t, d, h)).catch(() => {
     if (stale(t)) return;
     DS.failed = true;
@@ -2174,10 +2198,15 @@ async function absorb(t, d, h) {
    already read and decoded again over the union. The button says so while it runs — a second press
    would spend a second budget on the same blocks. */
 async function older() {
-  const t = TOKEN, d = DS.d, prev = DS.h.raw, to = DS.h.partial - 1;
+  const t = TOKEN, d = DS.d, prev = DS.h.raw;
   /* Unreachable without a wallet — no press is painted — so this is the wallet's own floor, the
      distribution's first block, and not the 24-hour one. */
-  const from = Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock));
+  const from = ownFloor(d);
+  /* **Where the older half starts from above.** A read that stopped short hands over its boundary; a
+     day read that *completed* has no boundary, and the block below the floor it used is the only
+     right answer — `DS.h.partial - 1` is `NaN` there, which silently returned before anything was
+     read and left the press doing nothing. That is the case #400 created and this is where it lands. */
+  const to = (DS.h.partial != null ? DS.h.partial : DS.h.from) - 1;
   if (!(to >= from)) return;
   for (const b of V.querySelectorAll('.older')) { b.disabled = true; b.textContent = 'loading older…'; }
   let add;
@@ -2194,12 +2223,15 @@ async function older() {
   /* The older half's boundary **and its wall**: it is the half that walked further back, so it is the
      one that met whatever stopped the read. Dropping the wall here would turn a depth refusal into a
      plain budget boundary on the next paint, and put back a `load older` that cannot work. */
-  const join = (older_, newer_) => ({ logs: [...older_.logs, ...newer_.logs], partial: older_.partial, wall: older_.wall, pressed: true });
-  await absorb(t, d, histOf({
+  const join = (older_, newer_) => ({ logs: [...older_.logs, ...newer_.logs], partial: older_.partial, wall: older_.wall });
+  /* The press walks from the distribution's own first block, so this read's floor **is** the bottom of
+     the history: `whole` is true here whatever it meets on the way, and a walk that stopped short
+     says so through its own `partial`. */
+  await absorb(t, d, { ...histOf({
     changes: join(add.changes, prev.changes),
     funds: join(add.funds, prev.funds),
     ins: prev.ins && add.ins ? join(add.ins, prev.ins) : null,
-  }));
+  }), from, whole: true });
 }
 
 /* The log-built sections, painted from DS so a repaint of the page — the drawer opening, a mode switch —

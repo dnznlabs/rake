@@ -57,8 +57,22 @@ run "the walk takes its window from P again, not its argument" \
 run "window1 ignores its provider argument" \
     'function window1(address, topics, a, b, prov) {' 'function window1(address, topics, a, b, prov) { prov = P;'
 run "the heads claim a whole read for any wallet again" \
-    'const readWhole = () => !!(DS.h && DS.h.pressed && DS.h.partial == null);' \
+    'const readWhole = () => !!(DS.h && DS.h.partial == null && DS.h.whole);' \
     'const readWhole = () => !!WALLET;'
 run "the floor search exempts a wallet from the day again" \
-    'const own = Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock));' \
-    'const own = Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock)); if (WALLET) return own;'
+    'const own = ownFloor(d);' \
+    'const own = ownFloor(d); if (WALLET) return own;'
+
+# The press on a finished day read, and the boundary it continues from — #400's own first head had
+# neither, and the token list was telling a wallet to use a control that was not painted.
+run "a wallet whose day read finished is offered no press" \
+    'return (DS.h && DS.h.partial == null) ? `<div class="help">this read covers the last 24 hours${press()}</div>` : '"''"';' \
+    "return '';"
+run "the press takes its top block from partial alone, as it did before the day read" \
+    'const to = (DS.h.partial != null ? DS.h.partial : DS.h.from) - 1;' \
+    'const to = DS.h.partial - 1;'
+run "a finished span is read as a finished history" \
+    'const readWhole = () => !!(DS.h && DS.h.partial == null && DS.h.whole);' \
+    'const readWhole = () => !!(DS.h && DS.h.partial == null);'
+run "the first read claims to have read the whole history" \
+    'whole: from <= ownFloor(d)' 'whole: true'

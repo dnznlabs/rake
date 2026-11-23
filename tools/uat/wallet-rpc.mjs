@@ -16,8 +16,13 @@
  * nothing else. A fix measured only in its fixed state is a claim; the pair is a measurement.
  *
  * Usage:
- *   node tools/uat/wallet-rpc.mjs [--chain 84532] [--wallet-rpc <url>] [--pre-400]
+ *   node tools/uat/wallet-rpc.mjs [--chain 84532] [--wallet-rpc <url>] [--pre-400] [--press]
  *                                 [--patience 45000] [--addr <distribution>] [--keep]
+ *
+ * `--press` then clicks `load older` — the one read that *should* go through the wallet — and reports
+ * what the wallet's endpoint was asked for and whether the day already painted survived it. On a
+ * 200-block endpoint the press cannot finish, and the requirement is that it fails without taking the
+ * day with it.
  *
  * Exit: 0 when no section reads `history unavailable` and a `distribute` control is present,
  *       1 when either fails, 2 on a usage or build error. With `--pre-400`, 1 is the expected
@@ -192,6 +197,32 @@ await page.addInitScript(() => {
 await page.goto(`http://127.0.0.1:${port}/index.html#/distros/${addr}`, { waitUntil: 'load' });
 await page.waitForTimeout(patience);
 
+/* The press, which is the only read that belongs to the wallet. What is asserted is not that it
+   succeeds — on a 200-block endpoint walking from the factory block it cannot — but that the day the
+   page had already painted is still there afterwards. */
+const read = () => page.evaluate(() => {
+  const txt = id => (document.getElementById(id)?.innerText || '').replace(/\s+/g, ' ').trim();
+  return { changes: txt('h-changes'), rows: document.querySelectorAll('#h-changes .hrow, #h-funds .hrow').length };
+});
+let pressed = null;
+if (flag('press')) {
+  const before = { ...(await read()), logs: wallet.logs };
+  const b = await page.$('button.older');
+  if (!b) {
+    pressed = { skipped: 'no load older was painted to press' };
+  } else {
+    await b.click();
+    await page.waitForTimeout(Math.min(patience, 30_000));
+    const after = await read();
+    pressed = {
+      logsAtWallet: wallet.logs - before.logs,
+      rowsBefore: before.rows, rowsAfter: after.rows,
+      dayKept: after.rows >= before.rows,
+      line: after.changes.slice(-120),
+    };
+  }
+}
+
 const out = await page.evaluate(() => {
   const txt = id => (document.getElementById(id)?.innerText || '').replace(/\s+/g, ' ').trim();
   return {
@@ -222,7 +253,7 @@ if (out.heads.length === 0 && !out.changes && !out.activity && !out.funds) {
 
 const unavailable = ['changes', 'activity'].filter(k => /history unavailable/.test(out[k]));
 const byMethod = [...wallet.byMethod].sort((a, b) => b[1] - a[1]).map(([m, n]) => `${m} ${n}`).join(', ');
-const ok = unavailable.length === 0 && out.distribute > 0;
+const ok = unavailable.length === 0 && out.distribute > 0 && (!pressed || !!pressed.skipped || pressed.dayKept);
 
 console.log(`\n  chain                : ${chain}${pre400 ? '   (--pre-400: the first read routed through the wallet)' : ''}`);
 console.log(`  page endpoint        : ${pageRpc}`);
@@ -238,6 +269,12 @@ console.log(`  history unavailable  : ${unavailable.length ? unavailable.join(',
 console.log(`  DISTRIBUTE buttons   : ${out.distribute}`);
 console.log(`  load older presses   : ${out.older}`);
 console.log(`  claims a 24h window  : ${/covers the last 24 hours/.test(out.funds)}`);
+if (pressed && pressed.skipped) console.log(`  press                : ${pressed.skipped}`);
+else if (pressed) {
+  console.log(`  press → eth_getLogs at the wallet: ${pressed.logsAtWallet}`);
+  console.log(`  press → rows before/after: ${pressed.rowsBefore} / ${pressed.rowsAfter}  (the day survived: ${pressed.dayKept})`);
+  console.log(`  press → line now     : ${pressed.line}`);
+}
 console.log(`  funds block          : ${out.funds.slice(0, 200)}`);
 if (errors.length) console.log(`  page errors          : ${errors.join(' | ')}`);
 console.log(`\n  verdict              : ${ok ? 'the wallet did not make the page worse' : 'the wallet made the page worse'}`

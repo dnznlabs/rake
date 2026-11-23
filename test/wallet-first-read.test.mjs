@@ -73,6 +73,8 @@ const TRANSFER = line('const TRANSFER = topic(');
 /* The page's two history reads, as the page spells them. */
 const FIRST_READ = expr('history(addr, from, hi, pageRead())');
 const PRESS_READ = expr('histLogs(d.addr, from, to, WALLET ? P : pageRead())');
+/* The whole first-read expression, including what it records about itself. */
+const FIRST_READ_FULL = expr('history(addr, from, hi, pageRead()).then(h => ({ ...h, from, whole: from <= ownFloor(d) }))');
 
 const ADDR = '0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE';
 /* The per-chain start windows, read out of the page. A walk that took its width from `P` instead of
@@ -121,6 +123,22 @@ test('with no wallet to press through, the press reads the page\'s provider', ()
 });
 
 /* ── the report itself: a wallet endpoint that refuses every log query ─────────────────────────── */
+
+test('the first read records which floor it asked for, not that it read everything', async () => {
+  /* A finished span is not a finished history since #400 — a day read finishes its span every time.
+     So the read records the floor it asked for against the oldest block this distribution can hold
+     anything in, and the heads, the empty sentences and the press all hang off that. With `whole`
+     hard-coded true the page claims all time on a day's read, which no later state can correct. */
+  const read = (from, own) => new Function('history', 'pageRead', 'ownFloor', 'addr', 'd', 'from', 'hi',
+    `return ${FIRST_READ_FULL};`)(async () => ({ logs: [] }), () => ({}), () => own, ADDR, { addr: ADDR }, from, 1_000_000);
+
+  assert.equal((await read(9_000, 1_000)).whole, false,
+    "a floor above the distribution's first block leaves history below it");
+  assert.equal((await read(1_000, 1_000)).whole, true, 'a read from the first block has nothing below it');
+  assert.equal((await read(900, 1_000)).whole, true, 'nor has one that started below it');
+  assert.equal((await read(9_000, 1_000)).from, 9_000,
+    'and the floor travels with the result, because the press continues from it');
+});
 
 const EVENT = { blockNumber: '0x1', logIndex: '0x0', topics: ['0xaa'], data: '0x' };
 

@@ -46,7 +46,8 @@ const line = (anchor, from = SHIPPED) => {
 const LOGS = block('async function logs(address, topics, fromBlock, toBlock, prov) {');
 const PARTIAL_LINE = block('function partialLine() {');
 const PRESS = line('const press = () =>');
-const MORE_LINE = line('const moreLine = () =>');
+const MORE_LINE = block('const moreLine = () => {', '\n};\n');
+const READ_WHOLE = line('const readWhole = () =>');
 const STATED_FLOOR = block('const statedFloor = text =>', '\n};\n');
 const CAPPED = block('const capped = (p, cap, prune, wrap) => ({', '\n});\n', PAGE);
 const RANGEY = line('const RANGEY =');
@@ -134,7 +135,7 @@ function walk({ cap = NO_CAP, prune = 0, rate = 0, head = 1_000_000, events = tr
  *  `test/day-read.test.mjs`'s subject.
  */
 function lineFor(h, wallet = true) {
-  const src = `${PRESS}\n${MORE_LINE}\n${PARTIAL_LINE}\nreturn partialLine;`;
+  const src = `${PRESS}\n${READ_WHOLE}\n${MORE_LINE}\n${PARTIAL_LINE}\nreturn partialLine;`;
   return new Function('DS', 'WALLET', src)({ h }, wallet)();
 }
 

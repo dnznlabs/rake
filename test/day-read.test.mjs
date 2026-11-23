@@ -41,9 +41,10 @@ const NOMINAL_SEC = line('const NOMINAL_SEC =');
 const TS_TOLERANCE = line('const TS_TOLERANCE =');
 const TS_OF = block('const tsOf = async n => {', '\n};\n');
 const DAY_FLOOR = block('async function dayFloor(hi, floor) {');
+const OWN_FLOOR = line('const ownFloor = d =>');
 const READ_FLOOR = block('async function readFloor(d, hi) {');
 const PRESS = line('const press = () =>');
-const MORE_LINE = line('const moreLine = () =>');
+const MORE_LINE = block('const moreLine = () => {', '\n};\n');
 const PARTIAL_LINE = block('function partialLine() {');
 const HIST_FILL = block('function histFill(id, items, empty) {');
 const READ_WHOLE = line('const readWhole = () =>');
@@ -79,6 +80,7 @@ function chain({ sec, head, floor = 0, chainId = 1, nominal = null, missing = nu
     let DAYFLOOR = null;
     const FIRST = new Map();
     let WALLET = WALLET_IN;
+    ${OWN_FLOOR}
     ${READ_FLOOR}
     return { dayFloor, readFloor, reads: () => READS, exact: () => DAY_EXACT };
   `;
@@ -148,6 +150,7 @@ test('a wallet is held to the same day as everyone: the exemption is gone (#400)
     ${DAY_SECONDS}
     ${NOMINAL_SEC}
     ${SEED_FLOOR}
+    ${OWN_FLOOR}
     ${READ_FLOOR}
     return { readFloor, searched: () => searched };
   `;
@@ -168,6 +171,7 @@ function fillFor({ h, items = [], wallet }) {
     const bindOlder = () => {};
     const document = { getElementById: () => null };
     ${PRESS}
+    ${READ_WHOLE}
     ${MORE_LINE}
     ${PARTIAL_LINE}
     ${HIST_FILL}
@@ -197,6 +201,50 @@ test('with a wallet the press is back where it was, and the wallet line is gone'
   const said = fillFor({ h: { partial: 500, wall: null }, items: [{}], wallet: true });
   assert.match(said, /load older/);
   assert.doesNotMatch(said, /connect a wallet to load more/);
+});
+
+test('a wallet whose day read finished is still offered the press (#400)', () => {
+  /* **The case #400 created, and my first head did not paint.** Before it, a wallet read from the
+     distribution's own first block, so a read with no boundary left had genuinely reached the bottom
+     and there was nothing to press for. Now every first read is a day deep, so a finished read has a
+     whole history underneath it — and `partialLine` returns nothing when `partial` is null, which
+     left a wallet with no press at all while the token list beside it said "use load older to read
+     further back". A sentence naming a control that is not painted is the defect this task opened
+     with, in the other direction. */
+  const said = fillFor({ h: { partial: null, wall: null }, items: [{}], wallet: true });
+  assert.match(said, /load older/, 'there is history below the day it read, so there is a press');
+  assert.match(said, /this read covers the last 24 hours/, 'and a line saying what it covers');
+  assert.doesNotMatch(said, /connect a wallet to load more/, 'a wallet is connected');
+  assert.doesNotMatch(said, /history before block/, 'nothing stopped short, so no boundary is claimed');
+});
+
+test('and offered nothing once a press has read to the first block', () => {
+  const said = fillFor({ h: { partial: null, wall: null, whole: true }, items: [{}], wallet: true });
+  assert.doesNotMatch(said, /load older/, 'there is nothing below the first block to load');
+  assert.doesNotMatch(said, /covers the last 24 hours/);
+  assert.doesNotMatch(said, /connect a wallet to load more/);
+});
+
+test('exactly one press is painted, never two', () => {
+  /* `partialLine` carries the press on a boundary and `moreLine` carries it on a finished day; a
+     section showing both would offer the same budget twice. */
+  for (const h of [{ partial: 500, wall: null }, { partial: 500, wall: { kind: 'throttle', block: 500 } },
+                   { partial: null, wall: null }]) {
+    const said = fillFor({ h, items: [{}], wallet: true });
+    assert.equal((said.match(/load older/g) || []).length, 1,
+      `one press per section, not ${(said.match(/load older/g) || []).length}: ${JSON.stringify(h)}`);
+  }
+});
+
+test("the press continues below the day, from the floor the first read used", () => {
+  /* `older()`'s top block, lifted. A finished day read has no `partial`, and `DS.h.partial - 1` is
+     `NaN` there — `!(to >= from)` then returned before a single window was asked for, so the press
+     existed and did nothing. The floor the first read used is the only right answer. */
+  const TO = line('  const to = (DS.h.partial != null');
+  const topOf = h => new Function('DS', `${TO}\nreturn to;`)({ h });
+  assert.equal(topOf({ partial: 500, from: 9_000 }), 499, 'a boundary hands over its own block');
+  assert.equal(topOf({ partial: null, from: 9_000 }), 8_999, 'a finished day continues below its floor');
+  assert.ok(Number.isFinite(topOf({ partial: null, from: 9_000 })), 'and never NaN, which read nothing at all');
 });
 
 test('a no-wallet read that fell short of its day says so, without promising more', () => {
@@ -238,10 +286,10 @@ test('only a press that read it all earns the descriptive text', () => {
      about the read, not about the wallet, so the same state claims it either way. The wallet-less
      case is unreachable in the page (no press is painted), and that is the point: the claim is keyed
      on evidence rather than on an affordance. */
-  assert.equal(headFor({ wallet: true, h: { pressed: true, partial: null } }), 'every change this contract has seen');
-  assert.equal(headFor({ wallet: false, h: { pressed: true, partial: null } }), 'every change this contract has seen');
+  assert.equal(headFor({ wallet: true, h: { whole: true, partial: null } }), 'every change this contract has seen');
+  assert.equal(headFor({ wallet: false, h: { whole: true, partial: null } }), 'every change this contract has seen');
   /* A press that itself stopped short claims neither: not the whole history, and no longer the day. */
-  assert.equal(headFor({ wallet: true, h: { pressed: true, partial: 500 } }), 'as far back as this endpoint served');
+  assert.equal(headFor({ wallet: true, h: { whole: true, partial: 500 } }), 'as far back as this endpoint served');
 });
 
 test('without a wallet a complete read says last 24 hours', () => {
@@ -390,6 +438,7 @@ test('an outright throw in the search is caught, and the read still happens at t
     ${NOMINAL_SEC}
     ${SEED_FLOOR}
     const dayFloor = async () => { throw new Error('the endpoint hung up'); };
+    ${OWN_FLOOR}
     ${READ_FLOOR}
     return readFloor;
   `;
@@ -409,8 +458,8 @@ test('the empty sentence names its window when there is no wallet', () => {
   /* Since #400 the sentence is keyed on the read, not on the wallet: a first read is a day deep for
      everyone, so a connected wallet that has not pressed may not claim all time either. */
   assert.equal(pick({ partial: null })(ALL, DAY), DAY, 'a first read is a day, wallet or not');
-  assert.equal(pick({ pressed: true, partial: 500 })(ALL, DAY), DAY, 'a press that stopped short is still not all time');
-  assert.equal(pick({ pressed: true, partial: null })(ALL, DAY), ALL, 'only a press that reached the first block');
+  assert.equal(pick({ whole: true, partial: 500 })(ALL, DAY), DAY, 'a press that stopped short is still not all time');
+  assert.equal(pick({ whole: true, partial: null })(ALL, DAY), ALL, 'only a press that reached the first block');
   /* And both sections go through it, rather than one being fixed and the other forgotten. */
   assert.match(SHIPPED, /histFill\('h-changes', DS\.h\.changes,\s*\n?\s*emptyLine\(/);
   assert.match(SHIPPED, /histFill\('h-funds', DS\.h\.funds,\s*\n?\s*emptyLine\(/);
@@ -440,6 +489,7 @@ test('a search that fails entirely floors the walk at the seed, not at the distr
     ${NOMINAL_SEC}
     ${SEED_FLOOR}
     const dayFloor = async () => { throw new Error('the endpoint hung up'); };
+    ${OWN_FLOOR}
     ${READ_FLOOR}
     return { readFloor, exact: () => DAY_EXACT };
   `;

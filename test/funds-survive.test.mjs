@@ -143,5 +143,5 @@ test('a wallet gets the same window, and a way onward it actually has (#400)', (
   // A state-only repaint still claims no window, wallet or not: no log was read in that path.
   assert.equal(windowedIn(true, null), '');
   // And a press that reached the first block has no window left to name.
-  assert.equal(windowedIn(true, { pressed: true, partial: null }), '');
+  assert.equal(windowedIn(true, { whole: true, partial: null }), '');
 });
