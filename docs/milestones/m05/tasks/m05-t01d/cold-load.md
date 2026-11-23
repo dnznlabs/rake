@@ -139,11 +139,41 @@ counting the endpoint rather than the keeping; the contiguous-prefix rule is unt
 ## The address-less query, refused everywhere
 
 `-32701 Please specify an address in your request` on **all four** endpoints, 37–40× per run, so the
-"other tokens" list is unavailable to every visitor without a wallet. The page paints
-"token payments in could not be read from this provider" and no `#others` element at all, so nothing
-reads as "there are none" and no code changes here. Carried as
+"other tokens" list is unavailable to every visitor without a wallet. **Confirmed in a browser on all
+four chains** (06:48Z, one load each): every one paints "token payments in could not be read from this
+provider" and **none has an `#others` element at all**, so nothing reads as "there are none" and no
+code changes here. Carried as
 [#393](https://github.com/dnznlabs/rake/issues/393), which holds the browser reading and the two
 routes open to it.
+
+## Chain 1's wall line, read in a browser at full budget
+
+`CHAIN_ID=1`, `factoryBlock` lowered by 40 × 1,000, no wallet, 06:48Z. `#h-funds` ends:
+
+> history before block 26466137 not loaded · **this endpoint refused older blocks, and may not serve
+> history that far back.** A connected wallet reads through its own endpoint, which may go further.
+
+**No press**, and `.hrow` count 0 — which is correct and is *not* the "serves no history before block
+N" wording. That variant only appears where the refusal **names** a floor, as
+`4444 pruned history unavailable: requested …, earliest available N` does. `Archive requests require a
+personal token` names nothing, so the line says the endpoint *may* not serve that far back rather than
+claiming a boundary the walk merely stopped at, which is step 5's own rule. Sepolia's line came out the
+same way in the same reading, for the same reason: its `pruned history unavailable` arrived without the
+`earliest available` suffix.
+
+## The row count corroborates the census, per chain
+
+One load each, 06:48Z, counting `#h-funds .hrow` **elements** rather than matching text:
+
+| chain | `.hrow` elements | `cast` event count |
+|:--|--:|--:|
+| 1 | 0 | 0 |
+| 8453 | 0 | 0 |
+| 11155111 | 10 (the display cap) | 6+ |
+| 84532 | **4** | **4** |
+
+84532 agrees exactly and the two mainnets agree at zero, from two different clients. 11155111 shows
+the `HIST_SHOW` cap of ten, which is why it is not an equality there.
 
 ## Block times, read rather than assumed
 
