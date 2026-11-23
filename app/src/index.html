@@ -2299,6 +2299,18 @@ function bindDrawer(d) {
    sit under the balance in every view, including a visitor's. The token list is the chain's own: ETH,
    plus every token that has appeared in a `Distributed` or an `Escrowed` log, since nothing on chain
    carries one. What `history` found sent here and never distributed is `readOthers`', read on demand. */
+/* At most `n` of `fn` in flight over `items`, in order. The table may hold 107 rows
+   (`Distribution.MAX_BENEFICIARIES`), and a `Promise.all` over 107 `eth_call`s is nine times the burst
+   that already draws a rate limit out of these endpoints — so the fan-out below is paced even though
+   it only ever runs when something is actually hidden. */
+async function pool(items, n, fn) {
+  const out = new Array(items.length);
+  let i = 0;
+  const worker = async () => { while (i < items.length) { const k = i++; out[k] = await fn(items[k], k); } };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
+  return out;
+}
+const ESCROW_INFLIGHT = 4;
 async function readFunds(d, funds) {
   const tokens = [ZERO, ...new Set(funds.filter(e => e.token && e.token !== ZERO).map(e => e.token))];
   const read = list => Promise.all(list.map(async tk => {
@@ -2325,7 +2337,35 @@ async function readFunds(d, funds) {
     const signs = !!ACC && !same(ACC, ac) && await signsFor(ac);
     return { tk, ac, held, signs, dec: await decimalsOf(tk) };
   }));
-  return { rows, escrows: escrows.filter(e => e.held > 0n) };
+  const found = escrows.filter(e => e.held > 0n);
+  /* **`reserved` is the check on all of the above** (step 5, amended). The rows above are only as
+     complete as the `Escrowed` logs that found them, and with no wallet those logs reach one day back;
+     `_set` never clears `escrowed`, so an escrow also outlives its account's removal from the table.
+     `reserved[token]` is the exact outstanding total — three writers in `Distribution.sol`, each in
+     lockstep with `escrowed`, and the contract fuzz-tests the equality
+     (`test/invariant/Distribution.inv.t.sol` `invariant_reservedEqualsEscrowSum`) — and it is already
+     read above for every token shown. So the difference between it and the rows found is exactly what
+     this read is missing, and it is never a guess.
+
+     Equal, and nothing more is read: the common case costs no calls at all. Larger, and the accounts
+     in the table are asked directly, paced. Larger still after that, and the remainder is stated with
+     its amount rather than left as an absence — an account removed from the table cannot be found from
+     state at all, since there is nothing left to enumerate it from. */
+  const hidden = [];
+  for (const r of rows) {
+    const sumFor = () => found.filter(e => same(e.tk, r.tk)).reduce((a, e) => a + e.held, 0n);
+    if (r.reserved <= sumFor()) continue;
+    const known = new Set(found.filter(e => same(e.tk, r.tk)).map(e => e.ac.toLowerCase()));
+    const ask = (d.table || []).map(b => b[0]).filter(a => a && !known.has(String(a).toLowerCase()));
+    const got = await pool(ask, ESCROW_INFLIGHT, async ac => {
+      const [held] = await call(d.addr, 'escrowed(address,address)', [r.tk, ac], ['uint256']).catch(() => [0n]);
+      return held > 0n ? { tk: r.tk, ac, held } : null;
+    });
+    for (const g of got) if (g) found.push({ ...g, dec: r.dec, signs: !!ACC && !same(ACC, g.ac) && await signsFor(g.ac) });
+    const left = r.reserved - sumFor();
+    if (left > 0n) hidden.push({ tk: r.tk, dec: r.dec, amount: left });
+  }
+  return { rows, escrows: found, hidden };
 }
 /* The unrecognised tokens, read only once their list is opened: each costs a balance and a decimals
    call, and they are the ones anyone can multiply by sending junk. Never distributed or escrowed here,
@@ -2416,7 +2456,18 @@ function fundsHTML(d, f, other) {
          what membership in it means instead of pretending to curate it. */
       + '<div class="status warn">unverified — anyone can send any token to this address. Check a token before distributing it; once distributed it is listed above. listed means distributed here at least once — not checked, not endorsed.</div>'
       + `<div id="others-body">${notice('reading their balances…')}</div></details>`;
-  return `<div class="ledger">${rows}${escrows}</div>${others}`
+  /* **Never a silent absence** (step 5, amended). Whatever `reserved` accounts for and the rows above
+     could not attribute is stated with its amount. It is real money and its owner can always take it
+     — `claim` is `msg.sender`'s own — but nothing on this page can name who, because an account
+     removed from the table leaves no enumerable trace: only the `Escrowed` log that created it. Said
+     as "accounts for" rather than "holds", because for a fee-on-transfer or rebasing token the balance
+     need not cover it (F4, and `invariant_balanceCoversReserved` excludes that class). */
+  const unlisted = (f.hidden || []).filter(h => h.amount > 0n).map(h =>
+    `<div class="status warn">${h.tk === ZERO ? eth(h.amount) : amt(h.amount, h.dec)} ${token(h.tk)} is accounted for in escrow`
+    + ` that this read could not attribute to an account${WALLET
+      ? ' — the account is no longer in the table, and only the log that escrowed it names them.'
+      : ' — connect a wallet to read further back and find it.'}</div>`).join('');
+  return `<div class="ledger">${rows}${escrows}</div>${unlisted}${others}`
     + `<div class="help wide">anyone can call distribute() — the contract splits by the table above; you pay the gas.${ACC ? '' : ' connect a wallet to send it.'} paying in from a contract? see <a class="link" href="#/docs#payin">receiving funds</a>.</div>`;
 }
 
