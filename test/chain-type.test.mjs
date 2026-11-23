@@ -38,6 +38,8 @@ const line = anchor => {
 const AS_CHAIN = block('const asChain = id => {', '\n};\n');
 const CHAIN_CHANGED = block('function chainChanged(id) {');
 const RESOLVE_NAME = block('async function resolveName(acc) {');
+const NAME_CHAINS = line('const NAME_CHAINS =');
+const NAMES_HERE = line('const namesHere =');
 /* The two assignment lines themselves, not a copy of them: `pickWallet`'s and `load()`'s.
 
    **Anchored on `CHAIN =`, deliberately not on `asChain(`.** Anchoring on the fixed right-hand side
@@ -56,17 +58,20 @@ const SEPOLIA_HEX = '0xaa36a7';
    a `location` whose reload is counted rather than performed, and three registries that record
    being asked. `asked` is the observation that matters — a gate that returns early never appears
    in it. */
-function harness({ chainId = SEPOLIA_HEX, ensAnswer = 'denizen.eth' } = {}) {
+function harness({ chainId = SEPOLIA_HEX, pageChain = '11155111', ensAnswer = 'denizen.eth' } = {}) {
   const src = `
     let CHAIN = null;
     let reloads = 0;
     const location = { reload: () => { reloads++; } };
     const P = { request: async ({ method }) => (method === 'eth_chainId' ? CHAIN_ID : null) };
+    const CFG = { chainId: PAGE_CHAIN };
     const asked = [];
     const NAMES = [{ id: 'ens' }, { id: 'wns' }, { id: 'gns' }];
     async function ensName(a) { asked.push('ens'); return ENS_ANSWER; }
     async function regName(reg, a) { asked.push(reg.id); return null; }
     ${AS_CHAIN}
+    ${NAME_CHAINS}
+    ${NAMES_HERE}
     ${CHAIN_CHANGED}
     ${RESOLVE_NAME}
     const viaLoad = async () => { ${LOAD_ASSIGN} };
@@ -77,10 +82,10 @@ function harness({ chainId = SEPOLIA_HEX, ensAnswer = 'denizen.eth' } = {}) {
       reloads: () => reloads,
       asked: () => asked.slice(),
       clear: () => { asked.length = 0; },
-      asChain, chainChanged, resolveName, viaLoad, viaPick,
+      asChain, chainChanged, resolveName, viaLoad, viaPick, namesHere,
     };
   `;
-  return new Function('CHAIN_ID', 'ENS_ANSWER', src)(chainId, ensAnswer);
+  return new Function('CHAIN_ID', 'ENS_ANSWER', 'PAGE_CHAIN', src)(chainId, ensAnswer, pageChain);
 }
 
 test('asChain answers a number for every shape a provider returns, and null for nothing', () => {
@@ -139,11 +144,31 @@ test('a real change still reloads', () => {
 
 /* The four that would have caught #379: not the type, but a registry being reached. */
 test('a name resolves after a wallet is picked from the menu', async () => {
-  const h = harness({ chainId: SEPOLIA_HEX });
+  const h = harness({ chainId: SEPOLIA_HEX, pageChain: '11155111' });
   await h.viaPick();
   const n = await h.resolveName(ACC);
   assert.deepEqual(h.asked(), ['ens'], 'resolveName must ask a registry after a wallet is picked');
   assert.equal(n, 'denizen.eth');
+});
+
+/* #375 in the same place: the gate is the **document's** chain, so a wallet somewhere else neither
+   unlocks nor blocks resolution. Before, the wallet's chain decided — which is how a page built for
+   Sepolia came to read a mainnet name, and how a wallet on a chain with no registry silenced one. */
+test('the page decides whether names resolve, not the wallet', async () => {
+  // Page on Sepolia, wallet on Base: the page has a registry, so it is asked.
+  const onBase = harness({ chainId: '0x2105', pageChain: '11155111' });
+  await onBase.viaPick();
+  assert.equal(onBase.chain(), 8453, 'the wallet is still recorded as being on Base');
+  assert.equal(await onBase.resolveName(ACC), 'denizen.eth');
+  assert.deepEqual(onBase.asked(), ['ens'], "the page's own chain can answer, so it is asked");
+
+  // Page on Base, wallet on mainnet: the page has no registry, so nothing is asked and no mainnet
+  // name can reach a page that is not showing mainnet.
+  const pageBase = harness({ chainId: '0x1', pageChain: '8453' });
+  await pageBase.viaPick();
+  assert.equal(pageBase.chain(), 1);
+  assert.equal(await pageBase.resolveName(ACC), null);
+  assert.deepEqual(pageBase.asked(), [], 'a page built for Base must not read a name off mainnet');
 });
 
 test('a name resolves after a same-chain chainChanged', async () => {
@@ -157,7 +182,7 @@ test('a name resolves after a same-chain chainChanged', async () => {
 
 test('a name resolves after load(), on mainnet as well as Sepolia', async () => {
   for (const [hexId, id] of [[SEPOLIA_HEX, 11155111], ['0x1', 1]]) {
-    const h = harness({ chainId: hexId });
+    const h = harness({ chainId: hexId, pageChain: String(id) });
     await h.viaLoad();
     assert.equal(h.chain(), id);
     assert.equal(await h.resolveName(ACC), 'denizen.eth');
@@ -168,11 +193,11 @@ test('a name resolves after load(), on mainnet as well as Sepolia', async () => 
 /* The control. A gate that cannot refuse is not a gate, so the chains that have no registry must
    still return before asking — otherwise the two tests above would pass on a page with no gate. */
 test('on a chain with no registry, resolveName refuses without asking', async () => {
-  for (const hexId of ['0x2105', '0x14a34']) {   // Base, Base Sepolia
-    const h = harness({ chainId: hexId });
+  for (const id of ['8453', '84532']) {          // Base, Base Sepolia
+    const h = harness({ chainId: '0x' + Number(id).toString(16), pageChain: id });
     await h.viaLoad();
     assert.equal(await h.resolveName(ACC), null);
-    assert.deepEqual(h.asked(), [], `chain ${h.chain()} has no registry, so nothing should be asked`);
+    assert.deepEqual(h.asked(), [], `a page on ${id} has no registry, so nothing should be asked`);
   }
 });
 
