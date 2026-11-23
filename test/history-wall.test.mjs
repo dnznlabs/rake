@@ -43,7 +43,7 @@ const line = (anchor, from = SHIPPED) => {
   return from.slice(at, from.indexOf('\n', at));
 };
 
-const LOGS = block('async function logs(address, topics, fromBlock, toBlock) {');
+const LOGS = block('async function logs(address, topics, fromBlock, toBlock, prov) {');
 const PARTIAL_LINE = block('function partialLine() {');
 const PRESS = line('const press = () =>');
 const MORE_LINE = line('const moreLine = () =>');

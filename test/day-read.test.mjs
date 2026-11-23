@@ -46,6 +46,7 @@ const PRESS = line('const press = () =>');
 const MORE_LINE = line('const moreLine = () =>');
 const PARTIAL_LINE = block('function partialLine() {');
 const HIST_FILL = block('function histFill(id, items, empty) {');
+const READ_WHOLE = line('const readWhole = () =>');
 const DAY_HEAD = block('const dayHead = full =>', "'about the last 24 hours';\n");
 
 /** A synthetic chain: block `n` has timestamp `n * sec`, and every header read is counted. */
@@ -129,23 +130,31 @@ test('the floor never goes below the distribution own first block', async () => 
   assert.equal(got, own);
 });
 
-test('a wallet is not held to a day: it reads from the distribution first block', async () => {
-  const head = 20_000_000, own = 1_000;
+test('a wallet is held to the same day as everyone: the exemption is gone (#400)', async () => {
+  /* It used to read from the distribution's first block the moment a wallet was connected, because
+     the wallet's endpoint was the one that served the first read. #400 moved that read to the page's
+     own provider, so the wallet no longer buys depth here — it buys it at the press, and nowhere
+     else. A connected wallet that skipped the day search then walked from the factory block through
+     an endpoint capped at 200 blocks a query, which is the Product Owner's report. */
+  const head = 20_000_000, own = 1_000, day = head - 7_171;
   const src = `
     const FIRST = new Map();
     const CFG = { factoryBlock: String(OWN) };
     let WALLET = true;
-    const dayFloor = async () => { throw new Error('a wallet must not pay for the day search'); };
+    let searched = 0;
+    const dayFloor = async () => { searched++; return DAY; };
     let DAYFLOOR = null;
     let DAY_EXACT = true;
     ${DAY_SECONDS}
     ${NOMINAL_SEC}
     ${SEED_FLOOR}
     ${READ_FLOOR}
-    return readFloor;
+    return { readFloor, searched: () => searched };
   `;
-  const readFloor = new Function('OWN', src)(own);
-  assert.equal(await readFloor({ addr: '0xabc' }, head), own);
+  const m = new Function('OWN', 'DAY', src)(own, day);
+  assert.equal(await m.readFloor({ addr: '0xabc' }, head), day,
+    'a wallet page reads the same 24 hours as a wallet-less one');
+  assert.equal(m.searched(), 1, 'and it pays for the day search, which it used to skip');
 });
 
 /** `histFill` over a history, in either wallet state, returning what it wrote. */
@@ -205,7 +214,7 @@ test('the four outcomes still speak for themselves without a wallet', () => {
 
 /** `dayHead` in a given state, which is the one place a head's claim is decided. */
 const headFor = ({ wallet, h, exact = true }) =>
-  new Function('WALLET', 'DS', 'DAY_EXACT', `${DAY_HEAD}\nreturn dayHead;`)(wallet, { h }, exact)('every change this contract has seen');
+  new Function('WALLET', 'DS', 'DAY_EXACT', `${READ_WHOLE}\n${DAY_HEAD}\nreturn dayHead;`)(wallet, { h }, exact)('every change this contract has seen');
 
 test('both heads go through dayHead, so one place decides what they claim', () => {
   const heads = SHIPPED.slice(SHIPPED.indexOf('<div class="sechead"><b>changes</b>'));
@@ -216,8 +225,23 @@ test('both heads go through dayHead, so one place decides what they claim', () =
   }
 });
 
-test('with a wallet the head keeps its descriptive text', () => {
-  assert.equal(headFor({ wallet: true, h: { partial: 500 } }), 'every change this contract has seen');
+test('a connected wallet alone no longer changes the head (#400)', () => {
+  /* The head is a claim about **what was read**, and since #400 a wallet page's first read is the
+     same 24 hours as anyone's. So a wallet whose read stopped short says so, exactly as a wallet-less
+     one does, and a wallet that has read its day cleanly claims the day. */
+  assert.equal(headFor({ wallet: true, h: { partial: 500 } }), 'as far back as this endpoint served');
+  assert.equal(headFor({ wallet: true, h: { partial: null } }), 'last 24 hours');
+});
+
+test('only a press that read it all earns the descriptive text', () => {
+  /* `pressed` with no boundary left is the one state that has read past the day — and the rule is
+     about the read, not about the wallet, so the same state claims it either way. The wallet-less
+     case is unreachable in the page (no press is painted), and that is the point: the claim is keyed
+     on evidence rather than on an affordance. */
+  assert.equal(headFor({ wallet: true, h: { pressed: true, partial: null } }), 'every change this contract has seen');
+  assert.equal(headFor({ wallet: false, h: { pressed: true, partial: null } }), 'every change this contract has seen');
+  /* A press that itself stopped short claims neither: not the whole history, and no longer the day. */
+  assert.equal(headFor({ wallet: true, h: { pressed: true, partial: 500 } }), 'as far back as this endpoint served');
 });
 
 test('without a wallet a complete read says last 24 hours', () => {
@@ -380,11 +404,13 @@ test('the empty sentence names its window when there is no wallet', () => {
      address yet" about an address with four funds events 1.1 million blocks back. The head said
      "last 24 hours" and the line below offered a wallet, but the sentence between them was false. */
   const EMPTY_LINE = line('const emptyLine = (all, day) =>');
-  const pick = wallet => new Function('WALLET', `${EMPTY_LINE}\nreturn emptyLine;`)(wallet);
-  assert.equal(pick(false)('nothing has arrived at this address yet.', 'nothing has arrived in the last 24 hours.'),
-    'nothing has arrived in the last 24 hours.');
-  assert.equal(pick(true)('nothing has arrived at this address yet.', 'nothing has arrived in the last 24 hours.'),
-    'nothing has arrived at this address yet.');
+  const pick = h => new Function('DS', `${READ_WHOLE}\n${EMPTY_LINE}\nreturn emptyLine;`)({ h });
+  const ALL = 'nothing has arrived at this address yet.', DAY = 'nothing has arrived in the last 24 hours.';
+  /* Since #400 the sentence is keyed on the read, not on the wallet: a first read is a day deep for
+     everyone, so a connected wallet that has not pressed may not claim all time either. */
+  assert.equal(pick({ partial: null })(ALL, DAY), DAY, 'a first read is a day, wallet or not');
+  assert.equal(pick({ pressed: true, partial: 500 })(ALL, DAY), DAY, 'a press that stopped short is still not all time');
+  assert.equal(pick({ pressed: true, partial: null })(ALL, DAY), ALL, 'only a press that reached the first block');
   /* And both sections go through it, rather than one being fixed and the other forgotten. */
   assert.match(SHIPPED, /histFill\('h-changes', DS\.h\.changes,\s*\n?\s*emptyLine\(/);
   assert.match(SHIPPED, /histFill\('h-funds', DS\.h\.funds,\s*\n?\s*emptyLine\(/);

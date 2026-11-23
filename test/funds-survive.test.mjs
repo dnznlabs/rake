@@ -97,15 +97,24 @@ test('and it still passes the real token list through when the history did land'
   assert.equal(seen.other, other, 'a successful history must still reach fundsHTML unchanged');
 });
 
-/* The sentence the funds block prints about its own token list. Lifted as a line, because the
-   surrounding `fundsHTML` reaches for a dozen helpers this test has no business stubbing. */
+/* The sentence the funds block prints about its own token list, lifted whole — to its `;`, not to
+   its first newline, because since #400 it spans three lines. The surrounding `fundsHTML` reaches
+   for a dozen helpers this test has no business stubbing, which is why only this declaration is
+   taken. `readWhole` comes with it: the sentence is keyed on what was read. */
 const WINDOWED = (() => {
   const at = SHIPPED.indexOf('const windowed = ');
   assert.ok(at >= 0, 'app/src/index.html no longer declares `windowed` — this test lifts it');
+  const end = SHIPPED.indexOf(';\n', at);
+  assert.ok(end > at, '`windowed` is no longer a single declaration');
+  return SHIPPED.slice(at, end + 1);
+})();
+const READ_WHOLE = (() => {
+  const at = SHIPPED.indexOf('const readWhole = () =>');
+  assert.ok(at >= 0, 'app/src/index.html no longer declares `readWhole` — this test lifts it');
   return SHIPPED.slice(at, SHIPPED.indexOf('\n', at));
 })();
 const windowedIn = (wallet, h) =>
-  new Function('WALLET', 'DS', `${WINDOWED}\nreturn windowed;`)(wallet, { h });
+  new Function('WALLET', 'DS', `${READ_WHOLE}\n${WINDOWED}\nreturn windowed;`)(wallet, { h });
 
 test('with no wallet and no history, the list claims no window at all', () => {
   /* The architect's finding on the first head: the state-only repaint still said "this list covers
@@ -120,7 +129,19 @@ test('with no wallet and a history that landed, it still says what the list cove
     'the honest case must keep its sentence, or the fix has removed a true statement');
 });
 
-test('with a wallet it says nothing, history or not', () => {
-  assert.equal(windowedIn(true, { partial: null }), '');
+test('a wallet gets the same window, and a way onward it actually has (#400)', () => {
+  /* It used to say nothing to a wallet, because a wallet's first read went to the factory block. Now
+     every first read is a day deep, so the sentence is the same for everyone — only the instruction
+     at the end of it differs, because “connect a wallet” is not a control a connected wallet has. */
+  const said = windowedIn(true, { partial: null });
+  assert.match(said, /covers the last 24 hours/, 'a wallet page reads the same day and must say so');
+  assert.match(said, /load older/, 'and must point at the control it has');
+  assert.doesNotMatch(said, /Connect a wallet/);
+  assert.doesNotMatch(windowedIn(false, { partial: null }), /load older/,
+    'while a page with no wallet keeps the sentence it had');
+
+  // A state-only repaint still claims no window, wallet or not: no log was read in that path.
   assert.equal(windowedIn(true, null), '');
+  // And a press that reached the first block has no window left to name.
+  assert.equal(windowedIn(true, { pressed: true, partial: null }), '');
 });
