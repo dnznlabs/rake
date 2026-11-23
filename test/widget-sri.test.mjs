@@ -65,6 +65,12 @@ symlinkSync(join(root, 'broadcast'), join(out, 'broadcast'));
   assert.equal(r.status, 0,
     `these tests build what they assert on, and the build failed: ${(r.stderr || r.stdout || '').trim().split('\n').slice(-3).join(' | ')}`);
 }
+/* Clean up after a green run, and **keep the tree when something failed** — that is when the built
+   artefacts are worth looking at. Eleven of these were left behind across one review, 600-850 KB
+   each. `process.exitCode` is set by then, where an `after` hook would run too early. */
+process.on('exit', code => {
+  if (code === 0 && !process.env.RAKE_KEEP_BUILD) rmSync(out, { recursive: true, force: true });
+});
 const dist = f => join(out, 'app/dist', f);
 for (const f of ['index.html', 'widget.js']) {
   assert.ok(existsSync(dist(f)), `the build reported success but did not write ${f}`);
