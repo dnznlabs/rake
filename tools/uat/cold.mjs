@@ -117,10 +117,27 @@ async function oneLoad(browser, port, { patience, shotTo }) {
       }
       return true;
     }, patience);
+    const fullText = {};
     for (const id of ['funds', 'h-changes', 'h-funds']) {
       const t = await textOf(page, `#${id}`);
+      fullText[id] = t;
       out.sections[id] = { outcome: classify(t), text: t.slice(0, 120) };
     }
+    /* How far back the first pass actually got, in the page's own numbers: `#asof` is the block the
+       route's reads were made at, and every wording of the partial line names the block it stopped
+       above — "history before block N". The lowest N across the three sections is the floor of the
+       pass. No line at all means nothing was truncated, so the pass covered the whole history the
+       distribution has. */
+    const asof = /block (\d+)/.exec(await textOf(page, '#asof'));
+    out.head = asof ? Number(asof[1]) : null;
+    /* Scanned over the **full** section text. `out.sections[].text` is cut to 120 characters for the
+       log, and a boundary line sits at the end of a section that has rows above it, so reading the
+       excerpt would have missed exactly the loads that read the most. */
+    const floors = Object.values(fullText)
+      .map(t => /history before block (\d+)/.exec(t))
+      .filter(Boolean).map(m => Number(m[1]));
+    out.stopped = floors.length ? Math.min(...floors) : null;
+    out.reach = out.head != null && out.stopped != null ? out.head - out.stopped : null;
     if (shotTo) await page.screenshot({ path: shotTo, fullPage: false });
   } catch (e) {
     out.threw = String(e && e.message || e).split('\n')[0].slice(0, 120);
@@ -129,6 +146,34 @@ async function oneLoad(browser, port, { patience, shotTo }) {
   }
   return out;
 }
+
+/** What a span of blocks is in wall-clock time, read from the chain rather than assumed.
+ *
+ *  A per-chain block time would be a guess; two `eth_getBlockByNumber` timestamps are a measurement,
+ *  and on an L2 with variable batching they are not the same thing. Returns null rather than a figure
+ *  it could not read: an endpoint that refuses the older block is exactly the case this reports on,
+ *  so a fabricated duration would be the worst possible answer.
+ */
+async function spanInTime(endpoint, lo, hi) {
+  const at = async n => {
+    const r = await fetch(endpoint, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getBlockByNumber', params: ['0x' + n.toString(16), false] }),
+    });
+    const j = await r.json().catch(() => null);
+    return j && j.result && j.result.timestamp ? parseInt(j.result.timestamp, 16) : null;
+  };
+  try {
+    const [a, b] = await Promise.all([at(lo), at(hi)]);
+    return a && b && b > a ? b - a : null;
+  } catch { return null; }
+}
+
+/** Seconds as the coarsest unit that is still honest, which is what a handoff row wants. */
+const asTime = sec => sec == null ? '—'
+  : sec >= 86400 ? `${(sec / 86400).toFixed(1)} days`
+  : sec >= 3600 ? `${(sec / 3600).toFixed(1)} h`
+  : `${Math.round(sec / 60)} min`;
 
 (async () => {
   const chains = (arg('chain', CHAINS.join(',')) || '').split(',').map(s => Number(s.trim())).filter(Boolean);
@@ -194,11 +239,11 @@ async function oneLoad(browser, port, { patience, shotTo }) {
 
   console.log(`\nRead ${when} by \`tools/uat/cold.mjs\`: ${loads} cold loads per chain, no wallet, the browser's own fetch.`);
   console.log(`Distribution page: \`${DNZN}\`. Screenshots: ${shots}\n`);
-  console.log('| chain | endpoint | featured panel filled | median fill | three sections, worst outcome per load | page errors |');
-  console.log('|:--|:--|--:|--:|:--|--:|');
+  console.log('| chain | endpoint | featured panel filled | median fill | three sections, worst outcome per load | blocks in the first pass | that in time | page errors |');
+  console.log('|:--|:--|--:|--:|:--|--:|--:|--:|');
   let bad = 0;
   for (const r of rows) {
-    if (!r.built) { console.log(`| ${r.chain} | — | **build failed** | — | ${r.why} | — |`); bad++; continue; }
+    if (!r.built) { console.log(`| ${r.chain} | — | **build failed** | — | ${r.why} | — | — | — |`); bad++; continue; }
     const filled = r.runs.filter(x => x.featured).length;
     const ms = r.runs.filter(x => x.featuredMs).map(x => x.featuredMs).sort((a, b) => a - b);
     const median = ms.length ? ms[Math.floor(ms.length / 2)] : null;
@@ -210,9 +255,23 @@ async function oneLoad(browser, port, { patience, shotTo }) {
     });
     const tally = worst.reduce((a, k) => ({ ...a, [k]: (a[k] || 0) + 1 }), {});
     const errs = r.runs.reduce((a, x) => a + x.errors.length, 0);
+    /* How far back a pass got. A load that painted no boundary line read the whole history the
+       distribution has, which is a different statement from a number and is printed as one. */
+    const reaches = r.runs.map(x => x.reach).filter(n => n != null).sort((a, b) => a - b);
+    const whole = r.runs.filter(x => x.head != null && x.stopped == null).length;
+    const reach = reaches.length ? reaches[Math.floor(reaches.length / 2)] : null;
+    let reachCell = '—', timeCell = '—';
+    if (reach != null) {
+      const rep = r.runs.find(x => x.reach === reach) || {};
+      reachCell = reach.toLocaleString('en-US') + (whole ? ` (${whole}/${r.runs.length} read it all)` : '');
+      timeCell = asTime(await spanInTime(r.endpoint, Math.max(1, rep.stopped || 0), rep.head || 0));
+    } else if (whole) {
+      reachCell = `all of it, ${whole}/${r.runs.length}`;
+      timeCell = 'whole history';
+    }
     const ok = filled === r.runs.length && !worst.some(k => k === 'nothing' || k === 'loading' || k === 'none' || k === 'threw');
     if (!ok) bad++;
-    console.log(`| ${r.chain} | \`${r.endpoint}\` | ${ok || filled === r.runs.length ? '' : '**'}${filled}/${r.runs.length}${ok || filled === r.runs.length ? '' : '**'} | ${median == null ? '—' : median + ' ms'} | ${Object.entries(tally).map(([k, n]) => `${n}× ${k}`).join(', ')} | ${errs} |`);
+    console.log(`| ${r.chain} | \`${r.endpoint}\` | ${ok || filled === r.runs.length ? '' : '**'}${filled}/${r.runs.length}${ok || filled === r.runs.length ? '' : '**'} | ${median == null ? '—' : median + ' ms'} | ${Object.entries(tally).map(([k, n]) => `${n}× ${k}`).join(', ')} | ${reachCell} | ${timeCell} | ${errs} |`);
   }
   if (bad) console.error(`\n${bad} chain(s) did not paint on every load.`);
   process.exit(bad ? 1 : 0);
