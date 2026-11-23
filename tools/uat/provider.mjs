@@ -51,7 +51,15 @@ export const PAGE_SCRIPT = `(() => {
 })();`;
 
 /** The node half. `log` receives every method so a run can be read after the fact. */
-export function makeRpc({ chainId, rpcUrl, sender, log }) {
+/* `readUrl` is the endpoint the **wallet** reads through, when it is not the page's own (#400).
+   Until this existed the injected provider always relayed to the chain's `PUBLIC_RPC` entry, so a
+   wallet could not be worse than the page and the one failure that mattered was invisible to every
+   row here: on Base Sepolia a real wallet reads through `sepolia.base.org`, 200 blocks a log query.
+   Writes stay on `rpcUrl` whatever this is set to — a narrow read endpoint is no reason to broadcast
+   somewhere a run did not choose. `tools/uat/wallet-rpc.mjs` is the read-only driver for the same
+   asymmetry. */
+export function makeRpc({ chainId, rpcUrl, readUrl, sender, log }) {
+  const reads = readUrl || rpcUrl;
   const sent = [];
   const rpc = async (method, params) => {
     log?.(method);
@@ -79,7 +87,7 @@ export function makeRpc({ chainId, rpcUrl, sender, log }) {
         return receipt.transactionHash;
       }
       default: {
-        const res = await fetch(rpcUrl, {
+        const res = await fetch(reads, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),

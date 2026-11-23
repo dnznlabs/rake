@@ -36,23 +36,32 @@ const line = (anchor, from = SHIPPED) => {
 
 const DAY_SECONDS = line('const DAY_SECONDS =');
 const SEED_FLOOR = line('const seedFloor = hi =>');
+const DAY_EXACT = line('let DAY_EXACT =');
 const DAY_STEPS = line('const DAY_STEPS =');
 const NOMINAL_SEC = line('const NOMINAL_SEC =');
 const TS_TOLERANCE = line('const TS_TOLERANCE =');
 const TS_OF = block('const tsOf = async n => {', '\n};\n');
 const DAY_FLOOR = block('async function dayFloor(hi, floor) {');
+const OWN_FLOOR = line('const ownFloor = d =>');
 const READ_FLOOR = block('async function readFloor(d, hi) {');
 const PRESS = line('const press = () =>');
-const MORE_LINE = line('const moreLine = () =>');
+const MORE_LINE = block('const moreLine = () => {', '\n};\n');
 const PARTIAL_LINE = block('function partialLine() {');
 const HIST_FILL = block('function histFill(id, items, empty) {');
+const READ_WHOLE = line('const readWhole = () =>');
 const DAY_HEAD = block('const dayHead = full =>', "'about the last 24 hours';\n");
 
 /** A synthetic chain: block `n` has timestamp `n * sec`, and every header read is counted. */
-function chain({ sec, head, floor = 0, chainId = 1, nominal = null, missing = null }) {
+function chain({ sec, head, floor = 0, chainId = 1, nominal = null, missing = null, walletRefuses = false }) {
   const reads = [];
+  const walletReads = [];
   const src = `
-    const P = {
+    /* **Two providers, because the page has two** (#400, the architect's review). \`tsOf\` reads the
+       day floor through the page's own provider, so the answering stub below is reached by
+       \`pageRead()\` and the wallet's \`P\` records \`\u2014 and, when a test asks, refuses \`\u2014 anything that
+       arrives at it. The floor is a fact about the document's chain, and before this review five
+       header reads a page load went to whichever endpoint a wallet had picked. */
+    const pageP = {
       request: async ({ method, params }) => {
         if (method !== 'eth_getBlockByNumber') throw new Error('unexpected ' + method);
         const n = parseInt(params[0], 16);
@@ -64,6 +73,14 @@ function chain({ sec, head, floor = 0, chainId = 1, nominal = null, missing = nu
         return { timestamp: '0x' + Math.round(n * SEC).toString(16) };
       },
     };
+    const P = {
+      request: async ({ method, params }) => {
+        WALLET_READS.push(method);
+        if (WALLET_REFUSES) throw { code: 35, message: 'chain is not available on free plan, please upgrade to paid plan' };
+        return pageP.request({ method, params });
+      },
+    };
+    const pageRead = () => pageP;
     ${DAY_SECONDS}
     ${TS_TOLERANCE}
     ${DAY_STEPS}
@@ -72,17 +89,20 @@ function chain({ sec, head, floor = 0, chainId = 1, nominal = null, missing = nu
     /* A deliberately wrong seed when a test asks for one: the architect's bound has to hold when the
        nominal figure is out by a factor of ten, which is exactly what a stale Base entry would be. */
     if (NOMINAL_IN != null) NOMINAL_SEC[CHAIN_ID] = NOMINAL_IN;
+    ${DAY_EXACT}
     ${TS_OF}
     ${SEED_FLOOR}
     ${DAY_FLOOR}
     let DAYFLOOR = null;
     const FIRST = new Map();
     let WALLET = WALLET_IN;
+    ${OWN_FLOOR}
     ${READ_FLOOR}
-    return { dayFloor, readFloor, reads: () => READS, exact: () => DAY_EXACT };
+    return { dayFloor, readFloor, reads: () => READS, walletReads: () => WALLET_READS, exact: () => DAY_EXACT };
   `;
-  return { ...new Function('READS', 'SEC', 'FLOOR', 'WALLET_IN', 'CHAIN_ID', 'NOMINAL_IN', 'MISSING', src)(
-    reads, sec, floor, false, chainId, nominal, missing), reads };
+  return { ...new Function('READS', 'SEC', 'FLOOR', 'WALLET_IN', 'CHAIN_ID', 'NOMINAL_IN', 'MISSING',
+    'WALLET_READS', 'WALLET_REFUSES', src)(
+    reads, sec, floor, false, chainId, nominal, missing, walletReads, walletRefuses), reads, walletReadsArr: walletReads };
 }
 
 test('a day is found from timestamps, on a 12-second chain and a 0.2-second one alike', async () => {
@@ -121,6 +141,22 @@ test('a history younger than a day is read whole, and costs two reads', async ()
   assert.equal(c.reads.length, 2, 'the head and the floor, and no search at all');
 });
 
+test('the day search goes to the page, not to the wallet (#400, the review)', async () => {
+  /* Five `eth_getBlockByNumber` a page load went to the wallet's endpoint before this, because `tsOf`
+     read through `P`. The floor is a fact about the document's chain, so an endpoint a wallet happened
+     to pick cannot be what decides it — and an endpoint that refuses block headers must not be able to
+     take the day search down. `1rpc.io/sepolia` refuses exactly that on its free plan. */
+  const head = 20_000_000;
+  const c = chain({ sec: 12, head, chainId: 1, walletRefuses: true });
+
+  const got = await c.readFloor({ addr: '0xabc' }, head);
+
+  assert.equal(got, head - 7_200, 'the day is found through the page, and found exactly');
+  assert.ok(c.exact(), 'so the heading may claim the day rather than "about"');
+  assert.deepEqual(c.walletReads(), [], 'and not one header read reached the wallet');
+  assert.ok(c.reads.length > 0, "while the page's own provider is what answered");
+});
+
 test('the floor never goes below the distribution own first block', async () => {
   const head = 20_000_000;
   const own = head - 100;                                   // younger than a day
@@ -129,23 +165,32 @@ test('the floor never goes below the distribution own first block', async () => 
   assert.equal(got, own);
 });
 
-test('a wallet is not held to a day: it reads from the distribution first block', async () => {
-  const head = 20_000_000, own = 1_000;
+test('a wallet is held to the same day as everyone: the exemption is gone (#400)', async () => {
+  /* It used to read from the distribution's first block the moment a wallet was connected, because
+     the wallet's endpoint was the one that served the first read. #400 moved that read to the page's
+     own provider, so the wallet no longer buys depth here — it buys it at the press, and nowhere
+     else. A connected wallet that skipped the day search then walked from the factory block through
+     an endpoint capped at 200 blocks a query, which is the Product Owner's report. */
+  const head = 20_000_000, own = 1_000, day = head - 7_171;
   const src = `
     const FIRST = new Map();
     const CFG = { factoryBlock: String(OWN) };
     let WALLET = true;
-    const dayFloor = async () => { throw new Error('a wallet must not pay for the day search'); };
+    let searched = 0;
+    const dayFloor = async () => { searched++; return DAY; };
     let DAYFLOOR = null;
     let DAY_EXACT = true;
     ${DAY_SECONDS}
     ${NOMINAL_SEC}
     ${SEED_FLOOR}
+    ${OWN_FLOOR}
     ${READ_FLOOR}
-    return readFloor;
+    return { readFloor, searched: () => searched };
   `;
-  const readFloor = new Function('OWN', src)(own);
-  assert.equal(await readFloor({ addr: '0xabc' }, head), own);
+  const m = new Function('OWN', 'DAY', src)(own, day);
+  assert.equal(await m.readFloor({ addr: '0xabc' }, head), day,
+    'a wallet page reads the same 24 hours as a wallet-less one');
+  assert.equal(m.searched(), 1, 'and it pays for the day search, which it used to skip');
 });
 
 /** `histFill` over a history, in either wallet state, returning what it wrote. */
@@ -159,6 +204,7 @@ function fillFor({ h, items = [], wallet }) {
     const bindOlder = () => {};
     const document = { getElementById: () => null };
     ${PRESS}
+    ${READ_WHOLE}
     ${MORE_LINE}
     ${PARTIAL_LINE}
     ${HIST_FILL}
@@ -190,6 +236,50 @@ test('with a wallet the press is back where it was, and the wallet line is gone'
   assert.doesNotMatch(said, /connect a wallet to load more/);
 });
 
+test('a wallet whose day read finished is still offered the press (#400)', () => {
+  /* **The case #400 created, and my first head did not paint.** Before it, a wallet read from the
+     distribution's own first block, so a read with no boundary left had genuinely reached the bottom
+     and there was nothing to press for. Now every first read is a day deep, so a finished read has a
+     whole history underneath it — and `partialLine` returns nothing when `partial` is null, which
+     left a wallet with no press at all while the token list beside it said "use load older to read
+     further back". A sentence naming a control that is not painted is the defect this task opened
+     with, in the other direction. */
+  const said = fillFor({ h: { partial: null, wall: null }, items: [{}], wallet: true });
+  assert.match(said, /load older/, 'there is history below the day it read, so there is a press');
+  assert.match(said, /this read covers the last 24 hours/, 'and a line saying what it covers');
+  assert.doesNotMatch(said, /connect a wallet to load more/, 'a wallet is connected');
+  assert.doesNotMatch(said, /history before block/, 'nothing stopped short, so no boundary is claimed');
+});
+
+test('and offered nothing once a press has read to the first block', () => {
+  const said = fillFor({ h: { partial: null, wall: null, whole: true }, items: [{}], wallet: true });
+  assert.doesNotMatch(said, /load older/, 'there is nothing below the first block to load');
+  assert.doesNotMatch(said, /covers the last 24 hours/);
+  assert.doesNotMatch(said, /connect a wallet to load more/);
+});
+
+test('exactly one press is painted, never two', () => {
+  /* `partialLine` carries the press on a boundary and `moreLine` carries it on a finished day; a
+     section showing both would offer the same budget twice. */
+  for (const h of [{ partial: 500, wall: null }, { partial: 500, wall: { kind: 'throttle', block: 500 } },
+                   { partial: null, wall: null }]) {
+    const said = fillFor({ h, items: [{}], wallet: true });
+    assert.equal((said.match(/load older/g) || []).length, 1,
+      `one press per section, not ${(said.match(/load older/g) || []).length}: ${JSON.stringify(h)}`);
+  }
+});
+
+test("the press continues below the day, from the floor the first read used", () => {
+  /* `older()`'s top block, lifted. A finished day read has no `partial`, and `DS.h.partial - 1` is
+     `NaN` there — `!(to >= from)` then returned before a single window was asked for, so the press
+     existed and did nothing. The floor the first read used is the only right answer. */
+  const TO = line('  const to = (DS.h.partial != null');
+  const topOf = h => new Function('DS', `${TO}\nreturn to;`)({ h });
+  assert.equal(topOf({ partial: 500, from: 9_000 }), 499, 'a boundary hands over its own block');
+  assert.equal(topOf({ partial: null, from: 9_000 }), 8_999, 'a finished day continues below its floor');
+  assert.ok(Number.isFinite(topOf({ partial: null, from: 9_000 })), 'and never NaN, which read nothing at all');
+});
+
 test('a no-wallet read that fell short of its day says so, without promising more', () => {
   const said = fillFor({ h: { partial: 500, wall: null }, items: [{}], wallet: false });
   assert.match(said, /stopped at block 500, short of a full day/);
@@ -205,7 +295,7 @@ test('the four outcomes still speak for themselves without a wallet', () => {
 
 /** `dayHead` in a given state, which is the one place a head's claim is decided. */
 const headFor = ({ wallet, h, exact = true }) =>
-  new Function('WALLET', 'DS', 'DAY_EXACT', `${DAY_HEAD}\nreturn dayHead;`)(wallet, { h }, exact)('every change this contract has seen');
+  new Function('WALLET', 'DS', 'DAY_EXACT', `${READ_WHOLE}\n${DAY_HEAD}\nreturn dayHead;`)(wallet, { h }, exact)('every change this contract has seen');
 
 test('both heads go through dayHead, so one place decides what they claim', () => {
   const heads = SHIPPED.slice(SHIPPED.indexOf('<div class="sechead"><b>changes</b>'));
@@ -216,8 +306,23 @@ test('both heads go through dayHead, so one place decides what they claim', () =
   }
 });
 
-test('with a wallet the head keeps its descriptive text', () => {
-  assert.equal(headFor({ wallet: true, h: { partial: 500 } }), 'every change this contract has seen');
+test('a connected wallet alone no longer changes the head (#400)', () => {
+  /* The head is a claim about **what was read**, and since #400 a wallet page's first read is the
+     same 24 hours as anyone's. So a wallet whose read stopped short says so, exactly as a wallet-less
+     one does, and a wallet that has read its day cleanly claims the day. */
+  assert.equal(headFor({ wallet: true, h: { partial: 500 } }), 'as far back as this endpoint served');
+  assert.equal(headFor({ wallet: true, h: { partial: null } }), 'last 24 hours');
+});
+
+test('only a press that read it all earns the descriptive text', () => {
+  /* `pressed` with no boundary left is the one state that has read past the day — and the rule is
+     about the read, not about the wallet, so the same state claims it either way. The wallet-less
+     case is unreachable in the page (no press is painted), and that is the point: the claim is keyed
+     on evidence rather than on an affordance. */
+  assert.equal(headFor({ wallet: true, h: { whole: true, partial: null } }), 'every change this contract has seen');
+  assert.equal(headFor({ wallet: false, h: { whole: true, partial: null } }), 'every change this contract has seen');
+  /* A press that itself stopped short claims neither: not the whole history, and no longer the day. */
+  assert.equal(headFor({ wallet: true, h: { whole: true, partial: 500 } }), 'as far back as this endpoint served');
 });
 
 test('without a wallet a complete read says last 24 hours', () => {
@@ -279,11 +384,14 @@ test('a chain that stalls the secant falls back to bisection and still converges
   const tOf = n => n <= KNEE ? n : KNEE + (n - KNEE) * 10_000;
   const reads = [];
   const src = `
-    const P = { request: async ({ params }) => {
+    const pageP = { request: async ({ params }) => {
       const n = parseInt(params[0], 16);
       READS.push(n);
       return { timestamp: '0x' + TOF(n).toString(16) };
     } };
+    /* The day search reads through the page's provider (#400), so that is what answers here. */
+    const pageRead = () => pageP;
+    const P = { request: async () => { throw new Error('the day search must not reach the wallet'); } };
     ${DAY_SECONDS}
     ${TS_TOLERANCE}
     ${DAY_STEPS}
@@ -366,6 +474,7 @@ test('an outright throw in the search is caught, and the read still happens at t
     ${NOMINAL_SEC}
     ${SEED_FLOOR}
     const dayFloor = async () => { throw new Error('the endpoint hung up'); };
+    ${OWN_FLOOR}
     ${READ_FLOOR}
     return readFloor;
   `;
@@ -380,11 +489,13 @@ test('the empty sentence names its window when there is no wallet', () => {
      address yet" about an address with four funds events 1.1 million blocks back. The head said
      "last 24 hours" and the line below offered a wallet, but the sentence between them was false. */
   const EMPTY_LINE = line('const emptyLine = (all, day) =>');
-  const pick = wallet => new Function('WALLET', `${EMPTY_LINE}\nreturn emptyLine;`)(wallet);
-  assert.equal(pick(false)('nothing has arrived at this address yet.', 'nothing has arrived in the last 24 hours.'),
-    'nothing has arrived in the last 24 hours.');
-  assert.equal(pick(true)('nothing has arrived at this address yet.', 'nothing has arrived in the last 24 hours.'),
-    'nothing has arrived at this address yet.');
+  const pick = h => new Function('DS', `${READ_WHOLE}\n${EMPTY_LINE}\nreturn emptyLine;`)({ h });
+  const ALL = 'nothing has arrived at this address yet.', DAY = 'nothing has arrived in the last 24 hours.';
+  /* Since #400 the sentence is keyed on the read, not on the wallet: a first read is a day deep for
+     everyone, so a connected wallet that has not pressed may not claim all time either. */
+  assert.equal(pick({ partial: null })(ALL, DAY), DAY, 'a first read is a day, wallet or not');
+  assert.equal(pick({ whole: true, partial: 500 })(ALL, DAY), DAY, 'a press that stopped short is still not all time');
+  assert.equal(pick({ whole: true, partial: null })(ALL, DAY), ALL, 'only a press that reached the first block');
   /* And both sections go through it, rather than one being fixed and the other forgotten. */
   assert.match(SHIPPED, /histFill\('h-changes', DS\.h\.changes,\s*\n?\s*emptyLine\(/);
   assert.match(SHIPPED, /histFill\('h-funds', DS\.h\.funds,\s*\n?\s*emptyLine\(/);
@@ -414,6 +525,7 @@ test('a search that fails entirely floors the walk at the seed, not at the distr
     ${NOMINAL_SEC}
     ${SEED_FLOOR}
     const dayFloor = async () => { throw new Error('the endpoint hung up'); };
+    ${OWN_FLOOR}
     ${READ_FLOOR}
     return { readFloor, exact: () => DAY_EXACT };
   `;

@@ -48,8 +48,8 @@ const MAX_WINDOWS = line('let MAX_WINDOWS =');
 const RANGEY = line('const RANGEY =');
 const ERRTEXT = block('const errText = e =>', ".join(' · ');\n");
 const STATED_FLOOR = block('const statedFloor = text =>', '\n};\n');
-const WINDOW1 = block('function window1(address, topics, a, b) {');
-const LOGS = block('async function logs(address, topics, fromBlock, toBlock) {');
+const WINDOW1 = block('function window1(address, topics, a, b, prov) {');
+const LOGS = block('async function logs(address, topics, fromBlock, toBlock, prov) {');
 
 /* The table's own figures, read out of the page rather than repeated here: a test that hard-coded
    them would still pass if the page and the measurement disagreed, which is the one thing worth
@@ -119,7 +119,7 @@ function walk({ chainId, wallet = null, refuse = '', refuseFor = 0, fromQuery = 
 test('the first window of a walk is the span the page measured for that chain', async () => {
   for (const [chainId, want] of Object.entries(TABLE)) {
     const w = walk({ chainId: Number(chainId) });
-    await w.logs(null, [[]], 0, HEAD);
+    await w.logs(null, [[]], 0, HEAD, w.provider);
     assert.equal(w.spans[0], want,
       `chain ${chainId} should open its walk at ${want} blocks, the span rpc-depth.md found reliable`);
   }
@@ -134,13 +134,13 @@ test('every chain in the table is one the page actually reads from', () => {
 
 test('a chain with no measured figure still starts at 10,000', async () => {
   const w = walk({ chainId: 10 });                // Optimism: an endpoint, no reading of it
-  await w.logs(null, [[]], 0, HEAD);
+  await w.logs(null, [[]], 0, HEAD, w.provider);
   assert.equal(w.spans[0], 10_000);
 });
 
 test("a wallet's provider starts at 10,000, because its cap is not ours to know", async () => {
   const w = walk({ chainId: 1, wallet: true });
-  await w.logs(null, [[]], 0, HEAD);
+  await w.logs(null, [[]], 0, HEAD, w.provider);
   assert.equal(w.spans[0], 10_000,
     'an injected provider must not inherit the page endpoint\'s figure');
   assert.equal(w.provider.logWindow, undefined, 'readProvider returns a wallet provider untouched');
@@ -148,13 +148,13 @@ test("a wallet's provider starts at 10,000, because its cap is not ours to know"
 
 test('a wallet on a chain the page measured narrower still starts at 10,000', async () => {
   const w = walk({ chainId: 1, wallet: true });   // chain 1's own endpoint is 1,000
-  await w.logs(null, [[]], 0, HEAD);
+  await w.logs(null, [[]], 0, HEAD, w.provider);
   assert.equal(w.spans[0], 10_000);
 });
 
 test('the window still shrinks on a refusal, from the chain\'s figure', async () => {
   const w = walk({ chainId: 8453, refuse: 'query returned too many results', refuseFor: 1 });
-  await w.logs(null, [[]], 0, HEAD);
+  await w.logs(null, [[]], 0, HEAD, w.provider);
   assert.equal(w.spans[0], 50_000, 'it opens at the measured span');
   const narrower = w.spans.find(s => s < 50_000);
   assert.ok(narrower, `no window narrower than the opening one was ever asked for: ${w.spans.slice(0, 8)}`);
@@ -163,14 +163,14 @@ test('the window still shrinks on a refusal, from the chain\'s figure', async ()
 
 test('a refusal that names a cap is taken at its word from the chain\'s figure', async () => {
   const w = walk({ chainId: 8453, refuse: 'exceed maximum block range: 1000', refuseFor: 1 });
-  await w.logs(null, [[]], 0, HEAD);
+  await w.logs(null, [[]], 0, HEAD, w.provider);
   assert.equal(w.spans[0], 50_000);
   assert.ok(w.spans.includes(1_000), `the named cap was never used: ${w.spans.slice(0, 8)}`);
 });
 
 test('the dev ?win= override beats the table, or the windowing affordance cannot narrow', async () => {
   const w = walk({ chainId: 84532, fromQuery: true });
-  await w.logs(null, [[]], 0, HEAD);
+  await w.logs(null, [[]], 0, HEAD, w.provider);
   assert.equal(w.spans[0], 10_000,
     'with WINDOW_FROM_QUERY set, readProvider must hand the provider no figure of its own');
 });

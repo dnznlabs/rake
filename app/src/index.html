@@ -578,7 +578,12 @@ let HEAD = null;
 /* #243 part 2: the block the route's own read was made at, under the nav beside the control that
    re-makes it. Written wherever the head resolves, which is every route that reads one. */
 const stamp = n => { const el = document.getElementById('asof'); if (el) el.textContent = `as of block ${n}`; };
-const head = () => HEAD ?? (HEAD = P.request({ method: 'eth_blockNumber' }).then(h => { const n = parseInt(h, 16); stamp(n); return n; }));
+/* **The chain's head belongs to the chain, so the page's own provider reads it** (#400, the
+   architect's review). It used to go through `P`, which is a wallet's endpoint when one is connected,
+   and this is the first read of every history walk: an endpoint that will not answer it stops the day
+   read before the floor search begins. Moved together with `tsOf` below — one without the other
+   leaves the walk still depending on the wallet for a block number. */
+const head = () => HEAD ?? (HEAD = pageRead().request({ method: 'eth_blockNumber' }).then(h => { const n = parseInt(h, 16); stamp(n); return n; }));
 /* **The last 24 hours, for a visitor with no wallet** (step 5, amended by the Product Owner's ruling
    of 2026-11-23). The aim is no longer to read as deep as the endpoint allows: it is to read a day and
    say so. A day is a span of *time*, and these chains do not agree on what a block costs — Ethereum
@@ -624,8 +629,14 @@ let DAY_EXACT = true;
    `null.timestamp` threw, the floor search rejected, and all three sections painted
    `history unavailable`, which is the outcome reserved for an endpoint that answered nothing at all.
    A missing block is now a `null` the caller steps around. */
+/* **Through the page's own provider** (#400, the architect's review). The day floor is a fact about
+   the document's chain, not about whichever endpoint a wallet picked, and reading it through the
+   wallet put five `eth_getBlockByNumber` on the wallet's endpoint on every wallet page load — so an
+   endpoint that refuses block headers took the day search down with it, which is the same defect as
+   the history read this amendment moved. #375's rule: what belongs to the page's chain is read from
+   the page's chain. */
 const tsOf = async n => {
-  const b = await P.request({ method: 'eth_getBlockByNumber', params: ['0x' + n.toString(16), false] });
+  const b = await pageRead().request({ method: 'eth_getBlockByNumber', params: ['0x' + n.toString(16), false] });
   return b && b.timestamp != null ? Number(BigInt(b.timestamp)) : null;
 };
 /** The first block at or after `hi`'s timestamp minus a day, never below `floor`. */
@@ -682,12 +693,18 @@ async function dayFloor(hi, floor) {
    and the head is read once per route entry. `route` clears it with `HEAD`, so a route entry searches
    again rather than serving a floor computed against an older head. */
 let DAYFLOOR = null;
-/* Where a history read starts: the distribution's own first block, and for a visitor with no wallet
-   the later of that and a day ago. A wallet reads as before, with its press — its endpoint is its
-   own business and its depth is not ours to ration. */
+/* The oldest block a distribution can have anything in: its own first block when the `Created` scan
+   found it, else the factory's. The floor of a *whole* read, and the one figure that says whether a
+   read that finished its span finished the **history** — a day read that completed is complete and
+   still has history below it. Used by `readFloor`, by `older()` and by `readWhole`'s bookkeeping, so
+   it is one expression rather than three. */
+const ownFloor = d => Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock));
+/* Where a history read starts: the later of the distribution's own first block and a day ago, for
+   everyone since #400. A wallet's extra reach is the press, and nothing else. */
 async function readFloor(d, hi) {
-  const own = Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock));
-  if (WALLET) return own;
+  const own = ownFloor(d);
+  /* **No wallet exemption any more** (#400): the first read is the last 24 hours for everyone,
+     because it is the page's own provider that serves it. A wallet's extra reach is the press. */
   /* **The floor search may never cost the page its history** — before this, a single `null` block
      rejected here and `paintFailed` wrote `history unavailable` over all three sections. But the
      fallback is **the seed, not the distribution's own block**: with no wallet that block is the deep
@@ -730,13 +747,13 @@ const statedFloor = text => {
   return m ? Number(m[1]) : null;
 };
 // A null `address` is left out of the filter, not sent as null: that is the query over every contract.
-function window1(address, topics, a, b) {
+function window1(address, topics, a, b, prov) {
   /*DEV*/
   /* The browser check counts requests per log kind against #76's budget of 40, and the kind is
      exactly the topic0 set the query asked for. */
   if (self.__LOGREQ) self.__LOGREQ.push({ kind: JSON.stringify(topics[0]), a, b });
   /*DEV*/
-  return P.request({
+  return prov.request({
     method: 'eth_getLogs',
     params: [{ ...(address ? { address } : {}), topics, fromBlock: '0x' + a.toString(16), toBlock: '0x' + b.toString(16) }],
   });
@@ -745,12 +762,12 @@ function window1(address, topics, a, b) {
    newest-first so that what a truncated scan has is the recent history and what it lacks is the old.
    `partial` is the block it was read back to — `null` when the whole range was covered — which is the
    one number the section's own line can honestly print. */
-async function logs(address, topics, fromBlock, toBlock) {
+async function logs(address, topics, fromBlock, toBlock, prov) {
   const from = Number(BigInt(fromBlock));
   let hi = toBlock == null ? await head() : Number(toBlock);
   /* The transport's own figure when it has one (#391): `P` is the page's read provider for a visitor
      with no wallet, and a wallet's provider otherwise, where 10,000 is the only safe guess. */
-  let size = (P && P.logWindow) || WINDOW_START, spent = 0;
+  let size = (prov && prov.logWindow) || WINDOW_START, spent = 0;
   const out = [];
   /* Windows answered, which is **not** `out.length`. An endpoint can answer forty windows that
      happen to hold no events; that is a read history with nothing in it, and the sections should say
@@ -780,7 +797,7 @@ async function logs(address, topics, fromBlock, toBlock) {
       .reverse().slice(0, Math.min(WINDOW_INFLIGHT, MAX_WINDOWS - spent));
     spent += batch.length;
     const res = await Promise.all(batch.map(([a, b]) =>
-      window1(address, topics, a, b).then(r => ({ ok: r }), e => ({ err: errText(e), e }))));
+      window1(address, topics, a, b, prov).then(r => ({ ok: r }), e => ({ err: errText(e), e }))));
     /* Kept only as far as the first refusal: the batch is contiguous from the top, so keeping a
        success from below a failure would leave a hole that no single boundary could describe. */
     const i = res.findIndex(r => r.err);
@@ -1363,14 +1380,21 @@ function tokenIn(log) {
    to. Separate from the decode below because `load older` adds to these lists and the decode then
    runs again over the union: a `Queued` that only arrives in the older slice still has to close
    against the `Applied` that was already on the page. */
-async function histLogs(addr, from, to) {
-  const pick = set => logs(addr, [set.map(([sig]) => topic(sig))], from, to);
+/* **Which provider reads the logs is now an argument, not whichever one `P` happens to be** (#400).
+   The first read of every page goes through the page's own read provider, wallet or not, because a
+   wallet must never make the page worse: the Product Owner connected one on Base Sepolia and all three
+   sections read `history unavailable`, while the same page with no wallet read its day cleanly — the
+   wallet's default endpoint there serves 200 blocks a query at 25 a second. Only `load older` reads
+   through the wallet's endpoint, where it may reach further than ours. #375's rule, applied to the
+   history: what belongs to the page's chain is read from the page's chain. */
+async function histLogs(addr, from, to, prov) {
+  const pick = set => logs(addr, [set.map(([sig]) => topic(sig))], from, to, prov);
   const [changes, funds, ins] = await Promise.all([pick(CHANGE_EVENTS), pick(FUND_EVENTS),
-    logs(null, [TRANSFER, null, word(addr)], from, to).catch(() => null)]);
+    logs(null, [TRANSFER, null, word(addr)], from, to, prov).catch(() => null)]);
   return { changes, funds, ins };
 }
-async function history(addr, from, to) {
-  return histOf(await histLogs(addr, from, to));
+async function history(addr, from, to, prov) {
+  return histOf(await histLogs(addr, from, to, prov));
 }
 function histOf(raw) {
   const fe = raw.funds.logs.map(entry);
@@ -1546,10 +1570,25 @@ function histFill(id, items, empty) {
    accident, so there is nothing for a press to continue — `moreLine` carries the one route onward
    instead. The stop lines stay, because a read that fell short of its day still has to say why. */
 const press = () => WALLET ? ' · <button class="link older">load older</button>' : '';
+/* Whether anything is left below what has been read: a boundary, or a floor above the distribution's
+   own first block. `whole` is recorded by whoever did the read, because only the caller knows which
+   floor it asked for — a read that completed its span tells you nothing about which span it was. */
+const readWhole = () => !!(DS.h && DS.h.partial == null && DS.h.whole);
 /* The one line a no-wallet reader gets instead of a press, under both history sections. Not
    conditional on the read having stopped short: the day is the limit even when the day read cleanly,
    and a reader is owed the route to the rest either way. */
-const moreLine = () => WALLET ? '' : '<div class="help">connect a wallet to load more</div>';
+/* The way onward, when there is one. Three cases, and the middle one was missing until #400's own
+   first head: a wallet whose day read **completed** has no stop line to hang the press on, and the
+   day is no longer the bottom of the history — so it was offered nothing at all while the token list
+   beside it said "use load older to read further back". A sentence pointing at a control that is not
+   painted is the same defect as "connect a wallet to load more" on a page where a wallet changed
+   nothing, which is what #400 exists to fix. */
+const moreLine = () => {
+  if (readWhole()) return '';
+  if (!WALLET) return '<div class="help">connect a wallet to load more</div>';
+  /* A boundary of its own: `partialLine` carries the press there, and two would be one too many. */
+  return (DS.h && DS.h.partial == null) ? `<div class="help">this read covers the last 24 hours${press()}</div>` : '';
+};
 /* **What the heads may claim** (the architect's ruling, 2026-11-23: the heading must be true when
    painted). With a wallet the sections are the whole history and keep their descriptive text. Without
    one they are a day deep — but only if the read actually reached the day. Where it stopped short,
@@ -1564,8 +1603,16 @@ const moreLine = () => WALLET ? '' : '<div class="help">connect a wallet to load
    back, and all ten cold loads said nothing had ever arrived. The head above said "last 24 hours"
    and the line below offered a wallet, but the sentence between them was still wrong, and a reader
    who read only the rows would have been misled. */
-const emptyLine = (all, day) => WALLET ? all : day;
-const dayHead = full => WALLET ? full
+/* Did this read reach the distribution's own first block? Only a press can, now that every first read
+   is a day deep — so `pressed` with a boundary of `null` is the one state in which the page may speak
+   about all of a distribution's history. */
+/* "nothing has arrived at this address **yet**" is a claim about all time, and only a read that
+   reached the first block may make it. */
+const emptyLine = (all, day) => readWhole() ? all : day;
+/* **What the heads may claim, for everyone** (#400). The first read is the page's own day whether or
+   not a wallet is connected, so there is no wallet branch here any more; what there is instead is the
+   press, which reads below the day and makes "last 24 hours" false. */
+const dayHead = full => readWhole() ? full
   : (DS.h && DS.h.partial != null) ? 'as far back as this endpoint served'
   : DAY_EXACT ? 'last 24 hours'
   : 'about the last 24 hours';
@@ -2089,7 +2136,12 @@ async function detail(addr) {
   // until it lands rather than reading as absence. The apply buttons do not wait on it (#215).
   /* The head is read first so the floor can be a day behind it. `head()` caches its promise, so the
      three reads below still make one `eth_blockNumber` between them. */
-  head().then(hi => readFloor(d, hi).then(from => history(addr, from, hi)))
+  /* `whole` is this read's own answer to "was there anything below me": the floor it asked for against
+     the oldest block this distribution can have anything in. The heads, the empty sentences and the
+     press all hang off it, and it cannot be inferred later — `partial == null` says the span
+     finished, not which span it was. */
+  head().then(hi => readFloor(d, hi).then(from =>
+    history(addr, from, hi, pageRead()).then(h => ({ ...h, from, whole: from <= ownFloor(d) }))))
     .then(h => absorb(t, d, h)).catch(() => {
     if (stale(t)) return;
     DS.failed = true;
@@ -2157,14 +2209,21 @@ async function absorb(t, d, h) {
    already read and decoded again over the union. The button says so while it runs — a second press
    would spend a second budget on the same blocks. */
 async function older() {
-  const t = TOKEN, d = DS.d, prev = DS.h.raw, to = DS.h.partial - 1;
+  const t = TOKEN, d = DS.d, prev = DS.h.raw;
   /* Unreachable without a wallet — no press is painted — so this is the wallet's own floor, the
      distribution's first block, and not the 24-hour one. */
-  const from = Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock));
+  const from = ownFloor(d);
+  /* **Where the older half starts from above.** A read that stopped short hands over its boundary; a
+     day read that *completed* has no boundary, and the block below the floor it used is the only
+     right answer — `DS.h.partial - 1` is `NaN` there, which silently returned before anything was
+     read and left the press doing nothing. That is the case #400 created and this is where it lands. */
+  const to = (DS.h.partial != null ? DS.h.partial : DS.h.from) - 1;
   if (!(to >= from)) return;
   for (const b of V.querySelectorAll('.older')) { b.disabled = true; b.textContent = 'loading older…'; }
   let add;
-  try { add = await histLogs(d.addr, from, to); } catch (e) {
+  /* **The press is the only thing that reads through the wallet** (#400). It may reach below the day
+     the page already painted; if it cannot, what is painted stays and the four outcomes say why. */
+  try { add = await histLogs(d.addr, from, to, WALLET ? P : pageRead()); } catch (e) {
     if (stale(t)) return;
     for (const b of V.querySelectorAll('.older')) { b.disabled = false; b.textContent = 'load older — that read failed, try again'; }
     return;
@@ -2176,11 +2235,31 @@ async function older() {
      one that met whatever stopped the read. Dropping the wall here would turn a depth refusal into a
      plain budget boundary on the next paint, and put back a `load older` that cannot work. */
   const join = (older_, newer_) => ({ logs: [...older_.logs, ...newer_.logs], partial: older_.partial, wall: older_.wall });
-  await absorb(t, d, histOf({
-    changes: join(add.changes, prev.changes),
-    funds: join(add.funds, prev.funds),
-    ins: prev.ins && add.ins ? join(add.ins, prev.ins) : null,
-  }));
+  /* The press walks from the distribution's own first block, so this read's floor **is** the bottom of
+     the history: `whole` is true here whatever it meets on the way, and a walk that stopped short
+     says so through its own `partial`. */
+  /* **The repaint is inside the handler's own guard too** (the architect's review of #400). `absorb`
+     re-reads the token decimals, the symbols and then the funds **from state**, and `readFunds` goes
+     through `call()`, which is the wallet's provider when one is connected. On an endpoint the press
+     has just sent seventy log queries to, one of those state reads comes back `HTTP 429` — and it was
+     rejecting out of a click handler, where nobody was waiting: an uncaught `unhandledrejection`
+     carrying `{"message":"HTTP 429"}`, which is what the driver was reporting as the word `Object`.
+     The first read's own path has had this catch since #382 (`detail`, two screens up); the press had
+     only the `histLogs` one above. Found by the architect in one run; measured here as one in three.
+
+     What a reader gets is the same as a failed walk: whatever is painted stays — the day especially —
+     and the press comes back saying the read failed, because asking the same endpoint again later is
+     exactly the thing that may work. */
+  try {
+    await absorb(t, d, { ...histOf({
+      changes: join(add.changes, prev.changes),
+      funds: join(add.funds, prev.funds),
+      ins: prev.ins && add.ins ? join(add.ins, prev.ins) : null,
+    }), from, whole: true });
+  } catch (e) {
+    if (stale(t)) return;
+    for (const b of V.querySelectorAll('.older')) { b.disabled = false; b.textContent = 'load older — that read failed, try again'; }
+  }
 }
 
 /* The log-built sections, painted from DS so a repaint of the page — the drawer opening, a mode switch —
@@ -2594,7 +2673,11 @@ function fundsHTML(d, f, other) {
      a claim about a read that never happened, which is the same fault as the heading claiming a day it
      did not reach. In that path `other` is null and the sentence below says the truth instead: the
      token payments could not be read. */
-  const windowed = (WALLET || !DS.h) ? '' : '<div class="help wide">this list covers the last 24 hours; a token distributed here earlier is not shown. Connect a wallet to read further back.</div>';
+  /* **The way onward differs, the window does not** (#400). A connected wallet reads the same day
+     here as anyone, so it gets the same sentence — but telling it to connect a wallet would be
+     nonsense, and `load older` is the control it actually has. */
+  const windowed = (readWhole() || !DS.h) ? ''
+    : `<div class="help wide">this list covers the last 24 hours; a token distributed here earlier is not shown. ${WALLET ? 'Use <b>load older</b> to read further back.' : 'Connect a wallet to read further back.'}</div>`;
   const others = !other ? '<div class="help wide">token payments in could not be read from this provider, so a token never distributed here is not listed.</div>'
     : !n ? ''
     : `<details class="others" id="others"><summary>other tokens received (${n})</summary>`
@@ -2792,7 +2875,13 @@ function paintCreate(st) {
 /* `mine` is the factory's `Created` logs with the connected account in the owner topic, each hit
    confirmed against `snapshot().owner` — ownership can have moved since the log was written. */
 async function mine() {
-  const found = await logs(CFG.factory, [topic('Created(address,address)'), null, word(ACC)], CFG.factoryBlock);
+  /* **The wallet's provider, explicitly** (the architect's review of #400). This is the one read that
+     is better off on the wallet's endpoint: it scans from the factory block, which no 24-hour floor
+     bounds, and our own mainnet endpoint serves about 10,000 blocks — so reading it through the page
+     would list only what an account created in the last day and a half and call that "mine". #400 is
+     about the *first screen* never being worse with a wallet; a tab that exists because an account is
+     connected is not that, and its depth is the wallet's to give. */
+  const found = await logs(CFG.factory, [topic('Created(address,address)'), null, word(ACC)], CFG.factoryBlock, null, P);
   const addrs = found.logs.map(l => { const a = Eth.dec(['address'], l.topics[1])[0]; FIRST.set(a, l.blockNumber); return a; });
   const rows = await Promise.all(addrs.map(async a => {
     const d = await loadDistro(a);

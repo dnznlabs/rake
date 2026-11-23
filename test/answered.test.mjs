@@ -38,10 +38,11 @@ const line = (anchor, from = SHIPPED) => {
   return from.slice(at, from.indexOf('\n', at));
 };
 
-const LOGS = block('async function logs(address, topics, fromBlock, toBlock) {');
+const LOGS = block('async function logs(address, topics, fromBlock, toBlock, prov) {');
 const PARTIAL_LINE = block('function partialLine() {');
 const PRESS = line('const press = () =>');
-const MORE_LINE = line('const moreLine = () =>');
+const MORE_LINE = block('const moreLine = () => {', '\n};\n');
+const READ_WHOLE = line('const readWhole = () =>');
 const STATED_FLOOR = block('const statedFloor = text =>', '\n};\n');
 const RANGEY = line('const RANGEY =');
 const ERRTEXT = block('const errText = e =>', ".join(' · ');\n");
@@ -88,7 +89,7 @@ function walk({ refuseAbove, saying = 'pruned history unavailable', code = 4444,
 }
 
 const lineFor = (h, wallet = true) =>
-  new Function('DS', 'Model', 'WALLET', `${PRESS}\n${MORE_LINE}\n${PARTIAL_LINE}\nreturn partialLine;`)({ h }, Model, wallet)();
+  new Function('DS', 'Model', 'WALLET', `${PRESS}\n${READ_WHOLE}\n${MORE_LINE}\n${PARTIAL_LINE}\nreturn partialLine;`)({ h }, Model, wallet)();
 
 test('a window answered below a refusal counts as answered, though its logs are dropped', async () => {
   /* The newest window of the first batch is refused and the three below it succeed. Before the fix
@@ -152,6 +153,7 @@ function fillFor(h, items, wallet = true) {
     const bindOlder = () => {};
     const document = { getElementById: () => null };
     ${PRESS}
+    ${READ_WHOLE}
     ${MORE_LINE}
     ${PARTIAL_LINE}
     ${HIST_FILL}
@@ -181,7 +183,10 @@ test('a section that read its whole range prints the empty sentence alone', asyn
   const w = walk({ refuseAbove: Number.MAX_SAFE_INTEGER, head: 5_000, from: 0, events: false });
   const h = await w.logs('0xabc', [['0xaa']], 0, 5_000);
   assert.equal(h.partial, null, 'the whole range fits in one window, so nothing is outstanding');
-  const said = fillFor(h, []);
+  /* `whole` is the reader's own record of which floor it asked for, and this walk started at the
+     distribution's first block — so there is nothing below it and no press to offer. Since #400 a
+     finished span alone does not mean a finished history: a day read finishes its span every time. */
+  const said = fillFor({ ...h, whole: true }, []);
   assert.match(said, /nothing has arrived at this address yet/);
   assert.doesNotMatch(said, /history before block/);
   assert.doesNotMatch(said, /load older/);

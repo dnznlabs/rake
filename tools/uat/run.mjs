@@ -2,6 +2,7 @@
 /* m05-t01c step 9a: the UAT rows that are about the page, as assertions.
 
    Usage: node run.mjs --chain 11155111 [--control] [--base https://rake.dnzn.dev] [--shots <dir>]
+          [--wallet-default | --wallet-rpc <url>]   the endpoint the wallet reads through (#400)
    Exits non-zero on the first missed assertion or any page error. A row's screenshot is written
    only after its assertions have passed, so a PNG under `shots/` is a claim the row made good.
    `--control` drives row (c) at an address with no code and requires the run to FAIL: a driver that
@@ -26,8 +27,8 @@ const COUNT_JS = fs.readFileSync(new URL('../../docs/milestones/m04/tasks/m04-t0
    out. If `PUBLIC_RPC` moves again, these move with it; a mismatch here makes every history row a
    measurement of the wrong endpoint. */
 const CHAINS = {
-  11155111: { name: 'sepolia', rpc: 'https://ethereum-sepolia-rpc.publicnode.com', receiver: '0xC5593d2aa5f89fDaBE6e298b4AC38ad1E50D7C95' },
-  84532: { name: 'base sepolia', rpc: 'https://base-sepolia-rpc.publicnode.com', receiver: '0x869DFe837B8dB2819027E53d75C20bE31f13acD2' },
+  11155111: { name: 'sepolia', rpc: 'https://ethereum-sepolia-rpc.publicnode.com', receiver: '0xC5593d2aa5f89fDaBE6e298b4AC38ad1E50D7C95', walletRpc: 'https://1rpc.io/sepolia' },
+  84532: { name: 'base sepolia', rpc: 'https://base-sepolia-rpc.publicnode.com', receiver: '0x869DFe837B8dB2819027E53d75C20bE31f13acD2', walletRpc: 'https://sepolia.base.org' },
 };
 const EXEC = process.env.RAKE_UAT_CHROME || `${process.env.HOME}/.cache/ms-playwright/chromium-1243/chrome-linux-arm64/chrome`;
 /* `cast` is the caller's to provide now that it comes from `PATH`, so say so once here rather than
@@ -60,6 +61,17 @@ const flag = k => process.argv.includes(`--${k}`);
 const chainId = Number(arg('chain'));
 const chain = CHAINS[chainId];
 if (!chain) { console.error(`run.mjs: --chain must be one of ${Object.keys(CHAINS).join(', ')}`); process.exit(2); }
+/* **Which endpoint the wallet reads through** (#400). The default is the page's own, which is what
+   every row here has measured so far — and that is exactly why none of them could see a wallet making
+   the page worse. `--wallet-rpc` points the injected provider somewhere narrower, as a real wallet
+   does: `walletRpc` below is the endpoint Base's own network entry carries. Writes still go to the
+   chain's `rpc`. The read-only driver for this asymmetry is `tools/uat/wallet-rpc.mjs`. */
+const walletRpc = arg('wallet-rpc', flag('wallet-default') ? chain.walletRpc : null);
+if (flag('wallet-default') && !chain.walletRpc) {
+  console.error(`run.mjs: no wallet-default endpoint recorded for chain ${chainId} — pass --wallet-rpc <url>`);
+  process.exit(2);
+}
+if (walletRpc) console.log(`wallet reads through ${walletRpc} (the page keeps ${chain.rpc})`);
 const base = (arg('base', 'https://rake.dnzn.dev')).replace(/\/$/, '') + `/${chainId}/`;
 const control = flag('control');
 /* **Screenshots go to a temp directory unless somebody asks for the record.** The default used to be
@@ -148,7 +160,7 @@ const browser = await chromium.launch({ executablePath: EXEC, headless: true });
 try {
   /* ---- the wallet pass ---------------------------------------------------------------------- */
   const methods = [];
-  const { rpc, sent } = makeRpc({ chainId, rpcUrl: chain.rpc, sender: R.ENGINEER, log: m => methods.push(m) });
+  const { rpc, sent } = makeRpc({ chainId, rpcUrl: chain.rpc, readUrl: walletRpc, sender: R.ENGINEER, log: m => methods.push(m) });
   /* Clipboard permission so row (j) exercises the branch a reader on an https origin takes, rather
      than only the textarea fallback (`app/src/index.html:402`). Both branches are accepted. */
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 }, permissions: ['clipboard-read', 'clipboard-write'] });
