@@ -73,6 +73,21 @@ document.getElementById('flinks').innerHTML = '<a href="https://eip.tools/eip/82
 
 /* ---- provider ------------------------------------------------------------------------------ */
 let P = null, ACC = null, CHAIN = null;
+/* `CHAIN` is a **number**, or `null` before anything has been read, and this helper is the only
+   place that decides so (#379). It used to be assigned three ways: `parseInt(…, 16)` in `load()` and
+   `String(Number(…))` in both `pickWallet` and `chainChanged`. The three name gates compare it
+   strictly against numbers (`:725`, `:762`, `:782`), so after a wallet was picked from the menu — or
+   after the same-chain `chainChanged` that Phantom emits on load — both comparisons were true on
+   every chain, `resolveName` returned `null` before asking any registry, and the page printed "names
+   resolve on mainnet and Sepolia" *while on* Sepolia. Nothing restored the number: `load()` runs once
+   from the boot IIFE and `pickWallet` → `connect()` never reaches it, so the string survived for the
+   life of the page. `eth_chainId` answers a hex string, which `Number` reads; anything unreadable
+   becomes `null` rather than `NaN`, so `CHAIN === null` stays the single "not read yet". */
+const asChain = id => {
+  if (id == null) return null;
+  const n = Number(id);
+  return Number.isFinite(n) ? n : null;
+};
 // True only when `discover` found an injected provider: the one thing `who()` reads to tell a visitor
 // with no wallet from a wallet that is there but not connected.
 let WALLET = false;
@@ -200,8 +215,8 @@ function wire() {
    reloads for ever. `CHAIN` is the chain last read; before anything has been read there is nothing to
    re-read, so the first event only records it. */
 function chainChanged(id) {
-  const n = id == null ? null : String(Number(id));
-  if (n === null || CHAIN === null || n === String(CHAIN)) { if (n !== null) CHAIN = n; return; }
+  const n = asChain(id);
+  if (n === null || CHAIN === null || n === CHAIN) { if (n !== null) CHAIN = n; return; }
   location.reload();
 }
 /* `wallet_requestPermissions` first: it is what makes a wallet that supports it show its own prompt
@@ -290,7 +305,7 @@ async function pickWallet(rdns) {
   PICK = rdns;
   P = readProvider(w.provider); WALLET = true;
   wire();
-  try { CHAIN = String(Number(await P.request({ method: 'eth_chainId' }))); } catch (e) {}
+  try { CHAIN = asChain(await P.request({ method: 'eth_chainId' })); } catch (e) {}
   /* `finally`, not a plain sequence: a wallet whose `eth_requestAccounts` throws must not leave the
      pick behind either, and the error still reaches the caller after the revert. */
   try {
@@ -864,7 +879,7 @@ function who() {
 /* ---- reading the chain ---------------------------------------------------------------------- */
 const S = { featured: null, featuredLie: null, impl: null, maxRows: null, grace: null, loaded: false, error: null, tab: 'recent' };
 async function load() {
-  CHAIN = parseInt(await P.request({ method: 'eth_chainId' }), 16);
+  CHAIN = asChain(await P.request({ method: 'eth_chainId' }));
   // The same address on another network is another contract, or none: do not read it.
   if (wrongChain()) return;
   await readClock();
