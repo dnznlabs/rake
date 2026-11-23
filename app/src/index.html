@@ -543,6 +543,15 @@ const errText = e => [e && e.message, e && e.data && e.data.message, e && e.caus
    shapes that name their number; these are the ones that complain without naming one, where halving
    is the only move left. Anything else is a real failure and is thrown to the caller, which paints it. */
 const RANGEY = /\brange\b|too many|more than \d+ results|response size|\blimit/i;
+/* The first block an endpoint admits to keeping, when its refusal says so — `4444 pruned history
+   unavailable: requested 360085, earliest available 1000000`. Taken in preference to any boundary a
+   walk arrives at by shrinking: the endpoint is describing itself, and a window answered *below* a
+   floor like that proves nothing, since an index can answer "no logs here" without reading the
+   pruned bodies it would have needed. */
+const statedFloor = text => {
+  const m = /earliest available (\d+)/i.exec(String(text || ''));
+  return m ? Number(m[1]) : null;
+};
 // A null `address` is left out of the filter, not sent as null: that is the query over every contract.
 function window1(address, topics, a, b) {
   /*DEV*/
@@ -564,6 +573,23 @@ async function logs(address, topics, fromBlock, toBlock) {
   let hi = toBlock == null ? await head() : Number(toBlock);
   let size = WINDOW_START, spent = 0;
   const out = [];
+  /* Windows answered, which is **not** `out.length`. An endpoint can answer forty windows that
+     happen to hold no events; that is a read history with nothing in it, and the sections should say
+     "nothing has arrived at this address yet". `history unavailable` is for an endpoint that answered
+     nothing **at all** (step 5, #382), and this counter is the difference between the two. Confusing
+     them is the same error as reading an empty `[]` below a prune floor as "no events". */
+  let answered = 0;
+  /* The last refusal that was about *old blocks* rather than about the width of the window.
+
+     It is kept because the walk usually runs out of budget before it finishes bisecting toward a
+     prune floor: shrinking 10,000 down to 1 takes about fourteen halvings at up to four windows
+     each, against `MAX_WINDOWS` of 40. So the `size === 1` case below, which was the only place a
+     prune became a boundary, is rarely the one that fires — the budget return fires instead, and the
+     cause was thrown away with it. A reader then saw "not loaded · load older" for history the
+     endpoint had already refused to serve, and the press could only fail the same way.
+
+     So the cause is recorded the moment it is seen, and whichever return happens carries it. */
+  let wall = null;
   while (hi >= from && spent < MAX_WINDOWS) {
     /* The next few windows at the current size, newest-first and contiguous, so everything above `hi`
        has been read and the boundary below it is a single number rather than a set of holes. */
@@ -575,7 +601,7 @@ async function logs(address, topics, fromBlock, toBlock) {
     /* Kept only as far as the first refusal: the batch is contiguous from the top, so keeping a
        success from below a failure would leave a hole that no single boundary could describe. */
     const i = res.findIndex(r => r.err);
-    for (const r of (i < 0 ? res : res.slice(0, i))) out.push(...r.ok);
+    for (const r of (i < 0 ? res : res.slice(0, i))) { out.push(...r.ok); answered++; }
     if (i < 0) { hi = batch[batch.length - 1][0] - 1; continue; }
     const top = batch[i][1], text = res[i].err, cap = Model.rangeCap(text);
     /* The fourth clause reads the error *object*, not the text: a wallet can replace a provider's
@@ -583,21 +609,62 @@ async function logs(address, topics, fromBlock, toBlock) {
        and nothing above matches that sentence, so before this clause existed the first window of
        the first kind threw and the history read ended there (#215). `cap` is `null` for that shape,
        so it falls through and halves like any other nameless refusal. */
-    if (!Model.isPruned(text) && cap == null && !RANGEY.test(text) && !Model.isWrappedRefusal(res[i].e)) throw new Error(text);
+    /* A refusal nobody recognises used to throw here, and the whole history read died with it —
+       all three sections replaced by `history unavailable`, the funds block with them (#382). The
+       shape that did it on Base Sepolia was a **rate limit**: four windows in flight against an
+       endpoint allowing 25 a second, answered `HTTP 429` whose body is a bare `{code, message}`
+       rather than a JSON-RPC `{"error":{…}}`, so `rpcProvider` never sees `j.error` and raises its own
+       sentence instead. `rangeCap` is null for it, `isPruned` false, `RANGEY` does not match, and
+       `isWrappedRefusal` reads 413 alone.
+
+       It is now a **wall**: the walk stops, keeps everything above it, and the line says where and
+       why. A wall is only a failure when nothing was read at all — that case still throws, below, and
+       is the one `history unavailable` is left for. */
+    if (!Model.isPruned(text) && cap == null && !RANGEY.test(text) && !Model.isWrappedRefusal(res[i].e)) {
+      if (!answered) throw new Error(text);
+      return { logs: out, partial: top + 1, wall: { block: top + 1, why: text, kind: 'refusal', stated: statedFloor(text) } };
+    }
+    /* A refusal of old blocks, named as such. Where it also names the first block it keeps, that
+       number is the boundary and there is nothing left to discover by shrinking — the endpoint has
+       described itself, and a window answered below such a floor proves nothing anyway, since an
+       index can report "no logs" without reading pruned bodies. */
+    const named = statedFloor(text);
+    if (Model.isPruned(text) || named != null) {
+      wall = { block: named ?? (top + 1), why: text, kind: 'prune', stated: named };
+      if (named != null) return { logs: out, partial: named, wall };
+    }
     /* A pruned refusal names no window either, but a *smaller* one can still fit above the block the
        provider stopped keeping — the refused range straddled it — so it shrinks like any other
        nameless refusal and the shrinking bisects toward that boundary, which is exactly "the first
        block the provider still serves". At one block wide there is nothing left to shrink: that block
        is not served, and the history stops above it. */
-    if (size === 1) return { logs: out, partial: top + 1 };
+    /* One block wide and still refused: that block is not served and the history stops above it.
+       A pruned refusal is a wall rather than a budget: `load older` cannot pass it, because the
+       endpoint has said it does not keep what is below. Where it named the first block it does keep,
+       that number is the boundary — better evidence than the one this bisection happened to reach. */
+    if (size === 1) {
+      // Refused all the way down to a single block without one window answered: nothing was read
+      // here, which is the one case `history unavailable` is for.
+      if (!answered) throw new Error(text);
+      return { logs: out, partial: (wall && wall.block) ?? (top + 1), wall: wall ?? { block: top + 1, why: text, kind: 'refusal', stated: null } };
+    }
     /* Strictly smaller every time, so the loop cannot sit still: a cap is only taken when it is
        narrower than what already failed, and anything else halves. A provider that names a cap it is
        already honouring is refusing for some other reason, and halving is the move that makes
        progress. */
-    size = cap != null && cap < size ? cap : Math.max(1, Math.floor(size / 2));
+    /* `cap > 0`, not just `cap < size`: an endpoint answering `limited to a 0 range` — broken, or
+       hostile — set `size` to 0, `Model.windows` then yielded no windows, and the next line read
+       `batch[-1][0]` and threw a `TypeError` out of the walk. A crash is the one failure the page
+       cannot describe, so a nonsense cap is treated as a refusal that named nothing and halves. */
+    size = cap != null && cap > 0 && cap < size ? cap : Math.max(1, Math.floor(size / 2));
     hi = top;
   }
-  return { logs: out, partial: hi >= from ? hi + 1 : null };
+  /* Out of budget, or the whole range was read — but carrying `wall` if one was seen on the way,
+     because a walk that was refused old blocks and then ran out of windows stopped for both reasons
+     and the refusal is the one a reader can act on. `wall: null` is explicit otherwise: every caller
+     distinguishes "ran out of windows" from "the endpoint refused", and an absent key reads as
+     neither. */
+  return { logs: out, partial: hi >= from ? hi + 1 : null, wall };
 }
 
 /* ---- text ---------------------------------------------------------------------------------- */
@@ -1106,12 +1173,18 @@ function histOf(raw) {
      The address-less `Transfer` query is excluded — a provider that refuses it outright leaves
      `other` null already, and its budget says nothing about the two queries that carry the history. */
   const floors = [raw.changes.partial, raw.funds.partial].filter(n => n != null);
+  /* The wall travels with the boundary, and the same rule picks it: the most conservative of the two
+     queries that carry the history. A wall beats a budget when both are present — if either query was
+     refused older blocks, `load older` cannot pass that point for the group, and offering it would be
+     a button that does nothing. */
+  const walls = [raw.changes.wall, raw.funds.wall].filter(Boolean);
   return {
     raw,
     changes: ch.sort(newest),
     funds: [...fe, ...(tin || []).filter(e => known.has(e.token))].sort(newest),
     other: tin && tin.filter(e => !known.has(e.token)).sort(newest),
     partial: floors.length ? Math.max(...floors) : null,
+    wall: walls.length ? walls.reduce((a, b) => (b.block > a.block ? b : a)) : null,
   };
 }
 const newest = (a, b) => b.block - a.block || b.index - a.index;
@@ -1236,8 +1309,25 @@ function histFill(id, items, empty) {
    that is the only honest unit — the page cannot know how many rows it has *not* read. */
 function partialLine() {
   if (!DS.h || DS.h.partial == null) return '';
-  return `<div class="notice">history before block ${DS.h.partial} not loaded · `
-    + '<button class="link older">load older</button></div>';
+  const w = DS.h.wall;
+  /* Out of budget: everything above is read, the rest is one press away. Unchanged, and #165's
+     budget is untouched by this task. */
+  if (!w) {
+    return `<div class="notice">history before block ${DS.h.partial} not loaded · `
+      + '<button class="link older">load older</button></div>';
+  }
+  /* A wall, so **no `load older`**: the endpoint has said it will not serve what is below, and a
+     button that cannot work is worse than no button. Two wordings, because the evidence differs.
+     Where the endpoint named the first block it keeps, that is a fact about the endpoint and the line
+     says so. Where it only refused, the line says it *may* not serve history that far back — it must
+     not claim to have read to a boundary it merely stopped at. Either way the next sentence is the
+     one a reader can act on: their own wallet's endpoint may go further. */
+  const where = `history before block ${DS.h.wall.block} not loaded`;
+  const why = w.stated != null
+    ? `this endpoint serves no history before block ${w.stated}`
+    : 'this endpoint refused older blocks, and may not serve history that far back';
+  return `<div class="notice">${where} · ${why}. A connected wallet reads through its own endpoint,`
+    + ' which may go further.</div>';
 }
 const bindOlder = () => V.querySelectorAll('.older').forEach(b => { b.onclick = older; });
 const histRows = items => `<div class="hist">${items.map(e => `<div class="hrow${e.kind === 'escrowed' ? ' err' : e.kind === 'queued' && !e.closed ? ' amber' : e.kind === 'applied' || e.kind === 'accepted' ? ' done' : ''}"><b>${e.kind}</b><span class="w">${e.what}</span><span class="t">block ${e.block} · ${ext('tx', e.tx, short(e.tx))}</span></div>`).join('')}</div>`;
