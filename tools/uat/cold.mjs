@@ -66,6 +66,33 @@ const castOut = (args) => {
 };
 const topic0 = sig => castOut(['keccak', sig]);
 
+/** The block 24 hours before `hi`, read with `cast`, mirroring what the page does.
+ *
+ *  **This is what a no-wallet section actually read**, and getting it wrong is how the emptiness
+ *  assertion fired on all ten Base Sepolia loads of the 08:50Z run: it compared "no boundary printed"
+ *  against the **whole** history, when a no-wallet read with no boundary has covered its *day*. The
+ *  page was right and the instrument was wrong. Secant steps over real timestamps, same as the page,
+ *  because a block time cannot be assumed across these chains.
+ */
+function dayFloorCast(endpoint, hi, floor) {
+  const ts = n => { const o = castOut(['block', String(n), '--rpc-url', endpoint, '--field', 'timestamp']); return o ? Number(o) : null; };
+  const tHi = ts(hi), tFl = ts(floor);
+  if (tHi == null || tFl == null) return floor;
+  const target = tHi - 86_400;
+  if (tFl >= target) return floor;
+  let a = floor, ta = tFl, b = hi, tb = tHi;
+  for (let i = 0; i < 12 && b - a > 1; i++) {
+    const rate = (tb - ta) / (b - a);
+    let g = rate > 0 ? Math.round(b - (tb - target) / rate) : Math.floor((a + b) / 2);
+    g = Math.min(b - 1, Math.max(a + 1, g));
+    const tg = ts(g);
+    if (tg == null) break;
+    if (Math.abs(tg - target) <= 60) return g;
+    if (tg >= target) { b = g; tb = tg; } else { a = g; ta = tg; }
+  }
+  return b;
+}
+
 /** Every block at which this address emitted one of these events, read with `cast`, not the browser.
  *
  *  Deliberately a different client: `cast` builds its own JSON, opens its own connection and parses
@@ -111,8 +138,10 @@ const READ_OK = new Set(['rows', 'read, empty', 'read in full']);
    assertion is one-directional on purpose: a page may show fewer rows than exist (it read less), but
    it may never say a history is empty when the chain has one in the range it read. */
 const EMPTY_CLAIM = {
-  'h-changes': { kind: 'changes', says: /no change has been queued yet/i },
-  'h-funds': { kind: 'funds', says: /nothing has arrived at this address yet/i },
+  /* Both wordings: a wallet page says "yet" of all history, a no-wallet page says "in the last 24
+     hours" of its window. The claim is checked against whichever range that section actually read. */
+  'h-changes': { kind: 'changes', says: /no change has been queued (yet|in the last 24 hours)/i },
+  'h-funds': { kind: 'funds', says: /nothing has arrived (at this address yet|in the last 24 hours)/i },
   /* `#funds` is deliberately absent: `paintFunds` never writes that sentence — `histFill` does, into
      the two history sections — so an entry for it could never fire and would only suggest a check
      that is not happening. */
@@ -156,7 +185,7 @@ function classify(text, id) {
   if (new RegExp(PATTERNS.loadingNotice, 'i').test(t.trim())) return 'loading';
   if (id === 'funds') return 'read in full';
   if (new RegExp(PATTERNS.activityRow, 'i').test(t)) return 'rows';
-  if (/no change has been queued yet|nothing has arrived at this address yet/i.test(t)) return 'read, empty';
+  if (/no change has been queued (yet|in the last 24 hours)|nothing has arrived (at this address yet|in the last 24 hours)/i.test(t)) return 'read, empty';
   return 'other';
 }
 
@@ -417,12 +446,17 @@ const asTime = sec => sec == null ? '—'
          asserted is the thing that cannot be excused either way: an emptiness that contradicts the
          chain. A section that stopped short is still checked, against its own shorter range. */
       const lies = [];
+      const dayLow = (fb && hi) ? dayFloorCast(endpoint, hi, fb) : fb;
+      if (fb && hi) process.stderr.write(`  the 24-hour floor for this chain is block ${dayLow} (${(hi - dayLow).toLocaleString('en-US')} back)\n`);
       for (const [i, r] of runs.entries()) {
         for (const [id, sx] of Object.entries(r.sections)) {
           const claim = EMPTY_CLAIM[id];
           if (!claim || !truth || !claim.says.test(sx.text)) continue;
           const at = truth.blocks[claim.kind] || [];
-          const low = sx.stopped == null ? fb : sx.stopped;      // the floor of what it read
+          /* The floor of what that section read: where it stopped, or — if it printed no boundary — the
+             24-hour floor, because that is the window a no-wallet read covers. Not `fb`: comparing a
+             day's read against the whole history is what made this fire ten times on a correct page. */
+          const low = sx.stopped == null ? Math.max(fb, dayLow) : sx.stopped;
           const inRange = at.filter(b => b >= low && b <= r.head);
           if (inRange.length) {
             lies.push(`load ${i + 1} · #${id} said the history is empty over blocks ${low}..${r.head}`
