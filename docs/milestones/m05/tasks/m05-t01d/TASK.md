@@ -68,6 +68,28 @@ with no wallet, and this task does not pretend one does.
      the four outcomes already built say why.
    - **Wallet connected, on the page's chain:** as today, through the wallet's provider, with
      `load older`.
+   - **Amended 2026-11-23, from the preview: a wallet is never worse off than no wallet.** The
+     Product Owner connected a wallet on Base Sepolia and all three sections read `history
+     unavailable`, while the same page with no wallet read its day cleanly. A wallet's history
+     goes through the wallet's own endpoint, and MetaMask's default for that chain serves
+     `eth_getLogs` 200 blocks at a time, 25 requests a second. "Connect a wallet to load more"
+     was false there. So:
+     - **The first read is the same for everyone:** the last 24 hours, through the page's own
+       read provider, wallet or not. The heads and the empty sentences follow what was read,
+       as they do today.
+     - **A wallet adds `load older`, and that press reads through the wallet's endpoint**,
+       continuing below the day. Its outcomes are the four already built, and a refusal there
+       leaves the day already painted in place.
+     - With no wallet the line stays **connect a wallet to load more**. With one, the line is
+       the press.
+     - This follows #375's rule: what belongs to the page's chain is read from the page's
+       chain. The wallet's endpoint is used only where it may reach further, and never to
+       paint the first screen.
+     - **Check:** tests that a wallet page's first read goes to the read provider and its
+       press to the wallet's; that a wallet endpoint refusing every log query still shows the
+       day; and `tools/uat/` gains a run with the injected provider pointed at each chain's
+       wallet-default endpoint (`sepolia.base.org` for 84532), since the driver's provider has
+       so far used the chain's good endpoint and could not see this.
    - **Hidden escrow is detected exactly, from state.** The amount of an escrow is already
      read from state; only finding which account holds one comes from `Escrowed` logs, and
      `_set` never clears `escrowed`, so an escrow outlives its account's removal from the
