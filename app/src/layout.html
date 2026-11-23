@@ -13,6 +13,10 @@
   </div>
 </nav>
 <div class="sub"><a class="alpha" href="#/docs#disclaimer">alpha software is alpha, act accordingly.</a><span class="asof" id="asof"></span><button class="rf" id="refresh" title="refresh" aria-label="refresh"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M10.2 6.4A4.2 4.2 0 1 1 8.9 3"/><path d="M9.6 .9v2.6H7"/></svg></button></div>
+<!-- The wallet's chain, when it is not this document's (#403). Non-blocking by ruling: the page reads
+     and paints its own chain whatever the wallet is on, so this says what will not work rather than
+     standing in front of what does. Filled by `chainBar()`; empty and hidden otherwise. -->
+<div id="chainbar" hidden></div>
 <main id="view"><div class="notice">reading the chain…</div></main>
 <footer><span id="ver"></span><span id="flinks"></span></footer>
 </div>

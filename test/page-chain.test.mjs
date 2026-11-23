@@ -43,7 +43,7 @@ const el = () => ({ innerHTML: '', textContent: '', className: '', classList: { 
 
 /** `tx()` with the wallet and the page on different chains. Each provider records what it was asked,
  *  which is the whole point: the mismatch must be found before anything is simulated anywhere. */
-function txHarness({ pageChain = '11155111', walletChain = '0x1' } = {}) {
+function txHarness({ pageChain = '11155111', walletChain = '0x1', lagged = false } = {}) {
   const els = { txs: el() };
   const src = `
     const ACC = ACCOUNT;
@@ -61,11 +61,14 @@ function txHarness({ pageChain = '11155111', walletChain = '0x1' } = {}) {
     const POLL_MS = 1;
     const ext = (k, v, t) => t;
     const short = h => h;
+    /* #403: the status line reads POLL_LAGGED to tell a receipt our own endpoint served from one only
+       the wallet's had. LAGGED lets a test drive both. */
+    let POLL_LAGGED = LAGGED;
     const waitReceipt = async () => ({ status: '0x1', blockNumber: '0x1' });
     ${TX}
     return { tx, walletAsked: () => walletAsked.slice(), pageAsked: () => pageAsked.slice() };
   `;
-  const made = new Function('ACCOUNT', 'PAGE_CHAIN', 'WALLET_CHAIN', 'ELS', src)(ACC, pageChain, walletChain, els);
+  const made = new Function('ACCOUNT', 'PAGE_CHAIN', 'WALLET_CHAIN', 'ELS', 'LAGGED', src)(ACC, pageChain, walletChain, els, lagged);
   return { ...made, els };
 }
 
@@ -94,6 +97,25 @@ test('when the chains agree, the preflight goes through the page and the send th
   assert.deepEqual(h.pageAsked(), ['eth_call'], 'the preflight belongs to the page’s own chain');
   assert.deepEqual(h.walletAsked(), ['eth_chainId', 'eth_sendTransaction'],
     'the wallet is asked for its chain and for the signature, and simulates nothing');
+  assert.match(h.els.txs.textContent, /landed in block 1/);
+  assert.doesNotMatch(h.els.txs.textContent, /caught up/, 'our own endpoint served the receipt, so there is nothing to explain');
+});
+
+test('a receipt only the wallet had says the write landed AND that this page has not caught up (#403)', async () => {
+  /* The deadline exception. `waitReceipt` asks the wallet once before printing the timeout wording,
+     because the receipt is the one read whose subject the wallet created — and if it has it, “timed
+     out” is false. But the repaint below reads state through **our** provider, so claiming the block
+     outright would put the old balance under a success line. Both facts, one sentence. */
+  const h = txHarness({ pageChain: '11155111', walletChain: '0xaa36a7', lagged: true });
+
+  const r = await h.tx('0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E', 'create(...)', [], { label: 'create' });
+
+  assert.equal(r.ok, true, 'the write landed: a lagging reader is not a failed transaction');
+  assert.equal(r.lagged, true, 'and the caller is told, so a repaint can decide what to trust');
+  assert.match(h.els.txs.textContent, /landed in block 1/);
+  assert.match(h.els.txs.textContent, /has not caught up/,
+    'the reader must not be left wondering why the page still shows the old state');
+  assert.doesNotMatch(h.els.txs.textContent, /no receipt after/, 'it did not time out — it landed');
 });
 
 /** `createPredict` with the two chains disagreeing about whether the salt is taken: free on the

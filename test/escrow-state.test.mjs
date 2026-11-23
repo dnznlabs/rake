@@ -55,7 +55,12 @@ function run({ table = [], logs = [], state = {}, reserved = null, balance = 10n
     const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
     const signsFor = async () => false;
     const decimalsOf = async () => 18;
-    const P = { request: async () => '0x' + BALANCE.toString(16) };
+    /* #403: the ETH balance is a read of the document's chain, so it comes from the page's provider.
+       The wallet provider is left answering nothing, which is what the rule means: if readFunds ever
+       reaches for it again these tests throw rather than quietly reading zero. No backticks in this
+       comment - it lives inside a template literal, and one ended it. */
+    const pageRead = () => ({ request: async () => '0x' + BALANCE.toString(16) });
+    const P = { request: async () => { throw new Error('readFunds must not read state through the wallet (#403)'); } };
     const call = async (to, sig, args) => {
       CALLS.push(sig + ' ' + args.join(','));
       LIVE.n++; if (LIVE.n > LIVE.peak) LIVE.peak = LIVE.n;
