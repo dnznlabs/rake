@@ -96,3 +96,31 @@ test('and it still passes the real token list through when the history did land'
   assert.equal(written.funds, 'FUNDS(1)');
   assert.equal(seen.other, other, 'a successful history must still reach fundsHTML unchanged');
 });
+
+/* The sentence the funds block prints about its own token list. Lifted as a line, because the
+   surrounding `fundsHTML` reaches for a dozen helpers this test has no business stubbing. */
+const WINDOWED = (() => {
+  const at = SHIPPED.indexOf('const windowed = ');
+  assert.ok(at >= 0, 'app/src/index.html no longer declares `windowed` — this test lifts it');
+  return SHIPPED.slice(at, SHIPPED.indexOf('\n', at));
+})();
+const windowedIn = (wallet, h) =>
+  new Function('WALLET', 'DS', `${WINDOWED}\nreturn windowed;`)(wallet, { h });
+
+test('with no wallet and no history, the list claims no window at all', () => {
+  /* The architect's finding on the first head: the state-only repaint still said "this list covers
+     the last 24 hours", and in that path **no log was read** — a claim about a read that never
+     happened, which is the same fault as a heading claiming a day it did not reach. */
+  assert.equal(windowedIn(false, null), '',
+    'a funds block painted from state alone must not claim a 24-hour window');
+});
+
+test('with no wallet and a history that landed, it still says what the list covers', () => {
+  assert.match(windowedIn(false, { partial: null }), /covers the last 24 hours/,
+    'the honest case must keep its sentence, or the fix has removed a true statement');
+});
+
+test('with a wallet it says nothing, history or not', () => {
+  assert.equal(windowedIn(true, { partial: null }), '');
+  assert.equal(windowedIn(true, null), '');
+});

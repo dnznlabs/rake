@@ -2589,7 +2589,12 @@ function fundsHTML(d, f, other) {
      list as complete. Audited with the empty sentences after the Base Sepolia finding: of the seven
      sentences in this block the other six are safe, because `reserved`, the balances and the escrow
      amounts are read from **state** and do not narrow with the window. This one is the exception. */
-  const windowed = WALLET ? '' : '<div class="help wide">this list covers the last 24 hours; a token distributed here earlier is not shown. Connect a wallet to read further back.</div>';
+  /* **Only when a history actually landed.** `DS.h` is null on the state-only repaint after a failed
+     log read, and there the list covers no window at all — saying it covers the last 24 hours would be
+     a claim about a read that never happened, which is the same fault as the heading claiming a day it
+     did not reach. In that path `other` is null and the sentence below says the truth instead: the
+     token payments could not be read. */
+  const windowed = (WALLET || !DS.h) ? '' : '<div class="help wide">this list covers the last 24 hours; a token distributed here earlier is not shown. Connect a wallet to read further back.</div>';
   const others = !other ? '<div class="help wide">token payments in could not be read from this provider, so a token never distributed here is not listed.</div>'
     : !n ? ''
     : `<details class="others" id="others"><summary>other tokens received (${n})</summary>`
