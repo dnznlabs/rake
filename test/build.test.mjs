@@ -217,7 +217,10 @@ test('build.mjs carries no version of its own', () => {
    recognises, the build refuses, and it is better found here than at an upload. */
 test('every App creation in this working tree yields a derivable version', () => {
   const dir = join(root, 'broadcast/DeployApp.s.sol');
-  if (!existsSync(dir)) return;   // a clean checkout has not deployed yet
+  /* **Asserted, not returned.** `broadcast/` is tracked — 23 files — so its absence is a broken
+     checkout rather than a clean one, and the early `return` here reported a *pass* for a test that
+     had examined nothing. That is worse than a skip, which at least shows in the summary. */
+  assert.ok(existsSync(dir), `${dir} is missing: broadcast/ is tracked, so this is a broken checkout`);
   const seen = [];
   for (const chain of readdirSync(dir)) {
     const file = join(dir, chain, 'run-latest.json');
@@ -238,7 +241,8 @@ test('every App creation in this working tree yields a derivable version', () =>
    that the assertion would refuse is a build that cannot run, so it is better found here. */
 test('every broadcast log in this working tree passes the assertion', () => {
   const dir = join(root, 'broadcast');
-  if (!existsSync(dir)) return;   // a clean checkout has not deployed yet
+  // Asserted for the same reason as above: tracked, so absent means broken, not clean.
+  assert.ok(existsSync(dir), `${dir} is missing: broadcast/ is tracked, so this is a broken checkout`);
   const files = [];
   for (const script of readdirSync(dir)) {
     for (const chain of readdirSync(join(dir, script))) {
@@ -345,7 +349,13 @@ test('every token the three sources use has a shape, and the table is only those
 
 /* `--set` and `deployed()` are `build.mjs`'s own surface, so these run it. The refusal path leaves
    `app/dist` as it was (`build.mjs:129-130`), which is why a *failing* build may be run here on the
-   tracked Sepolia logs; a green one would write `app/dist` and is deliberately not written. */
+   tracked Sepolia logs.
+
+   **Corrected 2026-11-23: this comment used to say a green build "is deliberately not written". It is
+   written.** Measured: on a tree with no `app/dist`, the directory exists after this suite runs, and
+   this test is what writes it. That wrong sentence is part of how the `widget-sri` race went
+   undiagnosed — it said the bundle could not appear from a test run, so the race it enables was not
+   looked for. */
 const buildRun = (...set) => {
   const dist = join(root, 'app/dist/index.html');
   const before = existsSync(dist) ? statSync(dist).mtimeMs : null;

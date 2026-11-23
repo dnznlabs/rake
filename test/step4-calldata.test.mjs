@@ -86,10 +86,25 @@ test('an --app-nonce that is not a non-negative integer is refused', () => {
    `--app-nonce 1` keeps it off the chain. `cast` is still needed, for the ABI encoding the tool
    never hand-rolls, so the case states its own precondition rather than failing obscurely without
    it; `make test` runs through devbox, where it is pinned and present. */
+/* **Absent tooling fails rather than skips**, with one named way out. A skip is a silent pass, and
+   these two are the only cases that exercise the tool against real ABI encoding and a real chain.
+   `make test` runs through devbox where `cast` and `anvil` are pinned and present, so failing by
+   default costs nothing there and costs a clear message anywhere else. `RAKE_ALLOW_MISSING_TOOLS=1`
+   is the deliberate opt-out for a tree without foundry; it has to be chosen, which is the point. */
 const haveCast = spawnSync('cast', ['--version'], { encoding: 'utf8' }).status === 0;
+const haveAnvilBin = spawnSync('anvil', ['--version'], { encoding: 'utf8' }).status === 0;
+const optOut = process.env.RAKE_ALLOW_MISSING_TOOLS === '1';
+/** Fails naming the tool and the opt-out, or skips only because the opt-out was set. */
+const needs = (have, what) => {
+  if (have) return false;
+  if (optOut) return `${what} is absent and RAKE_ALLOW_MISSING_TOOLS=1 was set deliberately`;
+  assert.fail(`${what} is not on PATH. Run through \`devbox run -- make test\`, where it is pinned, `
+    + `or set RAKE_ALLOW_MISSING_TOOLS=1 to skip this case on purpose. A skip you did not choose is a `
+    + `silent pass, so this fails instead.`);
+};
 
 test('--max-chunk reaches the cut, and its default leaves the piece count alone',
-  { skip: haveCast ? false : 'cast is not on PATH — run through `devbox run -- make test`' }, () => {
+  { skip: needs(haveCast, 'cast') }, () => {
     const home = mkdtempSync(join(tmpdir(), 'step4-fixture-'));
     mkdirSync(join(home, 'app', 'dist'), { recursive: true });
     writeFileSync(join(home, 'app', 'dist', 'index.html.gz'), Buffer.alloc(30_000, 0x61));
@@ -246,10 +261,10 @@ test('an --app that is not an address is refused', () => {
    throwaway anvil, with **both** readings — an address with no code and the same run against an
    address that has some, planted with `anvil_setCode`. The pair is the point: a refusal that fires
    for everything would pass the first assertion alone. */
-const haveAnvil = spawnSync('anvil', ['--version'], { encoding: 'utf8' }).status === 0;
+const haveAnvil = haveAnvilBin;
 
 test('with --rpc, an App with no code is refused — and one with code is not',
-  { skip: haveCast && haveAnvil ? false : 'anvil and cast are needed — run through `devbox run -- make test`' }, () => {
+  { skip: needs(haveCast && haveAnvil, 'anvil and cast') }, () => {
     /* `spawn`, detached, with stdio ignored. A backgrounded node inside `spawnSync('bash', …)`
        inherits the pipe spawnSync waits on, so the call never returns even though the shell has
        exited — the test hangs rather than fails. Readiness is then polled rather than slept for. */
