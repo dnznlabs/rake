@@ -33,7 +33,9 @@ async function sendOnce(args, rpcUrl, sender) {
   }
 }
 
-export const CAST = `${process.env.HOME}/.foundry/bin/cast`;
+/* `cast` from `PATH`, not from a path of mine: whichever foundry the caller has is the one the run
+   should use, and a missing one fails with its own message rather than a wrong absolute path. */
+export const CAST = process.env.RAKE_UAT_CAST || 'cast';
 export const PASS = process.env.RAKE_UAT_PASSFILE || `${process.env.HOME}/.config/elanik-wallet/keystore.pass`;
 export const ACCOUNT = process.env.RAKE_UAT_ACCOUNT || 'elanik';
 

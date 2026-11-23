@@ -11,6 +11,16 @@ export const UAT_WALLET = '0x357836fFcB45307FA7ff2A574F505753c961902B';
    number comes from the test rather than from either, and the run records which it found. */
 export const DOCS_SECTIONS = 15;
 
+/* Patterns that cross into `page.evaluate` live here as **strings**, and the page builds them with
+   `new RegExp`. A regex literal written inside an evaluate closure cannot be tested from node, which
+   is how `/block (\d+)/` shipped as `/block (\\d+)/` and left row (e) unable to fail. `selftest.mjs`
+   runs these against real lines. */
+export const PATTERNS = {
+  partialLine: 'history before block \\d+ not loaded',
+  blockNumber: 'block (\\d+)',
+  loadingNotice: '^(loading…|reading the balances and the escrow…|reading…)$',
+};
+
 export class Miss extends Error {
   constructor(row, what, got, want) {
     super(`row ${row}: ${what} — got ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
@@ -30,30 +40,64 @@ export const falsy = (row, what, got) => { if (got) throw new Miss(row, what, go
    child of `<body>` — so matching against it matches the bundle's own source and an assertion can
    pass on a page that renders nothing. Every text read here goes through the rendered view
    (`<main id="view">`, `app/src/layout.html:16`) and uses `innerText`, which is the rendered text. */
+export const text = (page, sel) => page.evaluate(s => (document.querySelector(s)?.innerText || '').replace(/\s+/g, ' ').trim(), sel);
+export const count = (page, sel) => page.evaluate(s => document.querySelectorAll(s).length, sel);
 export const viewText = page => page.evaluate(() => (document.getElementById('view')?.innerText || '').replace(/\s+/g, ' ').trim());
 
+/** Polls a predicate rather than sleeping: a public endpoint's round trip is not a fixed number. */
+export async function until(label, fn, { ms = 120000, every = 1000 } = {}) {
+  const t0 = Date.now();
+  for (;;) {
+    const v = await fn();
+    if (v) return v;
+    if (Date.now() - t0 > ms) throw new Error(`${label}: still not true after ${Math.round((Date.now() - t0) / 1000)} s`);
+    await new Promise(r => setTimeout(r, every));
+  }
+}
+
 /** Painted = none of the three containers still carries its loading notice. `count.js`'s rule. */
-export const painted = page => page.evaluate(() => {
+/* An assertion about a section's text waits on a **settled** section, not on one read: a write makes
+   the page re-read the view, and during the repaint a row that is still there reads as absent. The
+   predicate must hold on two consecutive reads of a section that is itself painted — this section,
+   not all three, because requiring the whole page quiet made one row wait out another's churn. */
+export async function settledText(page, sel, test, { label, ms = 300000, every = 2500 } = {}) {
+  let hits = 0, last = '';
+  await until(label || `${sel} settled`, async () => {
+    const state = await page.evaluate(([s, pats]) => {
+      const el = document.querySelector(s);
+      if (!el) return 'absent';
+      const LOADING = new RegExp(pats.loadingNotice);
+      return [...el.querySelectorAll('.notice')].some(n => LOADING.test(n.textContent.trim())) ? 'loading' : 'painted';
+    }, [sel, PATTERNS]);
+    if (state !== 'painted') { hits = 0; return false; }
+    last = await text(page, sel);
+    hits = test(last) ? hits + 1 : 0;
+    return hits >= 2;
+  }, { ms, every });
+  return last;
+}
+
+export const painted = page => page.evaluate(pats => {
   const IDS = ['funds', 'h-changes', 'h-funds'];
-  const LOADING = /^(loading…|reading the balances and the escrow…|reading…)$/;
+  const LOADING = new RegExp(pats.loadingNotice);
   return IDS.every(id => {
     const el = document.getElementById(id);
     return el && ![...el.querySelectorAll('.notice')].some(n => LOADING.test(n.textContent.trim()));
   });
-});
+}, PATTERNS);
 
 /* Reports which sections were still loading when it gave up, and does not pretend to know whose row
    it was: the caller tags the error with its own id. A bare "still loading" says nothing about which
    of the three was waiting or whether one was missing altogether. */
-export const sectionStates = page => page.evaluate(() => {
+export const sectionStates = page => page.evaluate(pats => {
   const IDS = ['funds', 'h-changes', 'h-funds'];
-  const LOADING = /^(loading…|reading the balances and the escrow…|reading…)$/;
+  const LOADING = new RegExp(pats.loadingNotice);
   return IDS.map(id => {
     const el = document.getElementById(id);
     if (!el) return `${id}:absent`;
     return `${id}:${[...el.querySelectorAll('.notice')].some(n => LOADING.test(n.textContent.trim())) ? 'loading' : 'painted'}`;
   }).join(' ');
-});
+}, PATTERNS);
 
 export const waitPainted = async (page, ms = 120000) => {
   const t0 = Date.now();
@@ -132,39 +176,29 @@ export async function ownerRelation({ addr, connected, rpcUrl, castCall }) {
 export async function rowC(page, { base, addr = DNZN, patience = 120000, relation = null }) {
   await page.evaluate(a => { location.hash = '#/distros/' + a; }, addr);
   const ms = await waitPainted(page, patience);
+  /* Painted is not the same as filled: the sections drop their loading notice and then render their
+     rows, so a single read lands in that gap — which is how `activity carries at least one row` failed
+     on a page whose activity, read seconds later, carried six. Each section is read until its own
+     predicate holds twice (`settledText`), and only then are the facts taken. */
+  await settledText(page, '#h-funds', t => !/history unavailable/i.test(t) && /(^|\s)(in|distributed|escrowed|released|claimed)\s/i.test(t),
+    { label: '(c) `activity` carries at least one row and is not the #382 notice' });
+  await settledText(page, '#h-changes', t => !/history unavailable/i.test(t) && (/created/i.test(t) || /no change has been queued yet/i.test(t)),
+    { label: '(c) `changes` reads the empty line this distribution has, or a Created row' });
   const r = await page.evaluate(() => ({
     view: (document.getElementById('view')?.innerText || '').replace(/\s+/g, ' ').trim(),
-    changes: (document.getElementById('h-changes')?.textContent || '').replace(/\s+/g, ' ').trim(),
-    funds: (document.getElementById('funds')?.textContent || '').replace(/\s+/g, ' ').trim(),
-    activity: (document.getElementById('h-funds')?.textContent || '').replace(/\s+/g, ' ').trim(),
+    changes: (document.getElementById('h-changes')?.innerText || '').replace(/\s+/g, ' ').trim(),
+    funds: (document.getElementById('funds')?.innerText || '').replace(/\s+/g, ' ').trim(),
+    activity: (document.getElementById('h-funds')?.innerText || '').replace(/\s+/g, ' ').trim(),
     queueButton: !!document.getElementById('queue'),
     ownerBar: ([...document.querySelectorAll('.actions .status')].map(n => n.textContent.trim())[0]) || '',
     ownsText: (document.getElementById('view')?.innerText || '').includes('you own this distribution'),
   }));
   has('c', 'the description', r.view, 'DNZN // FUND DISTRIBUTION');
   has('c', 'the table', r.view, 'treasury');
-  /* `UAT.md` expects `changes` to carry `Created`, and on this distribution it cannot through the
-     page's own endpoint: the factory's `Created` event is outside the `eth_getLogs` range that
-     endpoint serves, which `RUNBOOK.md:1944` already records for Base Sepolia. Measured here on
-     Sepolia: after two presses of `load older` the partial line goes, `changes` still reads "no
-     change has been queued yet.", and there are no page errors — the page scanned to its floor and
-     the range came back empty. So the row asserts that the section painted and records whether the
-     `Created` row was there; the absence is a finding about the endpoint, raised for amendment, and
-     not something this driver passes over in silence. */
-  /* Ruled 2026-11-22 (rake#381): `Created` moves to row (i), on the distribution row (f) creates.
-     Here the row asserts the three sections painted, `activity` non-empty, and `changes` carrying
-     either `Created` or its empty line with nothing left to load. */
-  truthy('c', '`changes` painted', r.changes.length > 0);
-  truthy('c', '`activity` is not empty', r.activity.length > 0);
-  /* The ruling reads "`Created`, or the empty line with nothing left to load". On the **first** load
-     there is still history to load — the section says so, and pressing it is row (e) — so the two
-     halves are asserted across the two rows rather than demanded of this one: here, `Created` or the
-     empty line; in row (e), that the boundary moves down or goes. Split this way the pair is stronger
-     than the clause, not weaker, and the deviation is stated rather than assumed. */
-  const changesOk = /created/i.test(r.changes) || /no change has been queued yet/i.test(r.changes);
-  truthy('c', '`changes` carries Created, or its empty line', changesOk);
-  /* Amended 2026-11-22: its owner is the Ops vault, so the owner bar reads as NOT the owner —
-     `ownerBar` returns nothing at all (`app/src/index.html:1747-1755`). */
+  falsy('c', '`activity` is not the #382 notice', /history unavailable/i.test(r.activity));
+  falsy('c', '`changes` is not the #382 notice', /history unavailable/i.test(r.changes));
+  truthy('c', '`activity` carries at least one row', /(^|\s)(in|distributed|escrowed|released|claimed)\s/i.test(r.activity));
+  has('c', '`changes` reads the empty line this distribution has', r.changes, 'no change has been queued yet');
   if (relation) {
     if (relation.expect === 'vault') {
       truthy('c', 'a vault signer is offered the drawer', r.queueButton);
@@ -181,7 +215,6 @@ export async function rowC(page, { base, addr = DNZN, patience = 120000, relatio
   return {
     ...r, msToPainted: ms, view: r.view.slice(0, 300), relation,
     createdRow: /created/i.test(r.changes),
-    createdRowNote: /created/i.test(r.changes) ? null : 'absent by construction: `changes` is built from CHANGE_EVENTS — Queued, Applied, Cancelled, OwnershipTransferred (app/src/index.html:961-962) — and the factory\'s Created is used only to find a distribution (:2229). No distribution shows a Created row; raised for amendment',
   };
 }
 
@@ -209,21 +242,29 @@ export async function rowD(page, { base, src, addr = DNZN }) {
    Three sections can each offer the control, so the boundary is read as the **minimum** across all
    of their lines rather than from whichever line happens to be first in the DOM: clicking one makes
    its own line go, the array shifts, and comparing `[0]` before with `[0]` after compares two
-   different sections. The minimum is monotone whichever section was pressed. */
+   different sections. The minimum is monotone whichever section was pressed.
+
+   The regexes below were written with doubled backslashes until 2026-11-22 and matched a literal
+   backslash, so `boundary` was always `null`, `moved` was always true and this row's whole boundary
+   assertion could not fail. The architect caught it at review. Hence the paired check in
+   `tools/uat/selftest.mjs`, which runs these patterns against a real line. */
 export async function rowE(page) {
-  const read = () => page.evaluate(() => {
+  const read = () => page.evaluate(pats => {
+    const partial = new RegExp(pats.partialLine);
+    const num = new RegExp(pats.blockNumber);
     const lines = [...document.querySelectorAll('.notice, .status')]
       .map(n => n.textContent.trim())
-      .filter(t => /history before block \\d+ not loaded/.test(t));
-    const nums = lines.map(t => Number((t.match(/block (\\d+)/) || [])[1])).filter(Number.isFinite);
+      .filter(t => partial.test(t));
+    const nums = lines.map(t => Number((t.match(num) || [])[1])).filter(Number.isFinite);
     return {
       logs: window.__uat ? window.__uat.eth_getLogs : null,
       lines, boundary: nums.length ? Math.min(...nums) : null,
       older: document.querySelectorAll('button.older').length,
     };
-  });
+  }, PATTERNS);
   const before = await read();
   if (!before.older) return { shown: false, note: 'not shown — the scan reached the factory block within budget', logs: before.logs };
+  truthy('e', 'a boundary was read from the partial line before pressing', Number.isFinite(before.boundary));
   await page.click('button.older');
   /* Give the reload of the older window time to land, and stop as soon as it has rather than after a
      fixed sleep: an `eth_getLogs` round trip on a public endpoint is not a predictable 6 s. */
@@ -231,14 +272,14 @@ export async function rowE(page) {
   for (let i = 0; i < 60; i++) {
     await page.waitForTimeout(1000);
     after = await read();
-    const moved = after.boundary === null || (before.boundary !== null && after.boundary < before.boundary);
+    const moved = after.boundary === null || after.boundary < before.boundary;
     if (moved && after.logs > before.logs) break;
   }
   await waitPainted(page);
-  const moved = after.boundary === null || (before.boundary !== null && after.boundary < before.boundary);
-  truthy('e', 'the boundary moved down or the line went', moved);
-  truthy('e', 'eth_getLogs rose', after.logs > before.logs);
-  const changes = await page.evaluate(() => (document.getElementById('h-changes')?.innerText || '').replace(/\\s+/g, ' ').trim());
+  const moved = after.boundary === null || after.boundary < before.boundary;
+  truthy('e', `the boundary moved down or the line went (before ${before.boundary}, after ${after.boundary})`, moved);
+  truthy('e', `eth_getLogs rose (before ${before.logs}, after ${after.logs})`, after.logs > before.logs);
+  const changes = await page.evaluate(() => (document.getElementById('h-changes')?.innerText || '').replace(/\s+/g, ' ').trim());
   return {
     shown: true, boundaryBefore: before.boundary, boundaryAfter: after.boundary,
     logsBefore: before.logs, logsAfter: after.logs, delta: after.logs - before.logs,

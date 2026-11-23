@@ -9,8 +9,10 @@
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 import path from 'node:path';
-import { PAGE_SCRIPT, makeRpc, castCall, castSend, payIn } from './provider.mjs';
+import { spawnSync } from 'node:child_process';
+import { PAGE_SCRIPT, makeRpc, castCall, castSend, payIn, CAST } from './provider.mjs';
 import * as W from './writes.mjs';
+import { check } from './selftest.mjs';
 import * as R from './rows.mjs';
 const COUNT_JS = fs.readFileSync(new URL('../../docs/milestones/m04/tasks/m04-t05/count.js', import.meta.url), 'utf8');
 
@@ -22,10 +24,32 @@ const CHAINS = {
   84532: { name: 'base sepolia', rpc: 'https://sepolia.base.org', receiver: '0x869DFe837B8dB2819027E53d75C20bE31f13acD2' },
 };
 const EXEC = process.env.RAKE_UAT_CHROME || `${process.env.HOME}/.cache/ms-playwright/chromium-1243/chrome-linux-arm64/chrome`;
+/* `cast` is the caller's to provide now that it comes from `PATH`, so say so once here rather than
+   let a row fail with `spawn cast ENOENT` two minutes in. */
+{
+  const { status } = spawnSync(CAST, ['--version'], { stdio: 'ignore' });
+  if (status !== 0) {
+    console.error(`run.mjs: no working "${CAST}" on PATH — put foundry's bin on PATH, or set RAKE_UAT_CAST to the binary.`);
+    process.exit(2);
+  }
+}
+
+if (!fs.existsSync(EXEC)) {
+  console.error(`run.mjs: no browser at ${EXEC} — install the one this playwright-core expects with "npx playwright install chromium", or set RAKE_UAT_CHROME to its path.`);
+  process.exit(2);
+}
 const CODELESS = '0x00000000000000000000000000000000000000f1';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
 const flag = k => process.argv.includes(`--${k}`);
+
+/* The patterns the page compiles are checked before anything is driven: one of them once shipped
+   matching a literal backslash, which left a row unable to fail. */
+{
+  const { bad, total } = check({ quiet: true });
+  if (bad) { console.error(`run.mjs: ${bad} of ${total} patterns do not do their job — run node selftest.mjs`); process.exit(2); }
+  console.log(`patterns: ${total} checked, all live`);
+}
 
 const chainId = Number(arg('chain'));
 const chain = CHAINS[chainId];
@@ -43,6 +67,7 @@ const only = (arg('rows', '') || '').split(',').map(s => s.trim()).filter(Boolea
 for (const id of only) if (!ROWS.includes(id)) { console.error(`run.mjs: --rows names ${id}, which is not a row (${ROWS.join(', ')})`); process.exit(2); }
 const want = id => only.length === 0 || only.includes(id);
 const skipped = [];
+const pending = [];
 
 const results = [];
 let failed = null;
@@ -50,6 +75,24 @@ let failed = null;
 /* Viewport captures, neither scaled nor split (the architect's ruling, 2026-11-22, in rake#381): the
    assertion is the evidence and the screenshot is illustration. A full-page `#/docs` is 1.3 MB, well
    over the plan's 300 KB; a viewport shot is under it on every row. */
+/* The figures a reader of the run should not have to take on trust — row (e)'s boundaries above all,
+   which is the row whose assertion was dead until the architect caught it. */
+const brief = (id, f) => {
+  if (!f) return '';
+  if (id === 'e') return f.shown
+    ? ` · boundary ${f.boundaryBefore} → ${f.boundaryAfter}, eth_getLogs ${f.logsBefore} → ${f.logsAfter} (+${f.delta}), older controls ${f.olderControlsBefore} → ${f.olderControlsAfter}`
+    : ` · ${f.note}`;
+  if (id === 'c') return ` · painted in ${f.msToPainted} ms, owner bar: the ${f.relation ? f.relation.expect : '?'} branch`;
+  if (id === 'c-console-first' || id === 'd') return ` · chainId ${f.chainId}, head ${f.head}, eth_getLogs ${f.eth_getLogs}, ${f.msToPainted} ms, firstLoad ${f.firstLoad}`;
+  if (id === 'f') return ` · ${f.addr} at salt #${f.salt}${f.reused ? ' (reused)' : ''}`;
+  if (id === 'g') return ` · pay-in ${f.payInTx?.slice(0, 12)}…, distribute in block ${f.distributeBlock}${f.receiverResetTx ? ', receiver put back to refusing' : ''}`;
+  if (id === 'h') return ` · setAccepting ${f.setAcceptingTx?.slice(0, 12)}…, release in block ${f.releaseBlock}`;
+  if (id === 'i') return ` · ${f.applyState}`;
+  if (id === 'j') return ` · ${f.addr} at salt #${f.salt}, ${f.branch} branch, ${f.calldataBytes} bytes, selector ${f.selector}`;
+  if (id === 'l') return ` · ${f.ids?.length} sections, rail ${f.rail?.length}`;
+  return '';
+};
+
 const shot = async (page, name) => {
   if (control) return null;
   fs.mkdirSync(shotsDir, { recursive: true });
@@ -66,8 +109,12 @@ const row = async (id, fn, page, shotName) => {
   let facts;
   try { facts = await fn(); } catch (e) { e.row = e.row || id; throw e; }
   const png = shotName ? await shot(page, shotName) : null;
+  /* A row that reports itself pending has not run: it goes in its own list, so `rowsRun` cannot be
+     read as "these rows were driven" when one of them was only inspected (the architect's finding
+     on rake#384, row (k)). */
+  if (facts && facts.pending) { pending.push(id); console.log(`pending — ${facts.why}`); return facts; }
   results.push({ row: id, facts, png });
-  console.log(`ok${png ? ` · ${png.bytes} B` : ''}`);
+  console.log(`ok${png ? ` · ${png.bytes} B` : ''}${brief(id, facts)}`);
   return facts;
 };
 
@@ -157,7 +204,7 @@ try {
   await browser.close();
 }
 
-const summary = { chainId, base, control, rowsRun: results.map(r => r.row), rowsSkipped: skipped, rows: results.length, writes: results.filter(r => 'fghij'.includes(r.row)).length, shots: control ? null : shotsDir, failed: failed ? String(failed.message || failed) : null, failedRow: failed?.row ?? null };
+const summary = { chainId, base, control, rowsRun: results.map(r => r.row), rowsPending: pending, rowsSkipped: skipped, rows: results.length, writes: results.filter(r => 'fghij'.includes(r.row)).length, shots: control ? null : shotsDir, failed: failed ? String(failed.message || failed) : null, failedRow: failed?.row ?? null };
 console.log(JSON.stringify(summary, null, 1));
 
 if (control) {

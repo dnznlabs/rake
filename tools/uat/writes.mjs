@@ -2,10 +2,9 @@
    (j) a vault-owned create whose drawer hands back calldata. Every one of them is a transaction the
    page builds and the injected provider signs with the engineer's key through `cast send`, so what is
    asserted is the page's own flow and not a script's idea of it. */
-import { eq, has, truthy, falsy, Miss, waitPainted, sectionStates } from './rows.mjs';
+import { eq, has, truthy, falsy, Miss, waitPainted, sectionStates, PATTERNS, until, settledText, viewText as view } from './rows.mjs';
 
 const text = (page, sel) => page.evaluate(s => (document.querySelector(s)?.innerText || '').replace(/\s+/g, ' ').trim(), sel);
-const view = page => page.evaluate(() => (document.getElementById('view')?.innerText || '').replace(/\s+/g, ' ').trim());
 const count = (page, sel) => page.evaluate(s => document.querySelectorAll(s).length, sel);
 
 /* The page reports every write on its own status line (`#txs`, `app/src/index.html:343`): the label,
@@ -72,29 +71,8 @@ export async function pressWrite(page, selector, row, label, { ms = 300000 } = {
   }
 }
 
-/* An assertion about a section's text has to wait on a **settled** section, not on one read: a write
-   makes the page re-read the view, and during the repaint a row that is still there reads as absent.
-   `settledText` requires the three sections painted and the predicate true on two consecutive reads
-   two and a half seconds apart. The architect's review asks for exactly this on every "row went". */
-export async function settledText(page, sel, test, { label, ms = 300000, every = 2500 } = {}) {
-  let hits = 0, last = '';
-  await until(label || `${sel} settled`, async () => {
-    /* Settled means **this** section, not all three. Requiring the whole page quiet made a row wait
-       out another section's churn — a fresh distribution's activity reloads while `changes` has long
-       since settled — and that is a driver stall dressed as a page failure. */
-    const state = await page.evaluate(s => {
-      const el = document.querySelector(s);
-      if (!el) return 'absent';
-      const LOADING = /^(loading…|reading the balances and the escrow…|reading…)$/;
-      return [...el.querySelectorAll('.notice')].some(n => LOADING.test(n.textContent.trim())) ? 'loading' : 'painted';
-    }, sel);
-    if (state !== 'painted') { hits = 0; return false; }
-    last = await text(page, sel);
-    hits = test(last) ? hits + 1 : 0;
-    return hits >= 2;
-  }, { ms, every });
-  return last;
-}
+
+
 
 /* The header of a distribution — its name, owner and delay — is filled by its own chain read, which
    can land after the three history sections have painted. Reading the view once at that moment catches
@@ -128,17 +106,6 @@ export async function waitControl(page, selector, row, what, { attempts = 4, eac
       await page.click('#refresh').catch(() => {});
       await page.waitForTimeout(4000);
     }
-  }
-}
-
-/** Polls a predicate rather than sleeping: a public endpoint's round trip is not a fixed number. */
-export async function until(label, fn, { ms = 120000, every = 1000 } = {}) {
-  const t0 = Date.now();
-  for (;;) {
-    const v = await fn();
-    if (v) return v;
-    if (Date.now() - t0 > ms) throw new Error(`${label}: still not true after ${Math.round((Date.now() - t0) / 1000)} s`);
-    await new Promise(r => setTimeout(r, every));
   }
 }
 
@@ -232,9 +199,13 @@ export async function rowG(page, { addr, payIn, rpcUrl, ether = '0.003', receive
   await settledText(page, '#funds', t => /held in escrow/i.test(t), { label: '(g) the escrow row appeared and stayed' });
   const funds = await text(page, '#funds');
   const activity = await text(page, '#h-funds');
-  has('g', 'activity carries the pay-in', activity, 'in');
-  has('g', 'activity carries the split', activity.toLowerCase(), 'distributed');
-  has('g', 'the escrow row names the failed push', funds.toLowerCase(), 'escrow');
+  /* `has(activity, 'in')` matched almost anything — "in" is a substring of half the page. The rows
+     have shapes: `in Ξ0.0030 from 0x…`, `distributed Ξ0.0030 by the table`, `escrowed Ξ0.0009 · 0x…`.
+     Assert those. */
+  truthy('g', 'activity carries the pay-in row', /(^|\s)in Ξ[\d.]+ from 0x/i.test(activity));
+  truthy('g', 'activity carries the split row', /(^|\s)distributed Ξ[\d.]+ by the table/i.test(activity));
+  truthy('g', 'activity carries the escrow row', /(^|\s)escrowed Ξ[\d.]+/i.test(activity));
+  has('g', 'funds names the escrow', funds.toLowerCase(), 'held in escrow');
   return { payInTx: receipt.transactionHash, receiverResetTx: reset, distributeBlock: dist.block, fundsBefore: before.slice(0, 160), funds: funds.slice(0, 200), activity: activity.slice(0, 200) };
 }
 
@@ -254,9 +225,9 @@ export async function rowH(page, { receiver, castSend, castCall, rpcUrl, sender 
   /* The sections repaint one after another, so `activity` can still be reading when `funds` has
      finished: wait for the row rather than for the other section. */
   await waitPainted(page);
-  await settledText(page, '#h-funds', t => /released/i.test(t), { label: '(h) activity carries the release' });
+  await settledText(page, '#h-funds', t => /(^|\s)released Ξ[\d.]+/i.test(t), { label: '(h) activity carries the release row' });
   const activity = await text(page, '#h-funds');
-  has('h', 'activity carries the release', activity.toLowerCase(), 'released');
+  truthy('h', 'activity carries the release row', /(^|\s)released Ξ[\d.]+/i.test(activity));
   return { setAcceptingTx: r.transactionHash, releaseBlock: rel.block, activity: activity.slice(0, 200) };
 }
 
@@ -266,7 +237,9 @@ export async function rowI(page, { rows }) {
   await until('(i) the drawer opened', () => count(page, '[data-send="table"]'));
   await setRows(page, rows);
   await pressWrite(page, '[data-send="table"]', 'i', 'propose setBeneficiaries');
-  await settledText(page, '#h-changes', t => /queued/i.test(t), { label: '(i) the change is queued' });
+  /* `/queued/i` also matches `no change has been queued yet.`, so this settled on a section showing
+     nothing. The rows name their setter: `queued setBeneficiaries · new table · …`. */
+  await settledText(page, '#h-changes', t => /queued setBeneficiaries/i.test(t), { label: '(i) the table change is queued' });
   const queued = await text(page, '#h-changes');
   /* `UAT.md` expects the apply control to read `anyone can apply once the delay passes`. That text
      is the **disabled** control's status (`app/src/index.html:1235`), so it exists only between the
@@ -285,7 +258,7 @@ export async function rowI(page, { rows }) {
   await pressWriteRetry(page, '[data-send^="apply:"]', 'i', 'applyQueued');
   /* A write makes the page re-read the view from the chain, so the section is loading again; wait for
      the paint before reading its text, and give the endpoint room. */
-  await settledText(page, '#h-changes', t => /applied/i.test(t), { label: '(i) the change applied' });
+  await settledText(page, '#h-changes', t => /applied setBeneficiaries/i.test(t), { label: '(i) the table change applied' });
   const applied = await text(page, '#h-changes');
   /* rake#381 has this row assert `Created`, `queued` and `applied`. **`Created` cannot appear in
      `changes` on any distribution**, and not for want of history: the section is built from the
@@ -296,8 +269,8 @@ export async function rowI(page, { rows }) {
      load, `changes` reads `queued` and `applied` and no `Created` — while the factory's `Created` log
      for it is on chain at block 12,191,964. So the row asserts the three events the section is made
      of, and the `Created` clause is raised for amendment instead of being asserted into failure. */
-  has('i', 'changes carries queued', applied.toLowerCase(), 'queued');
-  has('i', 'changes carries applied', applied.toLowerCase(), 'applied');
+  truthy('i', 'changes carries the queued row', /queued setBeneficiaries/i.test(applied));
+  truthy('i', 'changes carries the applied row', /applied setBeneficiaries/i.test(applied));
   truthy('i', 'the owner bar reads as the owner', /you own this distribution/.test(await view(page)));
   // then a name change, queued and cancelled
   if (!(await count(page, '[data-send="desc"]'))) await page.click('#queue').catch(() => {});
@@ -306,9 +279,9 @@ export async function rowI(page, { rows }) {
   await pressWrite(page, '[data-send="desc"]', 'i', 'propose setDescription');
   await waitControl(page, '[data-send^="cancel:"]', 'i', 'the queued name change offers cancel');
   await pressWriteRetry(page, '[data-send^="cancel:"]', 'i', 'cancel');
-  await settledText(page, '#h-changes', t => /cancelled/i.test(t), { label: '(i) the change is cancelled' });
+  await settledText(page, '#h-changes', t => /cancelled setDescription/i.test(t), { label: '(i) the name change is cancelled' });
   const cancelled = await text(page, '#h-changes');
-  has('i', 'changes carries cancelled', cancelled.toLowerCase(), 'cancelled');
+  truthy('i', 'changes carries the cancelled row', /cancelled setDescription/i.test(cancelled));
   return {
     queued: queued.slice(0, 200), applyState, applied: applied.slice(0, 240), cancelled: cancelled.slice(0, 240),
     createdRow: /created/i.test(cancelled),
