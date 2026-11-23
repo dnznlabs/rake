@@ -12,21 +12,71 @@
    gateway. The last one is also asserted by `tools/uat/` row (l) against the live page. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdtempSync, cpSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const dist = f => join(root, 'app/dist', f);
 const SRC = readFileSync(join(root, 'app/src/index.html'), 'utf8');
 
-/* The build's own output. `make dapp-nodev` writes it; when it has not run, these three skip rather
-   than pass, because a test that silently passes on a missing artefact is worse than no test. */
-const built = existsSync(dist('index.html')) && existsSync(dist('widget.js'));
-const skip = built ? false : 'app/dist is not built — run `make dapp-nodev CHAIN_ID=<id>` first';
+/* **These tests build what they assert on, into a directory of their own.**
 
-test('the page carries the sha384 of the widget the same build produced', { skip }, () => {
+   They used to skip when `app/dist` was missing, and that skip was a race rather than a property of
+   the tree: `test/build.test.mjs` runs a real build as a side effect, node runs test files as
+   concurrent processes, and this file decided at **module load** whether the artefacts existed. So
+   whether the integrity hash was ever checked depended on which process got there first — CI won
+   that race, this machine lost it three runs of three, and a flip either way was invisible because a
+   skip is not a failure (measured 2026-11-23). For a check whose whole subject is the integrity
+   hash, a skip is a silent pass.
+
+   **And it must not build into `app/dist`.** The obvious fix did, and it turned the silent race into a
+   red one: `build.test.mjs:370` asserts that a *refused* build leaves `app/dist` untouched, so a
+   second writer appearing concurrently made that test fail. `app/dist` is shared mutable state
+   between test files. So `app/` is copied to a temp directory and the copy's own `build.mjs` is run
+   there — `build.mjs` writes `dist/` beside itself (`:24`, `:184`), so the copy writes the copy's
+   dist and nothing here contends with anything.
+
+   `FEATURED_SALT` is the one value the recipe passes that the build needs, read from `mk/15-seed.mk`
+   rather than retyped, so there is still one source of truth. The chain does not matter to anything
+   asserted here — the widget is identical on every chain, and the page's `widgetSri` is the hash of
+   the widget built beside it — so Sepolia is used and named. */
+const salt = (() => {
+  const mk = readFileSync(join(root, 'mk/15-seed.mk'), 'utf8');
+  const m = /FEATURED_SALT_DNZN\s*=\s*(0x[0-9a-fA-F]+)/.exec(mk);
+  assert.ok(m, 'mk/15-seed.mk no longer declares FEATURED_SALT_DNZN — this test reads it from there');
+  return m[1];
+})();
+
+const out = mkdtempSync(join(tmpdir(), 'widget-sri-'));
+cpSync(join(root, 'app'), join(out, 'app'), { recursive: true });
+rmSync(join(out, 'app/dist'), { recursive: true, force: true });
+/* `build.mjs` reads one thing outside `app/`: the broadcast logs it takes the deployed addresses and
+   `__VERSION__` from (`:25`, `:40`). Symlinked rather than copied — it only reads them, and 23 files
+   of JSON per test run is waste. Without it the build refuses with "nothing to substitute for
+   __VERSION__", which is the build doing its job and was the first thing this fix hit. */
+symlinkSync(join(root, 'broadcast'), join(out, 'broadcast'));
+{
+  const r = spawnSync(process.execPath,
+    [join(out, 'app/build.mjs'), '--chain', '11155111', '--set', `FEATURED_SALT=${salt}`],
+    { cwd: out, encoding: 'utf8' });
+  assert.equal(r.status, 0,
+    `these tests build what they assert on, and the build failed: ${(r.stderr || r.stdout || '').trim().split('\n').slice(-3).join(' | ')}`);
+}
+/* Clean up after a green run, and **keep the tree when something failed** — that is when the built
+   artefacts are worth looking at. Eleven of these were left behind across one review, 600-850 KB
+   each. `process.exitCode` is set by then, where an `after` hook would run too early. */
+process.on('exit', code => {
+  if (code === 0 && !process.env.RAKE_KEEP_BUILD) rmSync(out, { recursive: true, force: true });
+});
+const dist = f => join(out, 'app/dist', f);
+for (const f of ['index.html', 'widget.js']) {
+  assert.ok(existsSync(dist(f)), `the build reported success but did not write ${f}`);
+}
+
+test('the page carries the sha384 of the widget the same build produced', () => {
   const page = readFileSync(dist('index.html'), 'utf8');
   const widget = readFileSync(dist('widget.js'));
 
@@ -63,7 +113,7 @@ test('the snippet names the gateway, and carries crossorigin with the integrity'
   }
 });
 
-test('the widget the build hashed is the one the document serves', { skip }, () => {
+test('the widget the build hashed is the one the document serves', () => {
   /* The hash would be worthless if the page served one widget and the snippet pinned another. The
      build writes both from the same minified text; this pins that they stay the same bytes. */
   const widget = readFileSync(dist('widget.js'), 'utf8');

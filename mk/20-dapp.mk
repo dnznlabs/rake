@@ -10,7 +10,7 @@ dapp-nodev: ## Same, without the dev overrides: the bundle that ships
 	@node app/build.mjs --chain $(CHAIN_ID) --set FEATURED_SALT=$(FEATURED_SALT)
 
 test::
-	node --test test/*.test.mjs
+	bash tools/node-test.sh test/*.test.mjs
 
 clean::
 	rm -rf app/dist app/chain
