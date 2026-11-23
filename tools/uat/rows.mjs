@@ -28,7 +28,16 @@ export const PATTERNS = {
   boundaryLine: 'history before block \\d+ (?:not loaded|is not loaded yet)',
   /* The one line that is never acceptable: the page saying an endpoint answered nothing at all. */
   unavailable: 'history unavailable',
-  activityRow: '(^|\\s)(in|distributed|escrowed|released|claimed)\\s',
+  /* **Anchored to the amount, because a bare kind word is a word.** This matched ` in ` anywhere, and
+     the funds block prints "token payments **in** could not be read from this provider" whenever the
+     address-less `Transfer` query is refused — which every endpoint the page ships does — so the help
+     sentence read as an activity row and credited chain 1 with history it has none of. A row always
+     puts its amount straight after its kind (`in Ξ0.0030 from 0x…`, `escrowed Ξ0.0009 · 0x…`,
+     `in 12.5 USDC from 0x…`), which is the form `writes.mjs` has always used. Row (c) counts the row
+     **elements** rather than trusting this; the pattern is for waiting and for classifying. */
+  activityRow: '(^|\\s)(in|distributed|escrowed|released|claimed)\\s+(?:Ξ)?\\d',
+  /* What a history row *is*, for counting. `histRows` emits one `.hrow` per entry inside `.hist`. */
+  activityRowSelector: '#h-funds .hrow',
   blockNumber: 'block (\\d+)',
   loadingNotice: '^(loading…|reading the balances and the escrow…|reading…)$',
 };
@@ -228,6 +237,9 @@ export async function rowC(page, { base, addr = DNZN, patience = 120000, relatio
     changes: (document.getElementById('h-changes')?.innerText || '').replace(/\s+/g, ' ').trim(),
     funds: (document.getElementById('funds')?.innerText || '').replace(/\s+/g, ' ').trim(),
     activity: (document.getElementById('h-funds')?.innerText || '').replace(/\s+/g, ' ').trim(),
+    /* Counted as elements. A text pattern over a section that also carries help sentences and stop
+       lines is a guess about wording; `.hrow` is what a row is. */
+    activityRows: document.querySelectorAll('#h-funds .hrow').length,
     queueButton: !!document.getElementById('queue'),
     ownerBar: ([...document.querySelectorAll('.actions .status')].map(n => n.textContent.trim())[0]) || '',
     ownsText: (document.getElementById('view')?.innerText || '').includes('you own this distribution'),
@@ -236,7 +248,7 @@ export async function rowC(page, { base, addr = DNZN, patience = 120000, relatio
   has('c', 'the table', r.view, 'treasury');
   falsy('c', '`activity` is not the #382 notice', new RegExp(PATTERNS.unavailable, 'i').test(r.activity));
   falsy('c', '`changes` is not the #382 notice', new RegExp(PATTERNS.unavailable, 'i').test(r.changes));
-  truthy('c', '`activity` carries at least one row', new RegExp(PATTERNS.activityRow, 'i').test(r.activity));
+  truthy('c', `\`activity\` carries at least one row (${r.activityRows} \`.hrow\` elements)`, r.activityRows > 0);
   has('c', '`changes` reads the empty line this distribution has', r.changes, 'no change has been queued yet');
   if (relation) {
     if (relation.expect === 'vault') {

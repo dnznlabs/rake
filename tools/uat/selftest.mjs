@@ -34,6 +34,15 @@ const CASES = [
   ['activityRow', 'in Ξ0.0030 from 0x5A15…C50d ↗ block 12192083 history before block 12181673 not loaded · load older', true],
   ['activityRow', 'this endpoint is limiting requests · history before block 12181673 is not loaded yet', false],
   ['activityRow', 'history unavailable', false],
+  /* **The sentence that broke it.** The funds block prints this whenever the address-less `Transfer`
+     query is refused, which is every endpoint the page ships (#393) — and the pattern used to match
+     the bare ` in ` inside "payments **in** could not be read", so a mainnet with no history at all
+     classified as having activity rows. The amount anchor is what makes it false. */
+  ['activityRow', 'token payments in could not be read from this provider, so a token never distributed here is not listed.', false],
+  ['activityRow', 'anyone can call distribute() — the contract splits by the table above; you pay the gas.', false],
+  /* A token row, so the anchor is not accidentally tied to the ether sign. */
+  ['activityRow', 'in 12.5 USDC from 0x5A15…C50d ↗ block 12192083', true],
+  ['activityRow', 'escrowed Ξ0.0009 · 0x5A15…C50d — the push failed', true],
 ];
 
 /* The row-kind patterns live in node, so they are tested as literals — including the two the
@@ -49,7 +58,12 @@ const KINDS = [
   [/(^|\s)distributed Ξ[\d.]+ by the table/i, 'distributed Ξ0.0030 by the table block 12192085', true],
   [/(^|\s)escrowed Ξ[\d.]+/i, 'escrowed Ξ0.0009 · 0xC559…7C95 ↗', true],
   [/(^|\s)released Ξ[\d.]+/i, 'released Ξ0.0027 · 0xC559…7C95 ↗', true],
-  [/(^|\s)(in|distributed|escrowed|released|claimed)\s/i, 'history unavailable', false],
+  /* A stale literal copy of `PATTERNS.activityRow`, kept here from before it was anchored. Updated
+     with it, and given the case that matters: the sentence the funds block prints when the
+     address-less query is refused. A test that encodes a retired pattern tests nothing. */
+  [/(^|\s)(in|distributed|escrowed|released|claimed)\s+(?:Ξ)?\d/i, 'history unavailable', false],
+  [/(^|\s)(in|distributed|escrowed|released|claimed)\s+(?:Ξ)?\d/i, 'token payments in could not be read from this provider', false],
+  [/(^|\s)(in|distributed|escrowed|released|claimed)\s+(?:Ξ)?\d/i, 'in Ξ0.0030 from 0x5A15…C50d', true],
 ];
 
 /* Not a pattern but a property of the runner, and it belongs here because it is the same kind of
