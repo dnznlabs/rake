@@ -25,6 +25,11 @@ const CASES = [
   ['boundaryLine', 'history before block 12181673 not loaded · load older', true],
   ['boundaryLine', 'history before block 900000 not loaded · this endpoint serves no history before block 900000. A connected wallet reads through its own endpoint, which may go further.', true],
   ['boundaryLine', 'this endpoint is limiting requests · history before block 12181673 is not loaded yet · load older', true],
+  /* The no-wallet wording, which has no press because the day is the limit by design. A pattern that
+     knew only the wallet wording would read this as "nothing stopped the read". */
+  ['boundaryLine', 'nothing has arrived at this address yet. this read stopped at block 12181673, short of a full day connect a wallet to load more', true],
+  ['boundaryLine', 'nothing has arrived at this address yet. connect a wallet to load more', false],
+  ['activityRow', 'nothing has arrived at this address yet. connect a wallet to load more', false],
   ['boundaryLine', 'nothing has arrived at this address yet.', false],
   ['boundaryLine', 'history unavailable', false],
   ['unavailable', 'history unavailable — the token list and the escrow rows are read from the logs.', true],

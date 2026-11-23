@@ -25,7 +25,12 @@ export const PATTERNS = {
      is not loaded yet"). The fourth, an endpoint that answered nothing, prints `unavailable` below
      and is a failure rather than a boundary. This matches the three that are boundaries — note the
      throttle's wording differs, which is why `partialLine` alone no longer covers them. */
-  boundaryLine: 'history before block \\d+ (?:not loaded|is not loaded yet)',
+  /* **Two wordings, because a no-wallet read is a day deep by design.** With a wallet, "history before
+     block N not loaded" is right: the press can fetch it. Without one there is no press, so the page
+     says it stopped short of a day instead — and a pattern that knew only the first wording would
+     classify that as no stop at all, which is the one error that would make an acceptance run on the
+     24-hour ruling meaningless. */
+  boundaryLine: 'history before block \\d+ (?:not loaded|is not loaded yet)|stopped at block \\d+, short of a full day',
   /* The one line that is never acceptable: the page saying an endpoint answered nothing at all. */
   unavailable: 'history unavailable',
   /* **Anchored to the amount, because a bare kind word is a word.** This matched ` in ` anywhere, and

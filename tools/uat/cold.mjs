@@ -186,12 +186,16 @@ async function oneLoad(browser, port, { patience, shotTo }) {
       const req = r.request();
       if (req.method() !== 'POST') return;
       const post = req.postData() || '';
-      if (!post.includes('eth_getLogs')) return;
+      /* **Every** JSON-RPC call, not only `eth_getLogs`: the 24-hour floor is found with
+         `eth_getBlockByNumber`, and the amendment asks for the request count per load, which means
+         the whole cost of a page load and not the part that happens to be a log query. */
+      if (!/"method"/.test(post)) return;
       const b = JSON.parse(post);
       const f = (b.params && b.params[0]) || {};
       const body = await r.text().catch(() => '');
       rpc.push({
         phase,
+        method: b.method,
         from: f.fromBlock ? parseInt(f.fromBlock, 16) : null,
         to: f.toBlock ? parseInt(f.toBlock, 16) : null,
         span: f.fromBlock && f.toBlock ? parseInt(f.toBlock, 16) - parseInt(f.fromBlock, 16) + 1 : null,
@@ -245,8 +249,8 @@ async function oneLoad(browser, port, { patience, shotTo }) {
        which is precisely the mixed case worth catching. Each section now carries the block *it*
        stopped above, and `null` means it covered its whole range. */
     for (const id of Object.keys(out.sections)) {
-      const m = /history before block (\d+)/.exec(fullText[id] || '');
-      out.sections[id].stopped = m ? Number(m[1]) : null;
+      const m = /history before block (\d+)|stopped at block (\d+), short of a full day/.exec(fullText[id] || '');
+      out.sections[id].stopped = m ? Number(m[1] ?? m[2]) : null;
     }
     const floors = Object.values(out.sections).map(sx => sx.stopped).filter(n => n != null);
     out.stopped = floors.length ? Math.min(...floors) : null;
@@ -418,11 +422,11 @@ const asTime = sec => sec == null ? '—'
   if (fullBudget) console.log('**`--full-budget`: `factoryBlock` was lowered in the build by 40 × the chain\'s start window**, so the walk'
     + ' spends its whole budget. The depth is simulated; these rows are a load measurement and not a reading of the chain\'s own history.');
   console.log(`Distribution page: \`${DNZN}\`. Screenshots: ${shots}\n`);
-  console.log('| chain | endpoint | panel | median fill | three sections, worst outcome per load | loads covering the whole range | blocks read by the loads that did NOT | that in time | earliest event, and the depth to it | budget | errors |');
-  console.log('|:--|:--|--:|--:|:--|--:|--:|--:|:--|--:|--:|');
+  console.log('| chain | endpoint | panel | **24h read completed** | median fill | worst outcome per load | requests per load (median) | per load, by method | errors |');
+  console.log('|:--|:--|--:|--:|--:|:--|--:|:--|--:|');
   let bad = 0;
   for (const r of rows) {
-    if (!r.built) { console.log(`| ${r.chain} | — | **build failed** | — | ${r.why} | — | — | — | — | — | — |`); bad++; continue; }
+    if (!r.built) { console.log(`| ${r.chain} | — | **build failed** | — | — | ${r.why} | — | — | — |`); bad++; continue; }
     const filled = r.runs.filter(x => x.featured).length;
     const ms = r.runs.filter(x => x.featuredMs).map(x => x.featuredMs).sort((a, b) => a - b);
     const median = ms.length ? ms[Math.floor(ms.length / 2)] : null;
@@ -439,6 +443,22 @@ const asTime = sec => sec == null ? '—'
     });
     const tally = worst.reduce((a, k) => ({ ...a, [k]: (a[k] || 0) + 1 }), {});
     const errs = r.runs.reduce((a, x) => a + x.errors.length, 0);
+    /* **The amendment's own bound**: with no wallet the read is a day deep, so a load that painted no
+       stop line anywhere covered its day. At least 9 of 10 must. */
+    const day = r.runs.filter(x => x.whole).length;
+    /* The amendment's bound is 9 of 10. Expressed as a proportion so a short diagnostic run is not
+       falsely marked as failing it — a 2-load run was, which is a defect in the instrument and not in
+       the page, and exactly the sort of false red that teaches people to ignore the column. */
+    const dayBound = Math.ceil(r.runs.length * 0.9);
+    /* Requests per load, over every JSON-RPC method the page sent — the day search is
+       `eth_getBlockByNumber`, so counting only `eth_getLogs` would under-report the thing the
+       amendment asks to be reported. */
+    const counts = r.runs.map(x => (x.rpc || []).length).sort((a, b) => a - b);
+    const reqMedian = counts.length ? counts[Math.floor(counts.length / 2)] : null;
+    const byMethod = {};
+    for (const run of r.runs) for (const q of (run.rpc || [])) byMethod[q.method] = (byMethod[q.method] || 0) + 1;
+    const perLoad = Object.entries(byMethod).sort((a, b) => b[1] - a[1])
+      .map(([m, n]) => `${m} ${(n / r.runs.length).toFixed(1)}`).join(', ');
     /* **Two populations, two columns.** One cell used to carry the median reach of the loads that
        stopped short *and* the count of loads that covered everything, which reads as "it stopped at
        400,000 blocks and claimed to have read it all" — and that is how it was read. The loads that
@@ -472,9 +492,13 @@ const asTime = sec => sec == null ? '—'
        is a wrong answer. A refused window makes it a floor, and the cell says so. */
 
     const ok = filled === r.runs.length && !worst.some(k => k === 'nothing' || k === 'loading' || k === 'none' || k === 'threw')
-      && !(r.lies || []).length;
+      && !(r.lies || []).length && day >= dayBound;
     if (!ok) bad++;
-    console.log(`| ${r.chain} | \`${r.endpoint}\` | ${ok || filled === r.runs.length ? '' : '**'}${filled}/${r.runs.length}${ok || filled === r.runs.length ? '' : '**'} | ${median == null ? '—' : median + ' ms'} | ${Object.entries(tally).map(([k, n]) => `${n}× ${k}`).join(', ')} | ${wholeCell} | ${reachCell} | ${timeCell} | ${floorCell} | ${budgetCell} | ${errs} |`);
+    console.log(`| ${r.chain} | \`${r.endpoint}\` | ${filled}/${r.runs.length}`
+      + ` | ${day}/${r.runs.length}${day >= dayBound ? '' : ` ← **under the bound of ${dayBound}**`}`
+      + ` | ${median == null ? '—' : median + ' ms'}`
+      + ` | ${Object.entries(tally).map(([k, n]) => `${n}× ${k}`).join(', ')}`
+      + ` | ${reqMedian == null ? '—' : reqMedian} | ${perLoad || '—'} | ${errs} |`);
   }
   /* An empty history stated as fact is the one failure that looks like success in every other
      column, so it is named in full rather than counted. */
