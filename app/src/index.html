@@ -609,6 +609,16 @@ async function logs(address, topics, fromBlock, toBlock) {
     if (i < 0) { hi = batch[batch.length - 1][0] - 1; continue; }
     const top = batch[i][1], text = res[i].err, cap = Model.rangeCap(text);
     lastText = text;
+    /* **Asked first, and before anything about the width of the window.** A throttle is a refusal
+       about how often rather than how much: `RANGEY` matches the bare word `limit`, so
+       `request limit reached` and `rate limit exceeded` would otherwise read as complaints about the
+       range and the walk would spend the rest of its budget halving, which neither helps nor
+       explains. And unlike a depth wall it **can** be passed by asking again later, so the walk stops
+       here, keeps what it read, and the page keeps `load older`. */
+    if (Model.isThrottle(text, res[i].e)) {
+      if (!answered) throw new Error(text);
+      return { logs: out, partial: top + 1, wall: { block: top + 1, why: text, kind: 'throttle', stated: null } };
+    }
     /* The fourth clause reads the error *object*, not the text: a wallet can replace a provider's
        range refusal with one of its own that says only `RPC endpoint returned HTTP client error.`,
        and nothing above matches that sentence, so before this clause existed the first window of
@@ -674,6 +684,12 @@ async function logs(address, topics, fromBlock, toBlock) {
      down to 1 costs more windows than the budget holds — so without this, an endpoint that refused
      every single window returned a boundary and a wall as though something had been read, and the
      sections would have painted an empty history as fact. Found by the test for a nonsense cap. */
+  /* The arithmetic worth naming, because it has hidden a case twice: halving from `WINDOW_START` of
+     10,000 to a single block takes about fourteen steps, and each step costs up to `WINDOW_INFLIGHT`
+     windows out of `MAX_WINDOWS` — about 56 against 40. So a walk being refused all the way down
+     **runs out of budget before it ever reaches the one-block case**, and any rule written only at
+     that case will not fire in practice. Both the "nothing was answered" check here and the carried
+     `wall` above exist for that reason. */
   if (!answered && spent) throw new Error(lastText || 'no window was answered');
   return { logs: out, partial: hi >= from ? hi + 1 : null, wall };
 }
@@ -1188,7 +1204,13 @@ function histOf(raw) {
      queries that carry the history. A wall beats a budget when both are present — if either query was
      refused older blocks, `load older` cannot pass that point for the group, and offering it would be
      a button that does nothing. */
-  const walls = [raw.changes.wall, raw.funds.wall].filter(Boolean);
+  /* A depth wall outranks a throttle, whatever the blocks say. If either query was refused *old
+     blocks*, the group cannot read past that point however often it asks, so offering the press
+     because the other query merely hit a rate limit would be offering one that cannot finish. Among
+     walls of the same standing the most conservative block wins, as the boundary does. */
+  const allWalls = [raw.changes.wall, raw.funds.wall].filter(Boolean);
+  const deep = allWalls.filter(w => w.kind !== 'throttle');
+  const walls = deep.length ? deep : allWalls;
   return {
     raw,
     changes: ch.sort(newest),
@@ -1333,6 +1355,14 @@ function partialLine() {
      says so. Where it only refused, the line says it *may* not serve history that far back — it must
      not claim to have read to a boundary it merely stopped at. Either way the next sentence is the
      one a reader can act on: their own wallet's endpoint may go further. */
+  /* A throttle keeps the press, because asking again later can succeed and `older()` resumes from
+     this boundary rather than restarting the walk. The sentence says what happened — the endpoint is
+     limiting requests — rather than implying it has no older history to give, which is the thing a
+     rate limit does not tell us. */
+  if (w.kind === 'throttle') {
+    return `<div class="notice">this endpoint is limiting requests · history before block ${w.block}`
+      + ' is not loaded yet · <button class="link older">load older</button></div>';
+  }
   const where = `history before block ${DS.h.wall.block} not loaded`;
   const why = w.stated != null
     ? `this endpoint serves no history before block ${w.stated}`
@@ -1888,7 +1918,10 @@ async function older() {
   if (stale(t)) return;
   /* `add` is the older half, so it goes in front, and the boundary that remains is its own. `ins` is
      dropped unless both halves have it: a half-read `other` list cannot be told from a complete one. */
-  const join = (older_, newer_) => ({ logs: [...older_.logs, ...newer_.logs], partial: older_.partial });
+  /* The older half's boundary **and its wall**: it is the half that walked further back, so it is the
+     one that met whatever stopped the read. Dropping the wall here would turn a depth refusal into a
+     plain budget boundary on the next paint, and put back a `load older` that cannot work. */
+  const join = (older_, newer_) => ({ logs: [...older_.logs, ...newer_.logs], partial: older_.partial, wall: older_.wall });
   await absorb(t, d, histOf({
     changes: join(add.changes, prev.changes),
     funds: join(add.funds, prev.funds),

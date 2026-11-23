@@ -187,6 +187,31 @@ const Model = (() => {
     return s.length > 2 ? s : null;
   }
 
+  /* A refusal about **how often**, not about how much or how old. Every shape here was measured in
+   * m05-t01d step 1 against a real endpoint; none is guessed:
+   *
+   *   `25/second request limit reached`            sepolia.base.org, under an HTTP 429
+   *   `-32011 request limit reached`               mainnet.base.org, which answers nothing else
+   *   `-32005 rate limit exceeded`                 sepolia.gateway.tenderly.co
+   *   `-32016 over rate limit`                     rpc.flashbots.net
+   *   `You reached Public endpoint rate limit`     eth.drpc.org and base.drpc.org
+   *   `the RPC endpoint answered HTTP 429`         what `rpcProvider` raises when the body carries
+   *                                                no JSON-RPC error to read, as Base's does not
+   *
+   * It matters that this is its own question. A throttle is **not** a wall: a depth refusal cannot be
+   * passed by asking again, and a rate limit can. So the page keeps `load older` for this one, and
+   * says the endpoint is limiting requests rather than implying it has no history to give.
+   *
+   * `RANGEY` matches the bare word `limit`, so most of these would otherwise be read as a complaint
+   * about the width of the window and the walk would halve for the rest of its budget, which neither
+   * helps nor explains. This has to be asked first. */
+  const THROTTLED = /\brate limit\b|request limit reached|too many requests|\b429\b/i;
+  function isThrottle(text, e) {
+    const status = e && e.data && e.data.httpStatus;
+    if (status === 429) return true;
+    return THROTTLED.test(String(text == null ? '' : text));
+  }
+
   function revertMessage(data, now, grace) {
     const d = String(data == null ? '' : data);
     if (!d || d === '0x') return 'reverted';
@@ -356,6 +381,6 @@ const Model = (() => {
     return '0x' + node;
   }
 
-  return { SNAPSHOT_T, BENEFICIARY_T, GATEWAYS, chainHref, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt, revertMessage, nodeSentence, tableFrom, parseDelay, wei, namehash, plainName, windows, rangeCap, isPruned, isWrappedRefusal, nonceOf };
+  return { SNAPSHOT_T, BENEFICIARY_T, GATEWAYS, chainHref, pct, countdown, deadline, dateText, decodePending, ownerChange, ownerKind, supersededBy, salt, revertMessage, nodeSentence, isThrottle, tableFrom, parseDelay, wei, namehash, plainName, windows, rangeCap, isPruned, isWrappedRefusal, nonceOf };
 })();
 export default Model;

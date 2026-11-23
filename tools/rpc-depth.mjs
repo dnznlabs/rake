@@ -111,6 +111,19 @@ const one = s => String(s).replace(/\s+/g, ' ').trim().slice(0, 120);
 const HEAD_SKEW = /beyond current head|requested \d+,? head \d+|header not found|unknown block/i;
 const kindOf = why => (HEAD_SKEW.test(why || '') ? 'head-skew' : 'policy');
 
+/* A per-second limit, where an endpoint states one. It belongs in the table because the page issues
+ * four windows in flight across three log kinds, so a stated 25 a second is one a single page load
+ * can reach — `sepolia.base.org` proved that, answering 102 of 120 and then refusing. Read out of
+ * the refusal rather than from documentation: the number in the sentence is the one in force. */
+const statedRate = why => {
+  const s = String(why || '');
+  const perSecond = /(\d+)\s*\/\s*second/i.exec(s) || /(\d+)\s+(?:requests?\s+)?per\s+second/i.exec(s);
+  if (perSecond) return `${perSecond[1]}/second`;
+  // Named but unnumbered, which is still worth knowing: it says a limit exists and we cannot plan to it.
+  if (/\brate limit\b|request limit reached|too many requests|\b429\b/i.test(s)) return 'stated, no number';
+  return null;
+};
+
 const getLogs = (url, from, to) =>
   rpc(url, 'eth_getLogs', [{ address: FACTORY, fromBlock: hex(from), toBlock: hex(to) }]);
 
@@ -238,6 +251,7 @@ function parseArgs(argv) {
     else if (a === '--md') out.md = argv[++i];
     else if (a === '--spans') out.spans = argv[++i].split(',').map(s => Number(s.trim())).filter(Boolean);
     else if (a === '--depths') out.depths = argv[++i].split(',').map(s => Number(s.trim())).filter(Boolean);
+    else if (a === '--selftest') { /* handled before parsing */ }
     else { console.error(`unknown argument: ${a}`); process.exit(2); }
   }
   if (!out.chains.length) out.chains = Object.keys(CANDIDATES);
@@ -286,6 +300,10 @@ async function measure(chain, cand, spans, depths) {
   row.rateAnswered = r.answered; row.rateRefused = r.refused; row.rateFirst = r.first; row.rateBand = r.band;
   const c = await corsFor(cand.url);
   row.cors = c.allow; row.corsUsable = c.ok;
+  // Every refusal this run saw, so the per-second limit is read from whichever one stated it.
+  const said = [row.spanRefusedWhy, row.rateFirst, ...(row.depths || []).flatMap(d => d.whys || [])]
+    .filter(Boolean);
+  row.statedRate = said.map(statedRate).find(Boolean) || null;
   row.answersNothing = false;
   return row;
 }
@@ -300,11 +318,11 @@ function markdown(rows, when) {
     + ' one answered on *every* attempt, which is the only one a page may count on. A fraction means'
     + ' the endpoint is a pool whose backends disagree.');
   lines.push('');
-  lines.push('| chain | endpoint | role | span, reliable / ever | refused past it | depth reliable (blocks back) | deeper, sometimes | states about itself | 40 reqs, 4 at a time | CORS to rake.dnzn.dev |');
-  lines.push('|:--|:--|:--|--:|:--|--:|:--|:--|:--|:--|');
+  lines.push('| chain | endpoint | role | span, reliable / ever | refused past it | depth reliable (blocks back) | deeper, sometimes | states about itself | per-second limit | 40 reqs, 4 at a time | CORS to rake.dnzn.dev |');
+  lines.push('|:--|:--|:--|--:|:--|--:|:--|:--|:--|:--|:--|');
   for (const r of rows) {
     if (r.answersNothing) {
-      lines.push(`| ${r.chain} | \`${r.url}\` | ${r.role} | **nothing** | ${r.why || r.spanRefusedWhy || '—'} | — | — | — | — | ${r.cors || '—'} |`);
+      lines.push(`| ${r.chain} | \`${r.url}\` | ${r.role} | **nothing** | ${r.why || r.spanRefusedWhy || '—'} | — | — | — | ${statedRate(r.why || r.spanRefusedWhy) || '—'} | — | ${r.cors || '—'} |`);
       continue;
     }
     const refused = r.spanRefusedAt == null ? 'nothing wider refused' : `${n(r.spanRefusedAt)}: ${r.spanRefusedWhy}`;
@@ -315,12 +333,53 @@ function markdown(rows, when) {
       ? r.depthPartial.map(d => n(d)).join(', ')
       : (r.depthEver != null && r.depthEver !== r.depth ? n(r.depthEver) : '—');
     const stated = r.statedFloor != null ? `\`earliest available ${n(r.statedFloor)}\`` : '—';
-    lines.push(`| ${r.chain} | \`${r.url}\` | ${r.role} | ${span} | ${refused} | ${depth}${r.depthSpanReliable ? '' : ' (at an unreliable width)'} | ${partial} | ${stated} | ${r.rateAnswered}/${r.rateAnswered + r.rateRefused} answered${r.rateRefused ? ` · ${r.rateFirst}` : ''} | ${r.cors}${r.corsUsable ? '' : ' **unusable**'} |`);
+    lines.push(`| ${r.chain} | \`${r.url}\` | ${r.role} | ${span} | ${refused} | ${depth}${r.depthSpanReliable ? '' : ' (at an unreliable width)'} | ${partial} | ${stated} | ${r.statedRate || '—'} | ${r.rateAnswered}/${r.rateAnswered + r.rateRefused} answered${r.rateRefused ? ` · ${r.rateFirst}` : ''} | ${r.cors}${r.corsUsable ? '' : ' **unusable**'} |`);
   }
   return lines.join('\n');
 }
 
+/* `--selftest`: the readers in this file, over the refusal texts actually measured. A rate limit
+ * fires when an endpoint feels like it, so a run can easily see none and leave the per-second column
+ * empty — which says nothing about whether the reader works. This does, without the network, and it
+ * is the same reason `tools/uat/selftest.mjs` exists. */
+function selftest() {
+  const cases = [
+    ['HTTP 429 {"code":-32007,"message":"25/second request limit reached"}', '25/second'],
+    ['-32011 request limit reached', 'stated, no number'],
+    ['-32005 rate limit exceeded', 'stated, no number'],
+    ['-32016 over rate limit', 'stated, no number'],
+    ['15 You reached Public endpoint rate limit, please upgrade to paid plan', 'stated, no number'],
+    ['the RPC endpoint answered HTTP 429', 'stated, no number'],
+    ['100 requests per second allowed', '100/second'],
+    ['-32701 exceed maximum block range: 50000', null],
+    ['4444 pruned history unavailable', null],
+    ['35 ranges over 100 blocks are not supported on free plan', null],
+    ['', null],
+  ];
+  let bad = 0;
+  for (const [text, want] of cases) {
+    const got = statedRate(text);
+    const ok = got === want;
+    if (!ok) bad++;
+    console.log(`${ok ? 'ok  ' : 'FAIL'} statedRate(${JSON.stringify(text.slice(0, 54))}) = ${JSON.stringify(got)}${ok ? '' : ` want ${JSON.stringify(want)}`}`);
+  }
+  const floors = [
+    ['4444 pruned history unavailable: requested 360085, earliest available 1000000', 1_000_000],
+    ['pruned history unavailable', null],
+  ];
+  for (const [text, want] of floors) {
+    const m = /earliest available (\d+)/i.exec(text);
+    const got = m ? Number(m[1]) : null;
+    const ok = got === want;
+    if (!ok) bad++;
+    console.log(`${ok ? 'ok  ' : 'FAIL'} stated floor of ${JSON.stringify(text.slice(0, 54))} = ${got}`);
+  }
+  console.log(bad ? `\n${bad} reader(s) wrong` : `\nall ${cases.length + floors.length} readings correct`);
+  return bad ? 1 : 0;
+}
+
 (async () => {
+  if (process.argv.includes('--selftest')) process.exit(selftest());
   const args = parseArgs(process.argv);
   const when = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   const rows = [];

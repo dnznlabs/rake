@@ -49,6 +49,13 @@ const STATED_FLOOR = block('const statedFloor = text =>', '\n};\n');
 const CAPPED = block('const capped = (p, cap, prune, wrap) => ({', '\n});\n', PAGE);
 const RANGEY = line('const RANGEY =');
 const ERRTEXT = block('const errText = e =>', ".join(' · ');\n");
+const HIST_OF = block('function histOf(raw) {');
+const JOIN_LINE = line('  const join = (older_, newer_) =>').replace(/^\s*const join = /, '').replace(/;\s*$/, '');
+
+/* `histOf` with only what it touches stubbed: it maps logs to rows through `entry`, which this test
+   does not exercise, so the rows are empty and what is asserted is the boundary and the wall. */
+const histOf = new Function('Model', 'ZERO', 'entry', 'tokenIn', 'newest', `${HIST_OF}\nreturn histOf;`)(
+  Model, '0x0000000000000000000000000000000000000000', () => ({}), () => ({}), () => 0);
 
 const EVENT = { blockNumber: '0x1', logIndex: '0x0', topics: ['0xaa'], data: '0x' };
 
@@ -167,18 +174,25 @@ test('where the refusal names the earliest block it keeps, that block is the bou
   assert.match(lineFor(r2), /serves no history before block 900000/);
 });
 
-test('a rate limit after some windows is a wall, not the end of the history read (#382)', async () => {
-  // Answers eight windows, then refuses with the 429 shape none of the four recognisers match.
+test('#382 end to end: the shape that killed the history read now keeps it', async () => {
+  /* The exact refusal measured on `sepolia.base.org`: a 200-block cap forces thousands of windows,
+     four in flight trip its 25-a-second limit, and the body is a bare `{code, message}` so
+     `rpcProvider` raises its own `HTTP 429`. Measured 2026-11-23: 102 and 112 of 120 windows answered
+     before it bit. Under the old code this threw and all three sections read `history unavailable`.
+
+     It is classified a **throttle**, not a depth wall: a rate limit can be passed by asking again,
+     which is why the press stays. That is a ruling of the architect's, 2026-11-23, and it is the
+     difference between this test and the one it replaced. */
   const w = walk({ cap: 200, rate: 8, head: 1_000_000 });
 
   const r = await w.logs('0xabc', [['0xaa']], 0);
 
-  assert.ok(r.logs.length > 0, 'what was read before the refusal is kept');
-  assert.ok(r.wall, 'an unrecognised refusal ends the walk as a wall');
-  assert.equal(r.wall.kind, 'refusal');
+  assert.ok(r.logs.length > 0, 'what was read before the refusal is kept — this is the whole fix');
+  assert.ok(r.wall, 'the walk stops and says so');
+  assert.equal(r.wall.kind, 'throttle');
   const out = lineFor(r);
-  assert.match(out, /may not serve history that far back/, 'nothing named a block, so nothing is claimed');
-  assert.doesNotMatch(out, /load older/);
+  assert.match(out, /limiting requests/);
+  assert.match(out, /load older/, 'a rate limit can be waited out, so the press stays');
 });
 
 test('a refusal on the very first window, with nothing read, still fails — that is history unavailable', async () => {
@@ -202,6 +216,81 @@ test('forty answered windows holding no events is a read history, not an unavail
   assert.equal(r.wall, null, 'nothing refused anything');
   assert.ok(w.served() > 0, 'windows were answered');
   // This is the distinction `answered` exists for: no events is not no answer.
+});
+
+/* The fourth outcome. A depth wall cannot be passed by asking again; a rate limit can, so it keeps
+   the press and says what actually happened. Every text driven here was measured against a real
+   endpoint in step 1 — none is invented, which is the point: the shapes are outside our control. */
+const THROTTLE_TEXTS = [
+  'the RPC endpoint answered HTTP 429',                      // what rpcProvider raises for Base's body
+  '25/second request limit reached',                         // sepolia.base.org
+  '-32011 request limit reached',                            // mainnet.base.org
+  '-32005 rate limit exceeded',                              // tenderly
+  '-32016 over rate limit',                                  // flashbots
+  '15 You reached Public endpoint rate limit, please upgrade to paid plan',   // drpc
+];
+
+test('a throttle after some answered windows keeps the press and names the limit', async () => {
+  for (const says of THROTTLE_TEXTS) {
+    const w = walk({ refuseAllSaying: says, refuseAfter: 8, head: 1_000_000 });
+
+    const r = await w.logs('0xabc', [['0xaa']], 0);
+
+    assert.ok(r.wall, `"${says}" should stop the walk`);
+    assert.equal(r.wall.kind, 'throttle', `"${says}" is a rate limit, not a depth wall`);
+    assert.ok(r.logs.length > 0, 'what was read before the limit is kept');
+    const out = lineFor(r);
+    assert.match(out, /limiting requests/, `"${says}" should say the endpoint is limiting requests`);
+    assert.match(out, /load older/, 'asking again later can succeed, so the press stays');
+    assert.doesNotMatch(out, /may not serve history that far back/,
+      'a throttle says nothing about how much history the endpoint has');
+  }
+});
+
+test('a throttle on every window is still nothing answered', async () => {
+  for (const says of THROTTLE_TEXTS) {
+    const w = walk({ refuseAllSaying: says, refuseAfter: 0, head: 1_000_000 });
+    await assert.rejects(() => w.logs('0xabc', [['0xaa']], 0),
+      `"${says}" with nothing answered is the history unavailable case`);
+  }
+});
+
+test('a throttle is told apart from a depth wall, and the press is the difference', async () => {
+  const throttled = walk({ refuseAllSaying: '-32005 rate limit exceeded', refuseAfter: 8, head: 1_000_000 });
+  const pruned = walk({ prune: 900_000, head: 1_000_000 });
+
+  const a = await throttled.logs('0xabc', [['0xaa']], 0);
+  const b = await pruned.logs('0xabc', [['0xaa']], 0);
+
+  assert.equal(a.wall.kind, 'throttle');
+  assert.equal(b.wall.kind, 'prune');
+  assert.match(lineFor(a), /load older/);
+  assert.doesNotMatch(lineFor(b), /load older/);
+});
+
+test('a depth wall on one query outranks a throttle on the other', () => {
+  // The group shares one press, so the half that cannot be passed decides: offering it because the
+  // other query merely hit a rate limit would offer a press that cannot finish.
+  const h = histOf({
+    changes: { logs: [], partial: 500, wall: { block: 500, kind: 'prune', why: 'pruned history unavailable', stated: null } },
+    funds: { logs: [], partial: 900, wall: { block: 900, kind: 'throttle', why: 'rate limit exceeded', stated: null } },
+    ins: null,
+  });
+
+  assert.equal(h.wall.kind, 'prune', 'the wall that cannot be passed decides for the group');
+  assert.doesNotMatch(lineFor(h), /load older/);
+});
+
+test('load older carries the wall, so a boundary does not become a budget on the next paint', () => {
+  const join = new Function('older_', 'newer_', `return (${JOIN_LINE})(older_, newer_);`);
+  const older_ = { logs: [1], partial: 400, wall: { block: 400, kind: 'prune', why: 'pruned', stated: null } };
+  const newer_ = { logs: [2], partial: 900, wall: null };
+
+  const joined = join(older_, newer_);
+
+  assert.equal(joined.partial, 400, "the older half's boundary is the one that remains");
+  assert.ok(joined.wall, 'and its wall with it — otherwise the next paint offers a press that cannot work');
+  assert.equal(joined.wall.kind, 'prune');
 });
 
 test('the budget is unchanged: 40 windows per kind, 4 in flight (#165)', () => {
