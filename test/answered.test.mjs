@@ -132,3 +132,52 @@ test("the sentence for a real wall still names the block and offers no press", a
   assert.match(said, /serves no history before block 996000/);
   assert.doesNotMatch(said, /load older/, 'a named wall offers no press');
 });
+
+/* The question the architect put first: can a section ever state an empty history it did not finish
+   reading? `histFill` writes `notice(empty) + partialLine()`, so the caveat and the press ride with
+   the sentence — but that is an argument, and an argument is not a test. These two are. */
+const HIST_FILL = block('function histFill(id, items, empty) {');
+
+/** `histFill` over a given history, returning the HTML it would have written into the section. */
+function fillFor(h, items) {
+  const written = {};
+  const src = `
+    const HIST_SHOW = 10;
+    const fill = (id, html) => { WRITTEN[id] = html; };
+    const notice = (t, k) => '<div class="notice">' + t + '</div>';
+    const histRows = xs => xs.map(() => '<div class="row">a row</div>').join('');
+    const bindOlder = () => {};
+    const document = { getElementById: () => null };
+    ${PARTIAL_LINE}
+    ${HIST_FILL}
+    return histFill;
+  `;
+  new Function('DS', 'Model', 'WRITTEN', src)({ h }, Model, written)('h-funds', items, 'nothing has arrived at this address yet.');
+  return written['h-funds'];
+}
+
+test('a section that ran out of budget with no rows still prints the boundary and the press', async () => {
+  /* The walk stops on `MAX_WINDOWS`, not on a refusal, and finds nothing in what it read. The empty
+     sentence may be there, but it may not stand alone: without the boundary a reader is told the
+     address has no history when the page simply stopped looking. */
+  const w = walk({ refuseAbove: Number.MAX_SAFE_INTEGER, head: 10_000_000, events: false });
+  const h = await w.logs('0xabc', [['0xaa']], 0, 10_000_000);
+  assert.notEqual(h.partial, null, 'the walk must report where it stopped');
+  assert.equal(h.wall, null, 'out of budget is not a wall');
+  const said = fillFor(h, []);
+  assert.match(said, /nothing has arrived at this address yet/);
+  assert.match(said, new RegExp(`history before block ${h.partial} not loaded`),
+    'an empty sentence after a budget stop must carry the boundary, or it is a wrong answer');
+  assert.match(said, /load older/, 'and the press, because the rest is one press away');
+});
+
+test('a section that read its whole range prints the empty sentence alone', async () => {
+  /* The other half, or the test above would pass on a page that never says a history is empty. */
+  const w = walk({ refuseAbove: Number.MAX_SAFE_INTEGER, head: 5_000, from: 0, events: false });
+  const h = await w.logs('0xabc', [['0xaa']], 0, 5_000);
+  assert.equal(h.partial, null, 'the whole range fits in one window, so nothing is outstanding');
+  const said = fillFor(h, []);
+  assert.match(said, /nothing has arrived at this address yet/);
+  assert.doesNotMatch(said, /history before block/);
+  assert.doesNotMatch(said, /load older/);
+});
