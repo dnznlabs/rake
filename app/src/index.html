@@ -599,6 +599,15 @@ const DAY_STEPS = 4;
    search confirms it against a real timestamp and corrects; `test/day-read.test.mjs` proves a seed
    that is wrong tenfold still lands inside the bound. 12 is the fallback for a chain not listed. */
 const NOMINAL_SEC = { 1: 12, 8453: 0.2, 11155111: 12, 84532: 0.2 };
+/* The seed as a block, which is both the search's first guess **and its fallback**. If no header can
+   be read the floor is this, unconfirmed — never the distribution's own block, which with no wallet is
+   the deep walk this amendment exists to replace: on Base that is 40 windows a kind against a day's 9,
+   and it reads far past what was ruled. An unconfirmed floor is a day's *estimate*, so the heading
+   says "about". */
+const seedFloor = hi => Math.max(1, hi - Math.round(DAY_SECONDS / (NOMINAL_SEC[Number(CFG.chainId)] || 12)));
+/* False while the floor in use is the unconfirmed seed. Read by `dayHead`, so the claim and the
+   evidence cannot drift apart. */
+let DAY_EXACT = true;
 /* **`null` is an answer here, not a failure.** A pooled hostname is many backends and they are not
    always on the same block, so a number one backend has another answers `null` for — measured on
    `ethereum-sepolia-rpc.publicnode.com` on 2026-11-23, where exactly that took the whole history down:
@@ -623,8 +632,8 @@ async function dayFloor(hi, floor) {
   };
   const [hiN, tHi] = await near(hi, floor, hi);
   const [flN, tFl] = await near(floor, floor, hi);
-  // Neither anchor readable: no basis for a day, so the caller reads from the distribution instead.
-  if (tHi == null || tFl == null) return floor;
+  // No anchor to measure from, so the seed stands unconfirmed rather than the whole history opening up.
+  if (tHi == null || tFl == null) { DAY_EXACT = false; return Math.max(floor, seedFloor(hi)); }
   const target = tHi - DAY_SECONDS;
   let a = flN, ta = tFl, b = hiN, tb = tHi;
   // The whole history is younger than a day, so there is nothing to cut: read all of it.
@@ -633,7 +642,7 @@ async function dayFloor(hi, floor) {
   let guess = Math.min(b - 1, Math.max(a + 1, hi - Math.round(DAY_SECONDS / nominal)));
   for (let i = 0; i < DAY_STEPS; i++) {
     const [gN, tg] = await near(guess, a + 1, b - 1);
-    if (tg == null) break;                       // nothing readable in the bracket; bisect below
+    if (tg == null) break;                       // nothing readable in this bracket; bisect below
     guess = gN;
     if (Math.abs(tg - target) <= TS_TOLERANCE) return guess;
     if (tg >= target) { b = guess; tb = tg; } else { a = guess; ta = tg; }
@@ -648,7 +657,10 @@ async function dayFloor(hi, floor) {
      four tries. The bracket is already narrowed, so this is short. */
   while (b - a > 1) {
     const [mN, tm] = await near(Math.floor((a + b) / 2), a + 1, b - 1);
-    if (tm == null) break;                       // the bracket holds nothing this backend will serve
+    /* The bracket holds nothing this backend will serve. `b` is a real block whose timestamp was read
+       and is at or after the target, so it is a sound floor — but it was not narrowed to the
+       tolerance, so it is not the exact day either. */
+    if (tm == null) { DAY_EXACT = false; break; }
     if (tm >= target) { b = mN; } else { a = mN; }
   }
   return b;
@@ -670,8 +682,11 @@ async function readFloor(d, hi) {
   try {
     return Math.max(own, await (DAYFLOOR ||= dayFloor(hi, own)));
   } catch {
+    /* The search threw outright. The seed is still a day's estimate and still bounds the walk; the
+       distribution's own block would not bound it at all. */
     DAYFLOOR = null;
-    return own;
+    DAY_EXACT = false;
+    return Math.max(own, seedFloor(hi));
   }
 }
 /* A refusal, wherever the wallet put the text: MetaMask wraps the provider's JSON-RPC error and the
@@ -1537,7 +1552,8 @@ const moreLine = () => WALLET ? '' : '<div class="help">connect a wallet to load
 const emptyLine = (all, day) => WALLET ? all : day;
 const dayHead = full => WALLET ? full
   : (DS.h && DS.h.partial != null) ? 'as far back as this endpoint served'
-  : 'last 24 hours';
+  : DAY_EXACT ? 'last 24 hours'
+  : 'about the last 24 hours';
 function partialLine() {
   if (!DS.h || DS.h.partial == null) return '';
   const w = DS.h.wall;
@@ -2523,6 +2539,13 @@ function fundsHTML(d, f, other) {
     'err',
   )).join('');
   const n = other && new Set(other.map(e => e.token)).size;
+  /* **The token list is built from the funds logs, so it inherits their window.** With no wallet those
+     logs are a day deep, and a token distributed here a week ago is simply not in `rows` — no sentence
+     above says so, and "listed means distributed here at least once" invites the reader to treat the
+     list as complete. Audited with the empty sentences after the Base Sepolia finding: of the seven
+     sentences in this block the other six are safe, because `reserved`, the balances and the escrow
+     amounts are read from **state** and do not narrow with the window. This one is the exception. */
+  const windowed = WALLET ? '' : '<div class="help wide">this list covers the last 24 hours; a token distributed here earlier is not shown. Connect a wallet to read further back.</div>';
   const others = !other ? '<div class="help wide">token payments in could not be read from this provider, so a token never distributed here is not listed.</div>'
     : !n ? ''
     : `<details class="others" id="others"><summary>other tokens received (${n})</summary>`
@@ -2542,7 +2565,7 @@ function fundsHTML(d, f, other) {
     + ` that this read could not attribute to an account${WALLET
       ? ' — the account is no longer in the table, and only the log that escrowed it names them.'
       : ' — connect a wallet to read further back and find it.'}</div>`).join('');
-  return `<div class="ledger">${rows}${escrows}</div>${unlisted}${others}`
+  return `<div class="ledger">${rows}${escrows}</div>${unlisted}${windowed}${others}`
     + `<div class="help wide">anyone can call distribute() — the contract splits by the table above; you pay the gas.${ACC ? '' : ' connect a wallet to send it.'} paying in from a contract? see <a class="link" href="#/docs#payin">receiving funds</a>.</div>`;
 }
 
@@ -3051,6 +3074,7 @@ function route() {
      found against an older head would read a window that is no longer the last day. */
   HEAD = null;
   DAYFLOOR = null;
+  DAY_EXACT = true;
   document.getElementById('nav-distros').className = h.startsWith('#/distros') ? 'on' : '';
   document.getElementById('nav-docs').className = h.startsWith('#/docs') ? 'on' : '';
   chrome(!(h.startsWith('#/docs') || h === '#/create'));

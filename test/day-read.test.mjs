@@ -35,6 +35,7 @@ const line = (anchor, from = SHIPPED) => {
 };
 
 const DAY_SECONDS = line('const DAY_SECONDS =');
+const SEED_FLOOR = line('const seedFloor = hi =>');
 const DAY_STEPS = line('const DAY_STEPS =');
 const NOMINAL_SEC = line('const NOMINAL_SEC =');
 const TS_TOLERANCE = line('const TS_TOLERANCE =');
@@ -45,7 +46,7 @@ const PRESS = line('const press = () =>');
 const MORE_LINE = line('const moreLine = () =>');
 const PARTIAL_LINE = block('function partialLine() {');
 const HIST_FILL = block('function histFill(id, items, empty) {');
-const DAY_HEAD = block('const dayHead = full =>', "'last 24 hours';\n");
+const DAY_HEAD = block('const dayHead = full =>', "'about the last 24 hours';\n");
 
 /** A synthetic chain: block `n` has timestamp `n * sec`, and every header read is counted. */
 function chain({ sec, head, floor = 0, chainId = 1, nominal = null, missing = null }) {
@@ -72,12 +73,13 @@ function chain({ sec, head, floor = 0, chainId = 1, nominal = null, missing = nu
        nominal figure is out by a factor of ten, which is exactly what a stale Base entry would be. */
     if (NOMINAL_IN != null) NOMINAL_SEC[CHAIN_ID] = NOMINAL_IN;
     ${TS_OF}
+    ${SEED_FLOOR}
     ${DAY_FLOOR}
     let DAYFLOOR = null;
     const FIRST = new Map();
     let WALLET = WALLET_IN;
     ${READ_FLOOR}
-    return { dayFloor, readFloor, reads: () => READS };
+    return { dayFloor, readFloor, reads: () => READS, exact: () => DAY_EXACT };
   `;
   return { ...new Function('READS', 'SEC', 'FLOOR', 'WALLET_IN', 'CHAIN_ID', 'NOMINAL_IN', 'MISSING', src)(
     reads, sec, floor, false, chainId, nominal, missing), reads };
@@ -135,6 +137,10 @@ test('a wallet is not held to a day: it reads from the distribution first block'
     let WALLET = true;
     const dayFloor = async () => { throw new Error('a wallet must not pay for the day search'); };
     let DAYFLOOR = null;
+    let DAY_EXACT = true;
+    ${DAY_SECONDS}
+    ${NOMINAL_SEC}
+    ${SEED_FLOOR}
     ${READ_FLOOR}
     return readFloor;
   `;
@@ -198,8 +204,8 @@ test('the four outcomes still speak for themselves without a wallet', () => {
 });
 
 /** `dayHead` in a given state, which is the one place a head's claim is decided. */
-const headFor = ({ wallet, h }) =>
-  new Function('WALLET', 'DS', `${DAY_HEAD}\nreturn dayHead;`)(wallet, { h })('every change this contract has seen');
+const headFor = ({ wallet, h, exact = true }) =>
+  new Function('WALLET', 'DS', 'DAY_EXACT', `${DAY_HEAD}\nreturn dayHead;`)(wallet, { h }, exact)('every change this contract has seen');
 
 test('both heads go through dayHead, so one place decides what they claim', () => {
   const heads = SHIPPED.slice(SHIPPED.indexOf('<div class="sechead"><b>changes</b>'));
@@ -335,28 +341,38 @@ test('a block one backend does not have is stepped around, not fatal', async () 
     `the day must still be found around ${want}; got ${got}`);
 });
 
-test('when no header is readable at all, the page reads from the distribution instead of failing', async () => {
-  /* The floor search is an optimisation of where to start. It may never cost the page its history,
-     which is what it did before this: one rejection and `paintFailed` wrote `history unavailable`. */
-  const head = 20_000_000, own = 19_000_000;
+test('when no header is readable at all, the read still happens — floored at the seed', async () => {
+  /* Two rules at once. The floor search may never cost the page its history, which is what it did
+     before: one rejection and `paintFailed` wrote `history unavailable`. **And the fallback is the
+     seed, not the distribution's own block** — this test asserted the latter until the architect
+     pointed out that with no wallet it is the deep walk the amendment exists to replace. A test that
+     encodes the mistake is worse than no test. Here the distribution is younger than the seed, so the
+     floor is the distribution and the day is not claimed exactly. */
+  const head = 20_000_000, own = head - 1_000;
   const c = chain({ sec: 12, head, floor: own, chainId: 1, missing: () => true });
   assert.equal(await c.readFloor({ addr: '0xabc' }, head), own,
-    'it must fall back to the distribution own first block');
+    'the floor never goes below the distribution itself');
 });
 
-test('an outright throw in the search is caught, and the read still happens', async () => {
+test('an outright throw in the search is caught, and the read still happens at the seed', async () => {
   const own = 19_000_000;
   const src = `
     const FIRST = new Map();
     const CFG = { factoryBlock: String(OWN), chainId: 1 };
     let WALLET = false;
     let DAYFLOOR = null;
+    let DAY_EXACT = true;
+    ${DAY_SECONDS}
+    ${NOMINAL_SEC}
+    ${SEED_FLOOR}
     const dayFloor = async () => { throw new Error('the endpoint hung up'); };
     ${READ_FLOOR}
     return readFloor;
   `;
   const readFloor = new Function('OWN', src)(own);
-  assert.equal(await readFloor({ addr: '0xabc' }, 20_000_000), own);
+  const head = 20_000_000, seed = head - Math.round(86_400 / 12);
+  assert.equal(await readFloor({ addr: '0xabc' }, head), seed,
+    'the seed bounds the walk; the distribution block, 19 million blocks down, would not');
 });
 
 test('the empty sentence names its window when there is no wallet', () => {
@@ -372,4 +388,51 @@ test('the empty sentence names its window when there is no wallet', () => {
   /* And both sections go through it, rather than one being fixed and the other forgotten. */
   assert.match(SHIPPED, /histFill\('h-changes', DS\.h\.changes,\s*\n?\s*emptyLine\(/);
   assert.match(SHIPPED, /histFill\('h-funds', DS\.h\.funds,\s*\n?\s*emptyLine\(/);
+});
+
+test('a floor that could not be confirmed says "about", and never claims the day exactly', () => {
+  /* The architect's ruling: an unconfirmed floor is a day's estimate, so the heading must not assert
+     the day. The three states are distinct and the order matters — a read that stopped short says so
+     whatever the floor was. */
+  assert.equal(headFor({ wallet: false, h: { partial: null }, exact: true }), 'last 24 hours');
+  assert.equal(headFor({ wallet: false, h: { partial: null }, exact: false }), 'about the last 24 hours');
+  assert.equal(headFor({ wallet: false, h: { partial: 9_000 }, exact: false }), 'as far back as this endpoint served');
+});
+
+test('a search that fails entirely floors the walk at the seed, not at the distribution', async () => {
+  /* The ruling this replaced a mistake of mine with: falling back to the distribution's own block is
+     the deep walk the amendment exists to avoid — on Base, 40 windows a kind against a day's nine,
+     reading far past what was ruled. The seed still bounds it. */
+  const head = 20_000_000, own = 1_000;        // a distribution 20 million blocks old
+  const src = `
+    const FIRST = new Map();
+    const CFG = { factoryBlock: String(OWN), chainId: 1 };
+    let WALLET = false;
+    let DAYFLOOR = null;
+    let DAY_EXACT = true;
+    ${DAY_SECONDS}
+    ${NOMINAL_SEC}
+    ${SEED_FLOOR}
+    const dayFloor = async () => { throw new Error('the endpoint hung up'); };
+    ${READ_FLOOR}
+    return { readFloor, exact: () => DAY_EXACT };
+  `;
+  const m = new Function('OWN', src)(own);
+  const got = await m.readFloor({ addr: '0xabc' }, head);
+  const seed = head - Math.round(86_400 / 12);
+  assert.equal(got, seed, `the floor must be the seed (${seed}), not the distribution (${own})`);
+  assert.ok(got > own, 'and nothing below it is ever asked for, because the walk starts here');
+  assert.equal(m.exact(), false, 'and the heading must say "about"');
+});
+
+test('the same when no header is readable, rather than a throw — and the claim is downgraded', async () => {
+  const head = 20_000_000, own = 1_000;
+  const c = chain({ sec: 12, head, floor: own, chainId: 1, missing: () => true });
+  const got = await c.readFloor({ addr: '0xabc' }, head);
+  const seed = head - Math.round(86_400 / 12);
+  assert.equal(got, seed, `expected the seed ${seed}, got ${got}`);
+  /* **Both halves, or the mutation passes.** Returning the seed without marking it unconfirmed leaves
+     the heading claiming a day it never measured — which is the whole point of the flag, and what
+     survived a mutation until this line existed. */
+  assert.equal(c.exact(), false, 'an unmeasured floor must not be claimed as the exact day');
 });

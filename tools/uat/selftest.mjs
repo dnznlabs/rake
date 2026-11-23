@@ -71,6 +71,33 @@ const KINDS = [
   [/(^|\s)(in|distributed|escrowed|released|claimed)\s+(?:Ξ)?\d/i, 'in Ξ0.0030 from 0x5A15…C50d', true],
 ];
 
+/* **The emptiness assertion's own negative case**, which the architect asked for after it fired on ten
+   correct Base Sepolia loads. The bug was the *range*: it compared a no-boundary section against every
+   block since the factory, when a no-wallet read with no boundary has covered its day. So the case
+   that matters is an event **inside** the day — that must still be caught — and one outside it, which
+   must not be. Modelled here rather than driven, because `cold.mjs` is the driver and this is its rule. */
+function checkEmptinessRange(quiet) {
+  const fb = 61_197_280, head = 62_510_175, dayLow = head - 432_000;
+  const claim = /nothing has arrived (at this address yet|in the last 24 hours)/i;
+  const text = 'nothing has arrived in the last 24 hours. connect a wallet to load more';
+  /* The rule as `cold.mjs` applies it: a section with no boundary read `[max(fb, dayLow), head]`. */
+  const low = (stopped) => stopped == null ? Math.max(fb, dayLow) : stopped;
+  const fires = (at, stopped) => claim.test(text) && at >= low(stopped) && at <= head;
+  const cases = [
+    ['an event inside the day, no boundary — must fire', 61_397_101 + 1_000_000, null, true],
+    ['an event 1.1M blocks back, outside the day — must NOT fire', 61_397_101, null, false],
+    ['an event above a boundary the section printed — must fire', head - 100, head - 1_000, true],
+    ['an event below that boundary — must NOT fire', head - 5_000, head - 1_000, false],
+  ];
+  let bad = 0;
+  for (const [name, at, stopped, want] of cases) {
+    const got = fires(at, stopped);
+    if (got !== want) { console.error(`FAIL ${name}: got ${got}`); bad++; }
+    else if (!quiet) console.log(`ok   ${name}`);
+  }
+  return bad;
+}
+
 /* Not a pattern but a property of the runner, and it belongs here because it is the same kind of
    claim: something the driver does that nobody can see by reading a row. The default screenshot
    directory must not be inside the repository. It used to be m05-t01c's merged acceptance evidence,
@@ -112,7 +139,8 @@ for (const [re, text, want] of KINDS) {
 // start if this file reports anything bad, so a driver that could overwrite another task's evidence
 // does not start either.
 bad += checkShotsDefault();
-if (!quiet) console.log(bad ? `\n${bad} check(s) do not do their job.` : `\nall ${CASES.length + KINDS.length} patterns do their job, and the shots default is outside the repository.`);
+bad += checkEmptinessRange(quiet);
+if (!quiet) console.log(bad ? `\n${bad} check(s) do not do their job.` : `\nall ${CASES.length + KINDS.length} patterns do their job, the emptiness assertion is scoped to the day, and the shots default is outside the repository.`);
 return { bad, total: CASES.length + KINDS.length + 1 };
 }
 
