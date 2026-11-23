@@ -19,11 +19,12 @@ const COUNT_JS = fs.readFileSync(new URL('../../docs/milestones/m04/tasks/m04-t0
 /* `rpc` is the page's own `PUBLIC_RPC` entry for that chain, not a favourite of mine: the injected
    provider has to read what the page reads, or the run measures the endpoint rather than the
    document. **Both changed in m05-t01d step 5**, measured rather than chosen — 84532 from
-   `sepolia.base.org`, whose 200-block window is #382, and 11155111 from publicnode, which serves
-   10,000 blocks of depth against Tenderly's 5,000,000. If `PUBLIC_RPC` moves again, these move with
-   it; a mismatch here makes every history row a measurement of the wrong endpoint. */
+   `sepolia.base.org`, whose 200-block window is #382. **11155111 is unchanged**: Tenderly measured
+   far deeper and then never filled the landing page in a browser, which this driver is how we found
+   out. If `PUBLIC_RPC` moves again, these move with it; a mismatch here makes every history row a
+   measurement of the wrong endpoint. */
 const CHAINS = {
-  11155111: { name: 'sepolia', rpc: 'https://sepolia.gateway.tenderly.co', receiver: '0xC5593d2aa5f89fDaBE6e298b4AC38ad1E50D7C95' },
+  11155111: { name: 'sepolia', rpc: 'https://ethereum-sepolia-rpc.publicnode.com', receiver: '0xC5593d2aa5f89fDaBE6e298b4AC38ad1E50D7C95' },
   84532: { name: 'base sepolia', rpc: 'https://base-sepolia-rpc.publicnode.com', receiver: '0x869DFe837B8dB2819027E53d75C20bE31f13acD2' },
 };
 const EXEC = process.env.RAKE_UAT_CHROME || `${process.env.HOME}/.cache/ms-playwright/chromium-1243/chrome-linux-arm64/chrome`;

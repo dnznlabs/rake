@@ -142,7 +142,21 @@ export async function probe(page, { base }) {
   return r;
 }
 
-export async function rowA(page, { chainName, wallet }) {
+export async function rowA(page, { chainName, wallet, patience = 60000 } = {}) {
+  /* **The featured panel is filled asynchronously, so it is waited for and not merely read.** This
+     row used to read it the instant the load event fired, which passed only because the endpoint it
+     was pointed at happened to answer inside that window. Repointing 11155111 at Tenderly in
+     m05-t01d step 5 made it fail with an empty panel — and the failure was the driver's, not the
+     page's: the panel filled a moment later. A row that depends on which endpoint is fast is not an
+     assertion about the document.
+
+     It is the same gap row (c)'s comment describes: painted is not filled. The timeout is the
+     finding if it expires — an endpoint too slow to fill the landing page inside a minute is worth
+     failing on, and it fails saying so rather than reporting an empty string. */
+  await until('(a) the featured panel fills', async () => {
+    const t = await text(page, '#featured');
+    return t.length > 0 && !/^(loading…|reading…)$/i.test(t);
+  }, { ms: patience, every: 1000 });
   const r = await page.evaluate(() => ({
     title: document.title,
     netname: document.getElementById('netname')?.textContent?.trim() ?? null,
