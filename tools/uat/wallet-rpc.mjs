@@ -24,9 +24,11 @@
  * 200-block endpoint the press cannot finish, and the requirement is that it fails without taking the
  * day with it.
  *
- * Exit: 0 when no section reads `history unavailable` and a `distribute` control is present,
- *       1 when either fails, 2 on a usage or build error. With `--pre-400`, 1 is the expected
- *       outcome and is reported as such — the driver says which result it was asked for.
+ * Exit: 0 when no section reads `history unavailable`, a `distribute` control is present, **and a
+ *       wallet page offers `load older`** — that last one because the run that found this defect
+ *       printed `load older presses : 0` beside a token list saying “use load older to read further
+ *       back”, and exited 0 anyway (the architect's review of #400). 1 when any of them fails, 2 on a
+ *       usage or build error. With `--pre-400`, 1 is the expected outcome and is reported as such.
  */
 import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
@@ -152,7 +154,15 @@ const browser = await chromium.launch({ executablePath: EXEC, headless: true });
 const ctx = await browser.newContext();
 const page = await ctx.newPage();
 const errors = [];
-page.on('pageerror', e => errors.push(String((e && e.message) || e).slice(0, 160)));
+/* A thrown value that is not an `Error` has no `message`, and `String()` of it reads `Object` — which
+   is what this printed the first time something rejected with a JSON-RPC error body. The shape of a
+   page error is part of the finding, so it is serialised rather than coerced. */
+const describeErr = e => {
+  if (e instanceof Error || (e && e.stack)) return String(e.message || e).slice(0, 200);
+  try { return JSON.stringify(e).slice(0, 200); } catch { return Object.prototype.toString.call(e); }
+};
+page.on('pageerror', e => errors.push(describeErr(e)));
+page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text().slice(0, 200)); });
 
 /* The page's own traffic, counted at the browser: whatever it sends to its own endpoint is a request
    the wallet did not serve, which is the whole point of #400. */
@@ -253,7 +263,13 @@ if (out.heads.length === 0 && !out.changes && !out.activity && !out.funds) {
 
 const unavailable = ['changes', 'activity'].filter(k => /history unavailable/.test(out[k]));
 const byMethod = [...wallet.byMethod].sort((a, b) => b[1] - a[1]).map(([m, n]) => `${m} ${n}`).join(', ');
-const ok = unavailable.length === 0 && out.distribute > 0 && (!pressed || !!pressed.skipped || pressed.dayKept);
+/* **A wallet page with no way down is a failure, not a detail.** Since #400 the first read is a day
+   deep for everyone, so unless the read reached the distribution's own first block there is history
+   below it and a wallet must be offered the press. Judged only on the post-#400 page: `--pre-400`
+   paints no history at all, where the absence of a press is a consequence and not the finding. */
+const noPress = !pre400 && unavailable.length === 0 && out.older === 0;
+const ok = unavailable.length === 0 && out.distribute > 0 && !noPress
+  && (!pressed || !!pressed.skipped || pressed.dayKept);
 
 console.log(`\n  chain                : ${chain}${pre400 ? '   (--pre-400: the first read routed through the wallet)' : ''}`);
 console.log(`  page endpoint        : ${pageRpc}`);
@@ -267,7 +283,7 @@ console.log(`  changes              : ${out.changes.slice(0, 90)}`);
 console.log(`  activity             : ${out.activity.slice(0, 90)}`);
 console.log(`  history unavailable  : ${unavailable.length ? unavailable.join(', ') : 'none'}`);
 console.log(`  DISTRIBUTE buttons   : ${out.distribute}`);
-console.log(`  load older presses   : ${out.older}`);
+console.log(`  load older presses   : ${out.older}${noPress ? '   ← a wallet page with history below the day must offer one' : ''}`);
 console.log(`  claims a 24h window  : ${/covers the last 24 hours/.test(out.funds)}`);
 if (pressed && pressed.skipped) console.log(`  press                : ${pressed.skipped}`);
 else if (pressed) {

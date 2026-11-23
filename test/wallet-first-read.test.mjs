@@ -75,6 +75,11 @@ const FIRST_READ = expr('history(addr, from, hi, pageRead())');
 const PRESS_READ = expr('histLogs(d.addr, from, to, WALLET ? P : pageRead())');
 /* The whole first-read expression, including what it records about itself. */
 const FIRST_READ_FULL = expr('history(addr, from, hi, pageRead()).then(h => ({ ...h, from, whole: from <= ownFloor(d) }))');
+/* The `Created` scan behind the “mine” tab, which is the one log read that stays on the wallet. */
+const MINE_READ = expr("logs(CFG.factory, [topic('Created(address,address)'), null, word(ACC)], CFG.factoryBlock, null, P)");
+/* The two block-header reads the day floor is built from. Both belong to the document's chain. */
+const HEAD_READ = expr("pageRead().request({ method: 'eth_blockNumber' })");
+const TS_READ = expr("pageRead().request({ method: 'eth_getBlockByNumber', params: ['0x' + n.toString(16), false] })");
 
 const ADDR = '0x00A90943f58b6Ab7fdE05aAE01C13a80e6995BaE';
 /* The per-chain start windows, read out of the page. A walk that took its width from `P` instead of
@@ -123,6 +128,38 @@ test('with no wallet to press through, the press reads the page\'s provider', ()
 });
 
 /* ── the report itself: a wallet endpoint that refuses every log query ─────────────────────────── */
+
+test('the “mine” tab keeps reading through the wallet, where the depth is (review of #400)', () => {
+  /* **Not the page's provider**, which is where I had wrongly put it. The scan starts at the factory
+     block and no 24-hour floor bounds it, while our own mainnet endpoint serves about 10,000 blocks —
+     so through the page this list would hold only what an account created in the last day and a half
+     and still call itself “mine”. #400 is about the first screen never being worse with a wallet; a
+     tab that exists because an account is connected is not the first screen. */
+  const readP = { tag: 'page read provider' };
+  const walletP = { tag: "the wallet's own provider" };
+  let got;
+  new Function('logs', 'pageRead', 'P', 'CFG', 'topic', 'word', 'ACC',
+    `return ${MINE_READ};`)((...a) => { got = a[a.length - 1]; }, () => readP, walletP,
+    { factory: '0xf', factoryBlock: 0 }, () => '0x0', () => '0x0', ADDR);
+
+  assert.equal(got, walletP, 'the Created scan is the wallet’s read, and its reach is the point of it');
+  assert.notEqual(got, readP);
+});
+
+test('the day floor is read through the page, both of its block reads (review of #400)', () => {
+  /* Asserted as the lifts above: five `eth_getBlockByNumber` a page load went to the wallet before
+     this, and `head()`’s `eth_blockNumber` is the first read of the walk — one without the other
+     leaves the day search depending on the wallet for a block number. `test/day-read.test.mjs` has
+     the behavioural half: a wallet refusing headers still gets its day, exactly. */
+  assert.ok(HEAD_READ && TS_READ, 'both header reads name the page’s provider');
+  /* And neither of them goes through `P` any more. The whole declaration is checked, not the file: a
+     `P.request` somewhere else in the page is nothing to do with the floor. */
+  const headDecl = SHIPPED.slice(SHIPPED.indexOf('const head = () =>'), SHIPPED.indexOf('\n', SHIPPED.indexOf('const head = () =>')));
+  const tsDecl = SHIPPED.slice(SHIPPED.indexOf('const tsOf = async n => {'), SHIPPED.indexOf('\n};', SHIPPED.indexOf('const tsOf = async n => {')));
+  for (const [what, text] of [['head()', headDecl], ['tsOf', tsDecl]]) {
+    assert.doesNotMatch(text, /\bP\.request\b/, `${what} must not read through the wallet's provider`);
+  }
+});
 
 test('the first read records which floor it asked for, not that it read everything', async () => {
   /* A finished span is not a finished history since #400 — a day read finishes its span every time.

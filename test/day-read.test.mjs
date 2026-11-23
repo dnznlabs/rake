@@ -36,6 +36,7 @@ const line = (anchor, from = SHIPPED) => {
 
 const DAY_SECONDS = line('const DAY_SECONDS =');
 const SEED_FLOOR = line('const seedFloor = hi =>');
+const DAY_EXACT = line('let DAY_EXACT =');
 const DAY_STEPS = line('const DAY_STEPS =');
 const NOMINAL_SEC = line('const NOMINAL_SEC =');
 const TS_TOLERANCE = line('const TS_TOLERANCE =');
@@ -51,10 +52,16 @@ const READ_WHOLE = line('const readWhole = () =>');
 const DAY_HEAD = block('const dayHead = full =>', "'about the last 24 hours';\n");
 
 /** A synthetic chain: block `n` has timestamp `n * sec`, and every header read is counted. */
-function chain({ sec, head, floor = 0, chainId = 1, nominal = null, missing = null }) {
+function chain({ sec, head, floor = 0, chainId = 1, nominal = null, missing = null, walletRefuses = false }) {
   const reads = [];
+  const walletReads = [];
   const src = `
-    const P = {
+    /* **Two providers, because the page has two** (#400, the architect's review). \`tsOf\` reads the
+       day floor through the page's own provider, so the answering stub below is reached by
+       \`pageRead()\` and the wallet's \`P\` records \`\u2014 and, when a test asks, refuses \`\u2014 anything that
+       arrives at it. The floor is a fact about the document's chain, and before this review five
+       header reads a page load went to whichever endpoint a wallet had picked. */
+    const pageP = {
       request: async ({ method, params }) => {
         if (method !== 'eth_getBlockByNumber') throw new Error('unexpected ' + method);
         const n = parseInt(params[0], 16);
@@ -66,6 +73,14 @@ function chain({ sec, head, floor = 0, chainId = 1, nominal = null, missing = nu
         return { timestamp: '0x' + Math.round(n * SEC).toString(16) };
       },
     };
+    const P = {
+      request: async ({ method, params }) => {
+        WALLET_READS.push(method);
+        if (WALLET_REFUSES) throw { code: 35, message: 'chain is not available on free plan, please upgrade to paid plan' };
+        return pageP.request({ method, params });
+      },
+    };
+    const pageRead = () => pageP;
     ${DAY_SECONDS}
     ${TS_TOLERANCE}
     ${DAY_STEPS}
@@ -74,6 +89,7 @@ function chain({ sec, head, floor = 0, chainId = 1, nominal = null, missing = nu
     /* A deliberately wrong seed when a test asks for one: the architect's bound has to hold when the
        nominal figure is out by a factor of ten, which is exactly what a stale Base entry would be. */
     if (NOMINAL_IN != null) NOMINAL_SEC[CHAIN_ID] = NOMINAL_IN;
+    ${DAY_EXACT}
     ${TS_OF}
     ${SEED_FLOOR}
     ${DAY_FLOOR}
@@ -82,10 +98,11 @@ function chain({ sec, head, floor = 0, chainId = 1, nominal = null, missing = nu
     let WALLET = WALLET_IN;
     ${OWN_FLOOR}
     ${READ_FLOOR}
-    return { dayFloor, readFloor, reads: () => READS, exact: () => DAY_EXACT };
+    return { dayFloor, readFloor, reads: () => READS, walletReads: () => WALLET_READS, exact: () => DAY_EXACT };
   `;
-  return { ...new Function('READS', 'SEC', 'FLOOR', 'WALLET_IN', 'CHAIN_ID', 'NOMINAL_IN', 'MISSING', src)(
-    reads, sec, floor, false, chainId, nominal, missing), reads };
+  return { ...new Function('READS', 'SEC', 'FLOOR', 'WALLET_IN', 'CHAIN_ID', 'NOMINAL_IN', 'MISSING',
+    'WALLET_READS', 'WALLET_REFUSES', src)(
+    reads, sec, floor, false, chainId, nominal, missing, walletReads, walletRefuses), reads, walletReadsArr: walletReads };
 }
 
 test('a day is found from timestamps, on a 12-second chain and a 0.2-second one alike', async () => {
@@ -122,6 +139,22 @@ test('a history younger than a day is read whole, and costs two reads', async ()
   const got = await c.dayFloor(head, head - 100);
   assert.equal(got, head - 100, 'there is nothing to cut, so the floor is the distribution itself');
   assert.equal(c.reads.length, 2, 'the head and the floor, and no search at all');
+});
+
+test('the day search goes to the page, not to the wallet (#400, the review)', async () => {
+  /* Five `eth_getBlockByNumber` a page load went to the wallet's endpoint before this, because `tsOf`
+     read through `P`. The floor is a fact about the document's chain, so an endpoint a wallet happened
+     to pick cannot be what decides it — and an endpoint that refuses block headers must not be able to
+     take the day search down. `1rpc.io/sepolia` refuses exactly that on its free plan. */
+  const head = 20_000_000;
+  const c = chain({ sec: 12, head, chainId: 1, walletRefuses: true });
+
+  const got = await c.readFloor({ addr: '0xabc' }, head);
+
+  assert.equal(got, head - 7_200, 'the day is found through the page, and found exactly');
+  assert.ok(c.exact(), 'so the heading may claim the day rather than "about"');
+  assert.deepEqual(c.walletReads(), [], 'and not one header read reached the wallet');
+  assert.ok(c.reads.length > 0, "while the page's own provider is what answered");
 });
 
 test('the floor never goes below the distribution own first block', async () => {
@@ -351,11 +384,14 @@ test('a chain that stalls the secant falls back to bisection and still converges
   const tOf = n => n <= KNEE ? n : KNEE + (n - KNEE) * 10_000;
   const reads = [];
   const src = `
-    const P = { request: async ({ params }) => {
+    const pageP = { request: async ({ params }) => {
       const n = parseInt(params[0], 16);
       READS.push(n);
       return { timestamp: '0x' + TOF(n).toString(16) };
     } };
+    /* The day search reads through the page's provider (#400), so that is what answers here. */
+    const pageRead = () => pageP;
+    const P = { request: async () => { throw new Error('the day search must not reach the wallet'); } };
     ${DAY_SECONDS}
     ${TS_TOLERANCE}
     ${DAY_STEPS}

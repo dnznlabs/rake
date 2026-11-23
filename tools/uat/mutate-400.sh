@@ -51,7 +51,7 @@ run "first read routed back through the wallet (P)" \
 run "press routed through the page instead of the wallet" \
     'histLogs(d.addr, from, to, WALLET ? P : pageRead())' 'histLogs(d.addr, from, to, pageRead())'
 run "Created scan passes the provider one slot early" \
-    'CFG.factoryBlock, null, pageRead())' 'CFG.factoryBlock, pageRead())'
+    'CFG.factoryBlock, null, P)' 'CFG.factoryBlock, P)'
 run "the walk takes its window from P again, not its argument" \
     'let size = (prov && prov.logWindow) || WINDOW_START' 'let size = (P && P.logWindow) || WINDOW_START'
 run "window1 ignores its provider argument" \
@@ -87,3 +87,14 @@ run "the seam skips one block, so an event is lost" \
     'const to = (DS.h.partial != null ? DS.h.partial : DS.h.from) - 2;'
 run "the join puts the halves back in the wrong order" \
     'logs: [...older_.logs, ...newer_.logs]' 'logs: [...newer_.logs, ...older_.logs]'
+
+# The architect's review, 2026-11-23: the day floor's two block reads belong to the page's chain, and
+# the Created scan behind the "mine" tab belongs to the wallet, where the depth is.
+run "the day floor is read through the wallet again" \
+    "const b = await pageRead().request({ method: 'eth_getBlockByNumber'" \
+    "const b = await P.request({ method: 'eth_getBlockByNumber'"
+run "the chain head is read through the wallet again" \
+    "HEAD = pageRead().request({ method: 'eth_blockNumber' })" \
+    "HEAD = P.request({ method: 'eth_blockNumber' })"
+run "the mine tab is moved to the page, where it cannot see far enough" \
+    "CFG.factoryBlock, null, P);" "CFG.factoryBlock, null, pageRead());"

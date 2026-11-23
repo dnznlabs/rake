@@ -578,7 +578,12 @@ let HEAD = null;
 /* #243 part 2: the block the route's own read was made at, under the nav beside the control that
    re-makes it. Written wherever the head resolves, which is every route that reads one. */
 const stamp = n => { const el = document.getElementById('asof'); if (el) el.textContent = `as of block ${n}`; };
-const head = () => HEAD ?? (HEAD = P.request({ method: 'eth_blockNumber' }).then(h => { const n = parseInt(h, 16); stamp(n); return n; }));
+/* **The chain's head belongs to the chain, so the page's own provider reads it** (#400, the
+   architect's review). It used to go through `P`, which is a wallet's endpoint when one is connected,
+   and this is the first read of every history walk: an endpoint that will not answer it stops the day
+   read before the floor search begins. Moved together with `tsOf` below — one without the other
+   leaves the walk still depending on the wallet for a block number. */
+const head = () => HEAD ?? (HEAD = pageRead().request({ method: 'eth_blockNumber' }).then(h => { const n = parseInt(h, 16); stamp(n); return n; }));
 /* **The last 24 hours, for a visitor with no wallet** (step 5, amended by the Product Owner's ruling
    of 2026-11-23). The aim is no longer to read as deep as the endpoint allows: it is to read a day and
    say so. A day is a span of *time*, and these chains do not agree on what a block costs — Ethereum
@@ -624,8 +629,14 @@ let DAY_EXACT = true;
    `null.timestamp` threw, the floor search rejected, and all three sections painted
    `history unavailable`, which is the outcome reserved for an endpoint that answered nothing at all.
    A missing block is now a `null` the caller steps around. */
+/* **Through the page's own provider** (#400, the architect's review). The day floor is a fact about
+   the document's chain, not about whichever endpoint a wallet picked, and reading it through the
+   wallet put five `eth_getBlockByNumber` on the wallet's endpoint on every wallet page load — so an
+   endpoint that refuses block headers took the day search down with it, which is the same defect as
+   the history read this amendment moved. #375's rule: what belongs to the page's chain is read from
+   the page's chain. */
 const tsOf = async n => {
-  const b = await P.request({ method: 'eth_getBlockByNumber', params: ['0x' + n.toString(16), false] });
+  const b = await pageRead().request({ method: 'eth_getBlockByNumber', params: ['0x' + n.toString(16), false] });
   return b && b.timestamp != null ? Number(BigInt(b.timestamp)) : null;
 };
 /** The first block at or after `hi`'s timestamp minus a day, never below `floor`. */
@@ -2847,9 +2858,13 @@ function paintCreate(st) {
 /* `mine` is the factory's `Created` logs with the connected account in the owner topic, each hit
    confirmed against `snapshot().owner` — ownership can have moved since the log was written. */
 async function mine() {
-  /* The page's own chain is being asked which distributions an account made, so it is the page's
-     provider that answers — the same rule as the three reads #375 moved. */
-  const found = await logs(CFG.factory, [topic('Created(address,address)'), null, word(ACC)], CFG.factoryBlock, null, pageRead());
+  /* **The wallet's provider, explicitly** (the architect's review of #400). This is the one read that
+     is better off on the wallet's endpoint: it scans from the factory block, which no 24-hour floor
+     bounds, and our own mainnet endpoint serves about 10,000 blocks — so reading it through the page
+     would list only what an account created in the last day and a half and call that "mine". #400 is
+     about the *first screen* never being worse with a wallet; a tab that exists because an account is
+     connected is not that, and its depth is the wallet's to give. */
+  const found = await logs(CFG.factory, [topic('Created(address,address)'), null, word(ACC)], CFG.factoryBlock, null, P);
   const addrs = found.logs.map(l => { const a = Eth.dec(['address'], l.topics[1])[0]; FIRST.set(a, l.blockNumber); return a; });
   const rows = await Promise.all(addrs.map(async a => {
     const d = await loadDistro(a);
