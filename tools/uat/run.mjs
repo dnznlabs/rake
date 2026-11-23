@@ -16,12 +16,15 @@ import { check } from './selftest.mjs';
 import * as R from './rows.mjs';
 const COUNT_JS = fs.readFileSync(new URL('../../docs/milestones/m04/tasks/m04-t05/count.js', import.meta.url), 'utf8');
 
-/* `rpc` is the page's own `PUBLIC_RPC` entry for that chain (`app/src/index.html:112`), not a
-   favourite of mine: the injected provider has to read what the page reads, or the run measures the
-   endpoint rather than the document. */
+/* `rpc` is the page's own `PUBLIC_RPC` entry for that chain, not a favourite of mine: the injected
+   provider has to read what the page reads, or the run measures the endpoint rather than the
+   document. **Both changed in m05-t01d step 5**, measured rather than chosen — 84532 from
+   `sepolia.base.org`, whose 200-block window is #382, and 11155111 from publicnode, which serves
+   10,000 blocks of depth against Tenderly's 5,000,000. If `PUBLIC_RPC` moves again, these move with
+   it; a mismatch here makes every history row a measurement of the wrong endpoint. */
 const CHAINS = {
-  11155111: { name: 'sepolia', rpc: 'https://ethereum-sepolia-rpc.publicnode.com', receiver: '0xC5593d2aa5f89fDaBE6e298b4AC38ad1E50D7C95' },
-  84532: { name: 'base sepolia', rpc: 'https://sepolia.base.org', receiver: '0x869DFe837B8dB2819027E53d75C20bE31f13acD2' },
+  11155111: { name: 'sepolia', rpc: 'https://sepolia.gateway.tenderly.co', receiver: '0xC5593d2aa5f89fDaBE6e298b4AC38ad1E50D7C95' },
+  84532: { name: 'base sepolia', rpc: 'https://base-sepolia-rpc.publicnode.com', receiver: '0x869DFe837B8dB2819027E53d75C20bE31f13acD2' },
 };
 const EXEC = process.env.RAKE_UAT_CHROME || `${process.env.HOME}/.cache/ms-playwright/chromium-1243/chrome-linux-arm64/chrome`;
 /* `cast` is the caller's to provide now that it comes from `PATH`, so say so once here rather than
@@ -58,10 +61,13 @@ const base = (arg('base', 'https://rake.dnzn.dev')).replace(/\/$/, '') + `/${cha
 const control = flag('control');
 const shotsDir = arg('shots', path.resolve('../../docs/milestones/m04/tasks/m04-t05/shots', control ? 'control' : String(chainId)));
 
-/* `--rows` runs a named subset, which is how 84532 is driven: its history rows cannot pass while
-   #382 stands, and the step's amended criterion (rake#383) has the driver run (a), (l), (w3) and the
-   probe there while the rest go in the handoff as not met with that cause. A subset invocation names
-   itself in the summary, so a reader can see which rows ran rather than inferring it from a count. */
+/* `--rows` runs a named subset. It existed because **84532's history rows could not pass while #382
+   stood** — rake#383 amended step 9a to run (a), (l), (w3) and the probe there and record the rest as
+   not met with that cause. **m05-t01d removes that reason**: 84532 reads through
+   `base-sepolia-rpc.publicnode.com` at 50,000-block windows, and a refusal that does arrive is a
+   boundary line rather than a dead section, so `--chain 84532` runs the full list like any other
+   chain. The flag stays for driving one row while working on it. A subset invocation names itself in
+   the summary, so a reader can see which rows ran rather than inferring it from a count. */
 const ROWS = ['probe', 'a', 'c', 'c-console-first', 'e', 'd', 'k', 'l', 'f', 'g', 'h', 'i', 'j', 'a-nowallet', 'w3'];
 const only = (arg('rows', '') || '').split(',').map(s => s.trim()).filter(Boolean);
 for (const id of only) if (!ROWS.includes(id)) { console.error(`run.mjs: --rows names ${id}, which is not a row (${ROWS.join(', ')})`); process.exit(2); }

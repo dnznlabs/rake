@@ -16,7 +16,19 @@ export const DOCS_SECTIONS = 15;
    is how `/block (\d+)/` shipped as `/block (\\d+)/` and left row (e) unable to fail. `selftest.mjs`
    runs these against real lines. */
 export const PATTERNS = {
+  /* One place for every row-kind pattern, so the driver and `selftest.mjs` cannot disagree about
+     what a row looks like (m05-t01d step 8). */
   partialLine: 'history before block \\d+ not loaded',
+  /* A read can stop short in four ways since step 5, and three of them print a line: out of budget
+     ("…not loaded · load older"), a depth refusal ("…not loaded · this endpoint serves no history
+     before block N"), and a throttle ("this endpoint is limiting requests · history before block N
+     is not loaded yet"). The fourth, an endpoint that answered nothing, prints `unavailable` below
+     and is a failure rather than a boundary. This matches the three that are boundaries — note the
+     throttle's wording differs, which is why `partialLine` alone no longer covers them. */
+  boundaryLine: 'history before block \\d+ (?:not loaded|is not loaded yet)',
+  /* The one line that is never acceptable: the page saying an endpoint answered nothing at all. */
+  unavailable: 'history unavailable',
+  activityRow: '(^|\\s)(in|distributed|escrowed|released|claimed)\\s',
   blockNumber: 'block (\\d+)',
   loadingNotice: '^(loading…|reading the balances and the escrow…|reading…)$',
 };
@@ -60,7 +72,7 @@ export async function until(label, fn, { ms = 120000, every = 1000 } = {}) {
    the page re-read the view, and during the repaint a row that is still there reads as absent. The
    predicate must hold on two consecutive reads of a section that is itself painted — this section,
    not all three, because requiring the whole page quiet made one row wait out another's churn. */
-export async function settledText(page, sel, test, { label, ms = 300000, every = 2500 } = {}) {
+export async function settledText(page, sel, test, { label, ms = 300000, every = 2500, fatal = PATTERNS.unavailable } = {}) {
   let hits = 0, last = '';
   await until(label || `${sel} settled`, async () => {
     const state = await page.evaluate(([s, pats]) => {
@@ -71,6 +83,14 @@ export async function settledText(page, sel, test, { label, ms = 300000, every =
     }, [sel, PATTERNS]);
     if (state !== 'painted') { hits = 0; return false; }
     last = await text(page, sel);
+    /* **`history unavailable` is final, so it fails here and not in five minutes.** It is the page
+       saying an endpoint answered nothing at all; waiting for that to improve is waiting for a
+       different endpoint. The old behaviour spent the whole 300-second budget on it and then
+       reported "still not true after 301 s", which reads as a slow read rather than as the refusal
+       it is — and three of those in one run is fifteen minutes of a driver telling you nothing. */
+    if (fatal && new RegExp(fatal, 'i').test(last)) {
+      throw new Miss(label || sel, 'the section reads `history unavailable`, which no amount of waiting changes', last.slice(0, 120), 'rows, or a boundary line');
+    }
     hits = test(last) ? hits + 1 : 0;
     return hits >= 2;
   }, { ms, every });
@@ -180,9 +200,14 @@ export async function rowC(page, { base, addr = DNZN, patience = 120000, relatio
      rows, so a single read lands in that gap — which is how `activity carries at least one row` failed
      on a page whose activity, read seconds later, carried six. Each section is read until its own
      predicate holds twice (`settledText`), and only then are the facts taken. */
-  await settledText(page, '#h-funds', t => !/history unavailable/i.test(t) && /(^|\s)(in|distributed|escrowed|released|claimed)\s/i.test(t),
-    { label: '(c) `activity` carries at least one row and is not the #382 notice' });
-  await settledText(page, '#h-changes', t => !/history unavailable/i.test(t) && (/created/i.test(t) || /no change has been queued yet/i.test(t)),
+  /* **A boundary line is accepted, and a row is still required** (step 5, step 8). The page may
+     honestly stop short — out of budget, or refused older blocks, or throttled — and say so; what it
+     may not do is show nothing and call that history. So the predicate asks for an activity row and
+     tolerates whatever stop line sits under it; `settledText` fails at once on `history unavailable`,
+     which is the one state no waiting improves. */
+  await settledText(page, '#h-funds', t => new RegExp(PATTERNS.activityRow, 'i').test(t),
+    { label: '(c) `activity` carries at least one row' });
+  await settledText(page, '#h-changes', t => /created/i.test(t) || /no change has been queued yet/i.test(t),
     { label: '(c) `changes` reads the empty line this distribution has, or a Created row' });
   const r = await page.evaluate(() => ({
     view: (document.getElementById('view')?.innerText || '').replace(/\s+/g, ' ').trim(),
@@ -195,9 +220,9 @@ export async function rowC(page, { base, addr = DNZN, patience = 120000, relatio
   }));
   has('c', 'the description', r.view, 'DNZN // FUND DISTRIBUTION');
   has('c', 'the table', r.view, 'treasury');
-  falsy('c', '`activity` is not the #382 notice', /history unavailable/i.test(r.activity));
-  falsy('c', '`changes` is not the #382 notice', /history unavailable/i.test(r.changes));
-  truthy('c', '`activity` carries at least one row', /(^|\s)(in|distributed|escrowed|released|claimed)\s/i.test(r.activity));
+  falsy('c', '`activity` is not the #382 notice', new RegExp(PATTERNS.unavailable, 'i').test(r.activity));
+  falsy('c', '`changes` is not the #382 notice', new RegExp(PATTERNS.unavailable, 'i').test(r.changes));
+  truthy('c', '`activity` carries at least one row', new RegExp(PATTERNS.activityRow, 'i').test(r.activity));
   has('c', '`changes` reads the empty line this distribution has', r.changes, 'no change has been queued yet');
   if (relation) {
     if (relation.expect === 'vault') {

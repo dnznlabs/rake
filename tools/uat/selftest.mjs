@@ -18,6 +18,21 @@ const CASES = [
   ['loadingNotice', 'loading…', true],
   ['loadingNotice', 'reading the balances and the escrow…', true],
   ['loadingNotice', 'history unavailable', false],
+  /* The three stop lines step 5 can print, each read from the page's own wording. A boundary is
+     acceptable to row (c); `unavailable` never is, and the driver fails on it at once rather than
+     waiting out five minutes for a refusal to improve. */
+  ['boundaryLine', 'history before block 12181673 not loaded · load older', true],
+  ['boundaryLine', 'history before block 900000 not loaded · this endpoint serves no history before block 900000. A connected wallet reads through its own endpoint, which may go further.', true],
+  ['boundaryLine', 'this endpoint is limiting requests · history before block 12181673 is not loaded yet · load older', true],
+  ['boundaryLine', 'nothing has arrived at this address yet.', false],
+  ['boundaryLine', 'history unavailable', false],
+  ['unavailable', 'history unavailable — the token list and the escrow rows are read from the logs.', true],
+  ['unavailable', 'history before block 12181673 not loaded · load older', false],
+  /* The activity-row pattern, which row (c) now asks for *alongside* a boundary line rather than
+     instead of one: a page may honestly stop short and say so, but it may not show nothing. */
+  ['activityRow', 'in Ξ0.0030 from 0x5A15…C50d ↗ block 12192083 history before block 12181673 not loaded · load older', true],
+  ['activityRow', 'this endpoint is limiting requests · history before block 12181673 is not loaded yet', false],
+  ['activityRow', 'history unavailable', false],
 ];
 
 /* The row-kind patterns live in node, so they are tested as literals — including the two the
