@@ -68,18 +68,25 @@ with no wallet, and this task does not pretend one does.
      the four outcomes already built say why.
    - **Wallet connected, on the page's chain:** as today, through the wallet's provider, with
      `load older`.
-   - **Escrow does not depend on the scan.** For every account in the table, the page reads
-     `escrowed(token, account)` for native ETH from state and paints the row with its `release`
-     and `claim` controls whenever it is above zero, wallet or not. Escrow found through logs
-     is added to that, not required for it. An escrow of an account no longer in the table, or
-     in a token, is still found only through logs; the funds block says so in one line when no
-     wallet is connected.
+   - **Hidden escrow is detected exactly, from state.** The amount of an escrow is already
+     read from state; only finding which account holds one comes from `Escrowed` logs, and
+     `_set` never clears `escrowed`, so an escrow outlives its account's removal from the
+     table. `reserved[token]` is the exact outstanding total and the page already reads it. So,
+     for native ETH and for each token the page already shows: compare `reserved` with the sum
+     of the escrow rows found. When they are equal nothing more is read. When `reserved` is
+     larger, read `escrowed(token, account)` for the accounts in the table, at most four calls
+     in flight (the table can hold 107 rows), and paint a row with its `release` and `claim`
+     controls for each above zero. Whatever is still unaccounted for is stated with its amount:
+     that much is held in escrow that this endpoint cannot list, and a connected wallet can.
+     Never a silent absence, and never the fan-out when nothing is hidden.
    - **Withdrawn:** the two parts below headed "one in-flight limit" and "mainnet at full
      budget" ([#392](https://github.com/dnznlabs/rake/pull/392), merged the same day, before
      this ruling): a 24-hour read does not make the burst they answer. Also withdrawn: the second `tools/rpc-depth.mjs` table as a gate on the calldata. The
      endpoints chosen and the start window stay as built.
    - **Check:** tests for the 24-hour floor from timestamps, both lines, no press without a
-     wallet, and an escrow row painted from state with the log read refused. Then
+     wallet; and for escrow with the log read refused: equal totals make no extra call, a
+     table account's escrow is painted with its controls, a removed account's is stated by
+     amount, and no more than four calls are in flight on a 107-row table. Then
      `tools/uat/cold.mjs` on all four chains, ten loads each after two quiet hours: the
      24-hour read completes in at least 9 of 10, and the handoff gives the request count per
      load per chain.
@@ -150,7 +157,7 @@ with no wallet, and this task does not pretend one does.
 - `devbox run -- make test` passes with the tests of steps 2 to 7 in it.
 - On all four chains, with no wallet, a distribution page reads its last 24 hours in at least
   9 of 10 cold loads in a browser, says **last 24 hours** and **connect a wallet to load more**,
-  and shows an escrow held for a table account with the log read refused. A screenshot per
+  and never shows less escrow than `reserved` says is held without stating the difference. A screenshot per
   chain. (Amended 2026-11-23; it read "paints its boundary line at that depth".)
 - `tools/uat/`'s driver exits 0 on Sepolia **and on Base Sepolia** against
   `https://rake.dnzn.dev`, full list, and exits 1 on the control on both. This closes the rows
