@@ -582,42 +582,66 @@ const head = () => HEAD ?? (HEAD = P.request({ method: 'eth_blockNumber' }).then
 /* **The last 24 hours, for a visitor with no wallet** (step 5, amended by the Product Owner's ruling
    of 2026-11-23). The aim is no longer to read as deep as the endpoint allows: it is to read a day and
    say so. A day is a span of *time*, and these chains do not agree on what a block costs — Ethereum
-   spends about 12 seconds a block and Base about **0.2**, so a figure in blocks that is a day on one
-   is five minutes on the other, and the amendment forbids assuming one at all.
+   spends about 12 seconds a block and Base about **0.2** — so the floor cannot be a constant.
 
-   So the floor is found from timestamps, by secant steps: each guess uses the rate **measured across
-   the current bracket** from two real headers, never a constant. Typically two to four reads — a plain
-   bisection over a million-block range costs about twenty, which is more than the read it precedes.
+   **Seed, then confirm** (the architect's ruling, 2026-11-23): a nominal block time is allowed as a
+   first guess and never as the answer. So the search starts at `head - a day / nominal`, reads the
+   timestamp there, and corrects by secant steps that use the rate **measured between two real
+   headers**. At most `DAY_STEPS` reads; if that has not converged it falls back to bisection, which
+   cannot fail to, rather than iterating a secant that is not settling.
 
    The tolerance is a minute. "The last 24 hours" is a statement about a day, and a block either side
    of the mark changes nothing a reader can see, so paying extra reads to land exactly is waste. */
 const DAY_SECONDS = 86_400;
 const TS_TOLERANCE = 60;
+const DAY_STEPS = 4;
+/* A **seed only**. Wrong by a factor of ten on either Base chain if ever stale, which is why the
+   search confirms it against a real timestamp and corrects; `test/day-read.test.mjs` proves a seed
+   that is wrong tenfold still lands inside the bound. 12 is the fallback for a chain not listed. */
+const NOMINAL_SEC = { 1: 12, 8453: 0.2, 11155111: 12, 84532: 0.2 };
 const tsOf = async n => Number(BigInt((await P.request({
   method: 'eth_getBlockByNumber', params: ['0x' + n.toString(16), false],
 })).timestamp));
 /** The first block at or after `hi`'s timestamp minus a day, never below `floor`. */
 async function dayFloor(hi, floor) {
-  const target = (await tsOf(hi)) - DAY_SECONDS;
-  let a = floor, ta = await tsOf(floor), b = hi, tb = target + DAY_SECONDS;
+  const tHi = await tsOf(hi);
+  const target = tHi - DAY_SECONDS;
+  let a = floor, ta = await tsOf(floor), b = hi, tb = tHi;
   // The whole history is younger than a day, so there is nothing to cut: read all of it.
   if (ta >= target) return floor;
-  for (let i = 0; i < 8 && b - a > 1; i++) {
-    const rate = (tb - ta) / (b - a);
-    let guess = rate > 0 ? Math.round(b - (tb - target) / rate) : Math.floor((a + b) / 2);
-    guess = Math.min(b - 1, Math.max(a + 1, guess));
+  const nominal = NOMINAL_SEC[Number(CFG.chainId)] || 12;
+  let guess = Math.min(b - 1, Math.max(a + 1, hi - Math.round(DAY_SECONDS / nominal)));
+  for (let i = 0; i < DAY_STEPS; i++) {
     const tg = await tsOf(guess);
     if (Math.abs(tg - target) <= TS_TOLERANCE) return guess;
     if (tg >= target) { b = guess; tb = tg; } else { a = guess; ta = tg; }
+    if (b - a <= 1) return b;
+    // The next guess uses the rate between the two headers now bracketing the target, not the seed's.
+    const rate = (tb - ta) / (b - a);
+    guess = rate > 0 ? Math.round(b - (tb - target) / rate) : Math.floor((a + b) / 2);
+    guess = Math.min(b - 1, Math.max(a + 1, guess));
+  }
+  /* Not converged inside the bound — a chain whose rate changed sharply inside the bracket. Bisection
+     is slower per step and cannot fail, which is the right trade once the cheap method has had its
+     four tries. The bracket is already narrowed, so this is short. */
+  while (b - a > 1) {
+    const mid = Math.floor((a + b) / 2);
+    const tm = await tsOf(mid);
+    if (tm >= target) { b = mid; } else { a = mid; }
   }
   return b;
 }
+/* Found once per page load and shared by all three log kinds: the floor is a property of the head,
+   and the head is read once per route entry. `route` clears it with `HEAD`, so a route entry searches
+   again rather than serving a floor computed against an older head. */
+let DAYFLOOR = null;
 /* Where a history read starts: the distribution's own first block, and for a visitor with no wallet
    the later of that and a day ago. A wallet reads as before, with its press — its endpoint is its
    own business and its depth is not ours to ration. */
 async function readFloor(d, hi) {
   const own = Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock));
-  return WALLET ? own : Math.max(own, await dayFloor(hi, own));
+  if (WALLET) return own;
+  return Math.max(own, await (DAYFLOOR ||= dayFloor(hi, own)));
 }
 /* A refusal, wherever the wallet put the text: MetaMask wraps the provider's JSON-RPC error and the
    message naming the cap can sit a level or two down from `message`. */
@@ -1465,6 +1489,16 @@ const press = () => WALLET ? ' · <button class="link older">load older</button>
    conditional on the read having stopped short: the day is the limit even when the day read cleanly,
    and a reader is owed the route to the rest either way. */
 const moreLine = () => WALLET ? '' : '<div class="help">connect a wallet to load more</div>';
+/* **What the heads may claim** (the architect's ruling, 2026-11-23: the heading must be true when
+   painted). With a wallet the sections are the whole history and keep their descriptive text. Without
+   one they are a day deep — but only if the read actually reached the day. Where it stopped short,
+   whether on a wall inside the day, a throttle or the budget, "last 24 hours" would be a claim the
+   page cannot support, and Ethereum makes that the ordinary case: its endpoint serves about 10,000
+   blocks and a day is about 7,171, so the margin is nine hours and a tightening would cross it.
+   The outcome line under the section names the block; this says only how far was reached. */
+const dayHead = full => WALLET ? full
+  : (DS.h && DS.h.partial != null) ? 'as far back as this endpoint served'
+  : 'last 24 hours';
 function partialLine() {
   if (!DS.h || DS.h.partial == null) return '';
   const w = DS.h.wall;
@@ -1915,7 +1949,7 @@ const closeDrawer = () => { PROPOSE = null; DRAWER = false; OWNOPEN = false; ACK
 /* After a write lands the view is re-read as the refresh control re-reads it, minus the scroll: the
    head is pulled again, or the history scan stops at the block before the write and its own row is
    missing until a manual refresh. */
-const bindAll = () => bindWrites(w => { if (w.sig === 'propose(bytes)') closeDrawer(); HEAD = null; TOKEN++; track(detail(DS.d.addr)); });
+const bindAll = () => bindWrites(w => { if (w.sig === 'propose(bytes)') closeDrawer(); HEAD = null; DAYFLOOR = null; TOKEN++; track(detail(DS.d.addr)); });
 
 /* Decision 7: who this page is for is decided once per load. The owner's own account sends directly;
    a contract owner that answers `isOwner(ACC)` gets the same view with every owner write rendered as
@@ -2095,8 +2129,8 @@ function paintDetail() {
     /* The head says what was read, not what exists: with no wallet these two sections are a day deep
        (step 5, amended), and a head promising "every change this contract has seen" over a day's worth
        of rows is the same wrong answer as an empty list stated as fact. */
-    + `<div class="sechead"><b>changes</b><span>${WALLET ? 'every configuration change this contract has seen' : 'last 24 hours'}</span></div><div id="h-changes">${notice('loading…')}</div>`
-    + `<div class="sechead"><b>activity</b><span>${WALLET ? 'funds in, and every split and escrow since' : 'last 24 hours'}</span></div><div id="h-funds">${notice('loading…')}</div></div>`;
+    + `<div class="sechead"><b>changes</b><span>${dayHead('every configuration change this contract has seen')}</span></div><div id="h-changes">${notice('loading…')}</div>`
+    + `<div class="sechead"><b>activity</b><span>${dayHead('funds in, and every split and escrow since')}</span></div><div id="h-funds">${notice('loading…')}</div></div>`;
   const q = document.getElementById('queue');
   if (q) q.onclick = () => { DRAWER = !DRAWER; if (DRAWER && !PROPOSE) PROPOSE = { rows: rowsFrom(d.table) }; paintDetail(); };
   if (DRAWER) bindDrawer(d);
@@ -2971,8 +3005,11 @@ const chrome = on => { for (const id of ['asof', 'refresh']) { const el = docume
 function route() {
   const h = location.hash || '#/';
   TOKEN++;
-  // A route entry re-pulls the head rather than serving the boot value; `refresh` is a route entry.
+  /* A route entry re-pulls the head rather than serving the boot value; `refresh` is a route entry.
+     The 24-hour floor goes with it: it is a block measured against a particular head, and serving one
+     found against an older head would read a window that is no longer the last day. */
   HEAD = null;
+  DAYFLOOR = null;
   document.getElementById('nav-distros').className = h.startsWith('#/distros') ? 'on' : '';
   document.getElementById('nav-docs').className = h.startsWith('#/docs') ? 'on' : '';
   chrome(!(h.startsWith('#/docs') || h === '#/create'));
