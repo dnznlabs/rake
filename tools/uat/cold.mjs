@@ -17,7 +17,13 @@
  * three log-built sections, which are classified into the four outcomes step 5 distinguishes.
  *
  * Usage: node tools/uat/cold.mjs [--chain 1,8453,11155111,84532] [--loads 10] [--shots <dir>]
- *                               [--patience 60000] [--keep] [--rpc <url>]
+ *                               [--patience 60000] [--keep] [--rpc <url>] [--full-budget]
+ *
+ * `--full-budget` is for a chain whose distribution is too young to put the walk under any load. It
+ * lowers `factoryBlock` in the **built** document by `MAX_WINDOWS ×` that chain's start window, so the
+ * walk has a full budget's worth of range to cover and spends it. With no wallet the walk starts at
+ * `CFG.factoryBlock` — `FIRST` is only filled by the `Created` scan a connected account triggers — so
+ * this is the whole of the change needed, and it touches the artefact rather than the source.
  *
  * `--rpc` compares a candidate against the committed one for a single chain. It rewrites only the
  * `PUBLIC_RPC` entry, and restores the file afterwards. Scoped to that table on purpose: a
@@ -60,32 +66,37 @@ const castOut = (args) => {
 };
 const topic0 = sig => castOut(['keccak', sig]);
 
-/** What the chain holds for this address, counted with `cast` rather than the browser.
+/** Every block at which this address emitted one of these events, read with `cast`, not the browser.
  *
  *  Deliberately a different client: `cast` builds its own JSON, opens its own connection and parses
- *  its own answer, so agreement between it and the page is evidence rather than a tautology. Windowed
- *  at the same span the page starts from, because these endpoints refuse wider.
+ *  its own answer, so agreement between it and the page is evidence rather than a tautology.
  *
- *  Returns counts per kind plus how many windows were refused, because a refused window makes the
- *  count a floor and not a total — and a floor is still enough to catch "empty" stated as fact.
+ *  **Blocks and not a count**, because the question is never "how many" on its own — it is "how many
+ *  in the range this section actually read". With the blocks in hand every such range is local
+ *  arithmetic and costs no further queries, which is what makes a per-section assertion affordable.
+ *  `refused` is carried because a refused window makes each list a floor; a floor still catches an
+ *  empty stated as fact, which is the failure being hunted.
  */
 function chainTruth(endpoint, address, from, to, span, kinds) {
-  const counts = {}, refused = {};
+  const blocks = {}, refused = {};
   for (const [name, sigs] of Object.entries(kinds)) {
     const topics = sigs.map(topic0).filter(Boolean);
     if (topics.length !== sigs.length) return null;        // no cast, no claim
-    let n = 0, bad = 0;
+    const at = [];
+    let bad = 0;
     for (let hi = to; hi >= from; hi -= span) {
       const lo = Math.max(from, hi - span + 1);
       const filter = JSON.stringify({ address, topics: [topics],
         fromBlock: '0x' + lo.toString(16), toBlock: '0x' + hi.toString(16) });
       const out = castOut(['rpc', '--rpc-url', endpoint, 'eth_getLogs', filter]);
       if (out == null) { bad++; continue; }
-      try { n += (JSON.parse(out) || []).length; } catch { bad++; }
+      try { for (const l of (JSON.parse(out) || [])) at.push(Number(BigInt(l.blockNumber))); }
+      catch { bad++; }
     }
-    counts[name] = n; refused[name] = bad;
+    at.sort((a, b) => a - b);
+    blocks[name] = at; refused[name] = bad;
   }
-  return { counts, refused };
+  return { blocks, refused };
 }
 
 /* Which section each kind backs, and the page's own sentence for "I read it and it was empty". The
@@ -94,7 +105,9 @@ function chainTruth(endpoint, address, from, to, span, kinds) {
 const EMPTY_CLAIM = {
   'h-changes': { kind: 'changes', says: /no change has been queued yet/i },
   'h-funds': { kind: 'funds', says: /nothing has arrived at this address yet/i },
-  funds: { kind: 'funds', says: /nothing has arrived at this address yet/i },
+  /* `#funds` is deliberately absent: `paintFunds` never writes that sentence — `histFill` does, into
+     the two history sections — so an entry for it could never fire and would only suggest a check
+     that is not happening. */
 };
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
@@ -117,16 +130,25 @@ function serve(dir) {
   });
 }
 
-/** One section's text, as one of the outcomes step 5 distinguishes. The names are the page's own. */
-function classify(text) {
+/** One section's text, as one of the outcomes step 5 distinguishes. The names are the page's own.
+ *
+ *  `id` matters for one section. **`#funds` is the funds *block*, not a log list**: its rows come from
+ *  the distribution's token table, and when the address-less `Transfer` query is refused — which it is
+ *  on all four shipped endpoints — it prints "token payments **in** could not be read from this
+ *  provider". `PATTERNS.activityRow` matches a bare ` in `, so that help sentence classified as rows,
+ *  and chain 1 was credited with activity `cast` says it does not have. The read-quality outcomes are
+ *  meaningful there; "rows" and "empty" are not, so they are not claimed.
+ */
+function classify(text, id) {
   const t = String(text || '');
   if (!t.trim()) return 'empty';
   if (new RegExp(PATTERNS.unavailable, 'i').test(t)) return 'nothing';
   if (/limiting requests/i.test(t)) return 'throttle';
   if (new RegExp(PATTERNS.boundaryLine, 'i').test(t)) return 'boundary';
+  if (new RegExp(PATTERNS.loadingNotice, 'i').test(t.trim())) return 'loading';
+  if (id === 'funds') return 'read in full';
   if (new RegExp(PATTERNS.activityRow, 'i').test(t)) return 'rows';
   if (/no change has been queued yet|nothing has arrived at this address yet/i.test(t)) return 'read, empty';
-  if (new RegExp(PATTERNS.loadingNotice, 'i').test(t.trim())) return 'loading';
   return 'other';
 }
 
@@ -206,7 +228,7 @@ async function oneLoad(browser, port, { patience, shotTo }) {
     for (const id of ['funds', 'h-changes', 'h-funds']) {
       const t = await textOf(page, `#${id}`);
       fullText[id] = t;
-      out.sections[id] = { outcome: classify(t), text: t.slice(0, 120) };
+      out.sections[id] = { outcome: classify(t, id), text: t.slice(0, 120) };
     }
     /* How far back the first pass actually got, in the page's own numbers: `#asof` is the block the
        route's reads were made at, and every wording of the partial line names the block it stopped
@@ -218,11 +240,20 @@ async function oneLoad(browser, port, { patience, shotTo }) {
     /* Scanned over the **full** section text. `out.sections[].text` is cut to 120 characters for the
        log, and a boundary line sits at the end of a section that has rows above it, so reading the
        excerpt would have missed exactly the loads that read the most. */
-    const floors = Object.values(fullText)
-      .map(t => /history before block (\d+)/.exec(t))
-      .filter(Boolean).map(m => Number(m[1]));
+    /* **Per section, not per load.** The load's lowest boundary was the wrong unit: a load where one
+       section stopped short and another claimed an empty history would be excused by the first,
+       which is precisely the mixed case worth catching. Each section now carries the block *it*
+       stopped above, and `null` means it covered its whole range. */
+    for (const id of Object.keys(out.sections)) {
+      const m = /history before block (\d+)/.exec(fullText[id] || '');
+      out.sections[id].stopped = m ? Number(m[1]) : null;
+    }
+    const floors = Object.values(out.sections).map(sx => sx.stopped).filter(n => n != null);
     out.stopped = floors.length ? Math.min(...floors) : null;
     out.reach = out.head != null && out.stopped != null ? out.head - out.stopped : null;
+    /* Did every section cover its whole range? That is what "all of it" means in the table, and it
+       is a property of the load only when it holds for all three. */
+    out.whole = out.head != null && Object.values(out.sections).every(sx => sx.stopped == null);
     if (shotTo) await page.screenshot({ path: shotTo, fullPage: false });
   } catch (e) {
     out.threw = String(e && e.message || e).split('\n')[0].slice(0, 120);
@@ -266,6 +297,7 @@ const asTime = sec => sec == null ? '—'
   const patience = Number(arg('patience', 60000));
   const shots = arg('shots', join(os.tmpdir(), `rake-cold-${process.pid}`));
   const rpcOverride = arg('rpc', '');
+  const fullBudget = flag('full-budget');
   mkdirSync(shots, { recursive: true });
 
   const when = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
@@ -294,6 +326,19 @@ const asTime = sec => sec == null ? '—'
       }
       const built = spawnSync('make', ['dapp-nodev', `CHAIN_ID=${chain}`], { cwd: ROOT, encoding: 'utf8' });
       if (before != null) writeFileSync(pageFile, before);
+      if (built.status === 0 && fullBudget) {
+        /* Lower the floor in the artefact so the walk has to spend its budget. Reported in the table,
+           because a reading taken this way is a reading of a **simulated** depth and must never be
+           quoted as the chain's own. */
+        const distFile = join(ROOT, 'app/dist/index.html');
+        const doc0 = readFileSync(distFile, 'utf8');
+        const m = /factoryBlock: *'(0x[0-9a-fA-F]+|\d+)'/.exec(doc0);
+        const win = Number((doc0.match(new RegExp(`const PUBLIC_WINDOW = \\{[^}]*\\b${chain}: *(\\d[\\d_]*)`)) || [])[1]?.replace(/_/g, '') || 10000);
+        if (!m) { console.error('cold: --full-budget cannot find factoryBlock in the build'); process.exit(2); }
+        const was = Number(BigInt(m[1])), now = Math.max(1, was - win * 40);
+        writeFileSync(distFile, doc0.replace(m[0], `factoryBlock: '0x${now.toString(16)}'`));
+        process.stderr.write(`  --full-budget: factoryBlock ${was} → ${now} (${(win * 40).toLocaleString('en-US')} blocks, ${win} × 40)\n`);
+      }
       if (built.status !== 0) {
         rows.push({ chain, built: false, why: (built.stderr || built.stdout || '').trim().split('\n').pop() });
         process.stderr.write(`  build failed: ${rows[rows.length - 1].why}\n`);
@@ -339,35 +384,45 @@ const asTime = sec => sec == null ? '—'
       if (fb && hi) {
         process.stderr.write(`  asking the chain with cast: blocks ${fb}..${hi} in windows of ${span}\n`);
         truth = chainTruth(endpoint, DNZN, fb, hi, span, { changes: CHANGE_EVENTS, funds: FUND_EVENTS });
-        if (truth) process.stderr.write(`  cast says: ${Object.entries(truth.counts).map(([k, n]) => `${k} ${n}`).join(', ')}`
+        if (truth) process.stderr.write(`  cast says: ${Object.entries(truth.blocks).map(([k, at]) => `${k} ${at.length}`).join(', ')}`
           + `${Object.values(truth.refused).some(Boolean) ? ` (refused windows: ${Object.entries(truth.refused).map(([k, n]) => `${k} ${n}`).join(', ')})` : ''}\n`);
       }
-      /* The one assertion that can fail on a *correct-looking* run: a section claiming an empty
-         history for a kind the chain has events of, in a load that painted no boundary at all. */
+      /* The assertion that can fail on a run every other column calls a success: a section saying a
+         history is empty **over the range that section itself read**, for a kind the chain has events
+         in that range. Not a row count — rows and events are not one to one, since `Applied` folds
+         into the `Queued` it closes and an incoming transfer adds a row of its own — so what is
+         asserted is the thing that cannot be excused either way: an emptiness that contradicts the
+         chain. A section that stopped short is still checked, against its own shorter range. */
       const lies = [];
       for (const [i, r] of runs.entries()) {
         for (const [id, sx] of Object.entries(r.sections)) {
           const claim = EMPTY_CLAIM[id];
-          if (!claim || !truth || r.stopped != null) continue;      // a truncated read claims nothing
-          if (claim.says.test(sx.text) && truth.counts[claim.kind] > 0) {
-            lies.push(`load ${i + 1} · #${id} said the history is empty · cast counts `
-              + `${truth.counts[claim.kind]} ${claim.kind} event(s) over ${fb}..${hi}`);
+          if (!claim || !truth || !claim.says.test(sx.text)) continue;
+          const at = truth.blocks[claim.kind] || [];
+          const low = sx.stopped == null ? fb : sx.stopped;      // the floor of what it read
+          const inRange = at.filter(b => b >= low && b <= r.head);
+          if (inRange.length) {
+            lies.push(`load ${i + 1} · #${id} said the history is empty over blocks ${low}..${r.head}`
+              + ` · cast finds ${inRange.length} ${claim.kind} event(s) in it, at ${inRange.slice(0, 3).join(', ')}`
+              + `${sx.stopped == null ? ' (the section reported no boundary, so it claims the whole range)' : ''}`);
           }
         }
       }
-      rows.push({ chain, built: true, endpoint, runs, truth, lies, fb, hi });
+      rows.push({ chain, built: true, endpoint, runs, truth, lies, fb, hi, span });
     }
   } finally {
     await browser.close();
   }
 
   console.log(`\nRead ${when} by \`tools/uat/cold.mjs\`: ${loads} cold loads per chain, no wallet, the browser's own fetch.`);
+  if (fullBudget) console.log('**`--full-budget`: `factoryBlock` was lowered in the build by 40 × the chain\'s start window**, so the walk'
+    + ' spends its whole budget. The depth is simulated; these rows are a load measurement and not a reading of the chain\'s own history.');
   console.log(`Distribution page: \`${DNZN}\`. Screenshots: ${shots}\n`);
-  console.log('| chain | endpoint | featured panel filled | median fill | three sections, worst outcome per load | blocks in the first pass | that in time | the chain, by `cast` | page errors |');
-  console.log('|:--|:--|--:|--:|:--|--:|--:|:--|--:|');
+  console.log('| chain | endpoint | panel | median fill | three sections, worst outcome per load | loads covering the whole range | when truncated, blocks read | that in time | earliest event, and the depth to it | budget | errors |');
+  console.log('|:--|:--|--:|--:|:--|--:|--:|--:|:--|--:|--:|');
   let bad = 0;
   for (const r of rows) {
-    if (!r.built) { console.log(`| ${r.chain} | — | **build failed** | — | ${r.why} | — | — | — | — |`); bad++; continue; }
+    if (!r.built) { console.log(`| ${r.chain} | — | **build failed** | — | ${r.why} | — | — | — | — | — | — |`); bad++; continue; }
     const filled = r.runs.filter(x => x.featured).length;
     const ms = r.runs.filter(x => x.featuredMs).map(x => x.featuredMs).sort((a, b) => a - b);
     const median = ms.length ? ms[Math.floor(ms.length / 2)] : null;
@@ -380,33 +435,41 @@ const asTime = sec => sec == null ? '—'
          nothing. A section that read its whole range is a good outcome whether or not that range
          held events, and the `cast` column beside this one says which. */
       for (const k of ['nothing', 'loading', 'empty', 'other', 'throttle', 'boundary']) if (o.includes(k)) return k;
-      return 'read in full';
+      return 'read in full';   // 'rows', 'read, empty' and the funds block all mean: it finished
     });
     const tally = worst.reduce((a, k) => ({ ...a, [k]: (a[k] || 0) + 1 }), {});
     const errs = r.runs.reduce((a, x) => a + x.errors.length, 0);
-    /* How far back a pass got. A load that painted no boundary line read the whole history the
-       distribution has, which is a different statement from a number and is printed as one. */
-    const reaches = r.runs.map(x => x.reach).filter(n => n != null).sort((a, b) => a - b);
-    const whole = r.runs.filter(x => x.head != null && x.stopped == null).length;
+    /* **Two populations, two columns.** One cell used to carry the median reach of the loads that
+       stopped short *and* the count of loads that covered everything, which reads as "it stopped at
+       400,000 blocks and claimed to have read it all" — and that is how it was read. The loads that
+       finished and the loads that were cut short are now never averaged together. */
+    const whole = r.runs.filter(x => x.whole).length;
+    const reaches = r.runs.filter(x => !x.whole).map(x => x.reach).filter(n => n != null).sort((a, b) => a - b);
     const reach = reaches.length ? reaches[Math.floor(reaches.length / 2)] : null;
-    let reachCell = '—', timeCell = '—';
+    const wholeCell = `${whole}/${r.runs.length}`;
+    let reachCell = reaches.length ? reach.toLocaleString('en-US') : '— (none were)';
+    let timeCell = '—';
     if (reach != null) {
-      const rep = r.runs.find(x => x.reach === reach) || {};
-      reachCell = reach.toLocaleString('en-US') + (whole ? ` (${whole}/${r.runs.length} read it all)` : '');
+      const rep = r.runs.find(x => !x.whole && x.reach === reach) || {};
       timeCell = asTime(await spanInTime(r.endpoint, Math.max(1, rep.stopped || 0), rep.head || 0));
-    } else if (whole) {
-      reachCell = `all of it, ${whole}/${r.runs.length}`;
-      timeCell = 'whole history';
     }
+    /* The floor the page has to reach for its rows to be the whole truth, and the budget it has to
+       reach it with. This is the column that makes "read it all" checkable rather than asserted:
+       `0xB611…` on Base Sepolia sits a million blocks back, and at a 10,000-block window the walk
+       could not have got there at all. */
+    const t2 = r.truth;
+    const all = t2 ? Object.values(t2.blocks).flat().sort((a, b) => a - b) : [];
+    const headMax = Math.max(0, ...r.runs.map(x => x.head || 0));
+    const floorCell = !t2 ? '(not read)' : !all.length ? 'no events at all'
+      : `${all[0].toLocaleString('en-US')}, ${(headMax - all[0]).toLocaleString('en-US')} back`;
+    const budgetCell = r.span ? (r.span * 40).toLocaleString('en-US') : '—';
     /* What the chain holds, so a reader can tell "read, empty" that is true from "read, empty" that
        is a wrong answer. A refused window makes it a floor, and the cell says so. */
-    const t = r.truth;
-    const truthCell = !t ? '(not read)'
-      : Object.entries(t.counts).map(([k, n]) => `${k} ${n}${t.refused[k] ? `+ (${t.refused[k]} windows refused)` : ''}`).join(', ');
+
     const ok = filled === r.runs.length && !worst.some(k => k === 'nothing' || k === 'loading' || k === 'none' || k === 'threw')
       && !(r.lies || []).length;
     if (!ok) bad++;
-    console.log(`| ${r.chain} | \`${r.endpoint}\` | ${ok || filled === r.runs.length ? '' : '**'}${filled}/${r.runs.length}${ok || filled === r.runs.length ? '' : '**'} | ${median == null ? '—' : median + ' ms'} | ${Object.entries(tally).map(([k, n]) => `${n}× ${k}`).join(', ')} | ${reachCell} | ${timeCell} | ${truthCell} | ${errs} |`);
+    console.log(`| ${r.chain} | \`${r.endpoint}\` | ${ok || filled === r.runs.length ? '' : '**'}${filled}/${r.runs.length}${ok || filled === r.runs.length ? '' : '**'} | ${median == null ? '—' : median + ' ms'} | ${Object.entries(tally).map(([k, n]) => `${n}× ${k}`).join(', ')} | ${wholeCell} | ${reachCell} | ${timeCell} | ${floorCell} | ${budgetCell} | ${errs} |`);
   }
   /* An empty history stated as fact is the one failure that looks like success in every other
      column, so it is named in full rather than counted. */
@@ -434,10 +497,21 @@ const asTime = sec => sec == null ? '—'
     for (const [chain, list] of Object.entries(said)) {
       console.log(`- **${chain}**: ${list.map(([m, n]) => `${n}× \`${m}\``).join(' · ')}`);
     }
+    /* The figure any shared in-flight cap would be sized against has to come from the endpoint, and
+       an endpoint that states no number is itself the finding — it means the cap cannot be derived
+       from its words and has to be measured. */
+    console.log('\nThe rate limit each endpoint states, for sizing:\n');
+    for (const [chain, list] of Object.entries(said)) {
+      const rate = list.filter(([m]) => /rate limit|request limit|429/i.test(m));
+      if (!rate.length) { console.log(`- **${chain}**: never refused for rate at all over these loads.`); continue; }
+      const nums = rate.map(([m]) => /(\d+) *\/ *second|(\d+) *(?:requests?|reqs?) *(?:per|\/) *second/i.exec(m)).filter(Boolean);
+      console.log(`- **${chain}**: ${nums.length ? `**${nums[0][0]}**` : '**names no number**'}`
+        + ` — ${rate.map(([m, n]) => `${n}× \`${m}\``).join(' · ')}`);
+    }
   }
   for (const r of rows) {
     if (!r.built || !r.truth) continue;
-    console.log(`\n- chain ${r.chain}: \`cast\` counted ${Object.entries(r.truth.counts).map(([k, n]) => `${n} ${k}`).join(' and ')}`
+    console.log(`\n- chain ${r.chain}: \`cast\` counted ${Object.entries(r.truth.blocks).map(([k, at]) => `${at.length} ${k}`).join(' and ')}`
       + ` for \`${DNZN}\` over blocks ${r.fb}..${r.hi}`
       + `${Object.values(r.truth.refused).some(Boolean) ? `, with ${Object.entries(r.truth.refused).filter(([, n]) => n).map(([k, n]) => `${n} refused window(s) on ${k}`).join(' and ')}, so those are floors` : ', every window answered'}.`);
   }

@@ -1,103 +1,145 @@
-Read by `tools/uat/cold.mjs`: 10 cold loads per chain, **no wallet**, so the page uses its own
-`PUBLIC_RPC` entry through the browser's own fetch. Landing panel, then the distribution page at
-`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`, whose three log-built sections are classified into the
-four outcomes step 5 distinguishes. Every reading below filled the featured panel **10/10** with
-**0 page errors**, so those columns are dropped here.
+Read by `tools/uat/cold.mjs`: cold loads with **no wallet**, so the page uses its own `PUBLIC_RPC`
+entry through the browser's own fetch. Landing panel, then the distribution page at
+`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`. Every reading below filled the featured panel on every
+load with **0 page errors**.
 
-**"Worst outcome per load" ranks read *quality*, not row count:**
-`nothing > loading > empty > other > throttle > boundary > read in full`. A section that covered its
-whole range is `read in full` whether or not that range held events — the `cast` column says which.
-An earlier ranking placed "read, empty" above "rows", so a load whose `changes` section was
-legitimately empty while the other two were full reported as "read, empty" and read as though the
-page had found nothing. That was a defect in this file, not in the page.
+## What the columns mean
 
-## What the start window bought — 05:52Z against 06:17Z
+**"Worst outcome per load" ranks read *quality*:**
+`nothing > loading > empty > other > throttle > boundary > read in full`, first match wins across the
+three sections. **`read in full` means every section covered its whole range** — it is one label for
+"rows", "read and empty" and the funds block, because a section that finished is a good outcome
+whether or not its range held events. An earlier ladder put "read, empty" above "rows", so a load
+whose `changes` was legitimately empty while the other two were full reported as "read, empty" and
+read as though the page had found nothing.
 
-| chain | start window | before (at 10,000 everywhere) | after |
-|:--|--:|:--|:--|
-| 1 | 1,000 | 10× read | 10× **read in full** |
-| 8453 | 50,000 | 4 read, **6 throttle** | 10× **read in full** |
-| 11155111 | 10,000 | 4 read, 1 boundary, 5 throttle | 2 boundary, 8 throttle |
-| 84532 | 50,000 | **3 boundary, 7 throttle** | **6 read in full**, 4 throttle |
+**"Loads covering the whole range" is the count whose *every* section printed no boundary line.**
+It is now a column of its own: one cell used to carry both it and the median depth of the loads that
+were cut short, which reads as "it stopped at 400,000 blocks and claimed to have read it all".
+The finished loads and the truncated ones are never averaged together.
 
-8453 lost every throttle and 84532 turned three truncated reads into six complete ones: both serve
-50,000 blocks a query and were being asked for 10,000. **11155111 is the control — its reliable span
-already *is* 10,000, so the amendment changes nothing for it**, and its throttle count still moved
-5 → 8 → 8 across three runs an hour apart. That spread is what one run of any of this is worth.
+**`#funds` is classified for read quality only.** It is the funds *block*, not a log list, and when
+the address-less `Transfer` query is refused it prints "token payments **in** could not be read from
+this provider" — which `PATTERNS.activityRow` matches on the bare ` in `, so chain 1 was briefly
+credited with activity `cast` says it does not have. **A latent trap in the driver, not just here:**
+the same pattern backs acceptance row (c), so if the activity section ever gains a help sentence
+containing ` in `, row (c) would pass on a section with no rows.
 
-## The reading of record — 2026-11-23T06:17:44Z
+## Can the page state an empty history it did not finish reading?
 
-| chain | three sections, worst per load | blocks in the first pass | that in time | the chain, by `cast` |
-|:--|:--|--:|--:|:--|
-| 1 | 10× read in full | all of it, 10/10 | whole history | changes 0, funds 0 |
-| 8453 | 10× read in full | all of it, 10/10 | whole history | changes 0, funds 0 |
-| 11155111 | 2× boundary, 8× throttle | 9,965 | 1.4 days | changes 0, funds 6+ |
-| 84532 | 6× read in full, 4× throttle | 399,999 (6/10 all) | 22.2 h | changes 0, funds 4 |
+**No, and it is now a test rather than an argument.** `histFill` writes `notice(empty) +
+partialLine()`, so a budget stop carries the boundary and the press alongside the sentence;
+`test/answered.test.mjs` asserts both halves — the empty-with-boundary case and the
+whole-range-alone case — and the mutation that drops the boundary line fails it. The classifier also
+ranks `boundary` above the empty sentences, so such a section is labelled `boundary` and never
+`read in full`.
 
-**The `cast` column is the answer to "is an empty section true?"** — the same question asked by a
-different client, which builds its own JSON and opens its own connection, so agreement is evidence
-rather than a tautology. Counted over the whole life of each chain's factory, windowed at that
-chain's start window:
+**And the claim is checked against the chain per section, not per load.** `cold.mjs` takes the block
+of every event of each kind with `cast` — a different client, which builds its own JSON and opens its
+own connection — and fails the run if a section says a history is empty over the range **that
+section itself read** while `cast` finds events in it. The load's lowest boundary was the wrong unit:
+it excused a section claiming emptiness whenever any *other* section had stopped short. It has not
+fired on any run since.
 
-- **1** — 0 changes and 0 funds over blocks 26,469,801..26,475,987, **every window answered**. The
-  mainnet distribution genuinely has no events yet, so ten "read in full" loads are correct.
-- **8453** — 0 and 0 over 60,730,845..61,121,675, every window answered. Same.
-- **11155111** — 0 changes and **6 funds** over 12,173,938..12,193,903, with one refused window on
-  each, so those are floors. The funds history is real, which is what the driver's row (c) requires;
-  `changes` is genuinely 0, so "no change has been queued yet" is a true sentence.
-- **84532** — 0 changes and **4 funds** over 61,197,280..62,464,647, every window answered.
+## Each chain's event floor, and the depth needed to reach it
 
-`cold.mjs` fails the run if any load claims an empty history for a kind `cast` counts events of.
-It did not fire. A refused window makes the count a floor, and a floor is still enough to catch a
-false "empty".
+Read with `cast` at 06:28Z, both kinds in one query, over the whole life of each factory:
 
-**The time column is read from the chain, never assumed** — two `eth_getBlockByNumber` timestamps per
-row, because a block time would have been wrong by a factor of ten. Verified independently with
-`cast` at 06:10Z: on **84532 ten thousand blocks took 2,000 s — 0.2 s a block**, Base Sepolia's
-200 ms flashblocks, so 400,000 blocks there is under a day and that chain makes ~432,000 blocks a
-day. On 11155111, 124,848 s — 12.48 s a block.
+| chain | events | earliest | depth from head | budget (40 × start window) | reachable |
+|:--|--:|--:|--:|--:|:--|
+| 1 | 0 | — | — | 40,000 | — |
+| 8453 | 0 | — | — | 2,000,000 | — |
+| 11155111 | 6 | 12,187,731 | 6,205 | 400,000 | yes, in one window |
+| 84532 | 4 | **61,397,101** | **1,069,648** | **2,000,000** | **yes — and not before #391** |
 
-## What the endpoints said when they refused, in their own words
+**This is what the start window actually bought on Base Sepolia.** At 10,000 blocks a window the
+budget reached 400,000 blocks and the earliest event sits 1,069,648 back, so the distribution's
+history was **unreachable at any point in the walk**; at 50,000 it is inside the budget, and the six
+loads that covered the whole range show those four events. That is a stronger claim than "fewer
+requests", and it is why the 399,999 figure in the earlier table was the median of the four
+**throttled** loads and not a ceiling on what the page can read.
 
-Counted over all ten loads of the 06:17Z run, from the browser's own traffic:
+## Run A — the four chains as shipped, 2026-11-23T06:31:49Z, 10 loads each
 
-| chain | its own sentences |
+| chain | worst per load | whole range | when truncated | that in time |
+|:--|:--|--:|--:|--:|
+| 1 | 6× read in full, 4× throttle | 6/10 | 3,999 | 13.4 h |
+| 8453 | 10× read in full | 10/10 | — none were | — |
+| 11155111 | 1× boundary, 9× throttle | 0/10 | 31 | 6 min |
+| 84532 | 6× read in full, 4× throttle | 6/10 | 399,999 | 22.2 h |
+
+## Run B — the mainnets under a full budget, 06:34:25Z, 10 loads each
+
+`--full-budget` lowers `factoryBlock` in the **built** document by 40 × the chain's start window, so
+the walk has a full budget's worth of range and spends it. The depth is simulated: these rows are a
+load measurement, not a reading of the chain's own history. With no wallet the walk starts at
+`CFG.factoryBlock` — `FIRST` is only filled by the `Created` scan a connected account triggers — so
+lowering it is the whole of the change needed.
+
+| chain | worst per load | whole range | when truncated | that in time | what it refused with |
+|:--|:--|--:|--:|--:|:--|
+| 1 | **10× boundary** | 0/10 | 9,999 | 1.4 days | 40× `Archive requests require a personal token` |
+| 8453 | 4× boundary, **6× throttle** | 0/10 | 399,999 | 22.2 h | 39× `Rate limit exceeded` |
+
+**Chain 1's mainnet problem is depth, not rate.** Every load ended on an archive wall about 10,000
+blocks back — **1.4 days of history** — and the endpoint said so in its own words forty times out of
+forty. `cast` corroborates from the other side: asked for the same 46,000-block range it had 37 of 47
+windows refused for the same reason. So a visitor to a mainnet distribution more than about a day old
+sees the recent history and a line saying this endpoint serves no older, with no press — which is the
+honest outcome step 5 built, but it is a 1.4-day window onto a permanent record.
+
+**Chain 8453 throttles 6 of 10 under a full budget** while being clean 10/10 as shipped, because its
+day-old history finishes in one or two windows. So the mainnet throttle question is answered: it is
+there, and it appears the moment the history is long enough to need the budget.
+
+## The limits, in the endpoints' own words
+
+| chain | the rate limit it states |
 |:--|:--|
-| 1 | 40× `Please specify an address in your request or, to remove restrictions, order a dedicated…` |
-| 8453 | 40× the same |
-| 11155111 | 64× `pruned history unavailable` · 27× `Rate limit exceeded. To obtain higher limits…` · 20× the address-less refusal |
-| 84532 | 37× the address-less refusal · 33× `Rate limit exceeded. To obtain higher limits…` |
+| 1 | **names no number** — `Rate limit exceeded. To obtain higher limits, please request a personal token…` |
+| 8453 | **names no number** — the same sentence |
+| 11155111 | **names no number** — the same sentence |
+| 84532 | **names no number** — the same sentence |
 
-**The address-less refusal is on all four chains and is not a fault**: it is the `Transfer` query
-that has no `address` filter, which publicnode declines on every endpoint, and the page already
-catches it (`histLogs`, `.catch(() => null)`). The consequence is worth stating plainly rather than
-leaving in a log — **the "other tokens" list is unavailable on all four of the endpoints the page
-ships**, by the operator's policy, and a connected wallet is the only way to see it.
+None of the four names a figure, so a shared in-flight cap cannot be derived from their words and has
+to be measured. Two further sentences worth having on the record: `pruned history unavailable` is
+Sepolia's depth wall (65× in run A), and 8453 once refused with `block range extends beyond current
+head block: requested 61125860, head 61125859` — a pooled hostname whose backends are a block apart,
+which the walk treats as a range refusal and halves for. Harmless, and not ours to fix.
+
+## A confound in the throttle figures, which are therefore not clean
+
+Sepolia's throttle count across four runs in one hour went **5 → 8 → 9 of 10**, and its median
+truncated depth collapsed from 9,965 blocks to **31**. Those runs are the same endpoint, the same IP
+and a few thousand requests of my own cumulative traffic. **A visitor does not arrive after I have
+made four thousand requests**, so the rising trend is at least partly my own instrument. Any figure
+used to size a shared in-flight limit should come from runs spaced far enough apart to clear the
+window, and from the mainnets, where run B is the only full-budget reading so far.
 
 ## The Sepolia "nothing", explained from the browser's own eight requests
 
-One load in twenty painted `history unavailable` across all three sections. The traffic is kept at
-`evidence/nothing-11155111-load7.json`; the `topics` count names the kind (4 = `changes`,
-5 = `funds`, 66 = the single `Transfer` topic string):
+One load in twenty painted `history unavailable` across all three sections; the traffic is kept at
+`evidence/nothing-11155111-load7.json`, with the `topics` count naming the kind (4 = `changes`,
+5 = `funds`, 66 = the single `Transfer` topic string). `changes` was refused `4444 pruned history
+unavailable` on its newer window and answered `[]` on its older one, `funds` returned a real log
+array and was then rate-limited. **The endpoint answered three windows and the page said the history
+was unavailable.** The cause was in step 5's own code: `logs()` keeps logs only from an unbroken run
+at the top of a batch — correct, or a hole sits below the boundary the line prints — and the same loop
+counted `answered`, so the window answered below a refusal did not count, the `changes` walk ended
+with `answered === 0` and threw, and `history()`'s single `Promise.all` turned that into
+`paintFailed()` across all three sections including `funds`, whose own window had the logs. Fixed by
+counting the endpoint rather than the keeping; the contiguous-prefix rule is untouched.
 
-| # | kind | span | answer |
-|--:|:--|--:|:--|
-| 1–2 | Transfer | 10,000 / 9,945 | `-32701` address-less, caught and discarded by design |
-| 3 | changes | 10,000 | `4444 pruned history unavailable` |
-| 4 | **funds** | 10,000 | **a real log array** |
-| 5 | **changes** | 9,945 | **`[]`** |
-| 6–8 | funds, changes | 9,945 / 5,000 / 5,000 | `-32005 Rate limit exceeded`, HTTP 429 |
+## The address-less query, refused everywhere
 
-**The endpoint answered three windows, and the page said the history was unavailable.** The cause was
-in step 5's own code, not in the endpoint: `logs()` keeps logs only from an unbroken run at the top of
-a batch — correct, or a hole sits below the boundary the line prints — and the same loop was counting
-`answered`. So window 5, answered by the endpoint and dropped for contiguity, did not count; the
-`changes` walk reached the end with `answered === 0` and threw; and `history()` wraps both walks in
-one `Promise.all`, so `paintFailed()` wrote `history unavailable` over the `funds` section too, whose
-own window 4 had returned real logs.
+`-32701 Please specify an address in your request` on **all four** endpoints, 37–40× per run. The page
+catches it by design (`histLogs`, `.catch(() => null)`), so nothing breaks — but **the "other tokens"
+list is unavailable on every endpoint the page ships**, by operator policy, and only a connected
+wallet can show it.
 
-Fixed by counting the endpoint rather than the keeping: `answered` increments for every window
-answered in the batch, and the contiguous-prefix rule for `out` is untouched. Five tests in
-`test/answered.test.mjs`, including one that keeps every event tagged with its own window's block so a
-hole below the boundary is detectable — the first version of that assertion could not see one, and a
-mutation that kept logs from under a refusal passed it.
+## Block times, read rather than assumed
+
+Two `eth_getBlockByNumber` timestamps per row, because a block time would have been wrong by a factor
+of ten. Verified with `cast` at 06:10Z: **84532 mints every 0.2 s** — 10,000 blocks in 2,000 s, Base's
+200 ms flashblocks — so that chain makes ~432,000 blocks a day and 400,000 blocks is under one.
+11155111 is 12.48 s.
