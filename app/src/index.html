@@ -651,7 +651,17 @@ async function logs(address, topics, fromBlock, toBlock) {
     /* Kept only as far as the first refusal: the batch is contiguous from the top, so keeping a
        success from below a failure would leave a hole that no single boundary could describe. */
     const i = res.findIndex(r => r.err);
-    for (const r of (i < 0 ? res : res.slice(0, i))) { out.push(...r.ok); answered++; }
+    /* **Two questions, and they were one variable.** Which logs may be *kept* is about contiguity:
+       only an unbroken run from the top, or a hole would sit below a boundary no single number could
+       describe. Whether the endpoint *answered* is about the endpoint. A window below a refusal is
+       discarded for the first reason while the endpoint answered it perfectly well — and counting
+       that as unanswered is what made a Sepolia load paint `history unavailable` over three sections
+       after the endpoint had returned both a log array and an empty one
+       (`docs/milestones/m05/tasks/m05-t01d/evidence/nothing-11155111-load7.json`, requests 4 and 5).
+       Step 5 reserves that sentence for an endpoint that answered **nothing at all**, so it is
+       counted over the whole batch and the keeping is left alone. */
+    for (const r of res) if (!r.err) answered++;
+    for (const r of (i < 0 ? res : res.slice(0, i))) out.push(...r.ok);
     if (i < 0) { hi = batch[batch.length - 1][0] - 1; continue; }
     const top = batch[i][1], text = res[i].err, cap = Model.rangeCap(text);
     lastText = text;

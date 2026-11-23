@@ -1,0 +1,85 @@
+{
+  "chain": 11155111,
+  "load": 7,
+  "endpoint": "https://ethereum-sepolia-rpc.publicnode.com",
+  "sections": {
+    "funds": {
+      "outcome": "nothing",
+      "text": "history unavailable — the token list and the escrow rows are read from the logs."
+    },
+    "h-changes": {
+      "outcome": "nothing",
+      "text": "history unavailable"
+    },
+    "h-funds": {
+      "outcome": "nothing",
+      "text": "history unavailable"
+    }
+  },
+  "requests": [
+    {
+      "from": 12173938,
+      "to": 12183937,
+      "span": 10000,
+      "topics": 66,
+      "status": 200,
+      "answer": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32701,\"message\":\"Please specify an address in your request or, to remove restrictions, order a dedicated full node here: https"
+    },
+    {
+      "from": 12183938,
+      "to": 12193882,
+      "span": 9945,
+      "topics": 66,
+      "status": 200,
+      "answer": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32701,\"message\":\"Please specify an address in your request or, to remove restrictions, order a dedicated full node here: https"
+    },
+    {
+      "from": 12173938,
+      "to": 12183937,
+      "span": 10000,
+      "topics": 4,
+      "status": 200,
+      "answer": "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":4444,\"message\":\"pruned history unavailable\"}}"
+    },
+    {
+      "from": 12173938,
+      "to": 12183937,
+      "span": 10000,
+      "topics": 5,
+      "status": 200,
+      "answer": "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":[{\"address\":\"0xb611ff193da8fa9391c0a3daa29c3c9a0f4d5199\",\"topics\":[\"0x88a5966d370b9919b20f3e2c13ff65706f196a4e32cc2c12bf57088f8"
+    },
+    {
+      "from": 12183938,
+      "to": 12193882,
+      "span": 9945,
+      "topics": 4,
+      "status": 200,
+      "answer": "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":[]}"
+    },
+    {
+      "from": 12183938,
+      "to": 12193882,
+      "span": 9945,
+      "topics": 5,
+      "status": 429,
+      "answer": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32005,\"message\":\"Rate limit exceeded. To obtain higher limits, please request a personal token or a dedicated node: https://ww"
+    },
+    {
+      "from": 12178938,
+      "to": 12183937,
+      "span": 5000,
+      "topics": 4,
+      "status": 429,
+      "answer": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32005,\"message\":\"Rate limit exceeded. To obtain higher limits, please request a personal token or a dedicated node: https://ww"
+    },
+    {
+      "from": 12173938,
+      "to": 12178937,
+      "span": 5000,
+      "topics": 4,
+      "status": 429,
+      "answer": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32005,\"message\":\"Rate limit exceeded. To obtain higher limits, please request a personal token or a dedicated node: https://ww"
+    }
+  ]
+}
