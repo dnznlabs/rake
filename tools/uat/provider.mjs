@@ -5,7 +5,33 @@
    with the engineer's keystore — the key is never in this tree and never printed. */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-const run = promisify(execFile);
+const exec = promisify(execFile);
+
+/* `execFile`'s own error says only "Command failed" and drops what the tool printed, which turned one
+   transient endpoint error into a run that could not say why it stopped. Everything here goes through
+   this wrapper so a failure carries `cast`'s own words. */
+async function run(cmd, args, opts) {
+  try { return await exec(cmd, args, opts); } catch (e) {
+    const detail = [e.stderr, e.stdout].map(s => String(s || '').trim()).filter(Boolean).join(' | ').slice(0, 600);
+    const err = new Error(`${args[0]} failed: ${detail || e.message}`);
+    err.stderr = e.stderr; err.stdout = e.stdout; err.code = e.code;
+    throw err;
+  }
+}
+
+/** One retry for a send that never reached the chain, decided by the account nonce rather than by
+    reading the error: a pay-in retried after it landed would pay twice. */
+async function sendOnce(args, rpcUrl, sender) {
+  const nonceOf = async () => Number((await exec(CAST, ['nonce', sender, '--rpc-url', rpcUrl])).stdout.trim());
+  const before = await nonceOf();
+  try { return JSON.parse((await run(CAST, args, { maxBuffer: 1 << 24 })).stdout); } catch (e) {
+    const after = await nonceOf();
+    if (after > before) throw new Error(`${e.message} — and the nonce moved ${before} → ${after}, so something was sent; not retrying`);
+    const retry = JSON.parse((await run(CAST, args, { maxBuffer: 1 << 24 })).stdout);
+    retry.retried = true;
+    return retry;
+  }
+}
 
 export const CAST = `${process.env.HOME}/.foundry/bin/cast`;
 export const PASS = process.env.RAKE_UAT_PASSFILE || `${process.env.HOME}/.config/elanik-wallet/keystore.pass`;
@@ -66,18 +92,16 @@ export function makeRpc({ chainId, rpcUrl, sender, log }) {
 }
 
 /** One plain ETH transfer, for row (g)'s pay-in, which the page does not send. */
-export async function payIn({ to, ether, rpcUrl }) {
-  const { stdout } = await run(CAST, [
+export async function payIn({ to, ether, rpcUrl, sender }) {
+  return sendOnce([
     'send', to, '--value', `${ether}ether`,
     '--rpc-url', rpcUrl, '--account', ACCOUNT, '--password-file', PASS, '--json',
-  ], { maxBuffer: 1 << 24 });
-  return JSON.parse(stdout);
+  ], rpcUrl, sender);
 }
 
 /** Any read or write the script asks for with `cast` rather than through the page. */
-export async function castSend(args, rpcUrl) {
-  const { stdout } = await run(CAST, [...args, '--rpc-url', rpcUrl, '--account', ACCOUNT, '--password-file', PASS, '--json'], { maxBuffer: 1 << 24 });
-  return JSON.parse(stdout);
+export async function castSend(args, rpcUrl, sender) {
+  return sendOnce([...args, '--rpc-url', rpcUrl, '--account', ACCOUNT, '--password-file', PASS, '--json'], rpcUrl, sender);
 }
 export async function castCall(args, rpcUrl) {
   const { stdout } = await run(CAST, [...args, '--rpc-url', rpcUrl], { maxBuffer: 1 << 24 });

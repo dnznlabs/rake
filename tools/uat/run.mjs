@@ -9,7 +9,8 @@
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 import path from 'node:path';
-import { PAGE_SCRIPT, makeRpc, castCall } from './provider.mjs';
+import { PAGE_SCRIPT, makeRpc, castCall, castSend, payIn } from './provider.mjs';
+import * as W from './writes.mjs';
 import * as R from './rows.mjs';
 const COUNT_JS = fs.readFileSync(new URL('../../docs/milestones/m04/tasks/m04-t05/count.js', import.meta.url), 'utf8');
 
@@ -36,23 +37,17 @@ const shotsDir = arg('shots', path.resolve('../../docs/milestones/m04/tasks/m04-
 const results = [];
 let failed = null;
 
-/* The plan caps a screenshot at 300 KB. A full-page capture of `#/docs` is 1.3 MB, so the rule is:
-   take the whole page, and if it will not fit, take the viewport instead and say so in the record
-   rather than ship a PNG that breaks the cap or silently crop every row. */
+/* Viewport captures, neither scaled nor split (the architect's ruling, 2026-11-22, in rake#381): the
+   assertion is the evidence and the screenshot is illustration. A full-page `#/docs` is 1.3 MB, well
+   over the plan's 300 KB; a viewport shot is under it on every row. */
 const shot = async (page, name) => {
   if (control) return null;
   fs.mkdirSync(shotsDir, { recursive: true });
   const file = path.join(shotsDir, `${name}.png`);
-  await page.screenshot({ path: file, fullPage: true });
-  let bytes = fs.statSync(file).size;
-  let clipped = false;
-  if (bytes > 300 * 1024) {
-    await page.screenshot({ path: file, fullPage: false });
-    bytes = fs.statSync(file).size;
-    clipped = true;
-  }
-  if (bytes > 300 * 1024) throw new Error(`${name}.png is ${bytes} bytes even clipped to the viewport, over the 300 KB the plan sets`);
-  return { file: path.relative(process.cwd(), file), bytes, clipped };
+  await page.screenshot({ path: file, fullPage: false });
+  const bytes = fs.statSync(file).size;
+  if (bytes > 300 * 1024) throw new Error(`${name}.png is ${bytes} bytes, over the 300 KB the plan sets`);
+  return { file: path.relative(process.cwd(), file), bytes };
 };
 
 const row = async (id, fn, page, shotName) => {
@@ -61,7 +56,7 @@ const row = async (id, fn, page, shotName) => {
   try { facts = await fn(); } catch (e) { e.row = e.row || id; throw e; }
   const png = shotName ? await shot(page, shotName) : null;
   results.push({ row: id, facts, png });
-  console.log(`ok${png ? ` · ${png.bytes} B${png.clipped ? ' (viewport, full page over the cap)' : ''}` : ''}`);
+  console.log(`ok${png ? ` · ${png.bytes} B` : ''}`);
   return facts;
 };
 
@@ -69,8 +64,10 @@ const browser = await chromium.launch({ executablePath: EXEC, headless: true });
 try {
   /* ---- the wallet pass ---------------------------------------------------------------------- */
   const methods = [];
-  const { rpc } = makeRpc({ chainId, rpcUrl: chain.rpc, sender: R.ENGINEER, log: m => methods.push(m) });
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
+  const { rpc, sent } = makeRpc({ chainId, rpcUrl: chain.rpc, sender: R.ENGINEER, log: m => methods.push(m) });
+  /* Clipboard permission so row (j) exercises the branch a reader on an https origin takes, rather
+     than only the textarea fallback (`app/src/index.html:402`). Both branches are accepted. */
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 }, permissions: ['clipboard-read', 'clipboard-write'] });
   await ctx.exposeFunction('__uatRpc', (method, params) => rpc(method, params));
   await ctx.addInitScript(PAGE_SCRIPT);
   const page = await ctx.newPage();
@@ -96,7 +93,38 @@ try {
   }, page, 'c-console-first');
   await row('e', () => R.rowE(page), page, 'e-older');
   await row('d', () => R.rowD(page, { base, src: COUNT_JS }), page, 'd-console-second');
-  await row('l', () => R.rowL(page, { base }), page, 'l-docs');
+  /* Row (k) is Sepolia's by the script's own wording, and it is pending rather than driveable. */
+  if (chainId === 11155111) await row('k', () => R.rowK({ readFile: f => fs.readFileSync(new URL(`../../${f}`, import.meta.url), 'utf8') }), null, null);
+  await row('l', async () => {
+    const facts = await R.rowL(page, { base, shot: async name => { await shot(page, name); } });
+    return facts;
+  }, page, 'l-docs-widget');
+
+  /* ---- the writes --------------------------------------------------------------------------- */
+  /* Ascending by address on both chains, which `BadTable` requires: the UAT wallet, the engineer,
+     then the chain's receiver. The receiver refuses ETH until row (h) tells it not to, which is what
+     makes row (g)'s third share escrow. */
+  const table = pct => [
+    { name: 'uat', note: 'the product owner', addr: R.UAT_WALLET, pct: pct[0] },
+    { name: 'engineer', note: 'the engineer', addr: R.ENGINEER, pct: pct[1] },
+    { name: 'receiver', note: 'refuses until told not to', addr: chain.receiver, pct: pct[2] },
+  ];
+  let made = null;
+  if (!flag('reads-only')) {
+    /* `--reuse <addr>` drives (g) to (i) against a distribution an earlier run created, so iterating
+       on those rows costs no gas and no new contract. The committed run takes (f) for real. */
+    const reuse = arg('reuse', null);
+    if (reuse) {
+      made = { addr: reuse, salt: null, reused: true };
+      await page.evaluate(a => { location.hash = '#/distros/' + a; }, reuse);
+      await R.waitPainted(page, 180000);
+      console.log(`row f … reused ${reuse}`);
+    } else made = await row('f', () => W.rowF(page, { base, owner: R.ENGINEER, delay: '60', desc: 'm05-t01c driver UAT', rows: table([40, 30, 30]) }), page, 'f-created');
+    await row('g', () => W.rowG(page, { addr: made.addr, payIn, rpcUrl: chain.rpc, receiver: chain.receiver, castCall, castSend, sender: R.ENGINEER }), page, 'g-distributed');
+    await row('h', () => W.rowH(page, { receiver: chain.receiver, castSend, castCall, rpcUrl: chain.rpc, sender: R.ENGINEER }), page, 'h-released');
+    await row('i', () => W.rowI(page, { rows: table([41, 29, 30]) }), page, 'i-applied');
+    await row('j', () => W.rowJ(page, { base, vault: R.VAULT, rows: table([50, 50, 0]).slice(0, 2).map((r, i) => ({ ...r, pct: 50 })), sent }), page, 'j-calldata');
+  }
 
   /* ---- the no-wallet pass ------------------------------------------------------------------- */
   const bare = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
@@ -115,15 +143,22 @@ try {
   await browser.close();
 }
 
-const summary = { chainId, base, control, rows: results.length, shots: control ? null : shotsDir, failed: failed ? String(failed.message || failed) : null, failedRow: failed?.row ?? null };
+const summary = { chainId, base, control, rows: results.length, writes: results.filter(r => 'fghij'.includes(r.row)).length, shots: control ? null : shotsDir, failed: failed ? String(failed.message || failed) : null, failedRow: failed?.row ?? null };
 console.log(JSON.stringify(summary, null, 1));
 
 if (control) {
-  /* Failing is not enough: it has to fail on the row the control moved. A control that trips on the
-     probe or on row (a) has proved the harness broken, not the assertions live. */
-  if (failed && failed.row === 'c') { console.log('\ncontrol: the run failed on row (c) as it must — the driver can fail.'); process.exit(0); }
-  if (failed) { console.error(`\ncontrol: the run failed on row ${failed.row}, not on (c) — the harness is broken, not proven.`); process.exit(4); }
-  console.error('\ncontrol: the run PASSED at an address with no code, so the assertions prove nothing.');
+  /* The criterion is that the control run **exits non-zero** (m05-t01c step 9a), so every control
+     outcome is a failure exit and the message is what distinguishes them:
+       1 — failed on row (c), which is the control behaving: the assertions are live.
+       3 — passed at an address with no code, which means they prove nothing. The alarming one.
+       4 — failed on some other row, so the harness is broken rather than proven.
+     Failing is not enough on its own: it has to fail on the row the control moved. */
+  if (failed && failed.row === 'c') {
+    console.error(`\ncontrol: failed on row (c) as it must — the driver can fail. ${failed.message || failed}`);
+    process.exit(1);
+  }
+  if (failed) { console.error(`\ncontrol: failed on row ${failed.row}, not on (c) — the harness is broken, not proven. ${failed.message || failed}`); process.exit(4); }
+  console.error('\ncontrol: PASSED at an address with no code, so the assertions prove nothing.');
   process.exit(3);
 }
 if (failed) { console.error(`\n${failed.stack || failed}`); process.exit(1); }

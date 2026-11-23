@@ -42,11 +42,24 @@ export const painted = page => page.evaluate(() => {
   });
 });
 
+/* Reports which sections were still loading when it gave up, and does not pretend to know whose row
+   it was: the caller tags the error with its own id. A bare "still loading" says nothing about which
+   of the three was waiting or whether one was missing altogether. */
+export const sectionStates = page => page.evaluate(() => {
+  const IDS = ['funds', 'h-changes', 'h-funds'];
+  const LOADING = /^(loading…|reading the balances and the escrow…|reading…)$/;
+  return IDS.map(id => {
+    const el = document.getElementById(id);
+    if (!el) return `${id}:absent`;
+    return `${id}:${[...el.querySelectorAll('.notice')].some(n => LOADING.test(n.textContent.trim())) ? 'loading' : 'painted'}`;
+  }).join(' ');
+});
+
 export const waitPainted = async (page, ms = 120000) => {
   const t0 = Date.now();
   for (;;) {
     if (await painted(page)) return Date.now() - t0;
-    if (Date.now() - t0 > ms) { const e = new Error(`sections still loading after ${ms} ms`); e.row = 'c'; throw e; }
+    if (Date.now() - t0 > ms) throw new Error(`sections still loading after ${Math.round(ms / 1000)} s — ${await sectionStates(page)}`);
     await page.waitForTimeout(250);
   }
 };
@@ -138,7 +151,18 @@ export async function rowC(page, { base, addr = DNZN, patience = 120000, relatio
      the range came back empty. So the row asserts that the section painted and records whether the
      `Created` row was there; the absence is a finding about the endpoint, raised for amendment, and
      not something this driver passes over in silence. */
+  /* Ruled 2026-11-22 (rake#381): `Created` moves to row (i), on the distribution row (f) creates.
+     Here the row asserts the three sections painted, `activity` non-empty, and `changes` carrying
+     either `Created` or its empty line with nothing left to load. */
   truthy('c', '`changes` painted', r.changes.length > 0);
+  truthy('c', '`activity` is not empty', r.activity.length > 0);
+  /* The ruling reads "`Created`, or the empty line with nothing left to load". On the **first** load
+     there is still history to load — the section says so, and pressing it is row (e) — so the two
+     halves are asserted across the two rows rather than demanded of this one: here, `Created` or the
+     empty line; in row (e), that the boundary moves down or goes. Split this way the pair is stronger
+     than the clause, not weaker, and the deviation is stated rather than assumed. */
+  const changesOk = /created/i.test(r.changes) || /no change has been queued yet/i.test(r.changes);
+  truthy('c', '`changes` carries Created, or its empty line', changesOk);
   /* Amended 2026-11-22: its owner is the Ops vault, so the owner bar reads as NOT the owner —
      `ownerBar` returns nothing at all (`app/src/index.html:1747-1755`). */
   if (relation) {
@@ -157,7 +181,7 @@ export async function rowC(page, { base, addr = DNZN, patience = 120000, relatio
   return {
     ...r, msToPainted: ms, view: r.view.slice(0, 300), relation,
     createdRow: /created/i.test(r.changes),
-    createdRowNote: /created/i.test(r.changes) ? null : "absent: the factory's Created event is outside the range this endpoint serves (RUNBOOK.md:1944); raised for amendment",
+    createdRowNote: /created/i.test(r.changes) ? null : 'absent by construction: `changes` is built from CHANGE_EVENTS — Queued, Applied, Cancelled, OwnershipTransferred (app/src/index.html:961-962) — and the factory\'s Created is used only to find a distribution (:2229). No distribution shows a Created row; raised for amendment',
   };
 }
 
@@ -223,7 +247,30 @@ export async function rowE(page) {
   };
 }
 
-export async function rowL(page, { base } = {}) {
+/* Row (k), Sepolia only: the published host page of m04-t04 AC (e), with the widget mounted twice.
+   It cannot be driven, and the reason is in the repository rather than in the page: the file exists
+   at `docs/milestones/m04/tasks/m04-t04/host/index.html` and carries both mounts, but **no published
+   URL for it exists** — m04-t05's own § Step 2 records this row as "pending on t04 (e)" for the same
+   reason — and the file names **84532's** w3link base rather than a `dnzn.dev` one, so even published
+   it would not be the page this row describes. Recorded as pending with the evidence; the plan has a
+   row that cannot reach its expected state become an issue linked from the handoff. */
+export async function rowK({ readFile }) {
+  const file = 'docs/milestones/m04/tasks/m04-t04/host/index.html';
+  const html = readFile(file);
+  const mounts = (html.match(/data-rake=/g) || []).length;
+  const withRpc = (html.match(/data-rpc=/g) || []).length;
+  const script = (html.match(/<script src="([^"]+widget\.js)"/) || [])[1] || null;
+  eq('k', 'the host page carries two mounts', mounts, 2);
+  eq('k', 'one of them names its own endpoint', withRpc, 1);
+  truthy('k', 'it loads widget.js from a gateway', script);
+  return {
+    pending: true,
+    why: 'no published URL for the host page; m04-t05 § Step 2 records the same, and the committed file names 84532’s w3link base rather than a dnzn.dev one',
+    file, mounts, withRpc, script,
+  };
+}
+
+export async function rowL(page, { base, shot } = {}) {
   await page.evaluate(() => { location.hash = '#/docs'; });
   await page.waitForTimeout(1500);
   const r = await page.evaluate(() => ({
@@ -237,6 +284,8 @@ export async function rowL(page, { base } = {}) {
      so the number comes from the test and the row wants amending. The run records what it found. */
   eq('l', 'the section count', r.ids.length, DOCS_SECTIONS);
   eq('l', 'the Disclaimer is first', r.ids[0], 'disclaimer');
+  /* Two viewport shots, because the row navigates to both and one frame cannot show both (rake#381). */
+  if (shot) await shot('l-docs');
   await page.evaluate(() => { location.hash = '#/docs#widget'; });
   await page.waitForTimeout(1200);
   /* The snippet is in the article, after the `s-widget` heading — the heading itself is three words.
