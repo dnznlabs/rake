@@ -35,6 +35,24 @@ entry through the browser's own fetch. Landing panel, then the distribution page
 `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`. Every reading below filled the featured panel on every
 load with **0 page errors**.
 
+## A standing risk: Ethereum's margin, which no code change can widen
+
+The page promises a visitor with no wallet **the last 24 hours**. On Ethereum that is about **7,171
+blocks** at the measured 12.05 s a block, and `ethereum-rpc.publicnode.com` was measured serving about
+**10,000** before refusing with `Archive requests require a personal token` — ten of ten loads at full
+budget, corroborated by `cast` having 37 of 47 windows refused over the same range.
+
+**So the margin is about 2,830 blocks, or nine hours.** If the operator tightens that horizon below
+~7,200 blocks, every no-wallet read on Ethereum stops short of its day. The page stays honest —
+`dayHead` then says "as far back as this endpoint served" and the outcome line names the block — but
+the promise is gone, and **no change in this repository recovers it**: the endpoint decides. The
+`RUNBOOK.md` § The gateway check now re-reads this horizon before each mainnet upload.
+
+Sepolia has the same shape with more room: 6,923 blocks needed against a prune wall measured at
+11,231. The Base chains are not depth-limited at all — 24 hours is ~432,000 blocks against a
+2,000,000-block budget — but they need **nine windows a section** to cover it, which is the throttle
+exposure instead.
+
 ## What the columns mean
 
 **"Worst outcome per load" ranks read *quality*:**

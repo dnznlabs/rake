@@ -1554,6 +1554,20 @@ devbox run -- env VERIFY_SITE=https://rake.dnzn.dev VERIFY_ADDRESS=<App> \
 compares what the site serves byte for byte; **read its first line**, which names the address and the
 chains it actually checked, before reading its result.
 
+**And before each mainnet upload, re-read chain 1's horizon:**
+
+```sh
+devbox run -- node tools/rpc-depth.mjs --chain 1
+```
+
+The page promises a visitor with no wallet "last 24 hours", which on Ethereum is about **7,171 blocks**,
+and `ethereum-rpc.publicnode.com` was measured serving about **10,000** before refusing with
+`Archive requests require a personal token` (m05-t01d, 2026-11-23). **That margin is nine hours and
+nothing in this repository can widen it** — if the operator tightens the horizon below ~7,200 blocks,
+the heading stops being true on every load, and the page says what it reached instead (`dayHead`).
+A reading below that is not a reason to stop an upload; it is a reason to say so in the handoff and to
+raise the endpoint choice, because no code change recovers it.
+
 **Two things the caller must not do**, both learned by doing them:
 
 - **No `concurrency` block.** The called workflow declares the group `pages` itself; a caller naming
