@@ -590,6 +590,10 @@ async function logs(address, topics, fromBlock, toBlock) {
 
      So the cause is recorded the moment it is seen, and whichever return happens carries it. */
   let wall = null;
+  // The last refusal seen, for the "nothing was answered" check at the end: a walk can be refused
+  // from the first window to the last without ever reaching the one-block case, if the budget runs
+  // out while it is still halving.
+  let lastText = null;
   while (hi >= from && spent < MAX_WINDOWS) {
     /* The next few windows at the current size, newest-first and contiguous, so everything above `hi`
        has been read and the boundary below it is a single number rather than a set of holes. */
@@ -604,6 +608,7 @@ async function logs(address, topics, fromBlock, toBlock) {
     for (const r of (i < 0 ? res : res.slice(0, i))) { out.push(...r.ok); answered++; }
     if (i < 0) { hi = batch[batch.length - 1][0] - 1; continue; }
     const top = batch[i][1], text = res[i].err, cap = Model.rangeCap(text);
+    lastText = text;
     /* The fourth clause reads the error *object*, not the text: a wallet can replace a provider's
        range refusal with one of its own that says only `RPC endpoint returned HTTP client error.`,
        and nothing above matches that sentence, so before this clause existed the first window of
@@ -664,6 +669,12 @@ async function logs(address, topics, fromBlock, toBlock) {
      and the refusal is the one a reader can act on. `wall: null` is explicit otherwise: every caller
      distinguishes "ran out of windows" from "the endpoint refused", and an absent key reads as
      neither. */
+  /* Windows were attempted and not one was answered: that is the "nothing at all" case, wherever the
+     walk happened to stop. It reached here rather than the one-block case because halving 10,000
+     down to 1 costs more windows than the budget holds — so without this, an endpoint that refused
+     every single window returned a boundary and a wall as though something had been read, and the
+     sections would have painted an empty history as fact. Found by the test for a nonsense cap. */
+  if (!answered && spent) throw new Error(lastText || 'no window was answered');
   return { logs: out, partial: hi >= from ? hi + 1 : null, wall };
 }
 

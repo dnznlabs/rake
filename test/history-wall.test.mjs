@@ -59,7 +59,8 @@ const EVENT = { blockNumber: '0x1', logIndex: '0x0', topics: ['0xaa'], data: '0x
  *  body, which is what a 429 arrives as — it fires once the given number of requests have been made.
  */
 const NO_CAP = 1_000_000_000;   // `capped` refuses anything wider than `cap`, so "no cap" is a large one, never 0
-function walk({ cap = NO_CAP, prune = 0, rate = 0, head = 1_000_000, events = true, pruneSays = '' } = {}) {
+function walk({ cap = NO_CAP, prune = 0, rate = 0, head = 1_000_000, events = true, pruneSays = '',
+                refuseAllSaying = '', refuseAfter = 0 } = {}) {
   const src = `
     const WINDOW_START = 10000, WINDOW_INFLIGHT = 4;
     let MAX_WINDOWS = 40;
@@ -90,7 +91,18 @@ function walk({ cap = NO_CAP, prune = 0, rate = 0, head = 1_000_000, events = tr
         return base.request({ method, params });
       },
     };
-    const P = capped(PRUNE_SAYS ? speaking : base, CAP, PRUNE_SAYS ? 0 : PRUNE, 0);
+    /* An endpoint that refuses every window with a sentence of its own choosing, optionally after
+       answering a few. This is where a cap that is zero, negative or not a number comes from: the
+       page reads the digits out of whatever it was told. */
+    const nonsense = {
+      request: async ({ method, params }) => {
+        asks++;
+        if (method === 'eth_getLogs' && asks > REFUSE_AFTER) throw { code: -32614, message: REFUSE_ALL_SAYING };
+        served++;
+        return EVENTS ? [EVENT] : [];
+      },
+    };
+    const P = REFUSE_ALL_SAYING ? nonsense : capped(PRUNE_SAYS ? speaking : base, CAP, PRUNE_SAYS ? 0 : PRUNE, 0);
     ${RANGEY}
     ${ERRTEXT}
     ${STATED_FLOOR}
@@ -101,8 +113,9 @@ function walk({ cap = NO_CAP, prune = 0, rate = 0, head = 1_000_000, events = tr
     ${LOGS}
     return { logs, asks: () => asks, served: () => served };
   `;
-  return new Function('Model', 'EVENT', 'CAP', 'PRUNE', 'RATE', 'HEAD', 'EVENTS', 'PRUNE_SAYS', src)(
-    Model, EVENT, cap, prune, rate, head, events, pruneSays);
+  return new Function('Model', 'EVENT', 'CAP', 'PRUNE', 'RATE', 'HEAD', 'EVENTS', 'PRUNE_SAYS',
+    'REFUSE_ALL_SAYING', 'REFUSE_AFTER', src)(
+    Model, EVENT, cap, prune, rate, head, events, pruneSays, refuseAllSaying, refuseAfter);
 }
 
 /** `partialLine` over a given history result, so the assertion is the sentence, not a flag. */
@@ -194,6 +207,43 @@ test('forty answered windows holding no events is a read history, not an unavail
 test('the budget is unchanged: 40 windows per kind, 4 in flight (#165)', () => {
   assert.match(line('let MAX_WINDOWS ='), /=\s*40\b/, '#165 is out of scope for this task');
   assert.match(line('const WINDOW_INFLIGHT ='), /=\s*4\b/);
+});
+
+/* A cap arrives as whatever digits an endpoint chose to put in a sentence, and `CAPS`' regexes will
+   match them. None of that is in our control, so none of it may reach `size` unchecked: a window of
+   zero or fewer yields no windows at all, and the walk then read `batch[-1][0]` and threw a
+   `TypeError` out of itself — the one failure the page cannot describe. Found by passing `cap: 0` to
+   the `capped` helper by mistake, which is exactly how a real endpoint would do it. */
+test('a cap of zero, negative, or no number at all halves instead of crashing', async () => {
+  for (const says of [
+    'eth_getLogs is limited to a 0 range',
+    'eth_getLogs is limited to a -5 range',
+    'eth_getLogs is limited to a lot range',
+    'eth_getLogs is limited to a 00000 range',
+  ]) {
+    const w = walk({ refuseAllSaying: says, head: 1_000_000 });
+    /* Nothing is ever answered here, so the walk must end in the one honest way: a thrown error that
+       paints `history unavailable`. What it must never do is throw a `TypeError` from inside itself. */
+    await assert.rejects(
+      () => w.logs('0xabc', [['0xaa']], 0),
+      e => {
+        assert.ok(!(e instanceof TypeError), `"${says}" crashed the walk: ${e && e.message}`);
+        return true;
+      },
+      `"${says}" must end the walk, not break it`,
+    );
+  }
+});
+
+test('a cap of zero does not stop a walk that had already read something', async () => {
+  // The same nonsense cap, but after eight windows have been answered: what was read is kept and the
+  // stop is described, rather than the whole read dying on an endpoint's bad arithmetic.
+  const w = walk({ refuseAllSaying: 'eth_getLogs is limited to a 0 range', refuseAfter: 8, head: 1_000_000 });
+
+  const r = await w.logs('0xabc', [['0xaa']], 0);
+
+  assert.ok(r.logs.length > 0, 'what was read before the nonsense is kept');
+  assert.ok(r.partial != null, 'and the boundary is still a number');
 });
 
 test('statedFloor reads the block an endpoint names, and nothing else', () => {
