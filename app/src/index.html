@@ -585,7 +585,15 @@ const errText = e => [e && e.message, e && e.data && e.data.message, e && e.caus
   .filter(Boolean).join(' · ');
 /* A refusal about the *size* of the range rather than its content. `Model.rangeCap` reads the two
    shapes that name their number; these are the ones that complain without naming one, where halving
-   is the only move left. Anything else is a real failure and is thrown to the caller, which paints it. */
+   is the only move left. Anything else is a real failure and is thrown to the caller, which paints it.
+
+   **One measured shape here is not a cap at all, and should not later be read as one.** `base-rpc.
+   publicnode.com` answered `block range extends beyond current head block: requested 61125860, head
+   61125859` once in ten cold loads on 2026-11-23: a pooled hostname whose backends are one block
+   apart, so the head this page read came from a backend one ahead of the one that served the query.
+   It matches `\brange\b` and the walk halves for it, which costs a window and then succeeds — the
+   right behaviour by accident, and worth leaving alone. What it must not become is an entry in
+   `rangeCap`'s list of endpoints that cap a span, because no endpoint capped anything here. */
 const RANGEY = /\brange\b|too many|more than \d+ results|response size|\blimit/i;
 /* The first block an endpoint admits to keeping, when its refusal says so — `4444 pruned history
    unavailable: requested 360085, earliest available 1000000`. Taken in preference to any boundary a
