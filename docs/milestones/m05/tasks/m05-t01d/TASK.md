@@ -90,6 +90,28 @@ with no wallet, and this task does not pretend one does.
        day; and `tools/uat/` gains a run with the injected provider pointed at each chain's
        wallet-default endpoint (`sepolia.base.org` for 84532), since the driver's provider has
        so far used the chain's good endpoint and could not see this.
+   - **Amended 2026-11-23, from the second preview: the page reads its own chain through its
+     own provider, everywhere.** #400 moved the history's first read. Three more sites still
+     read through a wallet merely because one is there, and each has now failed for a real
+     wallet: the `#/docs` widget demo, which picks its reader on `window.ethereum` existing, so
+     a visitor with a wallet installed on another network sees `wallet is on base sepolia,
+     distribution is on sepolia · retry` where the documentation should show a working example
+     (found by the Product Owner); every state read (`call()`, `readFunds`, the balances), which
+     is what a throttled wallet endpoint refused in #401; and `readClock()`, which stops the
+     boot on an endpoint that will not serve block headers
+     ([#402](https://github.com/dnznlabs/rake/issues/402)). One rule replaces the three fixes:
+     - **Every read of the chain the document was built for goes through the page's read
+       provider**, with a wallet or without: state, balances, code, block headers, the head,
+       names, the preflight, and the history's first read.
+     - **The wallet's provider is used for exactly four things:** the accounts, the chain it is
+       on, sending a transaction, and the `load older` press (and the "mine" scan, which is the
+       same kind of deep read).
+     - The `#/docs` demo reads through the page's endpoint always; the dev override still wins.
+     - **Check:** a test that fails on any `P.request` outside those four uses; `tools/uat/`'s
+       wallet-default run asserts that on first paint the wallet's endpoint received only
+       `eth_accounts` and `eth_chainId`; a wallet endpoint that refuses every other method
+       still paints the landing, a distribution page and `#/docs` in full; and a wallet
+       installed on another chain, not connected, sees the demo's table. Closes #402.
    - **Hidden escrow is detected exactly, from state.** The amount of an escrow is already
      read from state; only finding which account holds one comes from `Escrowed` logs, and
      `_set` never clears `escrowed`, so an escrow outlives its account's removal from the
