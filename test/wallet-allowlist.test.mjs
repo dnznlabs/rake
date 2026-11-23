@@ -143,6 +143,35 @@ test('the docs demo reads the page\'s endpoint, whatever a wallet is doing', () 
     'with no page endpoint the demo asks for a connected wallet on this chain rather than mounting through any wallet');
 });
 
+test('the landing\'s featured widget reads the page\'s endpoint too', () => {
+  /* The same defect as the docs demo, one screen earlier and not in the ruling's list of three: this
+     handed the widget nothing whenever a wallet was present, so the featured widget read through
+     whichever endpoint the wallet had picked. Found by `tools/uat/own-reads.mjs`'s hostile case as an
+     `eth_call` reaching a wallet that refuses everything, not by reading the page. */
+  const at = CODE.indexOf('if (!S.featured) return;');
+  assert.ok(at > 0, 'app/src/index.html no longer paints a featured widget — this test reads that path');
+  const fn = CODE.slice(at, CODE.indexOf('RakeWidget.mount', at));
+  assert.match(fn, /const rpc = WRPC \|\| PUBLIC_RPC\[CFG\.chainId\] \|\| ''/,
+    'the featured widget takes the page\'s endpoint, with the dev override ahead of it');
+  assert.doesNotMatch(fn, /WALLET \? ''/, 'a wallet being present may not decide what the landing reads through');
+  assert.match(fn, /ACC && !wrongChain\(\)/,
+    'and where there is no endpoint of ours, only a connected wallet on this chain may stand in');
+});
+
+test('the boot has no chain gate: a wallet elsewhere does not stop the page reading', () => {
+  /* **The second gate.** Removing `route()`'s was not enough: `load()` returned early on a wrong
+     chain, so the boot made two requests and the page painted nothing — measured, not reasoned. Its
+     premise ("the same address on another network is another contract") was true only while these
+     reads went through the wallet. */
+  const at = CODE.indexOf('async function load() {');
+  assert.ok(at > 0, 'app/src/index.html no longer declares `load` — this test reads it');
+  const fn = CODE.slice(at, CODE.indexOf('\n}\n', at));
+  assert.doesNotMatch(fn, /wrongChain\(\)/,
+    'the boot reads the document\'s chain through the document\'s provider, whatever the wallet is on');
+  assert.match(fn, /CHAIN = asChain\(await P\.request\(\{ method: 'eth_chainId' \}\)\)/,
+    'it still records which chain the wallet is on — that is what the write refusal and the bar need');
+});
+
 test('the press and the mine scan are the wallet\'s, and say so where they are written', () => {
   /* The two deep reads the rule keeps on the wallet. Asserted so that a later sweep of `P` out of the
      page does not take them with it: they are the exception that #400 and #391 are built on. */
