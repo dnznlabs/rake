@@ -436,3 +436,42 @@ test('the same when no header is readable, rather than a throw — and the claim
      survived a mutation until this line existed. */
   assert.equal(c.exact(), false, 'an unmeasured floor must not be claimed as the exact day');
 });
+
+test("near()'s cost is the figure the comment states: 5 clamped, 9 free, 10 for the two anchors", async () => {
+  /* The worst case is documented beside `DAY_STEPS`, so it is asserted rather than asserted-by-comment
+     — and the first version of this test asserted **nine**, which the comment also said, and both were
+     wrong. `near()` is clamped by the bracket it is given: the `hi` anchor can only walk *down* and the
+     `floor` anchor only *up*, so each costs 5 and the pair costs 10, not 9. Nine is the free-space
+     figure, which a mid-bracket step pays. A figure in a comment is worth exactly as much as the
+     assertion under it. */
+  const head = 20_000_000;
+  const c = chain({ sec: 12, head, floor: 0, chainId: 1, missing: () => true });
+  await c.dayFloor(head, 0);
+  assert.equal(c.reads.length, 10,
+    `the two clamped anchors should cost 5 each; they cost ${c.reads.length}: ${c.reads.join(', ')}`);
+  assert.equal(new Set(c.reads).size, 10, 'all distinct — no block asked twice');
+  assert.deepEqual(c.reads.slice(0, 5), [head, head - 1, head - 2, head - 3, head - 4],
+    'the hi anchor walks downward only, because up is clamped to hi');
+  assert.deepEqual(c.reads.slice(5), [0, 1, 2, 3, 4],
+    'and the floor anchor upward only');
+});
+
+test('a mid-bracket step pays the free-space figure of nine', async () => {
+  /* Anchors readable, everything in the middle missing: the first secant guess then walks ±4 and
+     finds nothing, which is the 9 the comment claims for free space. */
+  const head = 20_000_000, floor = 1_000_000;
+  const c = chain({ sec: 12, head, floor, chainId: 1,
+    missing: n => n !== head && n !== floor });
+  await c.dayFloor(head, floor);
+  const mid = c.reads.slice(2);                    // after the two anchors, which answer
+  /* **Two groups of nine, not one.** The seeded secant step pays 9 and finds nothing, which breaks the
+     step loop; bisection then takes its one probe and pays 9 for the same reason. So the free-space
+     figure is confirmed at 9 *per attempt* — which is what the comment claims — and the total here is
+     18 because two attempts are made. Asserting 9 was my own misreading of the control flow. */
+  const seed = head - Math.round(86_400 / 12);
+  assert.deepEqual(mid.slice(0, 9),
+    [seed, seed - 1, seed + 1, seed - 2, seed + 2, seed - 3, seed + 3, seed - 4, seed + 4],
+    'the secant step walks outward from the seed, nine blocks in free space');
+  assert.equal(mid.length, 18, `one secant attempt and one bisection probe, nine each: ${mid.length}`);
+  assert.equal(new Set(mid.slice(9)).size, 9, 'and the bisection probe pays the same nine');
+});

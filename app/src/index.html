@@ -587,8 +587,18 @@ const head = () => HEAD ?? (HEAD = P.request({ method: 'eth_blockNumber' }).then
    **Seed, then confirm** (the architect's ruling, 2026-11-23): a nominal block time is allowed as a
    first guess and never as the answer. So the search starts at `head - a day / nominal`, reads the
    timestamp there, and corrects by secant steps that use the rate **measured between two real
-   headers**. At most `DAY_STEPS` reads; if that has not converged it falls back to bisection, which
-   cannot fail to, rather than iterating a secant that is not settling.
+   headers**. At most `DAY_STEPS` secant steps; if those have not converged it falls back to bisection,
+   which cannot fail to, rather than iterating a secant that is not settling.
+
+   **What a step costs, worst case, because `DAY_STEPS` is steps and not reads.** Each step asks
+   `near()` for a readable header, and against a pool returning nulls that walks outward to ±4 blocks:
+   **at most 9 reads in free space** (`n`, then ±1 to ±4), and **5 when clamped against one end of the
+   bracket**, which is what the two anchor lookups are — so the anchors alone cost **10** in the
+   all-null case. Both figures are asserted in `test/day-read.test.mjs` rather than left as a claim
+   here: a first version of this comment said 9 for the anchors and was wrong, because each is clamped
+   and walks one way only. Four secant attempts and a bisection probe on top of that is 55 reads in
+   the pathological case. When headers answer normally it is **4 to 6 a load**, which is what all
+   four chains measured. The bisection behind the steps is bounded by the bracket, not by `DAY_STEPS`.
 
    The tolerance is a minute. "The last 24 hours" is a statement about a day, and a block either side
    of the mark changes nothing a reader can see, so paying extra reads to land exactly is waste. */
@@ -623,7 +633,10 @@ async function dayFloor(hi, floor) {
   /* A block a backend does not have is stepped around rather than fatal: a few blocks either way
      cannot matter to a figure whose tolerance is a minute. */
   const near = async (n, lo, up) => {
-    for (let k = 0; k <= 4; k++) for (const m of [n - k, n + k]) {
+    /* Nine distinct blocks at most: `n`, then ±1 to ±4. `k === 0` is asked once rather than twice —
+       `n - 0` and `n + 0` are the same block, so the pair would have spent a second request
+       re-confirming the same null. */
+    for (let k = 0; k <= 4; k++) for (const m of (k === 0 ? [n] : [n - k, n + k])) {
       if (m < lo || m > up) continue;
       const t = await tsOf(m);
       if (t != null) return [m, t];
@@ -675,10 +688,12 @@ let DAYFLOOR = null;
 async function readFloor(d, hi) {
   const own = Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock));
   if (WALLET) return own;
-  /* **The floor search may never cost the page its history.** It is an optimisation of where to start
-     reading; if it cannot be done, reading from the distribution's own first block is the honest
-     fallback and the four outcomes describe whatever that read reaches. Before this, a single `null`
-     block rejected here and `paintFailed` wrote `history unavailable` over all three sections. */
+  /* **The floor search may never cost the page its history** — before this, a single `null` block
+     rejected here and `paintFailed` wrote `history unavailable` over all three sections. But the
+     fallback is **the seed, not the distribution's own block**: with no wallet that block is the deep
+     walk this amendment replaces, 40 windows a kind against a day's nine on Base, reading far past
+     what was ruled. The seed is an unconfirmed day, which still bounds the walk and which `DAY_EXACT`
+     makes the heading admit to. */
   try {
     return Math.max(own, await (DAYFLOOR ||= dayFloor(hi, own)));
   } catch {
