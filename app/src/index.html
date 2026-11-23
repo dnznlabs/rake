@@ -80,12 +80,19 @@ const EXPLORER = { 1: 'https://etherscan.io', 10: 'https://optimistic.etherscan.
 
    **Sepolia is unchanged, and the reason is worth more than the measurement that argued for moving
    it.** `sepolia.gateway.tenderly.co` serves 100,000-block windows and 5,000,000 blocks of depth
-   against this endpoint's 10,000, and on that table it was the obvious choice. Driven in a browser it
-   **never fills the landing page**: the featured panel was still empty after 60 seconds, every time,
-   where the endpoint here fills it on the first try. The page's boot fires a burst of parallel reads
-   and Tenderly answered 19 of 40 under that kind of pressure; `cast` calls against it all succeed,
-   which is exactly why a flat request count was the wrong instrument. Depth that cannot paint is
-   worth nothing, so the shallower endpoint stays and `load older` carries what it cannot reach.
+   against this endpoint's 10,000, and on that table it was the obvious choice. Driven in a real page
+   it **never filled the landing panel**: still empty after 60 seconds, every time, where the endpoint
+   here fills it on the first try. The page's boot is a burst of parallel `eth_call`s, and Tenderly
+   answered 19 of 40 under that kind of pressure; single `cast` calls against it all succeed, which is
+   why a flat request count was the wrong instrument. Depth that cannot paint is worth nothing.
+
+   **Precisely what was driven, because it bounds the claim:** the page ran at
+   `rake.dnzn.dev/11155111/`, which serves the *previous* document, and the reads went through the
+   UAT driver's **injected** provider — `window.ethereum` relaying to node, which called Tenderly. So
+   what is measured is Tenderly under the page's own burst **as relayed from node**, not a browser's
+   own connections with their per-host limits. The burst is the page's; the transport was not. A
+   browser-native comparison across all four chains is `tools/rpc-cold.mjs`, and its table is in the
+   handoff.
 
    **`0xrpc.io` measured best on chain 1 and is deliberately not here.** 10,000-block spans, 5,000,000
    blocks deep, 40 of 40 under pressure — and no operator named anywhere on its own site, which

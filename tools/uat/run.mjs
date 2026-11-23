@@ -9,6 +9,8 @@
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { PAGE_SCRIPT, makeRpc, castCall, castSend, payIn, CAST } from './provider.mjs';
 import * as W from './writes.mjs';
@@ -60,7 +62,24 @@ const chain = CHAINS[chainId];
 if (!chain) { console.error(`run.mjs: --chain must be one of ${Object.keys(CHAINS).join(', ')}`); process.exit(2); }
 const base = (arg('base', 'https://rake.dnzn.dev')).replace(/\/$/, '') + `/${chainId}/`;
 const control = flag('control');
-const shotsDir = arg('shots', path.resolve('../../docs/milestones/m04/tasks/m04-t05/shots', control ? 'control' : String(chainId)));
+/* **Screenshots go to a temp directory unless somebody asks for the record.** The default used to be
+   `docs/milestones/m04/tasks/m04-t05/shots/<chain>` — m05-t01c's *merged* acceptance evidence — so
+   every exploratory run silently rewrote files another task had already shipped. Two of them were
+   overwritten by diagnostic runs during m05-t01d and caught in `git status` before they reached a
+   commit; the next pair might not be. Remembering not to is not a fix, so the default cannot write
+   into the repository at all: `--acceptance` is the word that says these shots are the record, and
+   an explicit `--shots <dir>` still goes wherever it is pointed.
+
+   `ACCEPTANCE_SHOTS` is relative to this file, not to the caller's cwd, so the run writes the same
+   place whether it is started from `tools/uat` or from the repository root. */
+const ACCEPTANCE_SHOTS = fileURLToPath(new URL('../../docs/milestones/m04/tasks/m04-t05/shots/', import.meta.url));
+const acceptance = flag('acceptance');
+const shotsDir = arg('shots', acceptance
+  ? path.join(ACCEPTANCE_SHOTS, control ? 'control' : String(chainId))
+  : path.join(os.tmpdir(), `rake-uat-${control ? 'control' : chainId}-${process.pid}`));
+if (!acceptance && !arg('shots', '')) {
+  console.log(`shots: ${shotsDir} (temporary — pass --acceptance to write the record under docs/)`);
+}
 
 /* `--rows` runs a named subset. It existed because **84532's history rows could not pass while #382
    stood** — rake#383 amended step 9a to run (a), (l), (w3) and the probe there and record the rest as

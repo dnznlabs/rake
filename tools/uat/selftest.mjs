@@ -8,6 +8,7 @@
    `new RegExp`, and this file proves they match what the page actually prints.
 
    Run: node selftest.mjs — exits non-zero on the first pattern that does not do its job. */
+import { readFileSync } from 'node:fs';
 import { PATTERNS } from './rows.mjs';
 
 const CASES = [
@@ -51,6 +52,29 @@ const KINDS = [
   [/(^|\s)(in|distributed|escrowed|released|claimed)\s/i, 'history unavailable', false],
 ];
 
+/* Not a pattern but a property of the runner, and it belongs here because it is the same kind of
+   claim: something the driver does that nobody can see by reading a row. The default screenshot
+   directory must not be inside the repository. It used to be m05-t01c's merged acceptance evidence,
+   so an exploratory run rewrote files another task had shipped — twice, during m05-t01d. */
+function checkShotsDefault() {
+  const src = readFileSync(new URL('./run.mjs', import.meta.url), 'utf8');
+  const fails = [];
+  if (!/const acceptance = flag\('acceptance'\)/.test(src)) {
+    fails.push('run.mjs has no --acceptance flag: the record and a trial run are not told apart');
+  }
+  /* The default branch must reach for the OS temp directory, and the `docs/` path must sit behind the
+     flag. Both halves are asserted: a default of `os.tmpdir()` with the docs path still reachable by
+     accident would read as fixed and not be. */
+  if (!/os\.tmpdir\(\)/.test(src)) fails.push('run.mjs does not default its shots to a temp directory');
+  const docsUse = src.match(/ACCEPTANCE_SHOTS[^\n]*/g) || [];
+  if (!docsUse.some(l => /acceptance\s*\n?\s*\?/.test(src.slice(src.indexOf(l))) || /acceptance\s*\?/.test(src))) {
+    fails.push('the docs/ shots path is not behind --acceptance');
+  }
+  for (const f of fails) console.log(`FAIL ${f}`);
+  if (!fails.length) console.log('ok   the default shots directory is outside the repository, and docs/ is behind --acceptance');
+  return fails.length;
+}
+
 export function check({ quiet = false } = {}) {
 let bad = 0;
 for (const [name, text, want, capture] of CASES) {
@@ -65,8 +89,12 @@ for (const [re, text, want] of KINDS) {
   if (got !== want) { bad++; console.error(`FAIL ${re} on ${JSON.stringify(text)}: matched ${got}, expected ${want}`); }
   else if (!quiet) console.log(`ok   ${String(re)} ${want ? 'matches' : 'refuses'} ${JSON.stringify(text.slice(0, 48))}`);
 }
-if (!quiet) console.log(bad ? `\n${bad} pattern(s) do not do their job.` : `\nall ${CASES.length + KINDS.length} patterns do their job.`);
-return { bad, total: CASES.length + KINDS.length };
+// The runner's own default, checked with the patterns rather than beside them: `run.mjs` refuses to
+// start if this file reports anything bad, so a driver that could overwrite another task's evidence
+// does not start either.
+bad += checkShotsDefault();
+if (!quiet) console.log(bad ? `\n${bad} check(s) do not do their job.` : `\nall ${CASES.length + KINDS.length} patterns do their job, and the shots default is outside the repository.`);
+return { bad, total: CASES.length + KINDS.length + 1 };
 }
 
 /* Run directly: `node selftest.mjs`. Imported by `run.mjs`, which refuses to start if a pattern is
