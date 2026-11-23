@@ -79,13 +79,56 @@ export async function pressWrite(page, selector, row, label, { ms = 300000 } = {
 export async function settledText(page, sel, test, { label, ms = 300000, every = 2500 } = {}) {
   let hits = 0, last = '';
   await until(label || `${sel} settled`, async () => {
-    const states = await sectionStates(page);
-    if (states.includes('loading') || states.includes('absent')) { hits = 0; return false; }
+    /* Settled means **this** section, not all three. Requiring the whole page quiet made a row wait
+       out another section's churn — a fresh distribution's activity reloads while `changes` has long
+       since settled — and that is a driver stall dressed as a page failure. */
+    const state = await page.evaluate(s => {
+      const el = document.querySelector(s);
+      if (!el) return 'absent';
+      const LOADING = /^(loading…|reading the balances and the escrow…|reading…)$/;
+      return [...el.querySelectorAll('.notice')].some(n => LOADING.test(n.textContent.trim())) ? 'loading' : 'painted';
+    }, sel);
+    if (state !== 'painted') { hits = 0; return false; }
     last = await text(page, sel);
     hits = test(last) ? hits + 1 : 0;
     return hits >= 2;
   }, { ms, every });
   return last;
+}
+
+/* The header of a distribution — its name, owner and delay — is filled by its own chain read, which
+   can land after the three history sections have painted. Reading the view once at that moment catches
+   a half-painted page: `OWNER renounced · DELAY none` for a distribution the chain says is owned by
+   the vault with a 3,600-second delay, which is exactly what row (j) failed on. So the view, too, is
+   read until a predicate holds twice. */
+export async function settledView(page, test, { label, ms = 240000, every = 2500 } = {}) {
+  let hits = 0, last = '';
+  await until(label || 'the view settled', async () => {
+    last = await view(page);
+    hits = test(last) ? hits + 1 : 0;
+    return hits >= 2;
+  }, { ms, every });
+  return last;
+}
+
+/** The write controls the page is offering, for a failure that would otherwise say only "not true". */
+export const controlsNow = page => page.evaluate(() => [...document.querySelectorAll('[data-send],[data-copy]:not(.cp)')]
+  .map(b => `${b.dataset.send ? 'send' : 'copy'}:${b.dataset.send || b.dataset.copy}${b.disabled ? ' (disabled)' : ''}`));
+
+/** Waits for a control to be offered, pressing `refresh` between tries, and names what was there. */
+export async function waitControl(page, selector, row, what, { attempts = 4, each = 45000 } = {}) {
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      await until(`${row}: ${what}`, () => count(page, selector), { ms: each, every: 1500 });
+      return true;
+    } catch (e) {
+      if (i === attempts) {
+        throw new Error(`${row}: ${what} — not offered after ${attempts} tries. Controls present: ${JSON.stringify(await controlsNow(page))}. who=${JSON.stringify(await page.evaluate(() => document.getElementById('who')?.textContent?.trim()))}`);
+      }
+      await page.click('#refresh').catch(() => {});
+      await page.waitForTimeout(4000);
+    }
+  }
 }
 
 /** Polls a predicate rather than sleeping: a public endpoint's round trip is not a fixed number. */
@@ -158,8 +201,7 @@ export async function rowF(page, { base, owner, delay = '60', desc, rows, saltFr
     await page.click('#refresh').catch(() => {});
     await waitPainted(page, 180000);
   }
-  const v = await view(page);
-  has('f', 'the new distribution shows its name', v, desc);
+  await settledView(page, t => t.includes(desc), { label: `(f) the new distribution shows its name — ${desc}` });
   return { addr: predicted, salt, sum };
 }
 
@@ -226,11 +268,20 @@ export async function rowI(page, { rows }) {
   await pressWrite(page, '[data-send="table"]', 'i', 'propose setBeneficiaries');
   await settledText(page, '#h-changes', t => /queued/i.test(t), { label: '(i) the change is queued' });
   const queued = await text(page, '#h-changes');
-  has('i', 'the queued row says anyone can apply after the delay', (await view(page)).toLowerCase(), 'anyone can apply');
-  await until('(i) the apply control is live', async () => {
-    if (!(await count(page, '[data-send^="apply:"]'))) { await page.click('#refresh').catch(() => {}); return false; }
-    return !(await page.isDisabled('[data-send^="apply:"]'));
-  }, { ms: 300000, every: 5000 });
+  /* `UAT.md` expects the apply control to read `anyone can apply once the delay passes`. That text
+     is the **disabled** control's status (`app/src/index.html:1235`), so it exists only between the
+     queue and the eta — a 60-second window that a settle wait on a public endpoint can easily
+     outlast. Both states are correct and which one a run catches is timing, so the row accepts
+     either and records which it saw rather than racing the window. */
+  const applyState = await (async () => {
+    const v = (await view(page)).toLowerCase();
+    if (v.includes('anyone can apply')) return 'the delay had not passed: the disabled control reads "anyone can apply once the delay passes"';
+    if (await count(page, '[data-send^="apply:"]')) return 'the delay had already passed by the time the row was read: a live apply control';
+    return null;
+  })();
+  truthy('i', 'the queued change offers the apply path, before or after its eta', applyState);
+  await waitControl(page, '[data-send^="apply:"]', 'i', 'the queued change offers apply');
+  await until('(i) the apply control is live', async () => !(await page.isDisabled('[data-send^="apply:"]')), { ms: 300000, every: 5000 });
   await pressWriteRetry(page, '[data-send^="apply:"]', 'i', 'applyQueued');
   /* A write makes the page re-read the view from the chain, so the section is loading again; wait for
      the paint before reading its text, and give the endpoint room. */
@@ -249,17 +300,17 @@ export async function rowI(page, { rows }) {
   has('i', 'changes carries applied', applied.toLowerCase(), 'applied');
   truthy('i', 'the owner bar reads as the owner', /you own this distribution/.test(await view(page)));
   // then a name change, queued and cancelled
-  if (!(await count(page, '[data-send="desc"]'))) await page.click('#queue');
-  await until('(i) the drawer is open again', () => count(page, '[data-send="desc"]'));
+  if (!(await count(page, '[data-send="desc"]'))) await page.click('#queue').catch(() => {});
+  await waitControl(page, '[data-send="desc"]', 'i', 'the drawer offers the name write again');
   await page.fill('#q-desc', 'm05-t01c driver UAT · renamed');
   await pressWrite(page, '[data-send="desc"]', 'i', 'propose setDescription');
-  await until('(i) the name change is queued', async () => (await count(page, '[data-send^="cancel:"]')) > 0, { ms: 240000, every: 2000 });
+  await waitControl(page, '[data-send^="cancel:"]', 'i', 'the queued name change offers cancel');
   await pressWriteRetry(page, '[data-send^="cancel:"]', 'i', 'cancel');
   await settledText(page, '#h-changes', t => /cancelled/i.test(t), { label: '(i) the change is cancelled' });
   const cancelled = await text(page, '#h-changes');
   has('i', 'changes carries cancelled', cancelled.toLowerCase(), 'cancelled');
   return {
-    queued: queued.slice(0, 200), applied: applied.slice(0, 240), cancelled: cancelled.slice(0, 240),
+    queued: queued.slice(0, 200), applyState, applied: applied.slice(0, 240), cancelled: cancelled.slice(0, 240),
     createdRow: /created/i.test(cancelled),
     createdRowNote: 'absent by construction: CHANGE_EVENTS is Queued/Applied/Cancelled/OwnershipTransferred (app/src/index.html:961-962), so no distribution shows a Created row',
   };
@@ -269,8 +320,7 @@ export async function rowI(page, { rows }) {
 export async function rowJ(page, { base, vault, rows, sent }) {
   const before = sent.length;
   const made = await rowF(page, { base, owner: vault, delay: '3600', desc: 'm05-t01c driver UAT · vault', rows, saltFrom: 40 });
-  const v = await view(page);
-  has('j', 'the owner bar names the vault this wallet signs on', v, 'you are a signer on');
+  await settledView(page, t => t.includes('you are a signer on'), { label: '(j) the owner bar names the vault this wallet signs on' });
   await page.click('#queue');
   /* `data-copy` is also on the little address copiers (`class="cp"`), so the drawer's own button is
      the one inside `.drawer` that is not one of those — clicking the first `[data-copy]` on the page

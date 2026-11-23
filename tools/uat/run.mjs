@@ -34,6 +34,16 @@ const base = (arg('base', 'https://rake.dnzn.dev')).replace(/\/$/, '') + `/${cha
 const control = flag('control');
 const shotsDir = arg('shots', path.resolve('../../docs/milestones/m04/tasks/m04-t05/shots', control ? 'control' : String(chainId)));
 
+/* `--rows` runs a named subset, which is how 84532 is driven: its history rows cannot pass while
+   #382 stands, and the step's amended criterion (rake#383) has the driver run (a), (l), (w3) and the
+   probe there while the rest go in the handoff as not met with that cause. A subset invocation names
+   itself in the summary, so a reader can see which rows ran rather than inferring it from a count. */
+const ROWS = ['probe', 'a', 'c', 'c-console-first', 'e', 'd', 'k', 'l', 'f', 'g', 'h', 'i', 'j', 'a-nowallet', 'w3'];
+const only = (arg('rows', '') || '').split(',').map(s => s.trim()).filter(Boolean);
+for (const id of only) if (!ROWS.includes(id)) { console.error(`run.mjs: --rows names ${id}, which is not a row (${ROWS.join(', ')})`); process.exit(2); }
+const want = id => only.length === 0 || only.includes(id);
+const skipped = [];
+
 const results = [];
 let failed = null;
 
@@ -51,6 +61,7 @@ const shot = async (page, name) => {
 };
 
 const row = async (id, fn, page, shotName) => {
+  if (!want(id)) { skipped.push(id); console.log(`row ${id} … skipped (not in --rows)`); return null; }
   process.stdout.write(`row ${id} … `);
   let facts;
   try { facts = await fn(); } catch (e) { e.row = e.row || id; throw e; }
@@ -79,10 +90,10 @@ try {
   await row('probe', () => R.probe(page, { base }), page, 'probe');
   await row('a', () => R.rowA(page, { chainName: chain.name, wallet: true }), page, 'a-landing');
   /* The instrument goes on before the route is opened, which is where `count.js` says it belongs. */
-  await R.countOn(page, COUNT_JS);
+  if (want('c') || want('c-console-first') || want('d') || want('e')) await R.countOn(page, COUNT_JS);
   /* The control's patience is short on purpose: it is proving the driver fails, not waiting out a
      page that cannot paint. The real run keeps `count.js`'s own 120 s. */
-  const relation = control ? null : await R.ownerRelation({ addr: R.DNZN, connected: R.ENGINEER, rpcUrl: chain.rpc, castCall });
+  const relation = (control || !want('c')) ? null : await R.ownerRelation({ addr: R.DNZN, connected: R.ENGINEER, rpcUrl: chain.rpc, castCall });
   if (relation) console.log(`   (c)'s owner relation from the chain: owner ${relation.owner}, contract ${relation.isContract}, signer ${relation.signer} → expect the ${relation.expect} bar)`);
   await row('c', () => R.rowC(page, { base, addr: control ? CODELESS : R.DNZN, patience: control ? 20000 : 120000, relation }), page, 'c-distro');
   await row('c-console-first', async () => {
@@ -95,6 +106,7 @@ try {
   await row('d', () => R.rowD(page, { base, src: COUNT_JS }), page, 'd-console-second');
   /* Row (k) is Sepolia's by the script's own wording, and it is pending rather than driveable. */
   if (chainId === 11155111) await row('k', () => R.rowK({ readFile: f => fs.readFileSync(new URL(`../../${f}`, import.meta.url), 'utf8') }), null, null);
+  else skipped.push('k (Sepolia only by the script)');
   await row('l', async () => {
     const facts = await R.rowL(page, { base, shot: async name => { await shot(page, name); } });
     return facts;
@@ -110,7 +122,9 @@ try {
     { name: 'receiver', note: 'refuses until told not to', addr: chain.receiver, pct: pct[2] },
   ];
   let made = null;
-  if (!flag('reads-only')) {
+  if (flag('reads-only') || !(want('f') || want('g') || want('h') || want('i') || want('j'))) {
+    for (const id of ['f', 'g', 'h', 'i', 'j']) if (!skipped.includes(id)) skipped.push(id);
+  } else {
     /* `--reuse <addr>` drives (g) to (i) against a distribution an earlier run created, so iterating
        on those rows costs no gas and no new contract. The committed run takes (f) for real. */
     const reuse = arg('reuse', null);
@@ -143,7 +157,7 @@ try {
   await browser.close();
 }
 
-const summary = { chainId, base, control, rows: results.length, writes: results.filter(r => 'fghij'.includes(r.row)).length, shots: control ? null : shotsDir, failed: failed ? String(failed.message || failed) : null, failedRow: failed?.row ?? null };
+const summary = { chainId, base, control, rowsRun: results.map(r => r.row), rowsSkipped: skipped, rows: results.length, writes: results.filter(r => 'fghij'.includes(r.row)).length, shots: control ? null : shotsDir, failed: failed ? String(failed.message || failed) : null, failedRow: failed?.row ?? null };
 console.log(JSON.stringify(summary, null, 1));
 
 if (control) {
