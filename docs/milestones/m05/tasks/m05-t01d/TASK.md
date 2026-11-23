@@ -59,6 +59,15 @@ with no wallet, and this task does not pretend one does.
 5. **#382, say what was read.** Three parts, the first chosen from step 1's table.
    - `PUBLIC_RPC` per chain is the measured endpoint that serves the deepest history to a
      browser, and `deploy/chains.json` agrees with it or the handoff says why not.
+   - **Amended 2026-11-23: the walk starts at the window its own endpoint is known to serve.**
+     `logs()` starts every walk at `WINDOW_START` 10,000 and only shrinks, so an endpoint that
+     serves 50,000 blocks a query is read 10,000 at a time, and one that serves 100 spends its
+     first four windows being refused. For the page's own read provider, and only for it, the
+     starting window is a per-chain figure beside `PUBLIC_RPC`, set to the span step 1 found
+     reliable. A wallet's provider keeps 10,000, since its cap is not ours to know. The window
+     still shrinks on a refusal, and `MAX_WINDOWS` and #165 are untouched. Check: a test that the
+     first request of a walk through the read provider asks for the chain's figure, that a
+     refusal still shrinks it, and that a wallet provider's first request is 10,000.
    - A refusal of old blocks ends the walk at that block as a boundary, as running out of budget
      does today. The section paints what was read, then one line naming the block and the cause:
      the endpoint does not serve history before it, and a connected wallet may. No `load older`
