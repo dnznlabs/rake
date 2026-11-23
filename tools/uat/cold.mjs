@@ -418,7 +418,7 @@ const asTime = sec => sec == null ? '—'
   if (fullBudget) console.log('**`--full-budget`: `factoryBlock` was lowered in the build by 40 × the chain\'s start window**, so the walk'
     + ' spends its whole budget. The depth is simulated; these rows are a load measurement and not a reading of the chain\'s own history.');
   console.log(`Distribution page: \`${DNZN}\`. Screenshots: ${shots}\n`);
-  console.log('| chain | endpoint | panel | median fill | three sections, worst outcome per load | loads covering the whole range | when truncated, blocks read | that in time | earliest event, and the depth to it | budget | errors |');
+  console.log('| chain | endpoint | panel | median fill | three sections, worst outcome per load | loads covering the whole range | blocks read by the loads that did NOT | that in time | earliest event, and the depth to it | budget | errors |');
   console.log('|:--|:--|--:|--:|:--|--:|--:|--:|:--|--:|--:|');
   let bad = 0;
   for (const r of rows) {
@@ -447,7 +447,12 @@ const asTime = sec => sec == null ? '—'
     const reaches = r.runs.filter(x => !x.whole).map(x => x.reach).filter(n => n != null).sort((a, b) => a - b);
     const reach = reaches.length ? reaches[Math.floor(reaches.length / 2)] : null;
     const wholeCell = `${whole}/${r.runs.length}`;
-    let reachCell = reaches.length ? reach.toLocaleString('en-US') : '— (none were)';
+    /* The figure names its own subset. "399,999" alone read as a ceiling on what the page can reach,
+       when it is the middle of the loads that were cut short and says nothing about the ones that
+       finished — which on that chain went a million blocks further. */
+    let reachCell = reaches.length
+      ? `${reach.toLocaleString('en-US')} (median of ${reaches.length})`
+      : '— (none were)';
     let timeCell = '—';
     if (reach != null) {
       const rep = r.runs.find(x => !x.whole && x.reach === reach) || {};

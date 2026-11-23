@@ -13,10 +13,12 @@ whether or not its range held events. An earlier ladder put "read, empty" above 
 whose `changes` was legitimately empty while the other two were full reported as "read, empty" and
 read as though the page had found nothing.
 
-**"Loads covering the whole range" is the count whose *every* section printed no boundary line.**
-It is now a column of its own: one cell used to carry both it and the median depth of the loads that
-were cut short, which reads as "it stopped at 400,000 blocks and claimed to have read it all".
-The finished loads and the truncated ones are never averaged together.
+**"Loads covering the whole range" is the count whose *every* section printed no boundary line**, and
+the depth column beside it describes **only the loads that did not** — it is their median, and it now
+prints its own subject (`399,999 (median of 4)`). One cell used to carry both, which reads as "it
+stopped at 400,000 blocks and claimed to have read it all", and that is how it was read. The two
+populations are never averaged, and the figure is not a ceiling on what the page can reach: on 84532
+the loads that *finished* went a million blocks further than the median of the ones that did not.
 
 **`#funds` is classified for read quality only.** It is the funds *block*, not a log list, and when
 the address-less `Transfer` query is refused it prints "token payments **in** could not be read from
@@ -61,12 +63,16 @@ requests", and it is why the 399,999 figure in the earlier table was the median 
 
 ## Run A — the four chains as shipped, 2026-11-23T06:31:49Z, 10 loads each
 
-| chain | worst per load | whole range | when truncated | that in time |
+| chain | worst per load | covered the whole range | blocks read by the loads that did **not** | that in time |
 |:--|:--|--:|--:|--:|
-| 1 | 6× read in full, 4× throttle | 6/10 | 3,999 | 13.4 h |
-| 8453 | 10× read in full | 10/10 | — none were | — |
-| 11155111 | 1× boundary, 9× throttle | 0/10 | 31 | 6 min |
-| 84532 | 6× read in full, 4× throttle | 6/10 | 399,999 | 22.2 h |
+| 1 | 6× read in full, 4× throttle | 6/10 | 3,999 (median of 4) | 13.4 h |
+| 8453 | 10× read in full | 10/10 | — none were truncated | — |
+| 11155111 | 1× boundary, 9× throttle | 0/10 | 31 (median of 10) | 6 min |
+| 84532 | 6× read in full, 4× throttle | 6/10 | 399,999 (median of 4) | 22.2 h |
+
+**On 84532 those are two different sets of loads.** Six reached the factory block, 1,069,648 blocks
+down, inside the 2,000,000-block budget. The other four were throttled and stopped a median of
+399,999 blocks down. The second figure is not a ceiling on the first.
 
 ## Run B — the mainnets under a full budget, 06:34:25Z, 10 loads each
 
@@ -76,10 +82,10 @@ load measurement, not a reading of the chain's own history. With no wallet the w
 `CFG.factoryBlock` — `FIRST` is only filled by the `Created` scan a connected account triggers — so
 lowering it is the whole of the change needed.
 
-| chain | worst per load | whole range | when truncated | that in time | what it refused with |
+| chain | worst per load | covered the whole range | blocks read by the loads that did **not** | that in time | what it refused with |
 |:--|:--|--:|--:|--:|:--|
-| 1 | **10× boundary** | 0/10 | 9,999 | 1.4 days | 40× `Archive requests require a personal token` |
-| 8453 | 4× boundary, **6× throttle** | 0/10 | 399,999 | 22.2 h | 39× `Rate limit exceeded` |
+| 1 | **10× boundary** | 0/10 | 9,999 (median of 10) | 1.4 days | 40× `Archive requests require a personal token` |
+| 8453 | 4× boundary, **6× throttle** | 0/10 | 399,999 (median of 10) | 22.2 h | 39× `Rate limit exceeded` |
 
 **Chain 1's mainnet problem is depth, not rate.** Every load ended on an archive wall about 10,000
 blocks back — **1.4 days of history** — and the endpoint said so in its own words forty times out of
@@ -132,10 +138,12 @@ counting the endpoint rather than the keeping; the contiguous-prefix rule is unt
 
 ## The address-less query, refused everywhere
 
-`-32701 Please specify an address in your request` on **all four** endpoints, 37–40× per run. The page
-catches it by design (`histLogs`, `.catch(() => null)`), so nothing breaks — but **the "other tokens"
-list is unavailable on every endpoint the page ships**, by operator policy, and only a connected
-wallet can show it.
+`-32701 Please specify an address in your request` on **all four** endpoints, 37–40× per run, so the
+"other tokens" list is unavailable to every visitor without a wallet. The page paints
+"token payments in could not be read from this provider" and no `#others` element at all, so nothing
+reads as "there are none" and no code changes here. Carried as
+[#393](https://github.com/dnznlabs/rake/issues/393), which holds the browser reading and the two
+routes open to it.
 
 ## Block times, read rather than assumed
 
