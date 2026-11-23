@@ -599,20 +599,42 @@ const DAY_STEPS = 4;
    search confirms it against a real timestamp and corrects; `test/day-read.test.mjs` proves a seed
    that is wrong tenfold still lands inside the bound. 12 is the fallback for a chain not listed. */
 const NOMINAL_SEC = { 1: 12, 8453: 0.2, 11155111: 12, 84532: 0.2 };
-const tsOf = async n => Number(BigInt((await P.request({
-  method: 'eth_getBlockByNumber', params: ['0x' + n.toString(16), false],
-})).timestamp));
+/* **`null` is an answer here, not a failure.** A pooled hostname is many backends and they are not
+   always on the same block, so a number one backend has another answers `null` for — measured on
+   `ethereum-sepolia-rpc.publicnode.com` on 2026-11-23, where exactly that took the whole history down:
+   `null.timestamp` threw, the floor search rejected, and all three sections painted
+   `history unavailable`, which is the outcome reserved for an endpoint that answered nothing at all.
+   A missing block is now a `null` the caller steps around. */
+const tsOf = async n => {
+  const b = await P.request({ method: 'eth_getBlockByNumber', params: ['0x' + n.toString(16), false] });
+  return b && b.timestamp != null ? Number(BigInt(b.timestamp)) : null;
+};
 /** The first block at or after `hi`'s timestamp minus a day, never below `floor`. */
 async function dayFloor(hi, floor) {
-  const tHi = await tsOf(hi);
+  /* A block a backend does not have is stepped around rather than fatal: a few blocks either way
+     cannot matter to a figure whose tolerance is a minute. */
+  const near = async (n, lo, up) => {
+    for (let k = 0; k <= 4; k++) for (const m of [n - k, n + k]) {
+      if (m < lo || m > up) continue;
+      const t = await tsOf(m);
+      if (t != null) return [m, t];
+    }
+    return [null, null];
+  };
+  const [hiN, tHi] = await near(hi, floor, hi);
+  const [flN, tFl] = await near(floor, floor, hi);
+  // Neither anchor readable: no basis for a day, so the caller reads from the distribution instead.
+  if (tHi == null || tFl == null) return floor;
   const target = tHi - DAY_SECONDS;
-  let a = floor, ta = await tsOf(floor), b = hi, tb = tHi;
+  let a = flN, ta = tFl, b = hiN, tb = tHi;
   // The whole history is younger than a day, so there is nothing to cut: read all of it.
   if (ta >= target) return floor;
   const nominal = NOMINAL_SEC[Number(CFG.chainId)] || 12;
   let guess = Math.min(b - 1, Math.max(a + 1, hi - Math.round(DAY_SECONDS / nominal)));
   for (let i = 0; i < DAY_STEPS; i++) {
-    const tg = await tsOf(guess);
+    const [gN, tg] = await near(guess, a + 1, b - 1);
+    if (tg == null) break;                       // nothing readable in the bracket; bisect below
+    guess = gN;
     if (Math.abs(tg - target) <= TS_TOLERANCE) return guess;
     if (tg >= target) { b = guess; tb = tg; } else { a = guess; ta = tg; }
     if (b - a <= 1) return b;
@@ -625,9 +647,9 @@ async function dayFloor(hi, floor) {
      is slower per step and cannot fail, which is the right trade once the cheap method has had its
      four tries. The bracket is already narrowed, so this is short. */
   while (b - a > 1) {
-    const mid = Math.floor((a + b) / 2);
-    const tm = await tsOf(mid);
-    if (tm >= target) { b = mid; } else { a = mid; }
+    const [mN, tm] = await near(Math.floor((a + b) / 2), a + 1, b - 1);
+    if (tm == null) break;                       // the bracket holds nothing this backend will serve
+    if (tm >= target) { b = mN; } else { a = mN; }
   }
   return b;
 }
@@ -641,7 +663,16 @@ let DAYFLOOR = null;
 async function readFloor(d, hi) {
   const own = Number(BigInt(FIRST.get(d.addr) || CFG.factoryBlock));
   if (WALLET) return own;
-  return Math.max(own, await (DAYFLOOR ||= dayFloor(hi, own)));
+  /* **The floor search may never cost the page its history.** It is an optimisation of where to start
+     reading; if it cannot be done, reading from the distribution's own first block is the honest
+     fallback and the four outcomes describe whatever that read reaches. Before this, a single `null`
+     block rejected here and `paintFailed` wrote `history unavailable` over all three sections. */
+  try {
+    return Math.max(own, await (DAYFLOOR ||= dayFloor(hi, own)));
+  } catch {
+    DAYFLOOR = null;
+    return own;
+  }
 }
 /* A refusal, wherever the wallet put the text: MetaMask wraps the provider's JSON-RPC error and the
    message naming the cap can sit a level or two down from `message`. */
@@ -1496,6 +1527,14 @@ const moreLine = () => WALLET ? '' : '<div class="help">connect a wallet to load
    page cannot support, and Ethereum makes that the ordinary case: its endpoint serves about 10,000
    blocks and a day is about 7,171, so the margin is nine hours and a tightening would cross it.
    The outcome line under the section names the block; this says only how far was reached. */
+/* **An empty section must say which window was empty** (the same ruling as `dayHead`, one line down).
+   "nothing has arrived at this address yet" was true while the page read all of a distribution's
+   history. Reading a day, it is a claim about all time made from one day's evidence — and on Base
+   Sepolia on 2026-11-23 it was simply false: the address has four funds events, 1.1 million blocks
+   back, and all ten cold loads said nothing had ever arrived. The head above said "last 24 hours"
+   and the line below offered a wallet, but the sentence between them was still wrong, and a reader
+   who read only the rows would have been misled. */
+const emptyLine = (all, day) => WALLET ? all : day;
 const dayHead = full => WALLET ? full
   : (DS.h && DS.h.partial != null) ? 'as far back as this endpoint served'
   : 'last 24 hours';
@@ -2096,10 +2135,12 @@ async function older() {
 /* The log-built sections, painted from DS so a repaint of the page — the drawer opening, a mode switch —
    puts back what has already arrived instead of leaving "loading…" that nothing will replace. */
 function paintChanges() {
-  histFill('h-changes', DS.h.changes, 'no change has been queued yet.');
+  histFill('h-changes', DS.h.changes,
+    emptyLine('no change has been queued yet.', 'no change has been queued in the last 24 hours.'));
   fill('pending', pendingBlock(DS.d, true));
 }
-const paintActivity = () => histFill('h-funds', DS.h.funds, 'nothing has arrived at this address yet.');
+const paintActivity = () => histFill('h-funds', DS.h.funds,
+  emptyLine('nothing has arrived at this address yet.', 'nothing has arrived in the last 24 hours.'));
 function paintFunds() {
   /* The escrow rows and the token list are built from the same logs the sections are, so a partial
      history is a caveat on this block too, not only on the two lists below it. */

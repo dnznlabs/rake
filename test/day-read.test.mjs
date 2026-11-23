@@ -38,7 +38,7 @@ const DAY_SECONDS = line('const DAY_SECONDS =');
 const DAY_STEPS = line('const DAY_STEPS =');
 const NOMINAL_SEC = line('const NOMINAL_SEC =');
 const TS_TOLERANCE = line('const TS_TOLERANCE =');
-const TS_OF = block('const tsOf = async n =>', '\n})).timestamp));\n');
+const TS_OF = block('const tsOf = async n => {', '\n};\n');
 const DAY_FLOOR = block('async function dayFloor(hi, floor) {');
 const READ_FLOOR = block('async function readFloor(d, hi) {');
 const PRESS = line('const press = () =>');
@@ -48,7 +48,7 @@ const HIST_FILL = block('function histFill(id, items, empty) {');
 const DAY_HEAD = block('const dayHead = full =>', "'last 24 hours';\n");
 
 /** A synthetic chain: block `n` has timestamp `n * sec`, and every header read is counted. */
-function chain({ sec, head, floor = 0, chainId = 1, nominal = null }) {
+function chain({ sec, head, floor = 0, chainId = 1, nominal = null, missing = null }) {
   const reads = [];
   const src = `
     const P = {
@@ -56,6 +56,10 @@ function chain({ sec, head, floor = 0, chainId = 1, nominal = null }) {
         if (method !== 'eth_getBlockByNumber') throw new Error('unexpected ' + method);
         const n = parseInt(params[0], 16);
         READS.push(n);
+        /* A pooled backend that does not have the block answers null - the shape that took the whole
+           history down on Sepolia on 2026-11-23 until tsOf stopped dereferencing it. No backticks in
+           here: this comment lives inside a template literal. */
+        if (MISSING && MISSING(n)) return null;
         return { timestamp: '0x' + Math.round(n * SEC).toString(16) };
       },
     };
@@ -75,8 +79,8 @@ function chain({ sec, head, floor = 0, chainId = 1, nominal = null }) {
     ${READ_FLOOR}
     return { dayFloor, readFloor, reads: () => READS };
   `;
-  return { ...new Function('READS', 'SEC', 'FLOOR', 'WALLET_IN', 'CHAIN_ID', 'NOMINAL_IN', src)(
-    reads, sec, floor, false, chainId, nominal), reads };
+  return { ...new Function('READS', 'SEC', 'FLOOR', 'WALLET_IN', 'CHAIN_ID', 'NOMINAL_IN', 'MISSING', src)(
+    reads, sec, floor, false, chainId, nominal, missing), reads };
 }
 
 test('a day is found from timestamps, on a 12-second chain and a 0.2-second one alike', async () => {
@@ -317,4 +321,55 @@ test('and it is cleared wherever the head is, or a route entry serves a stale da
     assert.match(after, /DAYFLOOR = null;/,
       `a \`HEAD = null\` with no \`DAYFLOOR = null\` beside it: ${JSON.stringify(after.slice(0, 120))}`);
   }
+});
+
+test('a block one backend does not have is stepped around, not fatal', async () => {
+  /* Measured, not imagined: on 2026-11-23 a Sepolia cold load read three headers, got
+     `{"result":null}` on the third, and painted `history unavailable` across all three sections and
+     the funds block — the outcome reserved for an endpoint that answered nothing at all, caused by
+     one missing block. Here two thirds of all blocks are missing and the day is still found. */
+  const head = 20_000_000, sec = 12, want = head - 7_200;
+  const c = chain({ sec, head, chainId: 1, missing: n => n % 3 !== 0 });
+  const got = await c.dayFloor(head, 0);
+  assert.ok(Math.abs(got - want) <= Math.ceil(60 / sec) + 4,
+    `the day must still be found around ${want}; got ${got}`);
+});
+
+test('when no header is readable at all, the page reads from the distribution instead of failing', async () => {
+  /* The floor search is an optimisation of where to start. It may never cost the page its history,
+     which is what it did before this: one rejection and `paintFailed` wrote `history unavailable`. */
+  const head = 20_000_000, own = 19_000_000;
+  const c = chain({ sec: 12, head, floor: own, chainId: 1, missing: () => true });
+  assert.equal(await c.readFloor({ addr: '0xabc' }, head), own,
+    'it must fall back to the distribution own first block');
+});
+
+test('an outright throw in the search is caught, and the read still happens', async () => {
+  const own = 19_000_000;
+  const src = `
+    const FIRST = new Map();
+    const CFG = { factoryBlock: String(OWN), chainId: 1 };
+    let WALLET = false;
+    let DAYFLOOR = null;
+    const dayFloor = async () => { throw new Error('the endpoint hung up'); };
+    ${READ_FLOOR}
+    return readFloor;
+  `;
+  const readFloor = new Function('OWN', src)(own);
+  assert.equal(await readFloor({ addr: '0xabc' }, 20_000_000), own);
+});
+
+test('the empty sentence names its window when there is no wallet', () => {
+  /* Base Sepolia, all ten loads of the 08:50Z run: the page said "nothing has arrived at this
+     address yet" about an address with four funds events 1.1 million blocks back. The head said
+     "last 24 hours" and the line below offered a wallet, but the sentence between them was false. */
+  const EMPTY_LINE = line('const emptyLine = (all, day) =>');
+  const pick = wallet => new Function('WALLET', `${EMPTY_LINE}\nreturn emptyLine;`)(wallet);
+  assert.equal(pick(false)('nothing has arrived at this address yet.', 'nothing has arrived in the last 24 hours.'),
+    'nothing has arrived in the last 24 hours.');
+  assert.equal(pick(true)('nothing has arrived at this address yet.', 'nothing has arrived in the last 24 hours.'),
+    'nothing has arrived at this address yet.');
+  /* And both sections go through it, rather than one being fixed and the other forgotten. */
+  assert.match(SHIPPED, /histFill\('h-changes', DS\.h\.changes,\s*\n?\s*emptyLine\(/);
+  assert.match(SHIPPED, /histFill\('h-funds', DS\.h\.funds,\s*\n?\s*emptyLine\(/);
 });
