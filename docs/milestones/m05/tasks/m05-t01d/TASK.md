@@ -68,6 +68,23 @@ with no wallet, and this task does not pretend one does.
      still shrinks on a refusal, and `MAX_WINDOWS` and #165 are untouched. Check: a test that the
      first request of a walk through the read provider asks for the chain's figure, that a
      refusal still shrinks it, and that a wallet provider's first request is 10,000.
+   - **Amended 2026-11-23: one in-flight limit for the page's own provider.** A distribution
+     page walks three log kinds at once, four windows in flight each, straight after the
+     landing's reads, and the free endpoints meet that burst with a rate limit: measured in a
+     browser, a first read ended on a throttle in 8 of 10 cold loads on Sepolia and 4 of 10 on
+     Base Sepolia, and one load was refused after its eighth request. Through the page's own
+     read provider the three kinds share one limit of four `eth_getLogs` in flight. A wallet's
+     provider keeps today's behaviour. `MAX_WINDOWS` and #165 are untouched: the same windows
+     are asked for, not all at once. Check: a test that no more than four are in flight across
+     kinds through the read provider and that a wallet provider is unchanged; then
+     `tools/uat/cold.mjs`, ten loads a chain, twice at least an hour apart, with a first read
+     ending on a throttle in no more than 2 of 10 on every chain. If four does not reach that,
+     the handoff says what figure does and what it costs in time to paint, and the architect
+     rules before the calldata is cut.
+   - **Amended 2026-11-23: mainnet at full budget.** Chains 1 and 8453 read cleanly today only
+     because their distributions are a day old. Each is also built with `factoryBlock` set back
+     by 40 times its start window and cold-loaded ten times, so the walk a visitor meets in
+     three months is measured before the upload and not after. Same bound.
    - A refusal of old blocks ends the walk at that block as a boundary, as running out of budget
      does today. The section paints what was read, then one line naming the block and the cause:
      the endpoint does not serve history before it, and a connected wallet may. No `load older`
