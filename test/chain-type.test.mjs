@@ -38,10 +38,16 @@ const line = anchor => {
 const AS_CHAIN = block('const asChain = id => {', '\n};\n');
 const CHAIN_CHANGED = block('function chainChanged(id) {');
 const RESOLVE_NAME = block('async function resolveName(acc) {');
-/* The two assignment lines themselves, not a copy of them: `pickWallet`'s and `load()`'s. If either
-   stops going through `asChain`, these lift the new text and the type assertions below fail on it. */
-const PICK_ASSIGN = line('  try { CHAIN = asChain(await P.request(');
-const LOAD_ASSIGN = line('  CHAIN = asChain(await P.request(');
+/* The two assignment lines themselves, not a copy of them: `pickWallet`'s and `load()`'s.
+
+   **Anchored on `CHAIN =`, deliberately not on `asChain(`.** Anchoring on the fixed right-hand side
+   made the mutation test fail for the wrong reason: putting the `String(Number(…))` back stopped the
+   anchor matching, so the file failed at the lift and every behavioural assertion was skipped — a
+   failure that cannot tell a renamed line from a reintroduced bug. Lifting whatever the line now
+   assigns means the bug comes back *into the harness*, and the type and name assertions below are
+   what fail. */
+const PICK_ASSIGN = line('  try { CHAIN = ');
+const LOAD_ASSIGN = line('  CHAIN = ');
 
 const ACC = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
 const SEPOLIA_HEX = '0xaa36a7';
