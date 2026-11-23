@@ -179,3 +179,16 @@ test('an account already found in the logs is not asked again', async () => {
     `once, for its own log row — not twice. All escrow reads were: ${asks.join(' | ')}`);
   assert.equal(out.hidden[0].amount, 5n);
 });
+
+test('the remainder line says what `reserved` accounts for, never what the contract holds', () => {
+  /* The distinction is not pedantry. `reserved` is exact **accounting** — `invariant_reservedEqualsEscrowSum`
+     — but whether the contract **holds** it is the separate `invariant_balanceCoversReserved`, which
+     its own comment says is true only "because the excluded token class is excluded: a fee-on-transfer
+     or rebasing balance is what would break it". So for a token arm "held" is a promise the page
+     cannot make. For native ETH either word is true, and one word is used everywhere so no arm can
+     drift. Asserted over the shipped source because it is a wording rule, and wording rules decay. */
+  const line = block('const unlisted = (f.hidden || [])', ".join('');\n");
+  assert.match(line, /accounted for in escrow/, 'the remainder must be stated as accounted for');
+  assert.doesNotMatch(line, /\bis held in escrow\b/,
+    'and never as held, which for a fee-on-transfer token would be a promise about the balance');
+});

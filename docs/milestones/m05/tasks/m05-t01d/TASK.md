@@ -77,7 +77,8 @@ with no wallet, and this task does not pretend one does.
      larger, read `escrowed(token, account)` for the accounts in the table, at most four calls
      in flight (the table can hold 107 rows), and paint a row with its `release` and `claim`
      controls for each above zero. Whatever is still unaccounted for is stated with its amount:
-     that much is held in escrow that this endpoint cannot list, and a connected wallet can.
+     that much is **accounted for** in escrow that this endpoint cannot list, and a connected wallet
+     can. (**Corrected 2026-11-23**, with the criterion below: "accounted for", not "held".)
      Never a silent absence, and never the fan-out when nothing is hidden.
    - **Withdrawn:** the two parts below headed "one in-flight limit" and "mainnet at full
      budget" ([#392](https://github.com/dnznlabs/rake/pull/392), merged the same day, before
@@ -157,8 +158,12 @@ with no wallet, and this task does not pretend one does.
 - `devbox run -- make test` passes with the tests of steps 2 to 7 in it.
 - On all four chains, with no wallet, a distribution page reads its last 24 hours in at least
   9 of 10 cold loads in a browser, says **last 24 hours** and **connect a wallet to load more**,
-  and never shows less escrow than `reserved` says is held without stating the difference. A screenshot per
-  chain. (Amended 2026-11-23; it read "paints its boundary line at that depth".)
+  and never shows less escrow than `reserved` **accounts for** without stating the difference. A screenshot per
+  chain. (Amended 2026-11-23; it read "paints its boundary line at that depth". **Corrected
+  2026-11-23**, same day: "accounts for", not "says is held". `reserved` is exact accounting, and
+  whether the contract *holds* it is the separate `invariant_balanceCoversReserved`, true only
+  because the fee-on-transfer and rebasing class is excluded (F4). For native ETH either word is
+  true; one word is used everywhere so a token arm never implies a balance it cannot promise.)
 - `tools/uat/`'s driver exits 0 on Sepolia **and on Base Sepolia** against
   `https://rake.dnzn.dev`, full list, and exits 1 on the control on both. This closes the rows
   m05-t01c recorded as not met on 84532.
