@@ -66,6 +66,30 @@ endpoint was overwhelmed and even that was gone. #400 is what keeps the history 
 painted, and the one place a wallet's endpoint can do better than ours. The press keeps the rule #391
 set: a wallet's provider starts at 10,000, because its cap is not ours to know.
 
+**And it had to be painted where no boundary existed.** `partialLine()` returns nothing when a read
+finished its span, so a wallet whose day read completed cleanly was offered no press at all — while
+the token list beside it said *use load older to read further back*. Before this change that state
+meant the read had reached the distribution's own first block; now it means a day was read and the
+rest of the history is still below. `older()` compounded it: its top block was `DS.h.partial - 1`,
+which is `NaN` there, so even a painted press would have returned before asking for one window.
+
+So a read records **which floor it asked for** — `whole: from <= ownFloor(d)` — because `partial ==
+null` says the span finished and not which span it was; `moreLine()` carries the press on a finished
+day read; and `older()` continues from that floor. `load older presses` in the driver's output: **0**
+before, **2** after, one per history section.
+
+`--press` then clicks it. 84532 through `sepolia.base.org`:
+
+| | |
+|:--|--:|
+| `eth_getLogs` the press sent to the wallet's endpoint | **72** |
+| outcome | throttled |
+| line after | `this endpoint is limiting requests · history before block 62236813 is not loaded yet · load older` |
+| history rows, before → after | **2 → 2** |
+
+That is the requirement for a refusal at the press: it fails, it says which of the four outcomes it
+was, and the day already painted is still there.
+
 A page with a wallet therefore says the same thing about its window as a page without one, with a
 different way onward: *"Use **load older** to read further back"* rather than *"Connect a wallet to
 read further back"*.
