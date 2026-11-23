@@ -1,3 +1,35 @@
+## How many of the last 30 events a visitor sees — **derived**, and the figure to read first
+
+For a distribution with **one event a day for a month**, on first load, **with no wallet**. Derived
+from the measured reach and the measured block time; every input is in this file and none of it is
+estimated. It is a worked example, not a measurement of any real distribution.
+
+| chain | s/block | budget: 40 × start window | that in days | best of 30 | where it actually stopped | that in days | **events seen** | can a press go further? |
+|:--|--:|--:|--:|--:|:--|--:|--:|:--|
+| 1 Ethereum | 12.05 | 40,000 | 5.6 | 5 | archive wall, 9,999 blocks, 10/10 loads | **1.4** | **1** | **no — it is a wall** |
+| 8453 Base | 0.20 | 2,000,000 | **4.6** | **4** | throttle, 399,999 blocks, 6/10 loads | 0.9 | **0 or 1** | yes, a throttle keeps the press |
+| 11155111 Sepolia | 12.48 | 400,000 | 57.8 | 30 | prune wall, 11,231 blocks, in a browser | **1.6** | **1** | **no — it is a wall** |
+| 84532 Base Sepolia | 0.20 | 2,000,000 | 4.6 | 4 | nothing; whole history reached, 6/10 | — | **4** | n/a |
+
+**Every chain lands between none and four of the last thirty, and for different reasons.** Ethereum
+and Sepolia are cut by the endpoint's own horizon — an archive refusal and a prune refusal, both
+**walls with no press**, so a visitor without a wallet cannot get past them at all. Base and Base
+Sepolia are not cut by depth but by **arithmetic**: at 0.2 s a block, forty windows of fifty thousand
+is 4.6 days, so even a walk that spends its whole budget unthrottled sees four events. Sepolia is the
+one chain whose *budget* would cover the month — 57.8 days — and its endpoint prunes to 1.6.
+
+**The press is the difference that matters.** `load older` adds another budget's worth per kind, so on
+the Base chains a visitor can keep pressing deeper; on Ethereum and Sepolia the stop is a wall and
+there is no press to offer. So "1 of 30 on Ethereum" is not "1 at first, more on request" — it is one,
+full stop, until a wallet with its own endpoint is connected.
+
+Block times read with `cast` from **outside** the four endpoints under a cooling period (`eth.drpc.org`,
+`base.drpc.org`), since block time is a property of the chain and reading it elsewhere keeps the quiet
+gap intact: 1,000 Ethereum blocks took 12,048 s, 10,000 Base blocks took 2,000 s. Base's 0.2 s was
+checked twice because it is surprising — publicnode and dRPC agree, and Base Sepolia reads the same.
+
+---
+
 Read by `tools/uat/cold.mjs`: cold loads with **no wallet**, so the page uses its own `PUBLIC_RPC`
 entry through the browser's own fetch. Landing panel, then the distribution page at
 `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`. Every reading below filled the featured panel on every
