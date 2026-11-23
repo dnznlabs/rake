@@ -311,7 +311,7 @@ export async function rowK({ readFile }) {
   };
 }
 
-export async function rowL(page, { base, shot } = {}) {
+export async function rowL(page, { base, chainId, shot } = {}) {
   await page.evaluate(() => { location.hash = '#/docs'; });
   await page.waitForTimeout(1500);
   const r = await page.evaluate(() => ({
@@ -330,10 +330,22 @@ export async function rowL(page, { base, shot } = {}) {
   await page.evaluate(() => { location.hash = '#/docs#widget'; });
   await page.waitForTimeout(1200);
   /* The snippet is in the article, after the `s-widget` heading — the heading itself is three words.
-     The row asks that it carries *this chain's* gateway URL, so both halves are asserted. */
+
+     **It names one fixed host, and no longer the page's own address** (m05-t01d step 7). It used to
+     be asserted against `new URL(base).origin`, which was right while the snippet resolved
+     `widget.js` against whatever served the page — and would now fail on any run whose base is not
+     the gateway, a local preview among them. What a host pasting this needs is an address that
+     resolves in an ordinary browser, so the assertion is the literal host and this chain's id.
+
+     The `integrity` and `crossorigin` attributes are asserted with it: the hash is what makes a
+     cross-origin script safe to paste, and a browser **refuses** a cross-origin script carrying
+     `integrity` without `crossorigin` rather than checking it — so a snippet with one and not the
+     other would not load at all, which no assertion about the URL would catch. */
   const article = await page.evaluate(() => (document.querySelector('article.doc')?.innerText || '').replace(/\s+/g, ' '));
   has('l', 'the widget snippet is in the article', article, 'widget.js');
-  if (base) has('l', 'the snippet carries this chain’s gateway URL', article, new URL(base).origin + new URL(base).pathname);
+  has('l', 'the snippet names the gateway and this chain', article, `https://rake.dnzn.dev/${chainId}/widget.js`);
+  has('l', 'the snippet pins the widget’s bytes', article, 'integrity="sha384-');
+  has('l', 'and carries crossorigin, without which integrity is refused', article, 'crossorigin="anonymous"');
   const snippet = (article.match(/<script[^>]*widget\.js[^>]*>/) || [])[0] || null;
   return { ...r, snippet };
 }

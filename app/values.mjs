@@ -50,6 +50,12 @@ export const SHAPES = {
   DISTRIBUTIONFACTORY_BLOCK: BLOCK,
   /* 32 bytes: the salts `mk/15-seed.mk:9-10` passes. */
   FEATURED_SALT: { re: /^0x[0-9a-fA-F]{64}$/, why: '32 hex bytes' },
+  /* A subresource integrity value for the widget, computed by `app/build.mjs` from the file it just
+     wrote. It is written into an HTML attribute in the `#/docs` snippet, so the shape is narrow on
+     purpose: `sha384-` and base64 alone, which cannot carry a quote and so cannot end the attribute
+     early. Exactly 64 base64 characters plus padding is what a 48-byte digest is; a wider pattern
+     would admit a truncated hash, which would fail only in a visitor's browser. */
+  WIDGET_SRI: { re: /^sha384-[A-Za-z0-9+/]{64}={0,2}$/, why: "'sha384-' and the base64 of a 48-byte digest" },
 };
 
 /** The declared shape of `key`, or `undefined` where none is declared. */

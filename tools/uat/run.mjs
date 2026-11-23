@@ -155,7 +155,7 @@ try {
   if (chainId === 11155111) await row('k', () => R.rowK({ readFile: f => fs.readFileSync(new URL(`../../${f}`, import.meta.url), 'utf8') }), null, null);
   else skipped.push('k (Sepolia only by the script)');
   await row('l', async () => {
-    const facts = await R.rowL(page, { base, shot: async name => { await shot(page, name); } });
+    const facts = await R.rowL(page, { base, chainId, shot: async name => { await shot(page, name); } });
     return facts;
   }, page, 'l-docs-widget');
 
