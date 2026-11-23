@@ -99,6 +99,14 @@ function chainTruth(endpoint, address, from, to, span, kinds) {
   return { blocks, refused };
 }
 
+/* The outcomes that mean a section **read** its range. Anything else — `nothing`, still `loading`, an
+   empty node, an unrecognised sentence — is a section that did not read, and a load containing one has
+   not completed its 24 hours however few stop lines it printed. A `history unavailable` section has no
+   boundary at all, so "no stop line" alone counted it as a completed day: measured on
+   `eth.drpc.org`, where 100-block windows make the walk answer nothing and the verdict column read
+   **2 of 2 completed** beside `2× nothing`. The bound would have passed on a page showing no history. */
+const READ_OK = new Set(['rows', 'read, empty', 'read in full']);
+
 /* Which section each kind backs, and the page's own sentence for "I read it and it was empty". The
    assertion is one-directional on purpose: a page may show fewer rows than exist (it read less), but
    it may never say a history is empty when the chain has one in the range it read. */
@@ -239,6 +247,11 @@ async function oneLoad(browser, port, { patience, shotTo }) {
        above — "history before block N". The lowest N across the three sections is the floor of the
        pass. No line at all means nothing was truncated, so the pass covered the whole history the
        distribution has. */
+    /* **The heading each section painted**, which is the one thing a unit test cannot show in a real
+       browser: the amendment says "last 24 hours" must be true when painted, so a load that stopped
+       short must have changed it. Captured per load and printed beside the outcome. */
+    out.heads = await page.evaluate(() => [...document.querySelectorAll('.sechead')]
+      .map(n => n.textContent.replace(/\s+/g, ' ').trim()).join(' · '));
     const asof = /block (\d+)/.exec(await textOf(page, '#asof'));
     out.head = asof ? Number(asof[1]) : null;
     /* Scanned over the **full** section text. `out.sections[].text` is cut to 120 characters for the
@@ -255,9 +268,10 @@ async function oneLoad(browser, port, { patience, shotTo }) {
     const floors = Object.values(out.sections).map(sx => sx.stopped).filter(n => n != null);
     out.stopped = floors.length ? Math.min(...floors) : null;
     out.reach = out.head != null && out.stopped != null ? out.head - out.stopped : null;
-    /* Did every section cover its whole range? That is what "all of it" means in the table, and it
-       is a property of the load only when it holds for all three. */
-    out.whole = out.head != null && Object.values(out.sections).every(sx => sx.stopped == null);
+    /* Did every section **read** its whole range? Both halves are needed: a section that stopped short
+       did not cover its day, and a section that answered nothing did not read one. */
+    out.whole = out.head != null
+      && Object.values(out.sections).every(sx => sx.stopped == null && READ_OK.has(sx.outcome));
     if (shotTo) await page.screenshot({ path: shotTo, fullPage: false });
   } catch (e) {
     out.threw = String(e && e.message || e).split('\n')[0].slice(0, 120);
@@ -369,8 +383,13 @@ const asTime = sec => sec == null ? '—'
           writeFileSync(f, JSON.stringify({ chain, load: i, endpoint, sections: r.sections, requests: r.rpc }, null, 2));
           process.stderr.write(`  ! nothing answered — the browser's own ${r.rpc.length} getLogs requests saved to ${f}\n`);
         }
+        /* A load that stopped short carries its heading on the line, because that is the pair the
+           amendment is judged on: the outcome, and what the page claimed while showing it. */
+        const short = Object.values(r.sections).some(sx => sx.stopped != null);
         process.stderr.write(`  load ${String(i).padStart(2)}: featured ${r.featured ? `yes (${r.featuredMs} ms)` : 'NO'}`
-          + ` · sections ${Object.values(r.sections).map(s => s.outcome).join('/') || '—'}${bad ? ' ← bad' : ''}${r.threw ? ` ← ${r.threw}` : ''}\n`);
+          + ` · sections ${Object.values(r.sections).map(s => s.outcome).join('/') || '—'}`
+          + ` · ${(r.rpc || []).length} reqs`
+          + `${short ? ` · STOPPED SHORT, heads: ${r.heads}` : ''}${bad ? ' ← bad' : ''}${r.threw ? ` ← ${r.threw}` : ''}\n`);
       }
       await new Promise(r => srv.close(r));
       /* The independent count, once per chain and after the loads, over the whole history the
@@ -425,6 +444,7 @@ const asTime = sec => sec == null ? '—'
   console.log('| chain | endpoint | panel | **24h read completed** | median fill | worst outcome per load | requests per load (median) | per load, by method | errors |');
   console.log('|:--|:--|--:|--:|--:|:--|--:|:--|--:|');
   let bad = 0;
+  const shortNotes = [];
   for (const r of rows) {
     if (!r.built) { console.log(`| ${r.chain} | — | **build failed** | — | — | ${r.why} | — | — | — |`); bad++; continue; }
     const filled = r.runs.filter(x => x.featured).length;
@@ -494,11 +514,21 @@ const asTime = sec => sec == null ? '—'
     const ok = filled === r.runs.length && !worst.some(k => k === 'nothing' || k === 'loading' || k === 'none' || k === 'threw')
       && !(r.lies || []).length && day >= dayBound;
     if (!ok) bad++;
+    /* Every heading a short load painted, deduplicated: the amendment's claim is that none of them
+       says "last 24 hours". Printed under the table so the pair is reviewable without the log. */
+    const shortHeads = [...new Set(r.runs.filter(x => Object.values(x.sections).some(sx => sx.stopped != null))
+      .map(x => x.heads).filter(Boolean))];
+    if (shortHeads.length) shortNotes.push(`- **${r.chain}**: ${r.runs.length - day} load(s) stopped short; `
+      + `the heads they painted were ${shortHeads.map(h => `\`${h}\``).join(' / ')}`);
     console.log(`| ${r.chain} | \`${r.endpoint}\` | ${filled}/${r.runs.length}`
       + ` | ${day}/${r.runs.length}${day >= dayBound ? '' : ` ← **under the bound of ${dayBound}**`}`
       + ` | ${median == null ? '—' : median + ' ms'}`
       + ` | ${Object.entries(tally).map(([k, n]) => `${n}× ${k}`).join(', ')}`
       + ` | ${reqMedian == null ? '—' : reqMedian} | ${perLoad || '—'} | ${errs} |`);
+  }
+  if (shortNotes.length) {
+    console.log('\nWhat the heads said on the loads that stopped short — none may read "last 24 hours":\n');
+    for (const n of shortNotes) console.log(n);
   }
   /* An empty history stated as fact is the one failure that looks like success in every other
      column, so it is named in full rather than counted. */
