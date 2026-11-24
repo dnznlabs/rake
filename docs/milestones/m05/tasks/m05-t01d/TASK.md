@@ -112,6 +112,22 @@ with no wallet, and this task does not pretend one does.
        `eth_accounts` and `eth_chainId`; a wallet endpoint that refuses every other method
        still paints the landing, a distribution page and `#/docs` in full; and a wallet
        installed on another chain, not connected, sees the demo's table. Closes #402.
+   - **Amended 2026-11-23 by the Product Owner's ruling (Telegram, 22:03 CST): pressing
+     connect asks the wallet to switch to the page's chain.** "Doesn't make sense to connect and
+     then immediately be on the wrong network." Since the page stopped blanking on a wallet
+     that is on another network, a visitor could connect and be left there with only the bar.
+     - When a **press** of connect (or a pick from the wallet menu) returns an account and the
+       wallet is on another chain, the page calls `wallet_switchEthereumChain` once, so the
+       wallet shows its own prompt straight after the account approval.
+     - Declined, or the wallet does not know the chain (`4902`): nothing else happens. The bar
+       stays with its switch button and the existing wording for an unknown chain.
+     - **Never on a silent reconnect.** A page load that finds a remembered wallet asks for
+       nothing; a prompt nobody asked for on arrival is worse than the bar.
+     - The page reads the same either way; only writes depend on the outcome.
+     - **Check:** tests that a press with the wallet on another chain makes exactly one switch
+       request after the account is returned, that a remembered wallet on load makes none,
+       that a refusal and a `4902` leave the bar and raise no error; `tools/uat/own-reads.mjs`
+       gains the pressed-connect case; `UAT.md` row (b) says the wallet prompts for the switch.
    - **Hidden escrow is detected exactly, from state.** The amount of an escrow is already
      read from state; only finding which account holds one comes from `Escrowed` logs, and
      `_set` never clears `escrowed`, so an escrow outlives its account's removal from the
