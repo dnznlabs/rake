@@ -316,6 +316,13 @@ function wire() {
    on load with the chain the page is already reading, and reloading on every event is a page that
    reloads for ever. `CHAIN` is the chain last read; before anything has been read there is nothing to
    re-read, so the first event only records it. */
+/* **Kept under #403, deliberately.** Now that every read is the page's own, a wallet changing network
+   invalidates nothing the page has painted — only whether a write can be sent, which `tx()` re-reads
+   at send time anyway. So this reload is no longer load-bearing for correctness, and removing it is a
+   separate question with its own risk: this handler is what stops a reload loop in Phantom's in-app
+   browser (#341), which emits `chainChanged` on load with the chain the page is already reading.
+   Dropping a reload nobody asked to drop, in a PR about which provider serves a read, is how a
+   behaviour change arrives unannounced. */
 function chainChanged(id) {
   const n = asChain(id);
   if (n === null || CHAIN === null || n === CHAIN) { if (n !== null) CHAIN = n; return; }
@@ -438,17 +445,47 @@ async function disconnect() {
   if (WALLETS.length > 1) { PICK = ''; store.set(WALLET_KEY, ''); WALLET = false; P = readProvider(null); }
   ACC = null; who(); route();
 }
-const call = async (to, sig, args, types) => Eth.dec(types, await P.request({ method: 'eth_call', params: [{ to, data: Eth.enc(sig, args) }, 'latest'] }));
+/* **Through the page's own provider** (#403). This is one function and **eighteen call sites** — the
+   whole of the page's state reading — and it used to go through `P`, which is a wallet's endpoint when
+   one is connected. That is what a throttled wallet endpoint refused in #401, taking the funds block
+   down with the history; and it is a read of the chain the **document** was built for, which by #375's
+   rule is read from the document's chain. `pcall` above has worked this way since #375; this is the
+   same seam, applied to the rest. */
+const call = async (to, sig, args, types) => Eth.dec(types, await pageRead().request({ method: 'eth_call', params: [{ to, data: Eth.enc(sig, args) }, 'latest'] }));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // A deadline, not a failure: a timed-out transaction may still land. POLL_ERR tells a dead RPC from a slow block.
 const POLL_MS = 120000;
 let POLL_ERR = null;
+/* True when the deadline passed on **our** endpoint and the wallet's had the receipt: the write landed
+   and this page has not caught up. Read by the status line, which must not call that a timeout. */
+let POLL_LAGGED = false;
+/* **The receipt comes from the page's own provider** (#403), for a reason that is about the paint and
+   not only the rule: the repaint after a landed write reads the new state through our provider, so a
+   wallet telling us "landed" a block before ours had it would put the **old** balance under a success
+   line. Consistency between the receipt and the state it licenses is the point.
+
+   **One named exception, at the deadline only** (the architect's ruling, 2026-11-23). The receipt is
+   the one read whose subject the wallet created, so our endpoint can legitimately not have it yet —
+   and our endpoints are pooled hostnames whose backends disagree by a block, the race that returned a
+   `null` block in `tsOf`. So before printing the timeout wording, the wallet's endpoint is asked
+   **once**: if it has the receipt, the write landed, and saying "timed out" would be false. That ask
+   is this one line, named in the allow-list test, and it is not a general permission to read through
+   the wallet. */
 async function waitReceipt(hash, ms) {
   POLL_ERR = null;
+  POLL_LAGGED = false;
   const end = Date.now() + ms;
   while (Date.now() < end) {
-    try { const rc = await P.request({ method: 'eth_getTransactionReceipt', params: [hash] }); if (rc) return rc; POLL_ERR = null; } catch (e) { POLL_ERR = e; }
+    try { const rc = await pageRead().request({ method: 'eth_getTransactionReceipt', params: [hash] }); if (rc) return rc; POLL_ERR = null; } catch (e) { POLL_ERR = e; }
     await sleep(1500);
+  }
+  /* The deadline. `P !== pageRead()` is the whole test for "there is a second endpoint to ask": with
+     no wallet they are the same object and asking twice would learn nothing. */
+  if (P && P !== pageRead()) {
+    try {
+      const rc = await P.request({ method: 'eth_getTransactionReceipt', params: [hash] });   /* allow: the deadline ask (#403) */
+      if (rc) { POLL_LAGGED = true; return rc; }
+    } catch (e) {}
   }
   return null;
 }
@@ -500,6 +537,13 @@ async function tx(to, sig, args, opts) {
     return { ok: false, stage: 'pending', hash, text };
   }
   if (rc.status !== '0x1') { txSay(label, `reverted · ${ext('tx', hash, short(hash))}`, 'bad'); return { ok: false, stage: 'reverted', hash, text: 'reverted' }; }
+  /* **A receipt the wallet's endpoint had and ours did not** (#403's deadline ask). The write landed;
+     what has not happened is our endpoint catching up, and the repaint below reads through ours. So the
+     line says both, rather than claiming a block this page cannot yet see state at. */
+  if (POLL_LAGGED) {
+    txSay(label, `landed in block ${parseInt(rc.blockNumber, 16)} · your wallet's endpoint has it and this page's has not caught up yet · ${ext('tx', hash, short(hash))}`, 'warn');
+    return { ok: true, hash, receipt: rc, lagged: true };
+  }
   txSay(label, `landed in block ${parseInt(rc.blockNumber, 16)} · ${ext('tx', hash, short(hash))}`);
   return { ok: true, hash, receipt: rc };
 }
@@ -938,7 +982,7 @@ async function decimalsOf(tk) {
     /* Not through `call`: an empty return decodes to 0, so a token with a fallback that answers
        nothing would print as whole units — the one thing `raw` exists to prevent. Anything short of
        a word is a failure here, which is what the plain `eth_call` is for. */
-    const res = await P.request({ method: 'eth_call', params: [{ to: tk, data: Eth.enc('decimals()', []) }, 'latest'] });
+    const res = await pageRead().request({ method: 'eth_call', params: [{ to: tk, data: Eth.enc('decimals()', []) }, 'latest'] });
     if (!res || res.length < 66) throw new Error('decimals() answered ' + res);
     dec = Number(Eth.dec(['uint8'], res)[0]);
   } catch (e) { dec = null; }
@@ -953,7 +997,7 @@ async function symbolOf(tk) {
   if (SYMBOLS.has(tk)) return SYMBOLS.get(tk);
   let sym = null;
   try {
-    const res = await P.request({ method: 'eth_call', params: [{ to: tk, data: Eth.enc('symbol()', []) }, 'latest'] });
+    const res = await pageRead().request({ method: 'eth_call', params: [{ to: tk, data: Eth.enc('symbol()', []) }, 'latest'] });
     if (res && res.length === 66) sym = new TextDecoder().decode(Uint8Array.from(res.slice(2).match(/../g).map(h => parseInt(h, 16)))).replace(/\0+$/, '');
     else if (res && res.length >= 130) sym = Eth.dec(['string'], res)[0];
     sym = sym && sym.trim() ? sym.trim().slice(0, 12) : null;
@@ -969,8 +1013,15 @@ async function symbolOf(tk) {
    the first block has been read. */
 let CLOCK = null;
 const secs = () => CLOCK ? CLOCK.t + Math.floor((Date.now() - CLOCK.at) / 1000) : Math.floor(Date.now() / 1000);
+/* **The page's own provider** (#403, closing [#402](https://github.com/dnznlabs/rake/issues/402)).
+   This read sits in the same `Promise.all` as the distribution load, so through a wallet whose endpoint
+   will not serve block headers it rejected that batch and the page painted **nothing at all** — no
+   section, no head, no funds block, which is worse than any outcome the history's stop lines describe.
+   Measured on `1rpc.io/sepolia`, whose free plan answers `eth_getCode` and `eth_call` and refuses this
+   with `code 35`. The chain's time is a property of the chain, not of whichever endpoint a wallet
+   picked. */
 async function readClock() {
-  const b = await P.request({ method: 'eth_getBlockByNumber', params: ['latest', false] });
+  const b = await pageRead().request({ method: 'eth_getBlockByNumber', params: ['latest', false] });
   CLOCK = { t: parseInt(b.timestamp, 16), at: Date.now() };
 }
 const isAddr = v => /^0x[0-9a-fA-F]{40}$/.test(v);
@@ -1258,14 +1309,33 @@ function who() {
         + `<div data-a="switch">switch wallet to ${cname(CFG.chainId)}</div>`);
   pill.classList.toggle('warn', wrong);
   pill.title = wrong ? `expected ${cname(CFG.chainId)}` : '';
+  /* The bar follows the pill (#403): `who()` runs on `accountsChanged`, on `connect`, on `disconnect`
+     and after a wallet is picked from the menu, which is every way the wallet's chain can change
+     without a reload. Without this the notice would be whatever the last route entry painted. */
+  chainBar();
 }
 
 /* ---- reading the chain ---------------------------------------------------------------------- */
 const S = { featured: null, featuredLie: null, impl: null, maxRows: null, grace: null, loaded: false, error: null, tab: 'recent' };
 async function load() {
-  CHAIN = asChain(await P.request({ method: 'eth_chainId' }));
-  // The same address on another network is another contract, or none: do not read it.
-  if (wrongChain()) return;
+  /* **Guarded, like the same call in `pickWallet` (`:417`)** — the architect's review of #403. This is
+     the last place a wallet could still stop the page: `load()` rejecting sets `S.error`, and the route
+     then paints `could not read the factory at …` and nothing else, which blames the factory for a
+     wallet that could not say what chain it is on — on a page that reads nothing through it. `CHAIN`
+     stays `null`, which every reader of it already treats as "not read yet" rather than as a mismatch:
+     the bar stays hidden, the pill says `not reachable`, and `tx()` re-reads the chain itself before
+     any write and refuses there. */
+  try { CHAIN = asChain(await P.request({ method: 'eth_chainId' })); } catch (e) { CHAIN = null; }
+  /* **No chain gate here any more** (#403). “The same address on another network is another contract,
+     or none: do not read it” was true while these reads went through the wallet — they would have been
+     asking the wallet's chain about this document's addresses. They go through the page's own provider
+     now, so the chain they read is the chain the document was built for by construction, and a wallet
+     sitting on another network cannot make any of them wrong.
+
+     **This was the second gate, and removing `route()`'s alone was not enough:** with a wallet on
+     another chain the boot returned here, so the page made two requests and painted nothing — found by
+     `tools/uat/own-reads.mjs`'s `wrongchain` case, not by reading the code. What a wrong chain still
+     costs is the writes, which `tx()` refuses (#375), and the bar above the view says so. */
   await readClock();
   // Read once at boot: the featured distribution is a salt in the build, never an address.
   const [[a], [impl]] = await Promise.all([
@@ -1303,7 +1373,7 @@ async function load() {
    `snapshot()` either, and a zero here means "nothing pending", which a failure must never read as.
    ETH only in v1 — a token balance needs a token list, which the chain does not carry. */
 async function loadDistro(addr) {
-  const code = await P.request({ method: 'eth_getCode', params: [addr, 'latest'] });
+  const code = await pageRead().request({ method: 'eth_getCode', params: [addr, 'latest'] });
   if (!code || code === '0x') return { addr, missing: true };
   /* The code is compared with the clone of the implementation this page read at boot, so a contract
      that is not one of this factory's distributions never reaches a paint (R3). `foreign` is handled
@@ -1315,11 +1385,11 @@ async function loadDistro(addr) {
     // The rehearsal's way into the fallback below without a hostile node; stripped from the bundle that ships.
     if (Q.get('nosnapshot')) throw new Error('nosnapshot=1');
     /*DEV*/
-    [snap] = Eth.dec([Model.SNAPSHOT_T], await P.request({ method: 'eth_call', params: [{ to: addr, data: Eth.enc('snapshot()', []) }, 'latest'] }));
+    [snap] = Eth.dec([Model.SNAPSHOT_T], await pageRead().request({ method: 'eth_call', params: [{ to: addr, data: Eth.enc('snapshot()', []) }, 'latest'] }));
   } catch (e) { snap = null; }
   const [reserved, balance, nominee] = await Promise.all([
     call(addr, 'reserved(address)', [ZERO], ['uint256']),
-    P.request({ method: 'eth_getBalance', params: [addr, 'latest'] }),
+    pageRead().request({ method: 'eth_getBalance', params: [addr, 'latest'] }),
     call(addr, 'pendingOwner()', [], ['address']),
   ]);
   const waiting = BigInt(balance) - reserved[0];
@@ -1962,9 +2032,14 @@ async function landing() {
      send `eth_getCode` with a null address. */
   if (!S.featured) return;
   const d = await loadDistro(S.featured);
-  // The widget reads `window.ethereum` alone, so with no RPC and no such global it could only fail.
-  const rpc = WRPC || (WALLET ? '' : PUBLIC_RPC[CFG.chainId] || '');
-  if (stale(t) || d.missing || d.foreign || !(rpc || window.ethereum)) return;
+  /* **The page's own endpoint, not the visitor's wallet** (#403). This handed the widget nothing
+     whenever a wallet was present, so the featured widget read through whichever endpoint the wallet
+     had picked — the same defect the Product Owner found in the `#/docs` demo, one screen earlier, and
+     the `eth_call` that reached the wallet in `own-reads.mjs`'s `hostile` case. With no endpoint of
+     ours at all the widget can only read a wallet, and then only a connected one on this chain: a
+     wallet merely installed may not decide what the landing shows. */
+  const rpc = WRPC || PUBLIC_RPC[CFG.chainId] || '';
+  if (stale(t) || d.missing || d.foreign || !(rpc || (ACC && !wrongChain()))) return;
   fill('featured', `<div id="wdg" data-rake="${d.addr}" data-chain="${CFG.chainId}" data-link${rpc ? ` data-rpc="${esc(rpc)}"` : ''}></div>`);
   window.RakeWidget.mount(document.getElementById('wdg'));
 }
@@ -2076,7 +2151,7 @@ const bindAll = () => bindWrites(w => { if (w.sig === 'propose(bytes)') closeDra
 const signsFor = async addr => {
   if (!addr || addr === ZERO) return false;
   try {
-    const r = await P.request({ method: 'eth_call', params: [{ to: addr, data: Eth.enc('isOwner(address)', [ACC]) }, 'latest'] });
+    const r = await pageRead().request({ method: 'eth_call', params: [{ to: addr, data: Eth.enc('isOwner(address)', [ACC]) }, 'latest'] });
     return !!r && r !== '0x' && BigInt(r) === 1n;
   } catch (e) { return false; }
 };
@@ -2425,8 +2500,8 @@ const PROBE = new Map();
 async function probeOwner(a) {
   if (PROBE.has(a)) return PROBE.get(a);
   const [code, n] = await Promise.all([
-    P.request({ method: 'eth_getCode', params: [a, 'latest'] }),
-    P.request({ method: 'eth_getTransactionCount', params: [a, 'latest'] }),
+    pageRead().request({ method: 'eth_getCode', params: [a, 'latest'] }),
+    pageRead().request({ method: 'eth_getTransactionCount', params: [a, 'latest'] }),
   ]).catch(() => [null, null]);
   const out = code === null ? { text: 'could not read this address', cls: 'warn' }
     : code !== '0x' ? { text: 'a contract — it will have to propose and cancel through its own calls', cls: '' }
@@ -2530,7 +2605,7 @@ async function readFunds(d, funds) {
   const read = list => Promise.all(list.map(async tk => {
     const [reserved] = await call(d.addr, 'reserved(address)', [tk], ['uint256']);
     const held = tk === ZERO
-      ? BigInt(await P.request({ method: 'eth_getBalance', params: [d.addr, 'latest'] }))
+      ? BigInt(await pageRead().request({ method: 'eth_getBalance', params: [d.addr, 'latest'] }))
       : (await call(tk, 'balanceOf(address)', [d.addr], ['uint256']))[0];
     const waiting = held - reserved;
     // The token's own decimals ride along with its balance rather than costing a second pass (#43).
@@ -3144,19 +3219,30 @@ function giveBind() {
   amt.onkeydown = e => { if (e.key === 'Enter') send(); };
 }
 /* The docs' live preview: the two variants of the real widget, mounted on whatever address the field
-   holds, and every snippet above rewritten to match. It reads through the dev `?rpc=`, else the wallet
-   as the landing's widget does — a page host's CSP can refuse a fetch to any endpoint, a wallet's
-   reads it cannot — and the chain's public endpoint only for a visitor with no wallet. */
+   holds, and every snippet above rewritten to match.
+
+   **It reads through the page's own endpoint** (#403). It used to choose on `window.ethereum`
+   *existing* — a wallet being **installed**, not connected and not on this chain — so a visitor with
+   MetaMask on another network got `wallet is on base sepolia, distribution is on sepolia · retry` in
+   both variants where the documentation is supposed to show a working example. Found by the Product
+   Owner on the second preview, with nothing connected at all. The old reasoning here was about an
+   **embedding host's** CSP refusing a fetch, which is an argument about somebody else's page: this one
+   already fetches that endpoint for everything it paints. It is also the form the snippet above
+   presents first, so the preview now demonstrates what it recommends. */
 function widgetDemo() {
   const input = document.getElementById('wd-in'), res = document.getElementById('wd-res'), go = document.getElementById('wd-go');
   if (!input) return;
-  const rpc = WRPC || (window.ethereum ? '' : PUBLIC_RPC[CFG.chainId] || ''), first = input.value;
+  const rpc = WRPC || PUBLIC_RPC[CFG.chainId] || '', first = input.value;
   const show = async () => {
     const a = await addrField(input.value, res);
     if (!a) return;
     document.querySelectorAll('.wd-a').forEach(el => el.textContent = a);
     if (a !== first) document.getElementById('wd-what').textContent = 'the distribution previewed above';
-    if (!rpc && !window.ethereum) { res.textContent = `the preview needs a wallet on ${cname(CFG.chainId)}`; return; }
+    /* **No page endpoint at all** — a chain with no `PUBLIC_RPC` entry, where the snippets above say
+       in prose that the widget reads through the visitor's wallet. The demo does the same there, so it
+       still shows what it documents, but **only with a wallet connected and on this chain**: a wallet
+       merely installed, or on another network, may never be what the documentation shows (#403). */
+    if (!rpc && (!ACC || wrongChain())) { res.textContent = `${cname(CFG.chainId)} has no public endpoint, so this preview reads through a wallet — connect one on ${cname(CFG.chainId)} to see it.`; return; }
     for (const v of ['full', 'compact']) {
       // A fresh element per mount: the widget keeps its state on the node it was given.
       const el = document.createElement('div');
@@ -3204,6 +3290,21 @@ function track(p) {
    mid-route and is deliberately unstamped: the stamp is a claim about where this view was read, not
    about every request the page will go on to make. */
 const chrome = on => { for (const id of ['asof', 'refresh']) { const el = document.getElementById(id); if (el) el.hidden = !on; } };
+/* The wallet-on-another-network notice (#403). **Visible and non-blocking**, by the architect's
+   ruling: since the page now reads its own chain whatever the wallet is on, the only thing a wrong
+   chain costs is the writes — and every write control on the page will refuse — so the network pill
+   alone is too quiet for that, and the old full-page refusal was too loud for a page that works.
+   It carries the same switch control the refusal did, and the sibling-chain link where that chain is
+   one this app is on. Called on every route entry and whenever the wallet's chain or account changes. */
+function chainBar() {
+  const el = document.getElementById('chainbar');
+  if (!el) return;
+  if (!wrongChain()) { el.hidden = true; el.innerHTML = ''; return; }
+  el.hidden = false;
+  el.innerHTML = `<div class="notice warn">Your wallet is on ${cname(CHAIN)}, and this page is ${cname(CFG.chainId)}. Reading works; sending does not — every control that writes will refuse until the wallet is on ${cname(CFG.chainId)}. <button class="link" id="sw">Switch network</button>${enabled(CHAIN) ? ` · <a class="link" href="${esc(chainHref(CHAIN))}">open rake on ${cname(CHAIN)}</a>` : ''}</div>`;
+  const b = document.getElementById('sw');
+  if (b) b.onclick = switchChain;
+}
 function route() {
   const h = location.hash || '#/';
   TOKEN++;
@@ -3220,8 +3321,18 @@ function route() {
      the wrong chain, which is most of the ways a stranger arrives at them. */
   if (h.startsWith('#/docs')) { docs(); docScroll(h); return; }
   EMBED = null;
-  if (!P) { V.innerHTML = notice('No wallet found. Open this page in a browser with a wallet.'); return; }
-  if (wrongChain()) { V.innerHTML = notice(`Your wallet is on ${cname(CHAIN)}. This app lives on ${cname(CFG.chainId)}. <button id="sw">Switch network</button>${enabled(CHAIN) ? `, or <a class="link" href="${esc(chainHref(CHAIN))}">open rake on ${cname(CHAIN)}</a>` : ''}.`); document.getElementById('sw').onclick = switchChain; return; }
+  /* **Not "no wallet found"** (#403). `readProvider` returns the chain's public endpoint whenever
+     there is one, so this can only fire on a chain with **no endpoint and no wallet** — the sentence
+     used to blame the absence of a wallet for what is really the absence of a reader, and on a chain
+     that has an endpoint it could not fire at all. */
+  if (!P) { V.innerHTML = notice(`This page has no way to read ${cname(CFG.chainId)}: no endpoint is configured for it, and no wallet is present to read through.`); return; }
+  /* **The wrong-chain refusal is not here any more** (#403). Every read on this page is a read of the
+     chain the document was built for, served by the page's own provider, so a wallet on another
+     network cannot make any of them wrong — and blanking the whole app over it hid a page that works.
+     What the wallet's chain does decide is whether a **write** can be sent, and `tx()` refuses there,
+     before the transaction reaches the wallet (#375). The bar below says so where a reader can see it,
+     without standing in front of the page. */
+  chainBar();
   if (S.error) { V.innerHTML = notice(`could not read the factory at ${CFG.factory}: ${esc(S.error)}`, 'err'); return; }
   if (!S.loaded) return;
   scrollTo(0, 0);
