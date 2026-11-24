@@ -18,6 +18,10 @@
  *   present      the same wallet, on this chain, answering normally. Here the figure matters rather
  *                than the paint: how many requests reach **our** endpoint per first paint, which is
  *                what moving eighteen `call()` sites onto it changes.
+ *   pressed      a wallet on **another chain** whose connect is actually pressed (#405). The page must
+ *                ask it to switch exactly once, straight after the account comes back, and must not
+ *                ask on the silent reconnect the other cases take. The Product Owner's ruling: it
+ *                makes no sense to connect and be left on the wrong network.
  *   nochainid    a wallet that cannot say what chain it is on — `eth_chainId` throws. The last place a
  *                wallet could stop the page: `load()` awaited that call unguarded, so the route painted
  *                `could not read the factory at …` and nothing else, blaming the factory for the
@@ -44,6 +48,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const EXEC = process.env.RAKE_UAT_CHROME || `${process.env.HOME}/.cache/ms-playwright/chromium-1243/chrome-linux-arm64/chrome`;
 const DNZN = '0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199';
+/* The account the `pressed` case's wallet returns. Any address does: nothing is signed. */
+const ACCOUNT = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
 const flag = k => process.argv.includes(`--${k}`);
 
@@ -51,7 +57,7 @@ const chain = Number(arg('chain', 84532));
 const addr = arg('addr', DNZN);
 const patience = Number(arg('patience', 35_000));
 const only = arg('case', 'all');
-const CASES = ['hostile', 'wrongchain', 'present', 'nochainid', 'nowallet'];
+const CASES = ['hostile', 'wrongchain', 'present', 'pressed', 'nochainid', 'nowallet'];
 const cases = only === 'all' ? CASES : [only];
 for (const c of cases) if (!CASES.includes(c)) { console.error(`own-reads: --case must be all or one of ${CASES.join(', ')}`); process.exit(2); }
 if (!existsSync(EXEC)) { console.error(`own-reads: no browser at ${EXEC}`); process.exit(2); }
@@ -113,7 +119,9 @@ async function run(kind) {
 
   const asked = [];
   if (kind) {
-    const walletChain = kind === 'wrongchain' ? (chain === 84532 ? '0xaa36a7' : '0x14a34') : '0x' + chain.toString(16);
+    const elsewhere = chain === 84532 ? '0xaa36a7' : '0x14a34';
+    const walletChain = (kind === 'wrongchain' || kind === 'pressed') ? elsewhere : '0x' + chain.toString(16);
+    let approved = false;
     await page.exposeFunction('__w', async (method, params) => {
       asked.push(method);
       /* A wallet that cannot answer which chain it is on. Not hypothetical: a locked wallet, an
@@ -121,11 +129,20 @@ async function run(kind) {
          the page reads nothing through the wallet, so it must not care. */
       if (kind === 'nochainid' && method === 'eth_chainId') throw { code: -32603, message: 'internal error' };
       if (method === 'eth_chainId') return walletChain;
-      if (method === 'eth_accounts' || method === 'eth_requestAccounts') return [];   // never connected
+      /* `pressed` is the one case with an account — but **not before it is approved**, which is the
+         whole shape of the thing being tested. My first version answered `eth_accounts` with an
+         account straight away, so the page booted already connected, the connect button became the
+         disconnect drawer, and the press opened a menu instead of connecting: 0 switch requests, and
+         the driver correctly called it a failure of page code that was fine. A real wallet answers
+         `eth_accounts` with nothing until the visitor approves. */
+      if (method === 'wallet_requestPermissions') { approved = true; return [{ parentCapability: 'eth_accounts' }]; }
+      if (method === 'eth_requestAccounts') { approved = true; return kind === 'pressed' ? [ACCOUNT] : []; }
+      if (method === 'eth_accounts') return (kind === 'pressed' && approved) ? [ACCOUNT] : [];
+      if (method === 'wallet_switchEthereumChain') return null;   // accepted; the page then reloads
       /* `hostile` is the limit case: a wallet that serves its own two answers and nothing else, which
          is what a rate-limited endpoint amounts to from the page's side. `present` relays to our own
          endpoint so the figure below is about volume rather than about a second endpoint's quirks. */
-      if (kind === 'hostile' || kind === 'wrongchain' || kind === 'nochainid') throw { code: 4100, message: 'this wallet serves only accounts and chainId' };
+      if (kind === 'hostile' || kind === 'wrongchain' || kind === 'nochainid' || kind === 'pressed') throw { code: 4100, message: 'this wallet serves only accounts and chainId' };
       const res = await fetch(OUR, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
       const body = await res.json().catch(() => null);
       if (body && body.error) { const e = new Error(body.error.message); e.code = body.error.code; throw e; }
@@ -138,6 +155,9 @@ async function run(kind) {
   }
 
   const base = `http://127.0.0.1:${port}/index.html`;
+  /* #405 is about a **press**, so this case presses. Everything before the click is the same page the
+     other cases load, which is what makes "no switch on the silent path" readable in their rows. */
+  const pressing = kind === 'pressed';
   // The landing first, then a distribution, then the docs: the three screens the clause names.
   await page.goto(base + '#/', { waitUntil: 'load' });
   await page.waitForTimeout(Math.round(patience * 0.4));
@@ -147,6 +167,11 @@ async function run(kind) {
     bar: (document.getElementById('chainbar')?.innerText || '').replace(/\s+/g, ' ').trim(),
   }));
   const firstPaint = ours;
+  const askedBeforePress = asked.length;
+  if (pressing) {
+    await page.click('#who').catch(() => {});
+    await page.waitForTimeout(8000);
+  }
 
   await page.goto(`${base}#/distros/${addr}`, { waitUntil: 'load' });
   await page.waitForTimeout(patience);
@@ -168,7 +193,9 @@ async function run(kind) {
   });
 
   await ctx.close();
-  return { kind: kind || 'nowallet', asked, ours, firstPaint, landing, distro, docs, errors };
+  return { kind: kind || 'nowallet', asked, ours, firstPaint, landing, distro, docs, errors,
+           switches: asked.filter(m => m === 'wallet_switchEthereumChain').length,
+           askedBeforePress, pressed: pressing };
 }
 
 /* ── report ───────────────────────────────────────────────────────────────────────────────────── */
@@ -189,7 +216,13 @@ for (const r of results) {
   const fails = [];
   /* On first paint the wallet may be asked for its accounts and its chain and nothing else — the
      clause's own words. Any other method is a read that belongs to our endpoint. */
-  if (extra.length) fails.push(`the wallet was asked ${[...new Set(extra)].join(', ')}`);
+  /* On first paint the wallet may be asked for its accounts and its chain and nothing else. A press
+     adds exactly one `wallet_switchEthereumChain` (#405), so the two are judged apart. */
+  const beforePress = r.asked.slice(0, r.askedBeforePress).filter(m => !WALLET_MAY.has(m));
+  if (beforePress.length) fails.push(`before any press the wallet was asked ${[...new Set(beforePress)].join(', ')}`);
+  if (r.pressed && r.switches !== 1) fails.push(`a press on another chain made ${r.switches} switch requests, not one`);
+  if (!r.pressed && r.switches) fails.push(`a switch was asked for with nothing pressed (${r.switches})`);
+  if (!r.pressed && extra.length) fails.push(`the wallet was asked ${[...new Set(extra)].join(', ')}`);
   if (!r.landing.featured) fails.push('the landing painted no featured widget');
   /* The shape of the defect this case was added for: the route's own error notice standing in for the
      page. Checked on the text rather than on the absence of a widget, so the failure names itself. */
@@ -201,7 +234,7 @@ for (const r of results) {
   if (/wallet is on/.test(r.docs.full + r.docs.compact)) fails.push('the docs demo blamed the wallet');
   if (r.errors.length) fails.push(`page errors: ${r.errors.join(' | ')}`);
 
-  console.log(`  ${r.kind.padEnd(11)} wallet asked: ${[...new Set(r.asked)].join(', ') || 'nothing'}`);
+  console.log(`  ${r.kind.padEnd(11)} wallet asked: ${[...new Set(r.asked)].join(', ') || 'nothing'}${r.pressed ? `   (switch requests: ${r.switches})` : ''}`);
   console.log(`              our endpoint: ${r.ours} requests (${r.firstPaint} by the landing's first paint)`);
   console.log(`              table rows ${r.distro.rows} · distribute ${r.distro.distribute} · docs demo ${r.docs.full.slice(0, 54) || '(empty)'}`);
   if (r.landing.bar) console.log(`              chain bar: ${r.landing.bar.slice(0, 100)}`);

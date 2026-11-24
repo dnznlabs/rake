@@ -344,6 +344,25 @@ async function connect() {
     a = await P.request({ method: 'eth_requestAccounts' });
   }
   ACC = a[0] || null; who(); route();
+  /* **A press that lands on the wrong network asks the wallet to move** (#405, the Product Owner's
+     ruling: "doesn't make sense to connect and then immediately be on the wrong network"). It belongs
+     here and nowhere else, because `connect()` is the only path a **press** takes — the direct button
+     and the wallet menu's `pickWallet` both arrive here, while the silent reconnect at boot reads
+     `eth_accounts` on its own and never calls this. A prompt nobody asked for on arrival is worse than
+     the bar, which is why that path is left alone.
+
+     **The chain is re-read rather than trusted from `CHAIN`**, for the reason `tx()` re-reads it
+     before a write (R17): the figure in hand was taken at boot or before the account approval, and a
+     stale one either skips a switch that is needed or asks for one that is not. Painting first and
+     prompting second is deliberate — the visitor sees their account arrive, then the wallet's own
+     dialog, rather than a dialog over a page that still says `connect`.
+
+     `switchChain()` is reused whole, so a decline is silent and a `4902` gets the same "your wallet
+     doesn't know this chain" wording it has always had; on acceptance the wallet emits
+     `chainChanged` and the page reloads into its remembered wallet, connected and asking nothing. */
+  if (!ACC) return;
+  try { CHAIN = asChain(await P.request({ method: 'eth_chainId' })); } catch (e) {}
+  if (wrongChain()) await switchChain();
 }
 /* "Phone or tablet", in the order the hints become reliable: the browser's own `mobile` boolean
    where it exists, then the user-agent's own words, then an iPad — which reports a Mac user-agent and
