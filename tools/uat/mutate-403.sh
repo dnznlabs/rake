@@ -69,3 +69,18 @@ run "a distribution's code read through the wallet" \
 run "load()'s eth_chainId unguarded again, so a wallet blanks the page" \
     "  try { CHAIN = asChain(await P.request({ method: 'eth_chainId' })); } catch (e) { CHAIN = null; }" \
     "  CHAIN = asChain(await P.request({ method: 'eth_chainId' }));"
+
+# #405: a press that lands on the wrong network asks the wallet to move, once, and never on arrival.
+run "connect asks for no switch, so a press leaves the visitor on the wrong network" \
+    "  if (wrongChain()) await switchChain();" "  if (false) await switchChain();"
+run "connect asks for the switch whatever chain the wallet is on" \
+    "  if (wrongChain()) await switchChain();" "  await switchChain();"
+run "the switch is asked for before the account comes back" \
+    "  ACC = a[0] || null; who(); route();
+  /* **A press that lands on the wrong network asks the wallet to move**" \
+    "  if (wrongChain()) await switchChain();
+  ACC = a[0] || null; who(); route();
+  /* **A press that lands on the wrong network asks the wallet to move**"
+run "the silent reconnect asks too, so arriving prompts for a network" \
+    "  if (WALLET && !store.get(OFF_KEY)) { try { const a = await P.request({ method: 'eth_accounts' }); ACC = a[0] || null; } catch (e) {} }" \
+    "  if (WALLET && !store.get(OFF_KEY)) { try { const a = await P.request({ method: 'eth_accounts' }); ACC = a[0] || null; if (ACC) await switchChain(); } catch (e) {} }"
