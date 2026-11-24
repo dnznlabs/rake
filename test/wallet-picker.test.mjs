@@ -48,7 +48,7 @@ const wallet = (rdns, name = rdns) => ({
 /* A provider that records what was asked of it, answers per method, and can emit the two events the
    page listens for. `unsupported` is the lever the fifth case needs: a wallet with no
    `wallet_revokePermissions` that still reports an account. */
-const prov = (rdns, { accounts = [ACCOUNT], unsupported = [], chainId = '0xaa36a7' } = {}) => ({
+const prov = (rdns, { accounts = [ACCOUNT], unsupported = [], chainId = '0xaa36a7', refuseSwitch = 0 } = {}) => ({
   rdns,
   calls: [],
   handlers: [],
@@ -56,6 +56,12 @@ const prov = (rdns, { accounts = [ACCOUNT], unsupported = [], chainId = '0xaa36a
   emit(ev, arg) { for (const [e, fn] of this.handlers) if (e === ev) fn(arg); },
   async request({ method }) {
     this.calls.push(method);
+    /* #405: the switch a press asks for. `refuseSwitch` is the code the wallet answers with — 4001
+       for a decline, 4902 for a chain it does not know — and 0 accepts. */
+    if (method === 'wallet_switchEthereumChain') {
+      if (refuseSwitch) { const e = new Error('refused'); e.code = refuseSwitch; throw e; }
+      return null;
+    }
     if (unsupported.includes(method)) {
       const e = new Error('Method not supported');
       e.code = -32601;
@@ -72,7 +78,7 @@ const announced = p => ({ info: { rdns: p.rdns, name: p.rdns, uuid: `uuid-${p.rd
    declarations come along, so the keys a choice and a disconnect are stored under are the page's
    strings and not this file's guess. `kv` can be handed back in to stand for a reload: the store
    survives, everything else is built again. */
-function load({ announce = [], stored = {}, injected = null, kv = null }) {
+function load({ announce = [], stored = {}, injected = null, kv = null, pageChain = 11155111 }) {
   const listeners = [];
   const addEventListener = (type, fn) => { if (type === 'eip6963:announceProvider') listeners.push(fn); };
   /* The request event is what makes an extension announce; the stub answers it the way the browser
@@ -101,19 +107,29 @@ function load({ announce = [], stored = {}, injected = null, kv = null }) {
     block('function wire'),
     block('async function pickWallet'),
     block('function chainChanged'),
+    line('const wrongChain = () =>'),
+    /* #405: `connect` asks for the switch through this, so it is lifted rather than stubbed — a stub
+       would make the decline and 4902 wordings this file's invention instead of the page's. */
+    block('async function switchChain'),
     block('async function connect'),
     block('async function disconnect'),
-    'return { discover, connect, disconnect, chainChanged, pickWallet, state: () => ({ P, ACC, CHAIN, WALLET, WALLETS, PICK }) };',
+    'return { discover, connect, disconnect, chainChanged, pickWallet, switchChain, state: () => ({ P, ACC, CHAIN, WALLET, WALLETS, PICK }) };',
   ].join('\n');
 
+  /* The network menu element `switchChain` writes its refusal into, and the chain-name helper it
+     spells that refusal with: both the page's, so the sentence asserted below is the shipped one. */
+  const nm = { hidden: true, lastElementChild: { textContent: '' } };
+  const CFG = { chainId: pageChain };
+  const cname = id => ({ 1: 'mainnet', 8453: 'base', 11155111: 'sepolia', 84532: 'base sepolia' }[id] || 'chain ' + id);
   const made = new Function(
     'addEventListener', 'dispatchEvent', 'Event', 'setTimeout', 'store', 'window', 'readProvider',
-    'who', 'route', 'location', body,
+    'who', 'route', 'location', 'nm', 'CFG', 'cname', body,
   )(
     addEventListener, dispatchEvent, class Event {}, fn => fn(), store,
     { ethereum: injected }, readProvider, () => {}, () => {}, { reload: () => reloads.push(1) },
+    nm, CFG, cname,
   );
-  return { ...made, given, stored: kv, reloads };
+  return { ...made, given, stored: kv, reloads, nm };
 }
 
 test('both extensions are kept, in announcement order, and a repeat is not', async () => {
@@ -830,4 +846,129 @@ test('Disconnect after a pick offers the menu again, and a reload does not recon
   await second.discover();
   assert.equal(second.state().PICK, '', 'the reload reconnected the wallet that was disconnected');
   assert.equal(second.state().ACC, null);
+});
+
+/* ── #405: a press that lands on the wrong network asks the wallet to move ──────────────────────── */
+/* The Product Owner's ruling from the preview: "doesn't make sense to connect and then immediately be
+   on the wrong network." Since the page stopped blanking on a wallet that is elsewhere (#403), a
+   visitor could connect and be left there with only the bar.
+
+   The whole of it lives at the end of `connect()`, which is the only path a **press** takes — the
+   button and the wallet menu's `pickWallet` both arrive there. The silent reconnect at boot reads
+   `eth_accounts` on its own and never calls it, which is what makes "never on arrival" structural
+   rather than a flag someone has to remember to check. */
+
+const SWITCH = 'wallet_switchEthereumChain';
+const switches = p => p.calls.filter(m => m === SWITCH).length;
+
+test('a press with the wallet on another chain asks for the switch, exactly once', async () => {
+  const p = prov('io.metamask', { chainId: '0x14a34' });          // wallet on Base Sepolia
+  const h = load({ injected: p, pageChain: 11155111 });           // page is Sepolia
+  await h.discover();
+
+  await h.connect();
+
+  assert.equal(switches(p), 1, `one switch request, not ${switches(p)}`);
+  /* **After the account, not before it.** The wallet shows its own dialog straight after the approval;
+     asking first would be a network prompt on a page the visitor has not connected to yet. */
+  const at = p.calls.indexOf(SWITCH);
+  assert.ok(p.calls.slice(0, at).some(m => m === 'eth_accounts' || m === 'eth_requestAccounts'),
+    `the switch came before the account was returned: ${p.calls.join(', ')}`);
+  assert.equal(h.state().ACC, ACCOUNT, 'and the account is still what the press was for');
+});
+
+test('a press with the wallet already on this chain asks for nothing', async () => {
+  const p = prov('io.metamask', { chainId: '0xaa36a7' });          // wallet on Sepolia
+  const h = load({ injected: p, pageChain: 11155111 });
+  await h.discover();
+
+  await h.connect();
+
+  assert.equal(switches(p), 0, 'there is nothing to switch to');
+});
+
+test('a remembered wallet on load asks for nothing — never a prompt on arrival', async () => {
+  /* The case the ruling is explicit about: "a prompt nobody asked for on arrival is worse than the
+     bar". `discover()` is the boot path; it finds the stored pick and reads the account itself. */
+  const p = prov('io.metamask', { chainId: '0x14a34' });           // remembered, and on the wrong chain
+  const h = load({ announce: [announced(p)], stored: { 'rake.wallet': 'io.metamask' }, pageChain: 11155111 });
+
+  await h.discover();
+
+  assert.equal(h.state().ACC, ACCOUNT, 'the wallet is reconnected silently, as before');
+  assert.equal(switches(p), 0, 'and asked for no switch: nobody pressed anything');
+});
+
+test('a declined switch leaves the page connected and says nothing more', async () => {
+  const p = prov('io.metamask', { chainId: '0x14a34', refuseSwitch: 4001 });
+  const h = load({ injected: p, pageChain: 11155111 });
+  await h.discover();
+
+  await assert.doesNotReject(() => h.connect(), 'a decline is an answer, not a page error');
+
+  assert.equal(switches(p), 1, 'asked once and not again');
+  assert.equal(h.state().ACC, ACCOUNT, 'the account the press was for survives the refusal');
+  assert.equal(h.nm.hidden, true, 'nothing is opened over the page: the bar already says what is wrong');
+  assert.equal(h.nm.lastElementChild.textContent, '', 'and a decline needs no sentence of its own');
+});
+
+test('a wallet that does not know the chain gets the wording it always had (4902)', async () => {
+  const p = prov('io.metamask', { chainId: '0x14a34', refuseSwitch: 4902 });
+  const h = load({ injected: p, pageChain: 11155111 });
+  await h.discover();
+
+  await assert.doesNotReject(() => h.connect());
+
+  assert.equal(switches(p), 1);
+  assert.equal(h.state().ACC, ACCOUNT);
+  assert.match(h.nm.lastElementChild.textContent, /doesn't know sepolia/,
+    'the existing unknown-chain sentence, not a new one invented for this path');
+  assert.equal(h.nm.hidden, false, 'which is shown where that sentence has always been shown');
+});
+
+test('the switch is asked for through the page\'s own switchChain, not a second copy of it', async () => {
+  /* A press and the bar's button must behave the same way, because they are the same function: two
+     copies would drift, and the decline and 4902 wordings above would stop being the page's. */
+  const CONNECT = block('async function connect');
+  assert.match(CONNECT, /await switchChain\(\)/,
+    'connect must reuse switchChain, so a press and the bar\'s button cannot diverge');
+  assert.match(CONNECT, /if \(wrongChain\(\)\)/, 'and ask only when the wallet is elsewhere');
+});
+
+test('after an accepted switch the page reloads and comes back connected, asking nothing', async () => {
+  /* The architect's question, measured rather than reasoned: what the `chainChanged` reload does on
+     the other side of an accepted switch. Two halves, because the answer is only useful if both hold.
+
+     First the reload happens at all: `chainChanged` reloads when the chain actually changed, and it is
+     that handler — not `connect` — which notices, since the wallet emits the event after it accepts.
+
+     Then the page that comes back must not ask again. It arrives at `discover()`, finds the pick it
+     stored during the press, reads the account silently, and never reaches `connect()`. Without the
+     store write that would be an infinite prompt: connect, switch, reload, prompt again. */
+  const p = prov('io.metamask', { chainId: '0x14a34' });
+  const first = load({ announce: [announced(p)], pageChain: 11155111 });
+  await first.discover();
+
+  await first.pickWallet('io.metamask');                    // the press, through the wallet menu
+  assert.equal(switches(p), 1, 'the press asked for the switch');
+  assert.equal(first.reloads.length, 0, 'and nothing has reloaded yet: the wallet has not spoken');
+
+  // What the wallet does on acceptance.
+  p.emit('chainChanged', '0xaa36a7');
+  assert.equal(first.reloads.length, 1, 'the chain changed, so the page reloads — one reload, not a loop');
+
+  // The page that comes back: same store, everything else built again, and now on the page's chain.
+  const after = prov('io.metamask', { chainId: '0xaa36a7' });
+  const second = load({ announce: [announced(after)], kv: first.stored, pageChain: 11155111 });
+  await second.discover();
+
+  assert.equal(second.state().ACC, ACCOUNT, 'it comes back connected');
+  assert.equal(switches(after), 0, 'and asks for nothing: the reload is not a press');
+  assert.equal(second.reloads.length, 0, 'nor does it reload again, which would be the loop #341 is about');
+  /* **What the silent path asks the wallet for, and it is only the account.** Not the chain: the boot's
+     `load()` reads that, and it is not lifted here — my first version of this test asserted `CHAIN`
+     was the page's chain and failed, because this harness cannot see a read it does not lift. The
+     chain's own assignment is `chain-type.test.mjs`'s subject. */
+  assert.deepEqual([...new Set(after.calls)], ['eth_accounts'],
+    `the reconnect asks for the account and nothing else: ${after.calls.join(', ')}`);
 });
