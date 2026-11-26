@@ -115,7 +115,11 @@ Re-run rather than quote.
    key and salt); on the two testnets, where the M04 distribution at `0x71a4…7a4A` stays live under
    the old factory, the new one is created by m05-t01 at the new address with decision 42's testnet
    delay. One `distribute` has run on Base, from a deposit Denizen made, with the hash in m05-t03's
-   handoff — the first real transfer through the contract.
+   handoff — the first real transfer through the contract. **Met 2026-11-26:** deposit
+   `0xee99eb54a345781729e647ed95d7d79ddb386e584d460ea2fd2ccf8a58ecfdd5` (block 62,651,967) and
+   `distribute(0x0)` `0x6564ba6e70e4e6ae42b916f6f67fe6302d3a72590eb7c1a1e32b9e0630f06b83`
+   (62,652,371), both `status 1`, the distribution 0.001 ETH → **0** and the split 20/40/40 landing
+   to the wei ([#433](https://github.com/dnznlabs/rake/issues/433)).
 5. **Served under dnzn.dev and embedded.** Rewritten 2026-11-21 under decision 66 as amended.
    `https://rake.dnzn.dev`, deployed from this repository by gw44's reusable workflow at a pinned
    commit, serves `App` on every chain rake is live on, the four mainnets and the two testnets,
@@ -361,13 +365,20 @@ as its upload lands.
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m05-t03](tasks/m05-t03/TASK.md) | **The document on Base, then on Ethereum.** Run B on each: the cut from the tip of `main`, three proposals at the vault's live nonce, co-signed, executed after the vault's delay, 4d's byte comparison before the batch is executed; `make gateway-check` against `https://<App>.<chainId>.w3link.io/`; the chain added to `rake.dnzn.dev` by `RUNBOOK.md` § The gateway, with `/` going to Ethereum once its document is up and never to Base (decision 70); a § Uploads row each. Ethereum's base fee against the stop rule before every send. On Base, the first deposit and `distribute`, and the signoff below. A chain's upload needs that chain's `create` landed, or its featured panel has nothing to paint | planned 2026-11-26 — starts on this plan's merge; its gate, m05-t01d, closed the same day, and the document is that one. No mainnet document is uploaded before #382 is fixed and measured on every chain (m05-t01c, as amended) |
+| [m05-t03](tasks/m05-t03/TASK.md) | **The document on Base, then on Ethereum.** Run B on each: the cut from the tip of `main`, three proposals at the vault's live nonce, co-signed, executed after the vault's delay, 4d's byte comparison before the batch is executed; `make gateway-check` against `https://<App>.<chainId>.w3link.io/`; the chain added to `rake.dnzn.dev` by `RUNBOOK.md` § The gateway, with `/` going to Ethereum once its document is up and never to Base (decision 70); a § Uploads row each. Ethereum's base fee against the stop rule before every send. On Base, the first deposit and `distribute`, and the signoff below. A chain's upload needs that chain's `create` landed, or its featured panel has nothing to paint | **done 2026-11-26** — the document is on Base and Ethereum, three `executeQueued` per chain through the Ops vault at vault nonces 3, 4, 5, read back equal to each chain's own build (`RUNBOOK.md` § Uploads rows 9 and 10, twelve transactions); `rake.dnzn.dev` serves all four chains with `/` on Ethereum (#436); the first deposit and `distribute` ran on Base and are the signoff below (#433). Records and handoff in [#437](https://github.com/dnznlabs/rake/pull/437) |
 
 m05-t05, the stretch row for MegaETH and Robinhood Chain, is withdrawn with the other two chains
 (decision 70).
 
-**Signoff:** _not yet — a dated line by Denizen after reading DNZN's distribution on Base through the
-gateway from a wallet, and after the first deposit and `distribute` have run, goes here._
+**Signoff:** **2026-11-26 — Denizen, on [#433](https://github.com/dnznlabs/rake/issues/433): "Verified
+all three on Base."** He opened DNZN's distribution at `rake.dnzn.dev/8453/` from his own wallet,
+deposited 0.001 ETH and pressed `distribute`, and ticked all three of that issue's boxes: the page
+naming Base with the three rows, the owner and the delay; `waiting to distribute` showing the amount
+after the deposit; and the return to zero with the split in `activity` after it ran. Read back from
+the chain in the same issue — deposit `0xee99eb54…8ecfdd5` in block 62,651,967 and
+`distribute(0x0)` `0x6564ba6e…30f06b83` in 62,652,371, both `status 1`, the distribution's balance
+0.001 → **0**, and treasury **+0.0002** / ops **+0.0004** / creator **+0.0004**, summing to the
+deposit exactly.
 
 ### Phase 4 — Served under dnzn.dev and embedded
 

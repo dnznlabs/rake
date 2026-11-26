@@ -994,7 +994,24 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
    ```
 
    The batch cannot be estimated until its chunks have landed — `CodelessChunk` — so estimate it
-   *between* piece 2 and the batch rather than before piece 1. Measured across all six sends of the
+   *between* piece 2 and the batch rather than before piece 1.
+
+   **Read the limit back off the first send before the second goes out.** The +30% is easy to lose
+   on a chain where the bare estimate is comfortable, and the receipt does not complain: on Base,
+   2026-11-26, all three `executeQueued` went out with the limit **equal to the estimate** —
+   5,555,376 / 5,538,569 / 3,580,191 against 5,330,488 / 5,313,748 / 3,350,122 used, a 4.22% to 6.87%
+   margin — and all three landed, so nothing in the run said the rule had been skipped. Ethereum's
+   three, sent the same day, carried it. So after the first execute and before the second:
+
+   ```sh
+   G=$(cast tx <first executeQueued hash> gas --rpc-url "$RPC")
+   [ "$G" -eq $(( ESTIMATE * 13 / 10 )) ] && echo margin-applied || echo "STOP: limit $G is not ESTIMATE*13/10"
+   ```
+
+   The gas limit of a sent transaction is public, so this is a reading and not a memory of what the
+   command line said. It also inverts: the only integer `g` with `g * 13 / 10` equal to the limit is
+   the estimate that was used, which is how Base's omission was found a day later from the chain
+   alone (§ Uploads, rows 9 and 10). Measured across all six sends of the
    2026-11-17 upload, every estimate came back clean from the public RPCs and sat between **2.62%**
    (Sepolia doc 0) and **7.62%** (the Sepolia batch) above the gas actually used; § Uploads carries
    the figures. The `DeploymentFailed()` that the hand table exists for is a **wallet-path**
@@ -1513,6 +1530,27 @@ until it is deployed again, and since m05-t01d the embed snippet carries that co
 
    The result is hex: `0xaa36a7` is 11155111, `0x14a34` is 84532. An endpoint that answers another
    chain's id, or an HTML error page, is not an endpoint.
+
+   **Ask it the question the gateway will ask, too — the chain id alone does not show that an
+   endpoint can serve the document.** On 2026-11-26, while Ethereum's pair was being chosen,
+   `https://1rpc.io/eth` answered `eth_chainId` `0x1` and `chunkCount()` `3` and then returned
+   **422 characters** where the other two returned **72,424**, so it was dropped. Four readings an
+   hour later, spaced, returned the full 72,424 from it as well — so **that endpoint is not shown to
+   truncate; it is shown to be inconsistent**, which is reason enough not to compile it into a
+   deployable. `https://rpc.flashbots.net` is a clearer case: it refuses `eth_call` with
+   `rpc method is not whitelisted`.
+
+   The reading that matters is a comparison, not a threshold:
+
+   ```bash
+   cast call <App> 'html()(string)' --rpc-url <endpoint> | wc -c   # the same on every candidate
+   ```
+
+   **And read what came back, not only how long it was.** A 422-character answer is as consistent
+   with an error page as with a truncated document, and counting its characters cannot tell the two
+   apart — the figure above is recorded as a length precisely because nobody looked at the body.
+   Ethereum's shipped pair, `https://ethereum-rpc.publicnode.com` and `https://eth.drpc.org`, each
+   returned 72,424 characters, equal to the `html()` the chain holds.
 3. **Build it locally before spending a run**, from a gw44 checkout at the commit the workflow pins
    — a worktree or a clone of its own, not a checkout something else is using:
 
@@ -1622,6 +1660,8 @@ head, where `--rpc` would read today's nonce and emit different pointers.
 | 6b | 2026-11-22 | Base Sepolia | `2307e1f` | **4** | the same four | 18, 19, 20 | `fc611218…10cd83e6` · `044139b7…961b37f1` | `0xb9bd5060…7e98d2ad` · `0xd6f9e842…ef7585d6` · `0xdaa700db…7690ee7c` | **13,165,327** |
 | 7 | 2026-11-26 | Sepolia | `4fb6296` | **8** | `0x7CFFe92a…7b30` · `0x9C8A8CDe…Bd1f` · `0x56AD5F80…631c` · `0x1934717f…f62b` | 19, 20, 21 | `fbd05198…49043549` · `044139b7…961b37f1` | `0xb032069f…00a3e3cb` · `0x8ee58764…fc3aefa4` · `0x80bf22f5…b803c9b4` | **97,699,258** |
 | 8 | 2026-11-26 | Base Sepolia | `4fb6296` | **8** | the same four | 21, 22, 23 | `525f4e3f…e2011d08` · `044139b7…961b37f1` | `0xab8227fe…95eb6dab` · `0xf4a700b6…121f4ead` · `0x3e014381…f417356d` | **13,913,818** |
+| **9** | 2026-11-26 | **Base** | `80124f6` | **1** | `0x029E4004…98F4` · `0x87eE9c5C…80A3` · `0x295fF302…9227` · `0x93Fa8086…9044` | 3, 4, 5 | `e9af3eaa…c4c4f556` · `044139b7…961b37f1` | `0x64737941…ffaceeb6` · `0x0191a4f6…bcbfd802` · `0x447a6475…6e6e6efe` | **13,994,358** |
+| **10** | 2026-11-26 | **Ethereum** | `d3000c2` | **1** | the same four | 3, 4, 5 | `52a8602c…b1bb89e` · `044139b7…961b37f1` | `0xff5a3e36…ed3e6ef2` · `0x450f7b76…b9ad287c` · `0x60b99bb3…af59fb69` | **13,994,134** |
 
 **Rows 6a and 6b are m05-t01c's upload, added after rows 7 and 8 were written — which is why they are
 lettered.** The numbers in this table are **positions in it, not a count of uploads**: before these
@@ -1895,6 +1935,51 @@ whose rule is *filled in as the steps execute* carry two rows that were not, whi
 record cannot afford. Its widget was 8,144 bytes and carried the alpha marker that decision 48
 removed, which is the difference these two rows ship.
 
+**Rows 9 and 10 are the two mainnet uploads, and every figure below was read from the chain in the
+sitting the rows were written.** The submits are the Product Owner's `execute()` calls, recovered from
+the vault's own `Queued` events on Ethereum and from the coordination service's `queue_tx` on Base and
+then verified by `cast receipt`; the executions come from the vault's `ExecutionSuccess` logs, the
+nonce being the event's own argument. Every receipt reads `status 0x1`. The two gas totals are the
+sums of the `executeQueued` receipts, **13,994,358** and **13,994,134**, re-derived to the unit.
+
+Row 9 — Base. Submits in blocks 62,622,712, 62,622,775 and 62,622,834, executions ~18,400 blocks
+later, which at 200 ms blocks is the hour the mainnet `delay()` asks for:
+
+| vault nonce | call | submit tx | `executeQueued` tx | block | `gasUsed` | limit as sent |
+|--:|:--|:--|:--|--:|--:|--:|
+| 3 | `addChunk` doc 0 | `0x94d0b4f44a56356dfc722bd52aa7bcdf9d6e55dae8ab5895485a53d74ebaeac7` | `0x647379411379c7ff92eea80635c9d05bf1c7af1befec53310cd55a70ffaceeb6` | 62641145 | 5,330,488 | 5,555,376 |
+| 4 | `addChunk` doc 1 | `0xb939fc03b3c0aeac33bb227d2ee70926b9d4477fc85e3481f8ea5abe82bfab33` | `0x0191a4f6d194bcb48f2b7c7eb4b0f718b310c1b9cab5a216a3b514cdbcbfd802` | 62641303 | 5,313,748 | 5,538,569 |
+| 5 | `batch3456` | `0x4d57cf479c2da0c114ab6c429e191b3f8af0ee049194f4c401c7a5268d67774b` | `0x447a64754c1683a103cffa3b3f38f61ee50d054d2afc8db76f9eb43b6e6e6efe` | 62641354 | 3,350,122 | 3,580,191 |
+
+Row 10 — Ethereum. All three submits within 48 s of each other and all three executions within 55 s,
+one hour later; the timelock windows run concurrently, so the wait is one and it ends at the **third**
+submit's eta:
+
+| vault nonce | call | submit tx | `executeQueued` tx | block | `gasUsed` | estimate · limit as sent |
+|--:|:--|:--|:--|--:|--:|--:|
+| 3 | `addChunk` doc 0 | `0x3746c754faf974f4c916cf884f3969994c7c5c7f6412b20f08bb6b42ff6679d9` | `0xff5a3e3647c888995474e7c6d8c8a355291b350e5c766d86664c28ceed3e6ef2` | 26502027 | 5,330,560 | 5,555,448 · 7,222,082 |
+| 4 | `addChunk` doc 1 | `0x54c4f493b50cb1b29b2f15415f379c0ad61b6be75367876830a61f43877fa6e1` | `0x450f7b764d35cc5909265724f16b9201984c6972335f8b4ded9adbcdb9ad287c` | 26502029 | 5,313,700 | 5,538,521 · 7,200,077 |
+| 5 | `batch3456` | `0x6e9040278ce9ec7fbbff806a22040264d7bd23fdcb4b77aa428eb37b70e9f5b6` | `0x60b99bb398141901b5e7c4d521727522a659e359e2810f3466f9999baf59fb69` | 26502031 | 3,349,874 | 3,579,932 · 4,653,911 |
+
+**The ×1.3 was applied on Ethereum and not on Base, and the limits say so.** Ethereum's three limits
+invert cleanly through `cast tx <hash> gas` to the estimates logged at send time — 7,222,082 is the
+only integer-×1.3 image of 5,555,448 — while Base's three limits **are** the estimates, 4.22%, 4.23%
+and 6.87% above the gas each call used. Base's sends landed on that margin, but § Step 4 asks for
+estimate + 30% and Base did not get it; the deviation is recorded rather than smoothed. The *estimate*
+margins are identical on both chains to two decimals, which is what one expects of one calldata set
+priced by two chains: the margin is a property of the call, not of the chain.
+
+**The pointers are the same four as rows 5 and 6** — `App`'s CREATEs at nonces 1, 2, 3 and 4 — because
+both mainnet `App`s were at nonce 1 when their calldata was cut, as the testnets were for those rows.
+Each was read by contents before the next piece was sent: `cast code` at the pointer equal to `0x00`
+followed by that piece's own `addChunk(bytes)` argument, 24,000, 24,000, 5,805 and 8,525 bytes of
+payload on Ethereum and 24,000, 24,000, 5,806 and 8,525 on Base. The two documents differ by three
+bytes, which is the chain id and `factoryBlock` and nothing else.
+
+**What the uploads cost:** Base **0.000084533 ETH** at ~6 gwei, Ethereum **0.000803690 ETH** at
+~0.057 gwei — 9.5× Base's, on 1.00× the gas. Ethereum's figure is **0.9983×** what the fork
+rehearsal predicted (14,018,430 gas), and Base's was 0.92× of its own.
+
 ## Rehearsed on anvil
 
 Steps 1, 2, 3, 6 and 7 were run start to finish on **two anvils at once** — `--chain-id 31337` on
@@ -2005,10 +2090,12 @@ immediately after `dapp-nodev` and `chunks`, and why this document says `dapp-no
 
 ## Executed on mainnets
 
-**Deployed 2026-11-22 (m05-t02 Part B).** Base and Ethereum were taken through steps 1, 2, 3, 5 and 6.
-**Step 4 was not run on either and no document is on either chain** — the mainnet documents are
-m05-t03's — so `App` is live and serves nothing, with `chunkCount()` 0 and `locked()` false. M05 is
-Base and Ethereum only (decision 70).
+**Deployed 2026-11-22 (m05-t02 Part B), and both documents uploaded 2026-11-26 (m05-t03).** Base and
+Ethereum were taken through steps 1, 2, 3, 5 and 6 on the 22nd, and **step 4 ran on both on the 26th**
+— Base first, Ethereum on the architect's word once Base's record had been read. Each `App` now
+answers `chunkCount()` **3**, `widgetChunkCount()` **1** and `locked()` **false**, and `rake.dnzn.dev`
+serves both, with `/` landing on Ethereum (decision 70). § Uploads rows 9 and 10 carry the twelve
+transactions and the per-chain figures. M05 is Base and Ethereum only (decision 70).
 
 **Six sends, every one landing first time: no failure, no `-32003` refusal, no retry, no deviation
 from step 1e's rule.** Four from the engineer key (a factory and an `App` per chain) and **two from
@@ -2030,10 +2117,18 @@ against another chain, by `make attest` over `deployments/{1,8453,11155111,84532
 | 3 | `App` | tx `0x96a64bcb5a59f1812efd68fb952fe97f6b013876b7f5e103ba3789b82fd58b19`, status 1, block 60,731,271, `gasUsed` **1,655,420** of 3,341,876 (`G` 190), effective gas price 6,746,681 wei, **base fee at send 5,758,940 wei** |
 | 3 | read-backs | `owner()` the Ops vault, `version()` `v0.1`, `locked()` false, `chunkCount()` 0, `cmp` against the artifact equal at 7,154 bytes |
 | 5 | Sourcify | three `exact_match`, asserting loop exit 0; factory `verifiedAt` 08:38:35Z and `App` 08:40:25Z, each about three minutes after its own deploy and not by this run's loop; implementation 08:47:37Z, this run's |
-| 5 | explorer | **queued, not verified** — GUID `6xw4xwzxi2dcmrtkvyxchcehcansymkj6jrvgkzd8gqxqviaiq`, `Pending in queue`, `getsourcecode` empty |
+| 5 | explorer | queued at the time of the run — GUID `6xw4xwzxi2dcmrtkvyxchcehcansymkj6jrvgkzd8gqxqviaiq`, `Pending in queue`, `getsourcecode` empty — and **verified since**: read 2026-11-26, `getsourcecode` returns `DistributionFactory` and `Distribution` at 24,043 source characters and `App` at 43,741, all `v0.8.38+commit.1835d247`, `status 1/OK` for each. The queue cleared on its own after m05-t02's run |
 | 5 | OpenChain | 82 `Duplicated:`, 0 `Imported:` |
 | 6 | DNZN `create` | **sent by the Product Owner from the Creator key**, tx `0x589b14dc65d280a251e181f4fc3ff0159ea57ca1e71a61eb937b3ee582cc4e7b`, status 1, block 60,747,680, index 48, `from` `0x68e0741D8d693e14BF56914567eADdC130b186eE` at nonce 0, `to` the factory, value 0, `gasUsed` **463,727** of the 480,533 estimated, effective gas price 6,000,000 wei |
 | 6 | read-backs | at `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`: `codesize` **45**, `owner()` the Ops vault, `delay()` **604800**, `description()` `DNZN // FUND DISTRIBUTION`, `beneficiaries()` treasury **2000** / ops **4000** / creator **4000** ascending, `nonce()` 0, `pendingCount()` 0; the 45 bytes' `PUSH20` holds `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`, the attested implementation |
+| **4** | **the document** | three `executeQueued` through the Ops vault at vault nonces 3, 4, 5 — **13,994,358** gas for **0.000084533 ETH**, 0.92× the fork rehearsal's prediction; generating commit `80124f6`, `App` nonce 1 → 5 |
+| **4d** | **read back** | `inflated sha256` `e9af3eaa…c4c4f556` at 170,384 B and `widget sha256` `044139b7…961b37f1` at 8,525 B, both equal to `make dapp-nodev CHAIN_ID=8453`'s build; on-chain document 72,421 B; `chunkCount` 3, widget 1, `locked` false |
+| **4d** | **w3link** | `make gateway-check` **passed**: 80,293 served − 7,872 injected = **72,421** = `html()`, `/widget.js` byte-identical to the build |
+| **7** | **the gateway** | added to `rake.dnzn.dev/8453/` by [#431](https://github.com/dnznlabs/rake/pull/431) (`4f161ef`); verify-only `45880994139`, deploy **`45881136990`**, which deployed on the deploy-pages action's **second** attempt; `check-site` 27 of 27 in three engines |
+| **8** | **first deposit and `distribute`** | the Product Owner's deposit `0xee99eb54…8ecfdd5`, 0.001 ETH, block 62,651,967, and `distribute(0x0)` `0x6564ba6e…`, block 62,652,371; the distribution's balance 0.001 → **0** in that block, treasury **+0.0002**, ops vault **+0.0004** and creator **+0.0004** — 20/40/40, summing to the deposit exactly. The `distribute` came from a second EOA of his, funded 24 s earlier; the call is permissionless and the split is unaffected. **His word on [#433](https://github.com/dnznlabs/rake/issues/433), 2026-11-26: "Verified all three on Base."** |
+
+**What the upload cost on Base: 0.000084533 ETH** for the three `executeQueued`, read from the three
+receipts; the two figures below are m05-t02's deploys and do not include it.
 
 **What the engineer's key spent on Base: 26,396,332,711,465 wei (~0.0000264 ETH)** for both sends —
 0.005000000 ETH before, 0.004973603667288535 after.
@@ -2054,10 +2149,20 @@ debit here, and on Ethereum they do.
 | 3 | `App` | tx `0x37d157cc643bb26358d59e6de43bc967b5bcffd72e57d26a2ec57bdd5f8d3295`, status 1, block 26,469,806, `gasUsed` **1,655,420** of 3,341,876 (`G` 190), effective gas price 123,794,910 wei, **base fee at send 117,397,085 wei** |
 | 3 | read-backs | `owner()` the Ops vault, `version()` `v0.1`, `locked()` false, `chunkCount()` 0, `cmp` equal at 7,154 bytes |
 | 5 | Sourcify | three `exact_match`, loop exit 0; factory `verifiedAt` 09:38:02Z against a 09:36:59Z deploy and `App` 09:39:02Z against 09:37:59Z — each about a minute later, not this run's loop; implementation 09:40:43Z, this run's. All three carry `creationMatch: exact_match`, unlike Base's implementation, which carries none; recorded unexplained |
-| 5 | explorer | **queued, not verified** — GUIDs `vyqncc7ethysu5igia38zpmlv2lpdiaxsqtt8gsjtpny5qrqg9` (factory), `4qe7mxxtx6lybemkrh6gz4tyyzfxl28nhxmmj86s8ce8j1jg1h` (implementation), `hfnhk7c5sarhs9821ecqy3iifb2ng6anz5cw9awlh4phtbwer3` (`App`) |
+| 5 | explorer | queued at the time of the run — GUIDs `vyqncc7ethysu5igia38zpmlv2lpdiaxsqtt8gsjtpny5qrqg9` (factory), `4qe7mxxtx6lybemkrh6gz4tyyzfxl28nhxmmj86s8ce8j1jg1h` (implementation), `hfnhk7c5sarhs9821ecqy3iifb2ng6anz5cw9awlh4phtbwer3` (`App`) — and **verified since**: read 2026-11-26, `getsourcecode` returns all three with source at `v0.8.38+commit.1835d247`, `status 1/OK` each |
 | 5 | OpenChain | 82 `Duplicated:`, 0 `Imported:` |
 | 6 | DNZN `create` | **sent by the Product Owner from the Creator key**, tx `0xe8b7ca91ff62854e3a6a8bd0bf08a51241a0cf2896f0a358ef1d9103ceb9afc1`, status 1, block 26,469,844, index 225, `from` `0x68e0741D8d693e14BF56914567eADdC130b186eE` at nonce 0, `to` the factory, value 0, `gasUsed` **463,727** — the same figure as Base — of the 480,533 estimated, effective gas price 126,664,141 wei (~0.0000588 ETH) |
 | 6 | read-backs | the same address and the same eleven readings as Base, value for value, re-read against `https://ethereum-rpc.publicnode.com`: 45 bytes, Ops-vault `owner()`, `delay()` **604800**, `DNZN // FUND DISTRIBUTION`, the three rows 2000/4000/4000 ascending, `nonce()` and `pendingCount()` 0, `PUSH20` holding the attested implementation |
+| **4** | **the document** | three `executeQueued` through the Ops vault at vault nonces 3, 4, 5 — **13,994,134** gas for **0.000803690 ETH**, **0.9983×** the fork rehearsal's prediction of 14,018,430; generating commit `d3000c2`, `App` nonce 1 → 5. Base fee read before each send: 58,208,922 / 57,645,756 / 57,110,885 wei, all ~0.057 gwei against § 0's 1 gwei stop |
+| **4** | **the gate between the sends** | after piece 1, the doc-0 pointer's code equalled `0x00` + `1-addChunk-0.hex`'s own `bytes` argument, 24,000 B; after piece 2, doc 1 the same at 24,000 B with doc 0 unchanged; after the batch, all four — 24,000, 24,000, 5,805 and 8,525. **Contents, not presence**: a swapped pair would pass a nonce or codesize check |
+| **4d** | **read back** | `inflated sha256` `52a8602c…b1bb89e` at 170,381 B and `widget sha256` `044139b7…961b37f1` at 8,525 B, both equal to `make dapp-nodev CHAIN_ID=1`'s build; on-chain document 72,417 B, payload 53,805 B; `chunkCount` 3, widget 1, `locked` false, `version` `v0.1` |
+| **4d** | **w3link** | `make gateway-check` **passed**: 80,289 served − 7,872 injected = **72,417** = `html()`; `/widget.js` 8,525 B byte-identical; `/nope` 404. Ethereum serving a three-chunk document here is what refuted the size-ceiling reading of Sepolia's 400 ([#411](https://github.com/dnznlabs/rake/issues/411)) |
+| **7** | **the gateway, and `/`** | added by [#436](https://github.com/dnznlabs/rake/pull/436) (`bf1d23c`), **`default` `"11155111"` → `"1"`**; verify-only `45901204314` ("the build matches expect, line for line"), deploy **`45901414856`**, which deployed on the deploy-pages action's **first** attempt; `check-site` 27 of 27 in chromium, firefox and webkit, each reporting `default 1` and `root … path /1/`; `make verify` timed after the deploy printed **eight `site` lines `ok`** across 1, 8453, 11155111 and 84532 |
+| **7** | **the worker** | `gw44-sw.js` `064eb6a9…aac06c65` 7,939 B `default:"11155111"` → `35cd521f…0fc36cd4` 8,048 B `default:"1"`; `/1/widget.js` 404 → 200 at 8,525 B, `cmp`-identical to the build, its own sha384 equal to the `integrity` the run printed |
+
+**What the upload cost on Ethereum: 0.000803690 ETH** for the three `executeQueued` — **9.5× Base's
+0.000084533 on 1.00× the gas**, which is the whole of the difference between the two chains. The
+figures below are m05-t02's deploys and do not include it.
 
 **What the engineer's key spent on Ethereum: 487,832,074,612,540 wei (~0.000488 ETH)** — 0.025093601299726950
 ETH before, 0.024605769225114410 after. Under **5%** of the 0.01 ETH asked for that chain.
