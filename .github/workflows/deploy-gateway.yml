@@ -41,12 +41,15 @@ jobs:
       chains: deploy/chains.json
       embeds: widget.js
       verify-only: ${{ inputs.verify-only }}
-      # The three lines the build printed locally on 2026-11-21 from this repository's two
-      # configuration files, at the pinned commit, with Sepolia as the default (m05-t04a). Any difference fails the run before anything is
-      # deployed; whitespace is normalised on both sides, so these are the build's own lines.
+      # The three lines the build printed locally on 2026-11-26 from this repository's two
+      # configuration files, at the pinned commit, with Base (8453) added and Sepolia still the
+      # default (m05-t03 step 7; decision 70 gives `/` to Ethereum, not Base). All three moved from
+      # m05-t04a's 2026-11-21 lines because the config gained a chain. Any difference fails the run
+      # before anything is deployed; whitespace is normalised on both sides, so these are the
+      # build's own lines.
       expect: |
-        c57375daa46705f7fab578be79483b52e75a5e26f94768c843e780f9bfb0cef9     9299  404.html
-        96fbe71216f0b2c63f937e4072c54b42be7c7cb5441a41067838248d106761a3     7817  gw44-sw.js
-        c57375daa46705f7fab578be79483b52e75a5e26f94768c843e780f9bfb0cef9     9299  index.html
+        61d1c417da60be604c282fc8e5528cd68b4dae8673695edee5f2cf4956bacb19     9421  404.html
+        064eb6a95a39c1831bf7e8023129664e160b6d92ff4045cd243b0d23aac06c65     7939  gw44-sw.js
+        61d1c417da60be604c282fc8e5528cd68b4dae8673695edee5f2cf4956bacb19     9421  index.html
     secrets:
       gw44-read-key: ${{ secrets.GW44_READ_KEY }}
