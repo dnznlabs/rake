@@ -1618,35 +1618,51 @@ head, where `--rpc` would read today's nonce and emit different pointers.
 | 4 | 2026-11-18 | Base Sepolia | `3751211` | 7 | the same three | 9, 10, 11 | `6f0225bb…ff45336f` · `8b6bbc88…108bc368` | in full below | **12,206,026** |
 | 5 | 2026-11-20 | Sepolia | `557a405` | **1** | `0x029E4004…98F4` · `0x87eE9c5C…80A3` · `0x295fF302…9227` | 13, 14, 15 | `59c24c98…cffdd2010` · `8b6bbc88…108bc368` | `0x3bc0b3c0…40e8fea` · `0xf25b0128…ca0f75a5` · `0x194caf5e…98e7a8eb` | **88,414,431** |
 | 6 | 2026-11-20 | Base Sepolia | `557a405` | **1** | the same three | 13, **17**, 15 | `59ef3a4e…ce20df28` · `8b6bbc88…108bc368` | `0xa64c1bb7…10e1ba4d` · `0xf9c0d4b6…0d1c862f` · `0x841bce0e…86a08524` | **12,602,565** |
+| 6a | 2026-11-22 | Sepolia | `2307e1f` | **4** | `0x93Fa8086…9044` · `0x12B3361f…a607` · `0x183A8FD6…Ce4D` · `0x24Ae0763…0b1D` | 16, 17, 18 | `190897f5…cf91c10e` · `044139b7…961b37f1` | `0xd6e8c0dc…89dfb6d` · `0xec754783…71cfce32` · `0xb4bd33e5…64f9dddf` | **92,374,659** |
+| 6b | 2026-11-22 | Base Sepolia | `2307e1f` | **4** | the same four | 18, 19, 20 | `fc611218…10cd83e6` · `044139b7…961b37f1` | `0xb9bd5060…17e98d2ad` · `0xd6f9e842…9ef7585d6` · `0xdaa700db…7690ee7c` | **13,165,327** |
 | 7 | 2026-11-26 | Sepolia | `4fb6296` | **8** | `0x7CFFe92a…7b30` · `0x9C8A8CDe…Bd1f` · `0x56AD5F80…631c` · `0x1934717f…f62b` | 19, 20, 21 | `fbd05198…49043549` · `044139b7…961b37f1` | `0xb032069f…00a3e3cb` · `0x8ee58764…fc3aefa4` · `0x80bf22f5…b803c9b4` | **97,699,258** |
 | 8 | 2026-11-26 | Base Sepolia | `4fb6296` | **8** | the same four | 21, 22, 23 | `525f4e3f…e2011d08` · `044139b7…961b37f1` | `0xab8227fe…95eb6dab` · `0xf4a700b6…121f4ead` · `0x3e014381…f417356d` | **13,913,818** |
 
+**Rows 6a and 6b are m05-t01c's upload, added after rows 7 and 8 were written — which is why they are
+lettered.** The numbers in this table are **positions in it, not a count of uploads**: before these
+rows existed the table went from `App` nonce 1 to nonce 8 with nothing between, and a reader had no
+way to see that an upload was missing rather than that none had happened.
+
+**Nothing in 6a and 6b is reconstructed, and the twelve figures were read a second time before the
+rows were published.** The six `executeQueued` transaction hashes and the six vault nonces come from
+the vault's own `ExecutionSuccess` logs, the nonce being the event's `uint256` argument rather than an
+inference from order; every receipt is `status 0x1`; the two gas totals are the sums of those
+receipts, **92,374,659** and **13,165,327**, re-derived to the unit; the four pointers are `App`'s
+CREATEs at 4, 5, 6 and 7, computed from the address and the nonce and confirmed to hold code on both
+testnets; and the two `inflated sha256` values are the ones `chain-doc` read after that upload, quoted
+from `docs/milestones/m05/tasks/m05-t01c/HANDOFF.md` because the document they describe has since been
+replaced and cannot be re-read from the chain — Sepolia's is independently corroborated by
+[#411](https://github.com/dnznlabs/rake/issues/411), which quoted it before this upload. The
+executions are in blocks 12,191,163–12,191,165 on Sepolia and 62,294,320–62,294,327 on Base Sepolia.
+Sepolia's total is **7.02×** Base Sepolia's here too, the same ratio as every other row pair.
+
+The pointers carry **24,000**, **24,000** and **2,366** bytes of document and the **8,525**-byte
+widget — **50,366 bytes of gzip**, against rows 7 and 8's 53,806. Those are chunk-data bytes, the unit
+this section uses throughout; each SSTORE2 pointer's runtime code is one byte longer, for the `0x00`
+stop.
+
 **Rows 7 and 8 are m05-t01d's upload**, ~~and the first three-chunk document~~ — **that second clause
-is struck, and it was wrong: m05-t01c's was the first.** It is left visible rather than deleted so the
-next person to write a superlative in this section sees that one of them was already false. § 4a
-records m05-t01c's document as three chunks, cut against this `App` at nonce **4**, and the chain
-agrees: `App`'s CREATEs at nonces 4, 5, 6 and 7 all hold code on both testnets, carrying **24,000**,
-**24,000** and **2,366** bytes of document and the **8,525**-byte widget (the SSTORE2 pointers are one
-byte longer each, for the `0x00` stop). `chunkCount()` read **3** before tonight's upload as well as
-after it ([#411](https://github.com/dnznlabs/rake/issues/411)). So this is the **second** three-chunk
-document, and 50,366 bytes of gzip against tonight's 53,806.
+is struck, and it was wrong: m05-t01c's was the first**, which rows 6a and 6b now show and the nonce
+moving 4 → 8 agrees with. It is left visible rather than deleted so the next person to write a
+superlative in this section sees that one of them was already false. § 4a records m05-t01c's document
+as three chunks at `App` nonce 4, and `chunkCount()` read **3** before m05-t01d's upload as well as
+after it (#411). So rows 7 and 8 are the **second** three-chunk document and the second four-pointer
+one, not the first of either.
 
-**And that upload has no row in this table, which is the gap the wrong superlative was hiding.**
-The rows jump from `App` nonce 1 (rows 5 and 6) to nonce 8 (rows 7 and 8), and nothing explains the
-four CREATEs in between. They are m05-t01c's, at vault nonces 16, 17 and 18 on Sepolia — the rows
-[#409](https://github.com/dnznlabs/rake/issues/409) warned were the previous upload's and not that
-issue's. **Reconstructing that row is m05-t01c's record to fill, not this task's**, so it is surfaced
-here rather than invented: whoever fills it has the pointers and the byte counts above, and `--app-nonce 4`
-regenerates its calldata.
+Four things are worth stating about rows 7 and 8, of which the first is **shared with rows 6a and 6b**
+and the rest are theirs alone:
 
-Four things in rows 7 and 8 are not in any row this table carries:
-
-- **Four pointers, not three**, so the column's heading is one short for these two rows: doc 0, doc 1,
+- **Four pointers, not three**, so the column's heading is one short for these rows *and* for 6a and 6b: doc 0, doc 1,
   doc 2 and the widget, which are `App`'s CREATEs at 8, 9, 10 and 11. `CHUNKS` is 4, the batch is
   `batch3456.hex` carrying `3-addChunk-2`, `4-addWidgetChunk`, `5-setChunks` and `6-setWidgetChunks`,
   and the nonce therefore moved **8 → 12** rather than by three. `--app-nonce 8` reproduces the
-  calldata. The unrecorded upload above had the same four-pointer shape, so this is new to the
-  *table* and not to the project.
+  calldata, and `--app-nonce 4` reproduces 6a and 6b's. Rows 6a and 6b have the same four-pointer
+  shape, so what is one-short is the column's heading rather than anything about this upload.
 - **The order gate was read between every piece**, not only the nonce: before piece 2 the code at the
   doc-0 pointer equalled `0x00` followed by `1-addChunk-0.hex`'s `bytes` argument, and before the
   batch both document pointers did. That is the only check that catches § 4c's one silent misorder, and
@@ -1665,6 +1681,22 @@ Four things in rows 7 and 8 are not in any row this table carries:
   | 84532 | 21 | `0xac3cac378f46a55726bfe47f538046413ea9516060b7435578be3dcb7df40ef4` | `0xab8227fe053d3e92c7db8138ce3ebb0910c065258ec4d8e75a6c91e895eb6dab` | 5,313,388 |
   | 84532 | 22 | `0x937a5b8df2dc8faade48cbe3943aaf77b51e76ce9f4cbee703eb94238c687c89` | `0xf4a700b6c2b4ef53e88b4dcfde16697f727f94c010871dddfe98e1c5121f4ead` | 5,313,868 |
   | 84532 | 23 | `0x524c654ae0c92753dc6109614a00c6b9f3d79ba9c092decd13536b1ea5156b4e` | `0x3e014381cd6cd4dbdb8843004bfa09efcaaf2da2dbb56f78ee25adaef417356d` | 3,286,562 |
+
+  **Read from the vault's logs because the explorers had not indexed the upload, and an explorer's
+  silence is not an absence.** Base Sepolia's third `executeQueued` — the engineer's account nonce
+  **25** — was missing from that account's transaction list, from the vault's inbound list **and**
+  from the chunk-2 pointer's `creation_transaction_hash`, which read `None` while `cast codesize` on
+  the same address read 5,807. Three lookups agreed it was not there. What said otherwise was
+  arithmetic: `App`'s nonce moved **8 → 12**, four CREATEs, and two chunk calls account for only two,
+  so a third transaction had to exist — `cast logs` on the vault over a 200-block window found it.
+  The submits are invisible to any vault-side query for a different reason, which § Uploads already
+  states: they are addressed to the relay, not to the vault.
+
+  **Two confirmations, each able to fail.** Every recovered submit's **block timestamp + `delay()`**
+  equals exactly the `queued[digest]` eta recorded for that vault nonce, three for three per chain;
+  and every `executeQueued`'s inner `bytes` argument is **byte-identical** to its committed
+  `calldata/<chain>/` file, so which transaction carried which chunk is read rather than inferred
+  from order.
 
   Sepolia's total is **7.02×** Base Sepolia's for byte-identical chunk payloads — #201's code-deposit
   repricing measured a fifth time, and at the same ratio as rows 5 and 6.
