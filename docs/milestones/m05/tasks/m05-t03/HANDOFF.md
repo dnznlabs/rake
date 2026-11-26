@@ -1,6 +1,6 @@
 # m05-t03 — handoff
 
-PR: pending · Branch: `chore/m05-t03-records` · 2026-11-26
+PR: #437 · Branch: `chore/m05-t03-records` · 2026-11-26
 
 Run B went to Base and then, on the architect's word after Base's record was read, to Ethereum: each chain cut from the tip of `main` at `App` nonce 1, three proposals at the vault's live nonce, co-signed and submitted by the Product Owner, and three `executeQueued` sent one at a time after the hour's timelock with each pointer's **contents** read against the committed calldata before the next piece went out. Both documents read back equal to their own builds. `rake.dnzn.dev` now serves four chains and `/` lands on Ethereum (decision 70). The Product Owner's first deposit and `distribute` ran on Base and are Phase 3's signoff. Nothing reverted, nothing was retried, and no piece went out of order.
 
