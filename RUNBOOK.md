@@ -1618,6 +1618,55 @@ head, where `--rpc` would read today's nonce and emit different pointers.
 | 4 | 2026-11-18 | Base Sepolia | `3751211` | 7 | the same three | 9, 10, 11 | `6f0225bb…ff45336f` · `8b6bbc88…108bc368` | in full below | **12,206,026** |
 | 5 | 2026-11-20 | Sepolia | `557a405` | **1** | `0x029E4004…98F4` · `0x87eE9c5C…80A3` · `0x295fF302…9227` | 13, 14, 15 | `59c24c98…cffdd2010` · `8b6bbc88…108bc368` | `0x3bc0b3c0…40e8fea` · `0xf25b0128…ca0f75a5` · `0x194caf5e…98e7a8eb` | **88,414,431** |
 | 6 | 2026-11-20 | Base Sepolia | `557a405` | **1** | the same three | 13, **17**, 15 | `59ef3a4e…ce20df28` · `8b6bbc88…108bc368` | `0xa64c1bb7…10e1ba4d` · `0xf9c0d4b6…0d1c862f` · `0x841bce0e…86a08524` | **12,602,565** |
+| 7 | 2026-11-26 | Sepolia | `4fb6296` | **8** | `0x7CFFe92a…7b30` · `0x9C8A8CDe…Bd1f` · `0x56AD5F80…631c` · `0x1934717f…f62b` | 19, 20, 21 | `fbd05198…49043549` · `044139b7…961b37f1` | `0xb032069f…00a3e3cb` · `0x8ee58764…fc3aefa4` · `0x80bf22f5…b803c9b4` | **97,699,258** |
+| 8 | 2026-11-26 | Base Sepolia | `4fb6296` | **8** | the same four | 21, 22, 23 | `525f4e3f…e2011d08` · `044139b7…961b37f1` | `0xab8227fe…95eb6dab` · `0xf4a700b6…121f4ead` · `0x3e014381…f417356d` | **13,913,818** |
+
+**Rows 7 and 8 are m05-t01d's upload, and the first three-chunk document.** Four things in them are
+not in any row above:
+
+- **Four pointers, not three**, so the column's heading is one short for these two rows: doc 0, doc 1,
+  doc 2 and the widget, which are `App`'s CREATEs at 8, 9, 10 and 11. `CHUNKS` is 4, the batch is
+  `batch3456.hex` carrying `3-addChunk-2`, `4-addWidgetChunk`, `5-setChunks` and `6-setWidgetChunks`,
+  and the nonce therefore moved **8 → 12** rather than by three. `--app-nonce 8` reproduces the
+  calldata.
+- **The order gate was read between every piece**, not only the nonce: before piece 2 the code at the
+  doc-0 pointer equalled `0x00` followed by `1-addChunk-0.hex`'s `bytes` argument, and before the
+  batch both document pointers did. That is the only check that catches § 4c's one silent misorder, and
+  it held on both chains. Every receipt is `status 1`.
+- **The product owner co-signed and submitted all six**, 2026-11-26 **01:35:17–01:37:00Z** by the
+  submitting blocks' own timestamps ([#409](https://github.com/dnznlabs/rake/issues/409)); the engineer
+  ran the six `executeQueued` once `delay()` — **900 s**, read on both chains — had matured,
+  **01:51:26–01:53:36Z** by the executing blocks'. The twelve hashes, read from the vault's own
+  `Queued` and `ExecutionSuccess` logs:
+
+  | chain | vault nonce | submit | `executeQueued` | gas used |
+  |:--|--:|:--|:--|--:|
+  | 11155111 | 19 | `0xa943b1c3d148816bc900724ef276195e741e96aec83eaae6fcd6c414bb23cbbb` | `0xb032069ff17dca34b33aac536f9eb090051e007dc7ac32d543a5d16600a3e3cb` | 37,493,288 |
+  | 11155111 | 20 | `0x4c87919b0c7b38314e90ec053f4e7b2f2beea933379f16ed7c9aa5a520479da5` | `0x8ee58764d43ab1c61de0c9d7eac6cea999f5c0cd2a87d54a93ee8b08fc3aefa4` | 37,493,588 |
+  | 11155111 | 21 | `0x6f4d5c806a5cc14663e5d447f75eda8835b62bbae95ba27e90397d373e0d4dc9` | `0x80bf22f58ab4c973daab893f818f48467b565ebe10c2662b268ae4e6b803c9b4` | 22,712,382 |
+  | 84532 | 21 | `0xac3cac378f46a55726bfe47f538046413ea9516060b7435578be3dcb7df40ef4` | `0xab8227fe053d3e92c7db8138ce3ebb0910c065258ec4d8e75a6c91e895eb6dab` | 5,313,388 |
+  | 84532 | 22 | `0x937a5b8df2dc8faade48cbe3943aaf77b51e76ce9f4cbee703eb94238c687c89` | `0xf4a700b6c2b4ef53e88b4dcfde16697f727f94c010871dddfe98e1c5121f4ead` | 5,313,868 |
+  | 84532 | 23 | `0x524c654ae0c92753dc6109614a00c6b9f3d79ba9c092decd13536b1ea5156b4e` | `0x3e014381cd6cd4dbdb8843004bfa09efcaaf2da2dbb56f78ee25adaef417356d` | 3,286,562 |
+
+  Sepolia's total is **7.02×** Base Sepolia's for byte-identical chunk payloads — #201's code-deposit
+  repricing measured a fifth time, and at the same ratio as rows 5 and 6.
+- **4d, 4e and 4f, recorded as the steps ran.** `chain-doc`'s `inflated sha256` equals
+  `sha256sum app/dist/index.html` on both chains — `fbd05198…49043549` at 170,387 bytes on 11155111 and
+  `525f4e3f…e2011d08` at 170,385 on 84532, the two-byte difference being `__CHAIN_ID__` — and the
+  widget hash equals `app/dist/widget.js` at 8,525 bytes on both. `tools/gateway-check.sh` in hosted
+  mode **passes on 84532** (body-minus-block 72,421 equal to `html()`, `/widget.js` `cmp`-identical,
+  `/nope` 404) and **fails on 11155111** with `status: 400` and no ERC-5219 headers — the same
+  third-party condition rows 5 and 6 carry, with one detail added: `/widget.js` there answers
+  `Invalid method name`, so w3link's Sepolia instance never read `resolveMode()` and fell back to auto
+  mode. Our own gw44 build at the pinned commit answers 200 at 72,421 bytes for **both** chains, and
+  `request()` answers 200 through our endpoints on both, so the chain is the reference and nothing is
+  re-uploaded. The gateway was redeployed in run
+  [45739273649](https://github.com/dnznlabs/rake/actions/runs/45739273649), **on the first attempt**,
+  after a verify-only run passed; the published copies are 8,525 bytes with
+  `integrity="sha384-8BWWI1ktl/NJwMpr0nOSjqG+S1bbjHSFVlPmZfULysk/4BMbvnd34o+TUyQP+t9I"` on both
+  chains. gw44's `make verify` with `VERIFY_SITE=https://rake.dnzn.dev` then printed `ok` on all four
+  **`site`** lines — `11155111 site root`/`site widget` and `84532 site root`/`site widget` — which is
+  the first upload whose record contains a measurement of the deployed host.
 
 **Rows 5 and 6 are the first upload to the redeployed `App`** `0x00a9F390A6010d045e0d34856048DdD6910d25BA`
 (m05-t01 Part B). Three things about them differ from rows 1–4 and are the reason this note exists:
