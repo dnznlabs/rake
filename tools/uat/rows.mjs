@@ -45,6 +45,33 @@ export const PATTERNS = {
   activityRowSelector: '#h-funds .hrow',
   blockNumber: 'block (\\d+)',
   loadingNotice: '^(loading…|reading the balances and the escrow…|reading…)$',
+  /* **Two wordings again, and for the same reason as `boundaryLine`.** `emptyLine`
+     (`app/src/index.html:1700`) prints the `yet` form only when the read covered the whole history
+     and the day form otherwise — and since #400 the first read is a day for everyone, wallet or not,
+     so the day form is what an acceptance run against a live chain meets. A pattern that knew only
+     `yet` waited five minutes and then called a correct page a failure. */
+  changesEmpty: 'no change has been queued (?:yet|in the last 24 hours)',
+  /* The two halves of it, because which one is right is a *fact about the read*: `emptyLine` prints
+     the `yet` form only when `readWhole()` holds, and the day form otherwise. Row (c) asserts the one
+     its state implies rather than the union, so a page claiming all of history from one day's
+     evidence — the thing the 24-hour ruling was written against — cannot pass. */
+  changesEmptyWhole: 'no change has been queued yet',
+  changesEmptyDay: 'no change has been queued in the last 24 hours',
+  /* **The head of a read that stopped short** (`dayHead`, `app/src/index.html:1704-1707`). This is
+     how row (c) tells which of the three states the page is in without guessing: the heads carry
+     their own descriptive text when the whole history was read, this sentence when the read stopped
+     short, and `last 24 hours` only when the day was reached. */
+  shortHead: 'as far back as this endpoint served',
+  dayHead: 'last 24 hours',
+  /* A wall, as opposed to a budget or a throttle: the endpoint has said it will not serve what is
+     below, so `partialLine` deliberately offers **no** press. The two wordings are the two kinds of
+     evidence it can have (`app/src/index.html:1728-1732`). */
+  wallLine: 'this endpoint serves no history before block \\d+|refused older blocks, and may not serve history that far back',
+  /* The sentence a finished 24-hour read prints under each history section
+     (`app/src/index.html:1679`), with ` · load older` after it for a wallet and nothing for no
+     wallet. Row (c) asks for the whole wallet form, because the press is the wallet's extra reach. */
+  dayLine: 'this read covers the last 24 hours',
+  dayLinePress: 'this read covers the last 24 hours · load older',
 };
 
 export class Miss extends Error {
@@ -235,7 +262,7 @@ export async function rowC(page, { base, addr = DNZN, patience = 120000, relatio
      which is the one state no waiting improves. */
   await settledText(page, '#h-funds', t => new RegExp(PATTERNS.activityRow, 'i').test(t),
     { label: '(c) `activity` carries at least one row' });
-  await settledText(page, '#h-changes', t => /created/i.test(t) || /no change has been queued yet/i.test(t),
+  await settledText(page, '#h-changes', t => /created/i.test(t) || new RegExp(PATTERNS.changesEmpty, 'i').test(t),
     { label: '(c) `changes` reads the empty line this distribution has, or a Created row' });
   const r = await page.evaluate(() => ({
     view: (document.getElementById('view')?.innerText || '').replace(/\s+/g, ' ').trim(),
@@ -245,9 +272,9 @@ export async function rowC(page, { base, addr = DNZN, patience = 120000, relatio
     /* Counted as elements. A text pattern over a section that also carries help sentences and stop
        lines is a guess about wording; `.hrow` is what a row is. */
     activityRows: document.querySelectorAll('#h-funds .hrow').length,
-    /* The three absences row (c) now also asserts (UAT.md (c), amended 2026-11-23). The driver's
-       injected provider makes this a wallet page, so the 24-hour wording must not appear — if it
-       does, the provider was not seen as a wallet and the whole run is measuring the wrong path. */
+    /* The two history heads are where the page says how far it read, so they are what row (c) reads
+       its state from (`dayHead`, `app/src/index.html:1704-1707`). Joined across all of `.sechead`;
+       the three state sentences appear in no other section's head. */
     heads: [...document.querySelectorAll('.sechead')].map(n => n.textContent.trim()).join(' | '),
     presses: document.querySelectorAll('.older').length,
     queueButton: !!document.getElementById('queue'),
@@ -259,12 +286,54 @@ export async function rowC(page, { base, addr = DNZN, patience = 120000, relatio
   falsy('c', '`activity` is not the #382 notice', new RegExp(PATTERNS.unavailable, 'i').test(r.activity));
   falsy('c', '`changes` is not the #382 notice', new RegExp(PATTERNS.unavailable, 'i').test(r.changes));
   truthy('c', `\`activity\` carries at least one row (${r.activityRows} \`.hrow\` elements)`, r.activityRows > 0);
-  /* A wallet page, because the driver injects a provider. These three say so, and catch the one
-     regression this row could otherwise pass through: the wallet path quietly taking the no-wallet
-     branch, which would read a day deep and still show rows. */
-  falsy('c', 'the heads do not say `last 24 hours` — this is a wallet page', /last 24 hours/i.test(r.heads));
-  falsy('c', 'no section offers `connect a wallet to load more`', /connect a wallet to load more/i.test(r.activity + ' ' + r.changes + ' ' + r.funds));
-  has('c', '`changes` reads the empty line this distribution has', r.changes, 'no change has been queued yet');
+  /* **A wallet page, because the driver injects a provider — and the discriminator is the press, not
+     the heading** (#400, UAT.md (c)). Since the first read is the page's own day for everyone, the
+     heads say so on both paths, and what separates a wallet from no wallet is `load older` against
+     `connect a wallet to load more`. That absence is the one assertion that holds in every state,
+     because `moreLine` offers the no-wallet sentence on no wallet-page branch
+     (`app/src/index.html:1673-1679`). */
+  falsy('c', 'no section offers `connect a wallet to load more` — the driver is a wallet page',
+    /connect a wallet to load more/i.test(r.activity + ' ' + r.changes + ' ' + r.funds));
+  /* **Then the state, read from the page rather than assumed.** A first read can land in three
+     states, and each prints a different head, a different tail and a different empty line. Asserting
+     the day state unconditionally fails a *correct* page whenever the read stops short — which the
+     9-of-10 cold-load criterion explicitly allows once in ten, and step 8 says this row accepts the
+     boundary line — so the state is decided first and only its own facts are asserted.
+     `DS.h` is one object for both history sections, and `histFill` appends `partialLine() +
+     moreLine()` in both its branches, so whichever tail is right is in **both** sections. */
+  const state = new RegExp(PATTERNS.shortHead, 'i').test(r.heads) ? 'short'
+    : new RegExp(PATTERNS.dayHead, 'i').test(r.heads) ? 'day'
+      : 'whole';
+  const bothSections = r.changes + ' | ' + r.activity;
+  if (state === 'day') {
+    truthy('c', '`changes` offers the day line with its press', new RegExp(PATTERNS.dayLinePress, 'i').test(r.changes));
+    truthy('c', '`activity` offers the day line with its press', new RegExp(PATTERNS.dayLinePress, 'i').test(r.activity));
+    eq('c', 'a press under each of the two history sections', r.presses, 2);
+    truthy('c', '`changes` reads the day form of the empty line, or a Created row',
+      /created/i.test(r.changes) || new RegExp(PATTERNS.changesEmptyDay, 'i').test(r.changes));
+  } else if (state === 'short') {
+    /* The head said the read stopped short, so the day claim must be gone — this is the assertion
+       that catches a page claiming `last 24 hours` over a boundary line, and `shortHead` winning the
+       branch above is what makes it reachable. */
+    falsy('c', 'the heads do not claim `last 24 hours` over a read that stopped short',
+      new RegExp(PATTERNS.dayHead, 'i').test(r.heads));
+    truthy('c', 'a boundary line says where the read stopped', new RegExp(PATTERNS.boundaryLine, 'i').test(bothSections));
+    /* A wall offers no press by design; a budget or a throttle carries one per section. */
+    const wall = new RegExp(PATTERNS.wallLine, 'i').test(bothSections);
+    eq('c', wall
+      ? 'no press under a wall the endpoint has named'
+      : 'a press under each of the two history sections, carried by the boundary line',
+      r.presses, wall ? 0 : 2);
+    truthy('c', '`changes` reads the day form of the empty line, or a Created row',
+      /created/i.test(r.changes) || new RegExp(PATTERNS.changesEmptyDay, 'i').test(r.changes));
+  } else {
+    /* The whole history was read, so there is nothing below and no press, and the empty line may
+       speak about all time. */
+    eq('c', 'no press once the whole history has been read', r.presses, 0);
+    falsy('c', 'the heads do not claim a day over a whole-history read', new RegExp(PATTERNS.dayHead, 'i').test(r.heads));
+    truthy('c', '`changes` reads the all-time form of the empty line, or a Created row',
+      /created/i.test(r.changes) || new RegExp(PATTERNS.changesEmptyWhole, 'i').test(r.changes));
+  }
   if (relation) {
     if (relation.expect === 'vault') {
       truthy('c', 'a vault signer is offered the drawer', r.queueButton);
@@ -279,7 +348,7 @@ export async function rowC(page, { base, addr = DNZN, patience = 120000, relatio
     }
   }
   return {
-    ...r, msToPainted: ms, view: r.view.slice(0, 300), relation,
+    ...r, msToPainted: ms, view: r.view.slice(0, 300), relation, state,
     createdRow: /created/i.test(r.changes),
   };
 }
@@ -314,40 +383,60 @@ export async function rowD(page, { base, src, addr = DNZN }) {
    backslash, so `boundary` was always `null`, `moved` was always true and this row's whole boundary
    assertion could not fail. The architect caught it at review. Hence the paired check in
    `tools/uat/selftest.mjs`, which runs these patterns against a real line. */
+/* **Since #400 the press hangs on a *finished* read, so a boundary before it is no longer the only
+   state this row can start from** — and requiring one failed the row on a correct page. `moreLine`
+   (`app/src/index.html:1676-1679`) offers the press in two states: under a partial line, with a
+   boundary block, or under `this read covers the last 24 hours`, with none. Both are driven, and
+   each has its own post-press assertion, because the old one (`after.boundary === null ||
+   after.boundary < before.boundary`) is satisfied *by definition* when the boundary starts null —
+   an assertion that cannot fail is the defect the architect caught in this very row.
+   What the press must prove from the day line is that the day is no longer the bottom: after it,
+   `readWhole()` is true and the line goes, or the read stopped short and a boundary says where. */
 export async function rowE(page) {
   const read = () => page.evaluate(pats => {
     const partial = new RegExp(pats.partialLine);
+    const day = new RegExp(pats.dayLine, 'i');
     const num = new RegExp(pats.blockNumber);
-    const lines = [...document.querySelectorAll('.notice, .status')]
-      .map(n => n.textContent.trim())
-      .filter(t => partial.test(t));
+    const all = [...document.querySelectorAll('.notice, .status, .help')].map(n => n.textContent.trim());
+    const lines = all.filter(t => partial.test(t));
     const nums = lines.map(t => Number((t.match(num) || [])[1])).filter(Number.isFinite);
     return {
       logs: window.__uat ? window.__uat.eth_getLogs : null,
       lines, boundary: nums.length ? Math.min(...nums) : null,
+      dayLines: all.filter(t => day.test(t)).length,
       older: document.querySelectorAll('button.older').length,
     };
   }, PATTERNS);
   const before = await read();
   if (!before.older) return { shown: false, note: 'not shown — the scan reached the factory block within budget', logs: before.logs };
-  truthy('e', 'a boundary was read from the partial line before pressing', Number.isFinite(before.boundary));
+  truthy('e', 'the press hangs on a boundary or on the day line, and one of them was read before pressing',
+    Number.isFinite(before.boundary) || before.dayLines > 0);
   await page.click('button.older');
   /* Give the reload of the older window time to land, and stop as soon as it has rather than after a
      fixed sleep: an `eth_getLogs` round trip on a public endpoint is not a predictable 6 s. */
+  /* Which of the two states the press was offered in decides what pressing has to show. Read once,
+     before the click, so the predicate cannot drift with the repaint. */
+  const fromBoundary = Number.isFinite(before.boundary);
+  const deeper = a => fromBoundary
+    ? (a.boundary === null || a.boundary < before.boundary)
+    : (a.dayLines === 0 || Number.isFinite(a.boundary));
   let after = before;
   for (let i = 0; i < 60; i++) {
     await page.waitForTimeout(1000);
     after = await read();
-    const moved = after.boundary === null || after.boundary < before.boundary;
-    if (moved && after.logs > before.logs) break;
+    if (deeper(after) && after.logs > before.logs) break;
   }
   await waitPainted(page);
-  const moved = after.boundary === null || after.boundary < before.boundary;
-  truthy('e', `the boundary moved down or the line went (before ${before.boundary}, after ${after.boundary})`, moved);
+  truthy('e', fromBoundary
+    ? `the boundary moved down or the line went (before ${before.boundary}, after ${after.boundary})`
+    : `the day line gave way to a deeper read (day lines ${before.dayLines} → ${after.dayLines}, boundary ${after.boundary})`,
+    deeper(after));
   truthy('e', `eth_getLogs rose (before ${before.logs}, after ${after.logs})`, after.logs > before.logs);
   const changes = await page.evaluate(() => (document.getElementById('h-changes')?.innerText || '').replace(/\s+/g, ' ').trim());
   return {
-    shown: true, boundaryBefore: before.boundary, boundaryAfter: after.boundary,
+    shown: true, pressedFrom: fromBoundary ? 'a boundary line' : 'the day line',
+    boundaryBefore: before.boundary, boundaryAfter: after.boundary,
+    dayLinesBefore: before.dayLines, dayLinesAfter: after.dayLines,
     logsBefore: before.logs, logsAfter: after.logs, delta: after.logs - before.logs,
     olderControlsBefore: before.older, olderControlsAfter: after.older,
     changesCarriesCreated: /created/i.test(changes),

@@ -118,9 +118,9 @@ let failed = null;
 const brief = (id, f) => {
   if (!f) return '';
   if (id === 'e') return f.shown
-    ? ` · boundary ${f.boundaryBefore} → ${f.boundaryAfter}, eth_getLogs ${f.logsBefore} → ${f.logsAfter} (+${f.delta}), older controls ${f.olderControlsBefore} → ${f.olderControlsAfter}`
+    ? ` · pressed from ${f.pressedFrom}, boundary ${f.boundaryBefore} → ${f.boundaryAfter}, day lines ${f.dayLinesBefore} → ${f.dayLinesAfter}, eth_getLogs ${f.logsBefore} → ${f.logsAfter} (+${f.delta}), older controls ${f.olderControlsBefore} → ${f.olderControlsAfter}`
     : ` · ${f.note}`;
-  if (id === 'c') return ` · painted in ${f.msToPainted} ms, owner bar: the ${f.relation ? f.relation.expect : '?'} branch`;
+  if (id === 'c') return ` · painted in ${f.msToPainted} ms, owner bar: the ${f.relation ? f.relation.expect : '?'} branch, read state: ${f.state}, presses ${f.presses}`;
   if (id === 'c-console-first' || id === 'd') return ` · chainId ${f.chainId}, head ${f.head}, eth_getLogs ${f.eth_getLogs}, ${f.msToPainted} ms, firstLoad ${f.firstLoad}`;
   if (id === 'f') return ` · ${f.addr} at salt #${f.salt}${f.reused ? ' (reused)' : ''}`;
   if (id === 'g') return ` · pay-in ${f.payInTx?.slice(0, 12)}…, distribute in block ${f.distributeBlock}${f.receiverResetTx ? ', receiver put back to refusing' : ''}`;
