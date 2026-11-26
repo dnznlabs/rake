@@ -366,8 +366,15 @@ as its upload lands.
 m05-t05, the stretch row for MegaETH and Robinhood Chain, is withdrawn with the other two chains
 (decision 70).
 
-**Signoff:** _not yet — a dated line by Denizen after reading DNZN's distribution on Base through the
-gateway from a wallet, and after the first deposit and `distribute` have run, goes here._
+**Signoff:** **2026-11-26 — Denizen, on [#433](https://github.com/dnznlabs/rake/issues/433): "Verified
+all three on Base."** He opened DNZN's distribution at `rake.dnzn.dev/8453/` from his own wallet,
+deposited 0.001 ETH and pressed `distribute`, and ticked all three of that issue's boxes: the page
+naming Base with the three rows, the owner and the delay; `waiting to distribute` showing the amount
+after the deposit; and the return to zero with the split in `activity` after it ran. Read back from
+the chain in the same issue — deposit `0xee99eb54…8ecfdd5` in block 62,651,967 and
+`distribute(0x0)` `0x6564ba6e…30f06b83` in 62,652,371, both `status 1`, the distribution's balance
+0.001 → **0**, and treasury **+0.0002** / ops **+0.0004** / creator **+0.0004**, summing to the
+deposit exactly.
 
 ### Phase 4 — Served under dnzn.dev and embedded
 
