@@ -110,7 +110,7 @@ three-chunk document for each (53,805 and 53,806 bytes of gzip), so each upload 
 
 ## Open questions
 
-- **Does a mainnet upload need its own preview and word, or is m05-t01d's word enough?**
+- **Does a mainnet upload need its own preview and word, or is m05-t01d's word enough?** ([#425](https://github.com/dnznlabs/rake/issues/425))
   *Options:* (1) **no new preview** while `app/` is byte-identical to `4fb6296`: the mainnet
   documents differ from the previewed ones only in the chain id, `factoryBlock` and the chain's
   endpoints, his § 4b co-signature is the acceptance, and decision 71's freeze runs from each cut;
