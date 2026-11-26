@@ -1621,14 +1621,32 @@ head, where `--rpc` would read today's nonce and emit different pointers.
 | 7 | 2026-11-26 | Sepolia | `4fb6296` | **8** | `0x7CFFe92a…7b30` · `0x9C8A8CDe…Bd1f` · `0x56AD5F80…631c` · `0x1934717f…f62b` | 19, 20, 21 | `fbd05198…49043549` · `044139b7…961b37f1` | `0xb032069f…00a3e3cb` · `0x8ee58764…fc3aefa4` · `0x80bf22f5…b803c9b4` | **97,699,258** |
 | 8 | 2026-11-26 | Base Sepolia | `4fb6296` | **8** | the same four | 21, 22, 23 | `525f4e3f…e2011d08` · `044139b7…961b37f1` | `0xab8227fe…95eb6dab` · `0xf4a700b6…121f4ead` · `0x3e014381…f417356d` | **13,913,818** |
 
-**Rows 7 and 8 are m05-t01d's upload, and the first three-chunk document.** Four things in them are
-not in any row above:
+**Rows 7 and 8 are m05-t01d's upload**, ~~and the first three-chunk document~~ — **that second clause
+is struck, and it was wrong: m05-t01c's was the first.** It is left visible rather than deleted so the
+next person to write a superlative in this section sees that one of them was already false. § 4a
+records m05-t01c's document as three chunks, cut against this `App` at nonce **4**, and the chain
+agrees: `App`'s CREATEs at nonces 4, 5, 6 and 7 all hold code on both testnets, carrying **24,000**,
+**24,000** and **2,366** bytes of document and the **8,525**-byte widget (the SSTORE2 pointers are one
+byte longer each, for the `0x00` stop). `chunkCount()` read **3** before tonight's upload as well as
+after it ([#411](https://github.com/dnznlabs/rake/issues/411)). So this is the **second** three-chunk
+document, and 50,366 bytes of gzip against tonight's 53,806.
+
+**And that upload has no row in this table, which is the gap the wrong superlative was hiding.**
+The rows jump from `App` nonce 1 (rows 5 and 6) to nonce 8 (rows 7 and 8), and nothing explains the
+four CREATEs in between. They are m05-t01c's, at vault nonces 16, 17 and 18 on Sepolia — the rows
+[#409](https://github.com/dnznlabs/rake/issues/409) warned were the previous upload's and not that
+issue's. **Reconstructing that row is m05-t01c's record to fill, not this task's**, so it is surfaced
+here rather than invented: whoever fills it has the pointers and the byte counts above, and `--app-nonce 4`
+regenerates its calldata.
+
+Four things in rows 7 and 8 are not in any row this table carries:
 
 - **Four pointers, not three**, so the column's heading is one short for these two rows: doc 0, doc 1,
   doc 2 and the widget, which are `App`'s CREATEs at 8, 9, 10 and 11. `CHUNKS` is 4, the batch is
   `batch3456.hex` carrying `3-addChunk-2`, `4-addWidgetChunk`, `5-setChunks` and `6-setWidgetChunks`,
   and the nonce therefore moved **8 → 12** rather than by three. `--app-nonce 8` reproduces the
-  calldata.
+  calldata. The unrecorded upload above had the same four-pointer shape, so this is new to the
+  *table* and not to the project.
 - **The order gate was read between every piece**, not only the nonce: before piece 2 the code at the
   doc-0 pointer equalled `0x00` followed by `1-addChunk-0.hex`'s `bytes` argument, and before the
   batch both document pointers did. That is the only check that catches § 4c's one silent misorder, and
