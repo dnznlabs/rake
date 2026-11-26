@@ -994,7 +994,24 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
    ```
 
    The batch cannot be estimated until its chunks have landed — `CodelessChunk` — so estimate it
-   *between* piece 2 and the batch rather than before piece 1. Measured across all six sends of the
+   *between* piece 2 and the batch rather than before piece 1.
+
+   **Read the limit back off the first send before the second goes out.** The +30% is easy to lose
+   on a chain where the bare estimate is comfortable, and the receipt does not complain: on Base,
+   2026-11-26, all three `executeQueued` went out with the limit **equal to the estimate** —
+   5,555,376 / 5,538,569 / 3,580,191 against 5,330,488 / 5,313,748 / 3,350,122 used, a 4.22% to 6.87%
+   margin — and all three landed, so nothing in the run said the rule had been skipped. Ethereum's
+   three, sent the same day, carried it. So after the first execute and before the second:
+
+   ```sh
+   G=$(cast tx <first executeQueued hash> gas --rpc-url "$RPC")
+   [ "$G" -eq $(( ESTIMATE * 13 / 10 )) ] && echo margin-applied || echo "STOP: limit $G is not ESTIMATE*13/10"
+   ```
+
+   The gas limit of a sent transaction is public, so this is a reading and not a memory of what the
+   command line said. It also inverts: the only integer `g` with `g * 13 / 10` equal to the limit is
+   the estimate that was used, which is how Base's omission was found a day later from the chain
+   alone (§ Uploads, rows 9 and 10). Measured across all six sends of the
    2026-11-17 upload, every estimate came back clean from the public RPCs and sat between **2.62%**
    (Sepolia doc 0) and **7.62%** (the Sepolia batch) above the gas actually used; § Uploads carries
    the figures. The `DeploymentFailed()` that the hand table exists for is a **wallet-path**
@@ -2100,7 +2117,7 @@ against another chain, by `make attest` over `deployments/{1,8453,11155111,84532
 | 3 | `App` | tx `0x96a64bcb5a59f1812efd68fb952fe97f6b013876b7f5e103ba3789b82fd58b19`, status 1, block 60,731,271, `gasUsed` **1,655,420** of 3,341,876 (`G` 190), effective gas price 6,746,681 wei, **base fee at send 5,758,940 wei** |
 | 3 | read-backs | `owner()` the Ops vault, `version()` `v0.1`, `locked()` false, `chunkCount()` 0, `cmp` against the artifact equal at 7,154 bytes |
 | 5 | Sourcify | three `exact_match`, asserting loop exit 0; factory `verifiedAt` 08:38:35Z and `App` 08:40:25Z, each about three minutes after its own deploy and not by this run's loop; implementation 08:47:37Z, this run's |
-| 5 | explorer | **queued, not verified** — GUID `6xw4xwzxi2dcmrtkvyxchcehcansymkj6jrvgkzd8gqxqviaiq`, `Pending in queue`, `getsourcecode` empty |
+| 5 | explorer | queued at the time of the run — GUID `6xw4xwzxi2dcmrtkvyxchcehcansymkj6jrvgkzd8gqxqviaiq`, `Pending in queue`, `getsourcecode` empty — and **verified since**: read 2026-11-26, `getsourcecode` returns `DistributionFactory` and `Distribution` at 24,043 source characters and `App` at 43,741, all `v0.8.38+commit.1835d247`, `status 1/OK` for each. The queue cleared on its own after m05-t02's run |
 | 5 | OpenChain | 82 `Duplicated:`, 0 `Imported:` |
 | 6 | DNZN `create` | **sent by the Product Owner from the Creator key**, tx `0x589b14dc65d280a251e181f4fc3ff0159ea57ca1e71a61eb937b3ee582cc4e7b`, status 1, block 60,747,680, index 48, `from` `0x68e0741D8d693e14BF56914567eADdC130b186eE` at nonce 0, `to` the factory, value 0, `gasUsed` **463,727** of the 480,533 estimated, effective gas price 6,000,000 wei |
 | 6 | read-backs | at `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`: `codesize` **45**, `owner()` the Ops vault, `delay()` **604800**, `description()` `DNZN // FUND DISTRIBUTION`, `beneficiaries()` treasury **2000** / ops **4000** / creator **4000** ascending, `nonce()` 0, `pendingCount()` 0; the 45 bytes' `PUSH20` holds `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`, the attested implementation |
@@ -2132,7 +2149,7 @@ debit here, and on Ethereum they do.
 | 3 | `App` | tx `0x37d157cc643bb26358d59e6de43bc967b5bcffd72e57d26a2ec57bdd5f8d3295`, status 1, block 26,469,806, `gasUsed` **1,655,420** of 3,341,876 (`G` 190), effective gas price 123,794,910 wei, **base fee at send 117,397,085 wei** |
 | 3 | read-backs | `owner()` the Ops vault, `version()` `v0.1`, `locked()` false, `chunkCount()` 0, `cmp` equal at 7,154 bytes |
 | 5 | Sourcify | three `exact_match`, loop exit 0; factory `verifiedAt` 09:38:02Z against a 09:36:59Z deploy and `App` 09:39:02Z against 09:37:59Z — each about a minute later, not this run's loop; implementation 09:40:43Z, this run's. All three carry `creationMatch: exact_match`, unlike Base's implementation, which carries none; recorded unexplained |
-| 5 | explorer | **queued, not verified** — GUIDs `vyqncc7ethysu5igia38zpmlv2lpdiaxsqtt8gsjtpny5qrqg9` (factory), `4qe7mxxtx6lybemkrh6gz4tyyzfxl28nhxmmj86s8ce8j1jg1h` (implementation), `hfnhk7c5sarhs9821ecqy3iifb2ng6anz5cw9awlh4phtbwer3` (`App`) |
+| 5 | explorer | queued at the time of the run — GUIDs `vyqncc7ethysu5igia38zpmlv2lpdiaxsqtt8gsjtpny5qrqg9` (factory), `4qe7mxxtx6lybemkrh6gz4tyyzfxl28nhxmmj86s8ce8j1jg1h` (implementation), `hfnhk7c5sarhs9821ecqy3iifb2ng6anz5cw9awlh4phtbwer3` (`App`) — and **verified since**: read 2026-11-26, `getsourcecode` returns all three with source at `v0.8.38+commit.1835d247`, `status 1/OK` each |
 | 5 | OpenChain | 82 `Duplicated:`, 0 `Imported:` |
 | 6 | DNZN `create` | **sent by the Product Owner from the Creator key**, tx `0xe8b7ca91ff62854e3a6a8bd0bf08a51241a0cf2896f0a358ef1d9103ceb9afc1`, status 1, block 26,469,844, index 225, `from` `0x68e0741D8d693e14BF56914567eADdC130b186eE` at nonce 0, `to` the factory, value 0, `gasUsed` **463,727** — the same figure as Base — of the 480,533 estimated, effective gas price 126,664,141 wei (~0.0000588 ETH) |
 | 6 | read-backs | the same address and the same eleven readings as Base, value for value, re-read against `https://ethereum-rpc.publicnode.com`: 45 bytes, Ops-vault `owner()`, `delay()` **604800**, `DNZN // FUND DISTRIBUTION`, the three rows 2000/4000/4000 ascending, `nonce()` and `pendingCount()` 0, `PUSH20` holding the attested implementation |
