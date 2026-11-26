@@ -48,8 +48,8 @@ jobs:
       # before anything is deployed; whitespace is normalised on both sides, so these are the
       # build's own lines.
       expect: |
-        61d1c417da60be604c282fc8e5528cd68b4dae8673695edee5f2cf4956bacb19     9421  404.html
-        064eb6a95a39c1831bf7e8023129664e160b6d92ff4045cd243b0d23aac06c65     7939  gw44-sw.js
-        61d1c417da60be604c282fc8e5528cd68b4dae8673695edee5f2cf4956bacb19     9421  index.html
+        7de30e0ad6a0615ba95ebadfd87001430bf00d7389b19a85deda6ff72158d11d     9530  404.html
+        35cd521fb1bd61acc566fa55deafa28f8b0f9242737a65a2be315d950fc36cd4     8048  gw44-sw.js
+        7de30e0ad6a0615ba95ebadfd87001430bf00d7389b19a85deda6ff72158d11d     9530  index.html
     secrets:
       gw44-read-key: ${{ secrets.GW44_READ_KEY }}
