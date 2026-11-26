@@ -1257,6 +1257,14 @@ convention. Numbered 45 because 44 is taken by
     pass without it, which means a new preview and a new word. First applied to m05-t01c's testnet
     upload ([#345](https://github.com/dnznlabs/rake/issues/345)). **Rejected:** re-cutting at each
     commit, which costs a rebuild, a fork proof and a preview sitting every time.
+    **Amended 2026-11-26 (Product Owner, Telegram, 02:04 CST; [#425](https://github.com/dnznlabs/rake/issues/425)):
+    a mainnet upload needs no preview of its own while `app/` is byte-identical to the commit his
+    word was given for.** m05-t03 uploads to Base and Ethereum the document previewed for the
+    testnets at `4fb6296`; the builds differ only in chain id, `factoryBlock` and endpoints, his
+    § 4b co-signature is the acceptance, and the freeze runs from each chain's cut to its last
+    `executeQueued`. If `git diff 4fb6296 origin/main -- app/` is not empty at a cut, the cut stops
+    and a preview is owed. Rejected: a preview per mainnet build, a sitting each for a page he
+    reads on Base with his own wallet before Ethereum is cut (m05-t03 step 8).
 
 72. **With no wallet, the page reads as much history as its free endpoint serves, and says where it
     stopped.** Ruled by Denizen on 2026-11-22 by merging m05-t01d's plan
