@@ -1,4 +1,8 @@
 {
+  "8453": [
+    "https://base-rpc.publicnode.com",
+    "https://mainnet.base.org"
+  ],
   "11155111": [
     "https://ethereum-sepolia-rpc.publicnode.com",
     "https://1rpc.io/sepolia"
