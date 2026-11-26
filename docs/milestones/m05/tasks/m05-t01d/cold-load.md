@@ -113,6 +113,16 @@ requests", and it is why the 399,999 figure in the earlier table was the median 
 
 ## Run A — the four chains as shipped, 2026-11-23T06:31:49Z, 10 loads each
 
+> **Run A predates the 24-hour read, so it is not a measurement of it.** The Product Owner's ruling is
+> 06:51Z, the commit that built the day read is `1262576` at 07:11:29Z, and the instrument that judges
+> it is `d581902` at 07:21Z — all after this run, which therefore measures the **full-history walk**
+> that ruling replaced. The 24-hour read's own figure is in
+> [#396](https://github.com/dnznlabs/rake/pull/396)'s criteria table: **10/10 on every chain**, 0 page
+> errors, no load stopping short, no endpoint refusing for rate in forty loads, and requests per load
+> 55 on chain 1 and 47 on the other three. An early head of m05-t01d's handoff reported a criterion
+> failed on Run A's numbers; that was wrong, and this note is here so the next reader does not repeat
+> it. Everything below is still a true reading of the walk it measured.
+
 | chain | worst per load | covered the whole range | blocks read by the loads that did **not** | that in time |
 |:--|:--|--:|--:|--:|
 | 1 | 6× read in full, 4× throttle | 6/10 | 3,999 (median of 4) | 13.4 h |
