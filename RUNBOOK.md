@@ -1618,8 +1618,8 @@ head, where `--rpc` would read today's nonce and emit different pointers.
 | 4 | 2026-11-18 | Base Sepolia | `3751211` | 7 | the same three | 9, 10, 11 | `6f0225bb…ff45336f` · `8b6bbc88…108bc368` | in full below | **12,206,026** |
 | 5 | 2026-11-20 | Sepolia | `557a405` | **1** | `0x029E4004…98F4` · `0x87eE9c5C…80A3` · `0x295fF302…9227` | 13, 14, 15 | `59c24c98…cffdd2010` · `8b6bbc88…108bc368` | `0x3bc0b3c0…40e8fea` · `0xf25b0128…ca0f75a5` · `0x194caf5e…98e7a8eb` | **88,414,431** |
 | 6 | 2026-11-20 | Base Sepolia | `557a405` | **1** | the same three | 13, **17**, 15 | `59ef3a4e…ce20df28` · `8b6bbc88…108bc368` | `0xa64c1bb7…10e1ba4d` · `0xf9c0d4b6…0d1c862f` · `0x841bce0e…86a08524` | **12,602,565** |
-| 6a | 2026-11-22 | Sepolia | `2307e1f` | **4** | `0x93Fa8086…9044` · `0x12B3361f…a607` · `0x183A8FD6…Ce4D` · `0x24Ae0763…0b1D` | 16, 17, 18 | `190897f5…cf91c10e` · `044139b7…961b37f1` | `0xd6e8c0dc…89dfb6d` · `0xec754783…71cfce32` · `0xb4bd33e5…64f9dddf` | **92,374,659** |
-| 6b | 2026-11-22 | Base Sepolia | `2307e1f` | **4** | the same four | 18, 19, 20 | `fc611218…10cd83e6` · `044139b7…961b37f1` | `0xb9bd5060…17e98d2ad` · `0xd6f9e842…9ef7585d6` · `0xdaa700db…7690ee7c` | **13,165,327** |
+| 6a | 2026-11-22 | Sepolia | `2307e1f` | **4** | `0x93Fa8086…9044` · `0x12B3361f…a607` · `0x183A8FD6…Ce4D` · `0x24Ae0763…0b1D` | 16, 17, 18 | `190897f5…cf91c10e` · `044139b7…961b37f1` | `0xd6e8c0dc…289dfb6d` · `0xec754783…71cfce32` · `0xb4bd33e5…64f9dddf` | **92,374,659** |
+| 6b | 2026-11-22 | Base Sepolia | `2307e1f` | **4** | the same four | 18, 19, 20 | `fc611218…10cd83e6` · `044139b7…961b37f1` | `0xb9bd5060…7e98d2ad` · `0xd6f9e842…ef7585d6` · `0xdaa700db…7690ee7c` | **13,165,327** |
 | 7 | 2026-11-26 | Sepolia | `4fb6296` | **8** | `0x7CFFe92a…7b30` · `0x9C8A8CDe…Bd1f` · `0x56AD5F80…631c` · `0x1934717f…f62b` | 19, 20, 21 | `fbd05198…49043549` · `044139b7…961b37f1` | `0xb032069f…00a3e3cb` · `0x8ee58764…fc3aefa4` · `0x80bf22f5…b803c9b4` | **97,699,258** |
 | 8 | 2026-11-26 | Base Sepolia | `4fb6296` | **8** | the same four | 21, 22, 23 | `525f4e3f…e2011d08` · `044139b7…961b37f1` | `0xab8227fe…95eb6dab` · `0xf4a700b6…121f4ead` · `0x3e014381…f417356d` | **13,913,818** |
 
@@ -1640,6 +1640,23 @@ replaced and cannot be re-read from the chain — Sepolia's is independently cor
 [#411](https://github.com/dnznlabs/rake/issues/411), which quoted it before this upload. The
 executions are in blocks 12,191,163–12,191,165 on Sepolia and 62,294,320–62,294,327 on Base Sepolia.
 Sepolia's total is **7.02×** Base Sepolia's here too, the same ratio as every other row pair.
+
+The twelve transactions, in the form rows 7 and 8 use. The submits are the `execute()` calls that
+queued each digest, recovered from the vault's own `Queued` events; the gas column is the
+`executeQueued` receipt's, which is what this section's totals are the sum of:
+
+| chain | vault nonce | submit | `executeQueued` | gas used |
+|:--|--:|:--|:--|--:|
+| 11155111 | 16 | `0x57fa738757edda69fda415048d0897f8dc405d9de7a2f1c906e1d1e9082ceaf2` | `0xd6e8c0dc424676796491d65df68237b85bdc889b8dc794ad6d7f0849289dfb6d` | 37,493,396 |
+| 11155111 | 17 | `0xe57f9ed1d5a944c548ca8715ddc819de1b52dcf56589b507e3e74baaf5d7d17b` | `0xec754783e71533e2ebdf0b1c5c365dc0a4d368d669e9eae7a041ef5f71cfce32` | 37,493,636 |
+| 11155111 | 18 | `0x1643cc4eb5b03eb36031547a72cf85e6ddd5dd6907f9fb8dbd4405be85211ef9` | `0xb4bd33e5b33695a22fa809a98a0232d8964a118cd0ae9779897f4e3c64f9dddf` | 17,387,627 |
+| 84532 | 18 | `0xbccb8c1e0c4b19172e29465bad25c6e7bca42c7561ee3c1e7049fbeb7fa8d658` | `0xb9bd50601c28f46274c8b1acad5a41e8b5290a71d7cdc62affd0a4417e98d2ad` | 5,313,508 |
+| 84532 | 19 | `0xa455acdc08db1af4cbd8cdfb937bc86c574e398457af5750d71cc7ed49d45107` | `0xd6f9e8425eaa0fd33332046c78abd82202596124eac3ad27f3817a29ef7585d6` | 5,313,784 |
+| 84532 | 20 | `0x2f85fa032e85c7908681fcbcd2a4ac2c0b050f39a274f04a93069c78a236cf86` | `0xdaa700db06a43688b323dc4859abb0b19536538aaf04bb695f6ea5867690ee7c` | 2,538,035 |
+
+The gas column sums to the row totals, **92,374,659** and **13,165,327**. Every submit reads
+`status 1`, re-read through a non-`publicnode` endpoint so the quiet gap m05-t01d's cold-load run
+depends on was not disturbed.
 
 The pointers carry **24,000**, **24,000** and **2,366** bytes of document and the **8,525**-byte
 widget — **50,366 bytes of gzip**, against rows 7 and 8's 53,806. Those are chunk-data bytes, the unit
@@ -1689,14 +1706,22 @@ and the rest are theirs alone:
   the same address read 5,807. Three lookups agreed it was not there. What said otherwise was
   arithmetic: `App`'s nonce moved **8 → 12**, four CREATEs, and two chunk calls account for only two,
   so a third transaction had to exist — `cast logs` on the vault over a 200-block window found it.
-  The submits are invisible to any vault-side query for a different reason, which § Uploads already
-  states: they are addressed to the relay, not to the vault.
+  **The submits are invisible to the vault's *inbound transaction list*, not to every vault-side
+  query** — an earlier wording of this note said the latter and was wrong. They are addressed to the
+  relay rather than to the vault, so nothing with `to = $OWNER` lists them; but `execute()` emits
+  `Queued(bytes32 indexed txHash, uint256 nonce, uint256 eta)` **from the vault**, so a log query on
+  the vault address finds them with their nonce and eta. That is the route, and it is how the six
+  below were recovered.
 
-  **Two confirmations, each able to fail.** Every recovered submit's **block timestamp + `delay()`**
-  equals exactly the `queued[digest]` eta recorded for that vault nonce, three for three per chain;
-  and every `executeQueued`'s inner `bytes` argument is **byte-identical** to its committed
-  `calldata/<chain>/` file, so which transaction carried which chunk is read rather than inferred
-  from order.
+  **Two confirmations, each able to fail — both run on 2026-11-26, six for six.** First, every
+  submit's **block timestamp + `delay()`** equals exactly the eta in its own `Queued` event: Sepolia
+  nonces 16, 17 and 18 at submit timestamps 1,795,379,676 / 688 / 724 against etas
+  1,795,380,576 / 588 / 624, and Base Sepolia nonces 18, 19 and 20 at 1,795,379,794 / 806 / 818
+  against 1,795,380,694 / 706 / 718, with `delay()` reading **900** on both chains. Second, every
+  `executeQueued`'s inner `bytes` argument is **byte-identical** to its committed
+  `calldata/<chain>/` file at `2307e1f`, the commit that cut it — which also reads back the vault
+  nonce and the target from the call itself, `$APP` for the two chunks and the vault for the batch,
+  so which transaction carried which chunk is read rather than inferred from order.
 
   Sepolia's total is **7.02×** Base Sepolia's for byte-identical chunk payloads — #201's code-deposit
   repricing measured a fifth time, and at the same ratio as rows 5 and 6.
