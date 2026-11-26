@@ -9,16 +9,17 @@ provider" — so what shipped is the third shape of that step rather than the fi
 document was cut from `main` at `4fb6296`, proposed by the engineer, co-signed and submitted by the
 Product Owner, and executed on both testnets as § Uploads rows 7 and 8; the gateway was redeployed so
 its static `widget.js` copies match, and gw44's `make verify` measured the deployed host for the
-first time in this project's record. **One acceptance criterion is not met — AC 2's 9-of-10 cold-load
-rate — and it is not met by the task's own committed measurement rather than by anything found
-tonight; it is the § Open question below, because the remedies are all outside this task.**
+first time in this project's record. **Every criterion is met except one clause of AC 2: the
+screenshot per chain, which was never produced.** AC 2's rate was measured **10/10 on every chain**
+at #396's head and has not been re-taken for the bytes that shipped, so what it wants is one
+`cold.mjs --shots` run after the quiet gap step 5 asks for — work, and mine, not a decision.
 
 ## Acceptance criteria
 
 | AC | Result | Evidence |
 |:---|:-------|:---------|
 | 1 — `make test` passes with the tests of steps 2 to 7 in it | **pass** | `devbox run -- make test` at `16891a2` → `tests 419 · pass 419 · fail 0 · skipped 0`. The step tests, run as a set: `node --test test/day-read.test.mjs test/answered.test.mjs test/page-chain.test.mjs test/node-sentence.test.mjs test/action-hash.test.mjs test/chain-type.test.mjs test/widget-sri.test.mjs` → `tests 77 · pass 77 · fail 0 · skipped 0`. **`skipped 0` is load-bearing and newly enforced:** `node --test` exits 0 on a skip, so two `widget-sri` tests were silent passes whenever they lost a race for `app/dist`; `make test` now runs through `tools/node-test.sh`, which fails the build on any skip (commit `1572929`, and Deviation 2) |
-| 2 — on all four chains, no wallet, the last 24 hours read in ≥ **9 of 10** cold loads, saying `last 24 hours` and `connect a wallet to load more`, never showing less escrow than `reserved` accounts for without stating the difference; a screenshot per chain | **not met** | **The wording and the escrow clause pass; the rate does not, and the screenshots are absent.** `cold-load.md` § Run A (as shipped, 2026-11-23T06:31:49Z, 10 loads each) gives loads whose every section printed no boundary line: chain **1 → 6/10**, **8453 → 10/10**, **11155111 → 0/10**, **84532 → 6/10**, against the 9 the criterion asks. The dominant cause is the endpoints' rate limiting, not the page — Run A's own worst-per-load column reads `9× throttle` on 11155111 and `4× throttle` on each of 1 and 84532 — and § The limits records that **none of the four endpoints names a figure** for its rate, so the cap cannot be derived from their words and has to be measured. **11155111's 0/10 is confounded by my own traffic** and the file says so in § A confound — four runs in one hour took its throttle count 5 → 8 → 9 of 10 and its median truncated depth from 9,965 blocks to 31, which is a measurement of my instrument. Wording: § Run A classifies by the page's own lines and `test/day-read.test.mjs` asserts the 24-hour floor from timestamps and both sentences. Escrow: `test/escrow-state.test.mjs`, with decision 72's reasoning — `reserved[token]` is exact, so the difference is always stated. **No screenshot per chain exists**; `cold.mjs --shots` was never run with it. See § Open questions |
+| 2 — on all four chains, no wallet, the last 24 hours read in ≥ **9 of 10** cold loads, saying `last 24 hours` and `connect a wallet to load more`, never showing less escrow than `reserved` accounts for without stating the difference; a screenshot per chain | **not yet evidenced for the uploaded document** — the rate was measured met, the screenshots are absent | **The rate clause was measured met, at [#396](https://github.com/dnznlabs/rake/pull/396)'s head `8fa8aea`**, whose criteria table reads **10/10 on every chain**, 0 page errors, no load stopping short, and **no endpoint refusing for rate in forty loads**; requests per load **55 on chain 1 and 47 on the other three**, which is the count step 5's check asks this file to give; floors used 7,000 blocks back on chain 1, 6,923 on Sepolia and 431,999 on both Base chains. **That is not the uploaded bytes:** `app/` moved **nine commits** after `8fa8aea` (`075549a` through `7c8a20b`, #399–#406) before the calldata was cut at `4fb6296`, so the figure holds for the page as #396 built it and has not been re-taken for the page that shipped. Wording: `test/day-read.test.mjs` asserts the 24-hour floor from timestamps and both sentences. Escrow: `test/escrow-state.test.mjs`, with decision 72's reasoning — `reserved[token]` is exact, so the difference is always stated. **The screenshot per chain does not exist**; `cold.mjs --shots` was never run with it, and that clause is **not met**. **The remedy is one run, not a decision:** `cold.mjs --shots` on all four chains from `main`, after the two quiet hours step 5 asks for, with the result and the shots committed here. **Do not read `cold-load.md` § Run A for this row** — it was taken 2026-11-23T06:31:49Z, forty minutes *before* the Product Owner's 06:51Z ruling and before `1262576` (07:11:29Z) built the 24-hour read, so it measures the full-history walk and not this criterion; an earlier head of this handoff reported AC 2 failed on those figures, which was my error |
 | 3 — the driver exits 0 on Sepolia **and** Base Sepolia against `https://rake.dnzn.dev`, full list, and 1 on the control on both | **pass** | Record run at `16891a2`, `--acceptance`: 11155111 **exit 0**, 14 rows, 5 writes, 03:05:59–03:13:26Z; 84532 **exit 0**, 14 rows, 5 writes, 03:13:38–03:18:05Z. Controls: **exit 1** on both, failing at row (c) with `sections still loading after 20 s`. Row (k) reports **pending**, not pass, for the pre-existing reason in `rowK` (Deviation 4). This closes the 84532 rows m05-t01c recorded as not met: that chain's shots went from 5 files to 13, the 8 new ones being `c-distro`, `c-console-first`, `d-console-second`, `e-older`, `g-distributed`, `h-released`, `i-applied`, `j-calldata`. **Sepolia's record run needed a second attempt** — Deviation 3 |
 | 4 — on both testnets `chain-doc`'s `inflated sha256` equals `sha256sum app/dist/index.html`, and `curl …/<chain>/widget.js \| sha256sum` equals `chain-doc`'s widget hash | **pass** | 11155111: `fbd0519846d31bb5d58e6649db8353554009902b031af7f96868f7ba49043549` at 170,387 B, equal both ways. 84532: `525f4e3f006049a6b489c03b45b6c6b75ea1470c30d153b7098f5341e2011d08` at 170,385 B — the two-byte difference is `__CHAIN_ID__`. Widget `044139b751a901df06e106d3b8a4c307c745427c3e210ea8f8467f28961b37f1` at 8,525 B from `chain-doc`, from `sha256sum app/dist/widget.js`, **and** from `curl https://rake.dnzn.dev/<chain>/widget.js` on both chains. Full readings in `RUNBOOK.md` § Uploads rows 7 and 8 |
 | 5 — gw44's `make verify` with `VERIFY_SITE` prints `ok` on its `site` lines for both chains | **pass** | Four `site` lines, all `ok`: `11155111 site root` and `site widget`, `84532 site root` and `site widget`, root 72,421 B per chain and widget 8,525 B, chain hash equal to site hash on each. Its first line read `verify: address 0x00a9F390A6010d045e0d34856048DdD6910d25BA on chains [11155111 84532]` before the result, as § 4f requires. The browser stage also passed, six loads across both chains |
@@ -36,12 +37,18 @@ tonight; it is the § Open question below, because the remedies are all outside 
    in AC 1 — `node --test` exits 0 on a skip, so two SRI tests were silent passes depending on
    process scheduling. Declared rather than quietly carried because it changes how **every**
    criterion that quotes `make test` is measured.
-3. **Step 11's record run on Sepolia needed two attempts, and the first failed.** Attempt 1
-   (03:00:34–03:04:44Z) failed at row (i): `propose setDescription was refused by the page — send
-   failed: … error code -32000: nonce too low: next nonce…`, after rows (f), (g) and (h) had each
-   sent. Attempt 2 passed every row. **The failure is recorded rather than re-run away**, and it is
-   the first Discovery; the rate across tonight's four full Sepolia runs is **1 in 4**. I did not
-   change the driver to make the record pass.
+3. **Step 11's record run on Sepolia needed two attempts, and the first failed.** Attempt 1,
+   03:00:34–03:04:44Z, **exit 1**, `rows 10 · writes 3`, failing at row (i): `propose setDescription
+   was refused by the page — send failed: … error code -32000: nonce too low: next nonce…`. Its rows
+   before the failure, in order: `probe` ok · `a` ok · `c` ok (read state **day**, presses 2) ·
+   `c-console-first` ok · `e` ok (pressed from the day line, boundary `null` → 12,200,071, day lines
+   2 → 0, `eth_getLogs` 0 → 84) · `d` ok · `k` pending · `l` ok · `f` ok
+   (`0x2266E523Bd2Ea19D811B189664645c264743ad92` at salt #14) · `g` ok (pay-in `0x934b85c9fa…`,
+   distribute in block 12,213,757, receiver put back to refusing) · `h` ok (`setAccepting`
+   `0xd0a98b4ff0…`, release in block 12,213,759). So the three sends before row (i) are readable
+   against the chain by their blocks. Attempt 2, 03:05:59–03:13:26Z, **exit 0**, every row. **The
+   failure is recorded rather than re-run away** and is carried as #420; the rate across tonight's
+   four full Sepolia runs is **1 in 4**. I did not change the driver to make the record pass.
 4. **Row (k) is `pending`, not a pass, on both chains**, which is unchanged from m04-t05 § Step 2 and
    not a regression: there is no published URL for the host page, and the committed file names
    84532's w3link base rather than a `dnzn.dev` one. `rowK` still asserts the file's two mounts, its
@@ -67,9 +74,11 @@ tonight; it is the § Open question below, because the remedies are all outside 
   own rule. Before classing it I checked the instrument could see a presence: 84532 answers 200 on the
   same host, our own gw44 build at the pinned commit answers 200 at 72,421 bytes for **both** chains,
   and `request([])` answers 200 through our endpoints on both.
-- **m05-t01c's missing § Uploads row was surfaced, not reconstructed, inside this task** (#418). It is
-  another task's record, and inventing its figures to close a visual gap is the error that section
-  exists to prevent. See § Discoveries for where the reconstruction now lives.
+- **m05-t01c's missing § Uploads row is added, by the architect's ruling, in its own `RUNBOOK.md` PR**
+  ([#422](https://github.com/dnznlabs/rake/pull/422)) rather than here. #418 surfaced the gap and deliberately did not fill it, on the view that it
+  is another task's record; **that view was overruled** — the row is added, with its twelve figures
+  read against the chain by me, pointer sizes in #418's chunk-data convention, and #418's "has no row
+  in this table" paragraph rewritten in the same commit so the file does not contradict itself.
 - **Row (c)'s two non-day branches are proven by forced-selector mutation rather than by a live
   reading**, because they cannot be induced against a deployed host: the `?rpc=`, `?cap=`, `?win=` and
   `?maxwin=` overrides are `/*DEV*/`-guarded and the shipped build strips them — `maxwin` occurs 2× in
@@ -85,15 +94,13 @@ tonight; it is the § Open question below, because the remedies are all outside 
   `pending` at 202. The remaining plausible cause is overlapping sends from one key within a run; the
   page's `eth_sendTransaction` path in `tools/uat/provider.mjs` calls `cast send` directly and has no
   `sendOnce` retry behind it, unlike the driver's own setup sends. Rate 1 in 4 Sepolia full runs
-  tonight.
+  tonight. Carried as [#420](https://github.com/dnznlabs/rake/issues/420).
 - **§ Uploads had no row for m05-t01c's upload at all** — `App` nonce 1 to 8 with nothing between —
-  which the struck superlative was hiding. **A reconstruction now exists and wants review:** branch
-  `docs/m05-t01d-handoff` on `origin` at `ff704c5`, written by another session of mine before it
-  stood down, adding rows 6a and 6b with two independent confirmations per row. It is **misnamed**,
-  has **no PR**, and is based on `01f2646`, which predates #418, so its strike and the merged one
-  overlap. It also states the pointer sizes as runtime bytes (24,001 / 2,367 / 8,526) where #418
-  states them as chunk data (24,000 / 2,366 / 8,525), one byte apart by the SSTORE2 stop byte — the
-  file should not carry both conventions.
+  which the struck superlative was hiding. **Now added as rows 6a and 6b in
+  [#422](https://github.com/dnznlabs/rake/pull/422)**, by the architect's ruling and against #418's
+  view: its draft came from another session of mine, its twelve figures were re-read off the chain
+  before publishing, and it rewrites #418's "has no row in this table" paragraph in the same commit
+  so the file does not contradict itself.
 - **w3link's Sepolia instance is not in ERC-5219 mode**, which narrows what `README.md`'s row should
   say: no `web3-resolve-mode` header, and `/widget.js` answers `Invalid method name`, the auto-mode
   error for a path read as a function name. Added to
@@ -103,28 +110,23 @@ tonight; it is the § Open question below, because the remedies are all outside 
   `PATTERNS.activityRow` backs row (c)'s "at least one row" assertion, and it once matched the bare
   ` in ` of "token payments **in** could not be read from this provider". It is anchored to an amount
   now, but the funds block gaining another sentence containing ` in ` would make row (c) pass on a
-  section with no rows. Row (c) counts `.hrow` **elements** as well, which is what currently stops it.
-- **AC 7's path list and the plan's own `Record:` line disagree** (Deviation 1). Worth fixing in the
-  template or in the next plan rather than here.
+  section with no rows — and the same pattern is `settledText`'s *wait* predicate, where a false match
+  ends the wait early and the row then reads a section mid-paint. Row (c) counts `.hrow` **elements**
+  as well, which is what currently stops it. Carried as
+  [#421](https://github.com/dnznlabs/rake/issues/421).
+- **AC 7's path list and the plan's own `Record:` line disagree** (Deviation 1): following the open
+  question's `Record:` destination necessarily breaks the criterion, so the only honest close is a
+  deviation for something the plan instructed. Raised where the template that produces both lives,
+  since any plan with an open question recorded outside its own directory reproduces it.
 
 ## Open questions
 
-- **AC 2's 9-of-10 cold-load rate is not met. Does the document ship on the committed figures, or is
-  a clean re-measurement a gate?**
-  *Options:* (1) **ship as measured** — the page is honest about what it could not read, which is what
-  #387's ruling and decision 72 chose, and the rate is a property of free public endpoints rather than
-  of the code; costs nothing, and leaves a criterion recorded as not met. (2) **re-measure cleanly
-  first** — `cold.mjs` on all four chains after a genuinely quiet gap from a quiet IP, with
-  `--shots` so the missing screenshot per chain exists; costs calendar time, not work, and is the only
-  way to know whether 11155111's 0/10 is the endpoint or my own four thousand requests. (3) **buy or
-  build depth** — a paid endpoint with its key out of the public document, or the log cache of #221;
-  both are tasks of their own and #221 is explicitly carried post-mainnet by decision 62.
-  *Recommendation:* **(2) then (1).** The figures as they stand cannot support a ship decision in
-  either direction, because the one chain that reads 0/10 is the one the file itself says is
-  confounded; a clean run costs a quiet gap and nothing else. If it comes back below 9 of 10 anyway,
-  (1) is right and the criterion should be amended to a rate the free endpoints can actually hold,
-  since (3) is out of this task's scope by its own § Out of scope.
-  *Default, if nothing is said:* (1), because decision 72 already governs what the page *says* and
-  nothing here changes it. *Blocks:* this task's close, and nothing else — the mainnet uploads of
-  m05-t03 read the same endpoints and will meet the same rate.
-  *Record:* `ROADMAP.md` § Decisions, as a second amendment to decision 72.
+**None.**
+
+An earlier head of this handoff asked the Product Owner to rule on AC 2's cold-load rate. **That
+question was raised by my own error and is withdrawn:** it rested on `cold-load.md` § Run A, a
+measurement of the page the 24-hour ruling replaced, and the rate was in fact measured **10/10 on
+every chain** at #396's head (AC 2). Nothing here needs the Product Owner. What AC 2 still wants is
+one `cold.mjs --shots` run against the uploaded document after the quiet gap step 5 asks for — work,
+not a decision, and mine. If that run comes back under 9 of 10, the question returns with its new
+figures and is his then.
