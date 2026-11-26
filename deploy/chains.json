@@ -1,4 +1,8 @@
 {
+  "1": [
+    "https://ethereum-rpc.publicnode.com",
+    "https://eth.drpc.org"
+  ],
   "8453": [
     "https://base-rpc.publicnode.com",
     "https://mainnet.base.org"
