@@ -48,6 +48,45 @@ const CASES = [
   /* A token row, so the anchor is not accidentally tied to the ether sign. */
   ['activityRow', 'in 12.5 USDC from 0x5A15…C50d ↗ block 12192083', true],
   ['activityRow', 'escrowed Ξ0.0009 · 0x5A15…C50d — the push failed', true],
+  /* **Both wordings of the empty `changes` line**, because `emptyLine` chooses between them on
+     whether the read covered the whole history, and since #400 a live acceptance run meets the day
+     form — which is what row (c) waited five minutes for and then failed on. */
+  ['changesEmpty', 'no change has been queued yet.', true],
+  ['changesEmpty', 'no change has been queued in the last 24 hours. this read covers the last 24 hours · load older', true],
+  ['changesEmpty', 'queued setBeneficiaries · new table · 41% / 29% / 30% · nonce 4 · applied', false],
+  ['changesEmpty', 'history unavailable', false],
+  /* The press is what tells a wallet page from a no-wallet one now that the heading does not: the
+     day line is printed on both paths and only a wallet gets ` · load older` after it. */
+  ['dayLine', 'no change has been queued in the last 24 hours. this read covers the last 24 hours · load older', true],
+  ['dayLine', 'no change has been queued in the last 24 hours. this read covers the last 24 hours', true],
+  ['dayLinePress', 'no change has been queued in the last 24 hours. this read covers the last 24 hours · load older', true],
+  ['dayLinePress', 'no change has been queued in the last 24 hours. this read covers the last 24 hours connect a wallet to load more', false],
+  ['dayLinePress', 'history before block 12181673 not loaded · load older', false],
+  /* **One pair per branch of row (c)'s state machine**, read off `dayHead`'s own three outcomes
+     (`app/src/index.html:1704-1707`). Getting the branch wrong is how the row came to require the day
+     state of a page that had honestly stopped short, so the sentence that selects each branch is
+     tested against the other two heads as well as its own. */
+  // the stopped-short head, which must win the branch over the day wording
+  ['shortHead', 'changes as far back as this endpoint served', true],
+  ['shortHead', 'changes last 24 hours', false],
+  ['shortHead', 'changes every configuration change this contract has seen', false],
+  // the day head, in both the exact and the approximate wording the page can print
+  ['dayHead', 'changes last 24 hours | activity last 24 hours', true],
+  ['dayHead', 'changes about the last 24 hours', true],
+  ['dayHead', 'changes as far back as this endpoint served', false],
+  ['dayHead', 'changes every configuration change this contract has seen | activity funds in, and every split and escrow since', false],
+  /* A wall against a budget and a throttle: the first offers no press, the other two do, and row (c)
+     asserts a different press count for each. The two wall wordings are the two kinds of evidence
+     `partialLine` can have. */
+  ['wallLine', 'history before block 900000 not loaded · this endpoint serves no history before block 900000. A connected wallet reads through its own endpoint, which may go further.', true],
+  ['wallLine', 'history before block 900000 not loaded · this endpoint refused older blocks, and may not serve history that far back. A connected wallet reads through its own endpoint, which may go further.', true],
+  ['wallLine', 'history before block 12181673 not loaded · load older', false],
+  ['wallLine', 'this endpoint is limiting requests · history before block 12181673 is not loaded yet · load older', false],
+  // the two halves of the empty line, which say whether the read covered all of history or one day
+  ['changesEmptyWhole', 'no change has been queued yet.', true],
+  ['changesEmptyWhole', 'no change has been queued in the last 24 hours.', false],
+  ['changesEmptyDay', 'no change has been queued in the last 24 hours.', true],
+  ['changesEmptyDay', 'no change has been queued yet.', false],
 ];
 
 /* The row-kind patterns live in node, so they are tested as literals — including the two the
