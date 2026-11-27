@@ -82,6 +82,25 @@ simply the harsher one. The disagreements are the triage's job, not this file's.
   meant to follow. This is operational: it constrains how the Ops vault sequences a final table and a
   renounce. Nothing is queued on DNZN's clone today (`nonce()` 0, `pendingCount()` 0, read in 1274).
 
+## Already in this project's record
+
+Four of the external items correspond to something already written down here. **These pairings are
+mine, made for triage — the auditor had none of these files and claimed no such thing**, and each
+still needs a disposition that says whether the existing record answers the finding or the finding
+sharpens the record.
+
+| external | already here |
+|:--|:--|
+| 1272 M-2 / 1274 M-01 — a clone cannot be paid by a 2,300-gas `transfer`/`send`; measured 4,159 gas cold on Base | [`docs/ROADMAP.md`](../../docs/ROADMAP.md) § Findings carried forward, first bullet — measured in `m01-t01` at 1,662 gas warm, with a cold `DELEGATECALL` adding about 2,600, and `test_receiveUnderStipend` proving the warm path only. Carried issue [#18](https://github.com/dnznlabs/rake/issues/18) (closed). **Two measurements of the same thing; reconcile the numbers rather than filing it as new** |
+| 1272 L-8 / 1274 L-03 — a token balance below `reserved` makes `distribute` revert | [`SECURITY.md`](../../SECURITY.md) § Findings — disposition, **F4**, dispositioned "none needed" under decision 23 and carried as [#19](https://github.com/dnznlabs/rake/issues/19) (closed). Raised by the two-model method on all three of its runs; **this is the fourth and fifth raising, and the second at Low** |
+| 1272 I-4 — `release` copies and re-throws recipient-chosen revert data | Carried issue [#20](https://github.com/dnznlabs/rake/issues/20) (closed), `release` bubbling a bare `false` word as revert data. 1272 L-10 and 1274 L-09 sit beside it on the same reliance on the return word, and are not the same item |
+| 1273 M-1 — `lock()` admits a pointer that deletes itself at the end of the transaction | [`SECURITY.md`](../../SECURITY.md) § Findings — disposition, **F11**, fixed by `_requireChunk` against a 7702 delegation designator. A second shape of the same vector, and **not** closed by that fix |
+
+What is **not** in our record, as far as I can tell: the unordered application of matured timelock
+actions (1272 M-1 / M-4, 1274 M-03), escrow having no exit for a contract that can neither receive in
+100k gas nor call `claim` (1272 M-6 / 1274 L-04), and the clone address not committing to its
+configuration (1272 M-5 / 1274 L-11). Those three are the ones to read as genuinely new.
+
 ## Provenance
 
 | | |
