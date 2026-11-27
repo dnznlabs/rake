@@ -12,7 +12,7 @@ A distribution is one address with a published table of beneficiaries. Anything 
 
 | STATUS | VERSION | AUDIT |
 |:---|:---|:---|
-| `pre-mvp` | `0.1alpha` | two-model agent review and Slither, 2026-11-06; the review of record, no paid review planned ([SECURITY.md](SECURITY.md)) |
+| `pre-mvp` | `0.1alpha` | two-model agent review and Slither, 2026-11-06, the review of record; three commissioned $1 AI reviews of the deployed Base contracts, 2026-11-26; no professional paid audit planned ([SECURITY.md](SECURITY.md)) |
 
 This is pre-release software and the contracts are unaudited. **They are now on Ethereum and Base as well as Sepolia and Base Sepolia** — see [Contracts](#contracts) for addresses and per-chain status. **The dapp's document is uploaded on all four**, since 2026-11-26 on Ethereum and Base, and is served at [`rake.dnzn.dev`](https://rake.dnzn.dev/) — see [Opening the App](#opening-the-app). Milestones and their status are in the [roadmap](docs/ROADMAP.md).
 
@@ -20,7 +20,7 @@ This is pre-release software and the contracts are unaudited. **They are now on 
 
 ### Disclaimer
 
-Alpha software. The contracts are reviewed by the shared two-model method and Slither ([SECURITY.md](SECURITY.md)), not audited. No warranty. The contracts are immutable: a found bug is not patched, it is a new address. The alpha marks come off 90 days after the mainnet milestone closes with no `bug` issue filed and no accepted security finding ([decision 45](docs/ROADMAP.md#decisions)).
+Alpha software. The contracts are reviewed by the shared two-model method, by Slither, and by three commissioned $1 AI reviews of the deployed contracts ([SECURITY.md](SECURITY.md)) — none of which is a professional audit, and the vendor of the third says so itself. No warranty. The contracts are immutable: a found bug is not patched, it is a new address. The alpha marks come off 90 days after the mainnet milestone closes with no `bug` issue filed and no accepted security finding ([decision 45](docs/ROADMAP.md#decisions)).
 
 ## Contracts
 

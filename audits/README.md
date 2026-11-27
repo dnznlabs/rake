@@ -47,6 +47,13 @@ audits/
     transcripts/
       leg-1-codex.log                everything leg 1 printed, tool calls included
       leg-2-claude.jsonl             leg 2's stream-json, tool calls included
+  external/
+    <YYYY-MM-DD>/
+      INDEX.md                         an index of that day's commissioned reviews — not a rollup
+      <vendor>/
+        <job>/
+          report.md                    the delivered report, untouched
+          README.md                    the callout: where it came from, what it covered, how to check it
 ```
 
 The transcripts are the only evidence of what a leg read, so they are committed with the findings.
@@ -302,6 +309,33 @@ there unchanged. Three things make it hold:
 A new review type is a new directory under `audits/<date>/` and a new leg in the runner. It does not
 need a new document. It needs: a name, what it reads, what it writes, and a line in the next
 `AUDIT.md` rollup. If it cannot state those four, it is not ready to be a leg.
+
+## External commissioned reviews
+
+A review bought from a third party is not a leg and does not go through `make audit`. It is filed
+because an outside reading of the same code is evidence, and because the alternative is a link in a
+chat log. The rules are few and all of them are about not overstating what arrived.
+
+**Layout.** `audits/external/<date>/<vendor>/<job>/`, one directory per engagement. Not the dated
+tree: `audits/<date>/` means a run of this project's own method with a rollup, and a vendor's report
+is neither. The date's index is `INDEX.md` and opens by saying it is an index, because there are no
+legs to reconcile.
+
+**`report.md` is the delivered file, untouched, and the callout is its sibling `README.md`.** That
+way the committed file carries the vendor's own content address and checking the copy is one
+`cmp` against the gateway, with no extraction recipe for a reader to trust. The callout carries, at
+minimum: the hosted report, the delivered markdown's content address, the engagement record, the
+target addresses and chain, when it was commissioned and pulled, the severity counts as filed, and
+who the vendor is. Verify the check you print, with the file as committed, before committing it.
+
+**A vendor's report is not a disposition.** Nothing in `audits/external/` accepts, rejects or fixes
+anything; dispositions live in `SECURITY.md` § Findings — disposition, with the citation that
+settles each one. An external auditor reads deployed verified source and has neither the tests nor
+the decision log, so a finding may already be answered — say so with the citation, and never read
+the auditor's silence as agreement.
+
+First instance: [`external/2026-11-26`](external/2026-11-26/INDEX.md) — three One Dollar Audit
+engagements on the Base deployments.
 
 ## Known limits
 
