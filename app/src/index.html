@@ -1138,8 +1138,8 @@ const recents = () => {
 const addRecent = a => store.set(RECENT, JSON.stringify([a, ...recents().filter(x => x !== a)].slice(0, 8)));
 
 /* ---- names ---------------------------------------------------------------------------------- */
-/* Ported from another DNZN project's dapp, which took it from that project's own name-probe tool
-   — the reference implementation and the oracle, not re-derived here. GNS and
+/* Ported from state-collection `app/src/index.html:224-279`, which took it from its own
+   `tools/names-probe.mjs` — the reference implementation and the oracle, not re-derived here. GNS and
    WNS answer the same selectors with the same semantics and differ only by address, so they are one
    path; ENS is the other.
 
