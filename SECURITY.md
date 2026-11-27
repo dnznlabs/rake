@@ -6,6 +6,41 @@
 
 ## Prior reviews
 
+**Date:** 2026-11-26 — **commissioned external review, not this project's own method**
+**Method:** three paid engagements with One Dollar Audit (LeftClaw Services), an AI auditor that
+describes its own work as "an AI first-pass, not a Big-4 replacement". Its method, in its words, is
+`deep-audit v3`: an x-ray pre-scan, a context map, checklist agents, then blind attack agents,
+reconciled behind a coverage gate. Independent of everything above it — different vendor, different
+method, no access to this repository
+**Scope:** the **deployed, Sourcify-verified source** at three addresses on Base (8453), not a commit
+of this repo and not [`audits/SCOPE`](audits/SCOPE): `DistributionFactory`
+`0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E` with the `Distribution` implementation
+`0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A` (job 1272), `App` `0x00a9F390A6010d045e0d34856048DdD6910d25BA`
+(job 1273), and DNZN's distribution clone `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199` with the same
+implementation behind it (job 1274). **No tests, no `docs/`, no `RUNBOOK.md` and no decision log were
+available to the auditor**, and each report says so; `src/App.sol` and `src/Distribution.sol` are
+verified byte-identical at the same addresses on Ethereum (1) and Base Sepolia (84532), so the code
+findings apply to all three chains
+**Result:** **0 Critical, 0 High** in all three. 1272: 6 Medium, 12 Low, 8 Informational. 1273:
+1 Medium, 13 Low, 8 Informational. 1274: 3 Medium, 13 Low, 7 Informational. 1272 and 1274 read the
+same implementation independently and agree on substance while rating three items differently, in
+both directions ([`AUDIT.md`](audits/2026-11-26/AUDIT.md) § The implementation was reviewed twice).
+**None of it is dispositioned yet** — see the note in § Findings — disposition
+**Full report:** [`audits/2026-11-26/AUDIT.md`](audits/2026-11-26/AUDIT.md) (an index; the three
+reports are filed verbatim beside it, each with its hosted and IPFS links)
+
+**One finding reopens a vector this file records as closed.** 1273's M-1 locks an `App` whose chunk
+pointer deletes itself: init code can `DELEGATECALL` a self-destruct helper and still return runtime
+`0x00 ‖ data`, so under EIP-6780 the account survives `_requireChunk`'s code-present, first-byte-`0x00`
+test during the locking transaction and is deleted when it ends — after which the same `CREATE2` salt
+can place different bytes at that address. The auditor reproduced it on `anvil --hardfork cancun`
+against byte-identical source. **That is a second shape of F11 below, which `_requireChunk` was
+written to close**; F11 was a 7702 delegation designator, this is a same-transaction self-destruct,
+and both need the owner to install the pointer. Nothing is locked under such a pointer today: `App`
+is unlocked on all four chains and decision 74 ([#441](https://github.com/dnznlabs/rake/issues/441))
+rules that no lock is planned. It bears on any future lock and on how a reader verifies what they are
+served, and it is the first item in triage ([#440](https://github.com/dnznlabs/rake/issues/440)).
+
 **Date:** 2026-11-06
 **Method:** two-model agent review — in the method's own words, "several independent adversarial
 reviews of the same code, captured separately, then reconciled"
@@ -140,6 +175,14 @@ additions; § Coverage and § Mutation are the other two.
 ---
 
 ## Findings — disposition
+
+**The 2026-11-26 commissioned reviews are not in this table yet.** Their 10 Medium, 38 Low and 23
+Informational items are filed verbatim under [`audits/2026-11-26/`](audits/2026-11-26/AUDIT.md) with
+no disposition, and triage is tracked in [#440](https://github.com/dnznlabs/rake/issues/440). They
+are listed separately rather than merged into F1–F14 because they were read against deployed
+verified source instead of a commit of this repository, so each one needs a disposition that says
+whether a test, a decision or an operational practice already answers it — and the auditor had none
+of those three to read.
 
 **Three runs now feed this table, and each numbered its own findings from F1.** To keep one stable
 identifier per issue, the rows keep the 2026-10-30 numbering (**F1–F10**, that run's `AUDIT.md`
