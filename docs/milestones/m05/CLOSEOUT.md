@@ -32,8 +32,8 @@ readings are the engineer's and were not re-run here; they are named in their ro
   is a claim about them. An address there can only ever hold these bytes, so nothing is lost by
   waiting.
 - **`App` is unlocked on all four chains.** The Ops vault, 2 of 4 behind a one-hour delay on the
-  mainnets, can replace the document. Whether and when to lock is
-  [#441](https://github.com/dnznlabs/rake/issues/441).
+  mainnets, can replace the document. There is no plan to lock it and no item tracks one
+  (decision 74, [#441](https://github.com/dnznlabs/rake/issues/441)).
 - **Base's three document executes went out without the 30% gas margin** and landed with 4% to 7% to
   spare. Nothing was lost; § 4c now reads the limit back after the first send.
 - **The widget asks `window.ethereum` when a mount has no `data-rpc`**, and can report the chain of
@@ -62,7 +62,8 @@ Sorted by the architect and approved by the Product Owner on 2026-11-26 (Telegra
   days later if no `bug` issue is filed and no security finding is accepted in that time. One `bug`
   issue is open today, [#412](https://github.com/dnznlabs/rake/issues/412), filed before the close;
   whether it holds the clock is the Product Owner's to say when the 90 days are up.
-- **`lock()`** is [#441](https://github.com/dnznlabs/rake/issues/441), default: nothing is locked.
+- **`lock()` has no date.** Ruled on [#441](https://github.com/dnznlabs/rake/issues/441) the day of
+  this run: no plan to lock, and it is off the roadmap (decision 74).
 
 ## Handed on
 

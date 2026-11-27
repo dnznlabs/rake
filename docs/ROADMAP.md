@@ -1303,6 +1303,15 @@ convention. Numbered 45 because 44 is taken by
     was on Base when the wallet he uses was not; that mount is removed, and the widget reading only
     `window.ethereum` is [#289](https://github.com/dnznlabs/rake/issues/289).
 
+74. **There is no plan to call `App.lock()`, and it is not a roadmap item.** Ruled by Denizen on
+    2026-11-26 ([#441](https://github.com/dnznlabs/rake/issues/441)): "No plan to lock any time soon,
+    remove from roadmap." M05's close-out was to open the question with a watch period; it did, and
+    this is the answer. `App` stays unlocked on Ethereum, Base, Sepolia and Base Sepolia, so the Ops
+    vault can replace the document it serves. No date, watch period or milestone tracks a lock; it
+    comes back only if he raises it. `lock()` remains one-way per chain if it is ever called.
+    **Rejected:** revisiting at decision 45's 90-day mark, the architect's recommendation, and a
+    fixed watch period.
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
@@ -1370,8 +1379,8 @@ milestone that first acts on it, and the issue list is the queue — this sectio
 - The `Render` / `DocsRenderer` / `WidgetRenderer` split and the 60 KB uncompressed budget. Superseded
   by the scaffold's single `App` with gzipped SSTORE2 chunks. Measured 2026-10-10: the prototype
   comment-stripped is 74.0 KB, gzipped 20.7 KB; the widget 5.6 KB, gzipped 2.5 KB. Re-run before citing.
-- `App.lock()` at launch. Same ruling as `state-collection`: lock when there is a reason to claim the
-  document is immutable, not on deploy day.
+- `App.lock()`, at launch or after. No plan to lock any time soon, and no item tracks it (decision 74,
+  2026-11-26). `App` stays replaceable by the Ops vault on every chain.
 - A branch protection rule on `main`. Not available on this plan; revisit at M05's go/no-go.
 - ERC-1363 receiver. Optional surface before an audit; propose it as a task in M01 only if the
   review in M03 is already scoped to include it.
