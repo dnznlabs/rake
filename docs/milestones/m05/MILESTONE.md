@@ -1,6 +1,6 @@
 # M05 — Mainnet
 
-Status: in progress · scoped 2026-11-18 · re-scoped 2026-11-22 (decision 70)
+Status: done · closed on the merge of [`CLOSEOUT.md`](CLOSEOUT.md), run 2026-11-26 · scoped 2026-11-18 · re-scoped 2026-11-22 (decision 70)
 
 **Re-scoped 2026-11-22, decision 70: this milestone's mainnets are Base and Ethereum.** Wherever the
 text below says "the four chains", read those two, and where it says "all six", read those two and
@@ -409,7 +409,7 @@ which M05-D3 (decision 55) removed. Re-estimate when m05-t02 reports.
 
 ## Carried issues at close-out
 
-Filled at close-out. The queue today, 2026-11-18 — every open issue labelled `m05`, plus the M04
+**Filled at close-out, 2026-11-26: [`CLOSEOUT.md`](CLOSEOUT.md) § Carried issues is the record of where each open issue went.** The table below is the queue as it stood when the milestone was scoped. The queue then, 2026-11-18 — every open issue labelled `m05`, plus the M04
 issues whose body names this milestone:
 
 | Issue | Where it lands |
