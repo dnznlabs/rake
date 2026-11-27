@@ -44,7 +44,7 @@ audits/
       solidity-auditor/
         gpt-5.6-sol/                 leg 1 — full-report.md, run-1.md, scope.tsv
         opus/                        leg 2 — same shape
-    transcripts/
+    transcripts/                     kept in history only — see below
       leg-1-codex.log                everything leg 1 printed, tool calls included
       leg-2-claude.jsonl             leg 2's stream-json, tool calls included
   external/
@@ -56,7 +56,7 @@ audits/
           README.md                    the callout: where it came from, what it covered, how to check it
 ```
 
-The transcripts are the only evidence of what a leg read, so they are committed with the findings.
+The transcripts are the only evidence of what a leg read, so they are committed with the findings — and **from 2026-11-27 they live in the history rather than in the tree**: each rollup's § 1 Provenance names the commit to read its own transcripts at, with the `git show` command. They are never edited, because an edited transcript is no longer what the leg produced; a future audit commits its transcripts as before, and the same removal follows once its findings are filed.
 They land last, after the rollup, and never while a leg or the rollup could read them.
 
 One directory per audit date. **Audits are append-only: a past audit is never edited**, because the

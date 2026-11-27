@@ -16,6 +16,9 @@ skill             https://github.com/pashov/skills @ f6c7f0de9cce16f6aa9c57aaac1
 leg 1             codex codex-cli 0.158.0 · requested gpt-5.6-sol → observed gpt-5.6-sol · effort high · 1 pass · 593s wall
 leg 2             claude 2.1.310 (Claude Code) · requested opus → observed claude-opus-5-5 · 1 pass · 568s wall
 tokens            leg 1 112,063 · leg 2 1191782
+transcripts       kept in history only, out of the tree since 2026-11-27 — read them with
+                  `git show 8bfb807:audits/2026-11-06/transcripts/leg-1-codex.log` and the same for
+                  `leg-2-claude.jsonl`
 ```
 
 The code commit `d07483a` is the blind-review snapshot of `src/` and the deploy scripts at `94d028c`.

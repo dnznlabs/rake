@@ -1312,6 +1312,19 @@ convention. Numbered 45 because 44 is taken by
     **Rejected:** revisiting at decision 45's 90-day mark, the architect's recommendation, and a
     fixed watch period.
 
+75. **Review transcripts are kept in the history rather than in the tree.** Taken by **default**:
+    the plan for this pass carried the question with three options, a recommendation from the
+    architect and this option as the default if nothing was said, and it merged on 2026-11-26
+    unanswered. So this is the default standing, not a ruling anyone made. The four leg transcripts
+    carried the bulk of the machine-local detail in the tree, and the two ways to keep them
+    browsable were both worse: redacting them makes an edited transcript, which `audits/README.md`
+    says is no longer evidence of what a leg read, and leaving them means publishing that detail.
+    So each rollup's § 1 Provenance now names the commit its own transcripts can be read at, with
+    the command, and `audits/README.md` § Layout says the same. **Nothing is edited and nothing is
+    lost**: the files are whole in the history, and a future audit commits its transcripts as
+    before, with the same removal once its findings are filed. **Rejected:** redaction in place,
+    and leaving them in the tree.
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that
