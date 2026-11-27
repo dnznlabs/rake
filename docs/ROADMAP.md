@@ -941,7 +941,7 @@ convention. Numbered 45 because 44 is taken by
     Rejected: option (2), a landing under dnzn.dev linking each chain's gateway URL and serving no
     bundle (not a mirror in decision 12's sense).
 
-60. **Going public is its own milestone, M06, between mainnet and owner integrations; owner
+60. *Superseded in part by 76 on 2026-11-26; kept as ruled.* **Going public is its own milestone, M06, between mainnet and owner integrations; owner
     integrations moves from M06 to M07.** Ruled by Denizen on 2026-11-19 (Telegram, 09:18 CST),
     with the procedure agreed the same morning. The public repository is a new one whose history
     starts at the mainnet tag; the private one is archived under the `.buildarchive` suffix, never
@@ -1324,6 +1324,19 @@ convention. Numbered 45 because 44 is taken by
     lost**: the files are whole in the history, and a future audit commits its transcripts as
     before, with the same removal once its findings are filed. **Rejected:** redaction in place,
     and leaving them in the tree.
+
+76. **This repository goes public as itself, history and issues included, with its door shut.**
+    Ruled by Denizen on 2026-11-26 (Telegram, 18:41 to 23:07 CST), superseding decision 60's new
+    repository. The records here cite commits, and a one-commit history would leave those
+    citations pointing at nothing a reader can open; the findings found and fixed are the best
+    evidence the review method has. Before the flip, everything it publishes was reviewed and no
+    secret was found in any of it; he ruled that names of projects not yet public and
+    machine-local paths come out of the tree and stay in the history, that nothing under `app/`,
+    `src/` or `test/` changes for it, and that the author address on the first commit stands.
+    **Door shut:** issues, comments and pull requests are limited to collaborators until outside
+    contributions can be handled, and open when someone asks. **Rejected:** the new repository of
+    decision 60, which is kept as the route for a repository that holds something that cannot be
+    public; and rewriting history, which breaks every commit reference and signature.
 
 ## Findings carried forward
 
