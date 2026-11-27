@@ -43,7 +43,7 @@ Figures below were read on 2026-11-07; re-run rather than quote.
      but say so in the handoff if the base fee rises). The Creator key `0x68e0741D…` needs ≥ 0.005 on each for Denizen's step 6 (funded
      2026-11-07: 0.01 and 0.01); read it and record it, it is not yours to fund.
    - `ETHERSCAN_API_KEY` lives in the org's shared env file, `../shared/.envrc.local`
-     (`/mnt/bigdata/shared/.envrc.local`, mode 664, user `openclaw`), which this repo's `.envrc`
+     (group-readable on the build host), which this repo's `.envrc`
      already names (`source_env_if_exists ../shared/.envrc.local`) — for **direnv**, which only an
      interactive shell with the hook runs; a tool shell and `devbox run` see nothing from it,
      measured 2026-11-07. So at the top of each chain's shell: `set -a; . ../shared/.envrc.local;
