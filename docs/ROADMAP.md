@@ -1286,6 +1286,23 @@ convention. Numbered 45 because 44 is taken by
     without stating the difference. **Withdrawn with it:** the request pacing of
     [#392](https://github.com/dnznlabs/rake/pull/392), unless Base misses its 24 hours.
 
+73. **The embed of criterion 5 is the widget's test page, published by the Product Owner under
+    `research.dnzn.dev`; no DNZN product embeds the widget in M05.** Ruled by Denizen on 2026-11-26
+    (Telegram, 17:16–17:35 CST; [#438](https://github.com/dnznlabs/rake/issues/438)), completing
+    M05-D4, whose host half is decisions 59 and 66. The page is
+    `docs/milestones/m05/tasks/m05-t04b/host/index.html`, made from M04's host page: one mount, the snippet `#/docs` prints for
+    Ethereum, loading `https://rake.dnzn.dev/1/widget.js` with its `integrity` attribute and reading
+    through a public endpoint, so it needs no wallet. He published it at
+    `https://research.dnzn.dev/tmp/rake-widget-test.html`; read back the same day, it is
+    byte-identical to the committed file and renders DNZN's table from Ethereum
+    (`docs/milestones/m05/tasks/m05-t04b/embed-ethereum.png`). It is a test page under a `tmp/`
+    path and is not promised to stay up. **Rejected:** an embed inside a DNZN product, which is work
+    in a repository that is not the focus project and would hold M05's close-out on it; and
+    dropping the embed, which he considered and replaced with this. The page first carried a
+    second mount with no `data-rpc`, which reads through `window.ethereum` and told him his wallet
+    was on Base when the wallet he uses was not; that mount is removed, and the widget reading only
+    `window.ethereum` is [#289](https://github.com/dnznlabs/rake/issues/289).
+
 ## Findings carried forward
 
 Measurements made during a task that amend the spec but are not rulings. Each names the milestone that

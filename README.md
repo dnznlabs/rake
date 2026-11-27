@@ -14,7 +14,7 @@ A distribution is one address with a published table of beneficiaries. Anything 
 |:---|:---|:---|
 | `pre-mvp` | `0.1alpha` | two-model agent review and Slither, 2026-11-06; the review of record, no paid review planned ([SECURITY.md](SECURITY.md)) |
 
-This is pre-release software and the contracts are unaudited. **They are now on Ethereum and Base as well as Sepolia and Base Sepolia** — see [Contracts](#contracts) for addresses and per-chain status. **The dapp's own document is not uploaded to either mainnet yet**, so on Ethereum and Base the contracts are live and `App` serves nothing. Milestones and their status are in the [roadmap](docs/ROADMAP.md).
+This is pre-release software and the contracts are unaudited. **They are now on Ethereum and Base as well as Sepolia and Base Sepolia** — see [Contracts](#contracts) for addresses and per-chain status. **The dapp's document is uploaded on all four**, since 2026-11-26 on Ethereum and Base, and is served at [`rake.dnzn.dev`](https://rake.dnzn.dev/) — see [Opening the App](#opening-the-app). Milestones and their status are in the [roadmap](docs/ROADMAP.md).
 
 **Alpha software is alpha, act accordingly.** See [Disclaimer](#disclaimer).
 

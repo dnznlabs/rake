@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rake widget — test page</title>
+<style>
+  body { margin: 0; background: #f4f3ef; color: #181818;
+         font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, Helvetica, Arial, sans-serif; }
+  main { max-width: 44rem; margin: 0 auto; padding: 4rem 1.25rem; }
+  h1 { font-size: 1.35rem; letter-spacing: -0.01em; margin: 0 0 1rem; }
+  p { color: #4a4a4a; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>A test page for the rake widget</h1>
+
+<p>This page is not part of the app and is served from a different site. It carries the embed
+snippet the app's own documentation prints for Ethereum and nothing else. The mount names a public
+endpoint, so it reads the distribution without a wallet, whatever wallet the visitor has and whatever
+chain that wallet is on.</p>
+
+<p>The script is loaded from <code>rake.dnzn.dev</code> with an <code>integrity</code> attribute, so
+the browser refuses to run it if the bytes served differ from the bytes the app's build produced.</p>
+
+<script src="https://rake.dnzn.dev/1/widget.js"
+  integrity="sha384-8BWWI1ktl/NJwMpr0nOSjqG+S1bbjHSFVlPmZfULysk/4BMbvnd34o+TUyQP+t9I"
+  crossorigin="anonymous"></script>
+<div
+  data-rake="0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199"
+  data-chain="1"
+  data-link
+  data-rpc="https://ethereum-rpc.publicnode.com"
+></div>
+
+</main>
+</body>
+</html>
