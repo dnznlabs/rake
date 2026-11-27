@@ -177,4 +177,4 @@ the top; the one choice the plan made itself — `calldata/<CHAIN_ID>/` at the r
 - `RUNBOOK.md` § Step 4 (4a–4d, § The five calls, § Gas) as it stands at `c0ea940`.
 - ROADMAP decisions 44 (Step 4 is a vault action), 47 (three proposals), 48, 49, 51.
 - [#203](https://github.com/dnznlabs/rake/pull/203): the UI batch this upload ships.
-- handbook `docs/contract-verification.md`: not exercised here (no new contract), cited by Run A.
+- the organisation's verification notes: not exercised here (no new contract), cited by Run A.

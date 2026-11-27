@@ -288,7 +288,7 @@ there being no URL to link until M05.
 - Carried into this task: none. Carried past it, read before starting: [#50](https://github.com/dnznlabs/rake/issues/50),
   [#42](https://github.com/dnznlabs/rake/issues/42), [#41](https://github.com/dnznlabs/rake/issues/41),
   [#35](https://github.com/dnznlabs/rake/issues/35) (M02); [#61](https://github.com/dnznlabs/rake/issues/61)
-  and the M03 set; [design-base#3](https://github.com/dnznlabs/design-base/issues/3) (the base styles
+  and the M03 set; the shared design system's own issue (the base styles
   the bare `nav` — moot for the host page, which does not load the base). If any names `widget.js`,
   `App.sol` or `Chunks.s.sol`, it is a defect in this plan, fixed here before work begins.
 - Precedent: t04 handoff § Size and § Deviations (the hash order; the inflated output); M02 Phase 5

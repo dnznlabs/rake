@@ -183,7 +183,7 @@
   a selector (`OWNMODE`). Each carries `hold: true`, which `holdToFire` turns into a 3-second press of
   pointer or Enter/Space (a click does nothing), behind three chained checkboxes (`ACKS`), and the
   button is `--err` red — red for an irreversible action, beyond the base's "red means error". Both are
-  patterns to propose to `design-base`. The owner's own address in the change-owner field is the
+  patterns to propose to the shared design system. The owner's own address in the change-owner field is the
   withdraw arm of the same call, admitted only while `pendingOwner()` is non-zero. The fourth
   ownership write is the nominee's, not the owner's: `acceptOwnership()` is its own bar on the detail
   page, in the two `VIEW` values (`pending`, `pending-vault`) the nominee and its signers get.
@@ -240,7 +240,7 @@
   endpoint and renders nothing. `Chunks.s.sol` never reads it and nothing uploads it.
 - The browser check every `app/` task ends with runs here, driven by `playwright-core` from a directory
   outside the repo (there is no playwright in this project's `node_modules`;
-  `/home/openclaw/src/deadletter/node_modules/playwright-core` is one that is, at 1.63.0). **Measured
+  a sibling project's `node_modules/playwright-core` is one that is, at 1.63.0). **Measured
   2026-11-07, both launchers on this host, and the result is the opposite of what this paragraph said
   until now:** the cached Playwright chromium
   (`~/.cache/ms-playwright/chromium-1243/chrome-linux-arm64/chrome`, the `arm64` build, marked
@@ -311,21 +311,21 @@
   reported rather than crashed.
 - `lock()` is one-way.
 
-<!-- fragment: design-base -->
+<!-- fragment: design-system -->
 ## Design: DNZN Base v1
 
 - `app/src/theme.css` and `app/src/layout.html` are DNZN Base v1. The system and its rules are in the
-  `design-base` repo: `v1/README.md` and `v1/GUIDELINES.md`. Read both before changing either file.
+  the shared design system's repository: `v1/README.md` and `v1/GUIDELINES.md`. Read both before changing either file.
 - A project supplies four slots and inherits everything else unchanged: the mark and wordmark (the
   `<svg>` and name in the nav lockup, and `<title>`), the accent hue (the `250` in both `--accent`
   declarations), the signature data element (`.sig`), and the footer fact (the right-hand footer span).
 - Rake moves the footer fact to the left-hand span, replacing the base's left-hand text, and puts
   icon links to the repo and dnzn.dev on the right. That departs from the base's footer and is a
-  change to propose to `design-base`.
+  change to propose to the shared design system.
 - The accent appears on the signature element, the focus ring and link hover, and nowhere else.
   Amber means pending, red means error; neither is restyled.
 - No webfonts, CDN scripts, icon fonts or remote images. No cards, shadows, gradients or emoji.
-- A pattern the base is missing is designed to its rules here and proposed to `design-base` for the
+- A pattern the base is missing is designed to its rules here and proposed to the shared design system for the
   next version.
 
 <!-- fragment: forge-audit -->

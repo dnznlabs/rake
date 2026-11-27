@@ -4,7 +4,7 @@ Status: **done 2026-11-19** — closed on [CLOSEOUT.md](CLOSEOUT.md)'s merge
 ([#296](https://github.com/dnznlabs/rake/pull/296), `eec7164`) by decision 64, with criteria 1, 3
 and 5's unmet clauses transferred to [m05-t01](../m05/tasks/m05-t01/TASK.md) Part B as its criteria
 18c–18f, beside criterion 6's wallet run (decision 63, its criterion 18b); criterion 8's comment on
-state-collection#74 stays drafted in `CLOSEOUT.md` § For state-collection#74, awaiting the Product
+The sibling project's payee issue stays drafted in `CLOSEOUT.md` § For the sibling project's payee issue, awaiting the Product
 Owner's word · scoped 2026-11-07 · updated 2026-11-18 (t04 scoped; t11 from #215 and t12 added; t08 2026-11-08, t09 2026-11-12, t10 2026-11-17; t10 done, t11 approved, t12 issue opened, #209 closed, all 2026-11-17; t12 held out of Run B, 2026-11-18; t13 scoped from t04's front-end rollup, 2026-11-17; t05 and t14 scoped 2026-11-18; t13 done, t05 steps 0–2 done, t14 done, 2026-11-18; t15 scoped 2026-11-19; t16 scoped 2026-11-19; t12 closed before mainnet, decision 62, 2026-11-19; t05 step 3 superseded, the wallet run moves to m05-t01, decision 63, 2026-11-19; close-out criteria 1–8 re-run at `2f93d26`, [CLOSEOUT.md](CLOSEOUT.md), carried issues relabelled, 2026-11-19)
 
 `RUNBOOK.md` executed for real, twice — Sepolia (11155111) and Base Sepolia (84532) — so that the
@@ -113,7 +113,7 @@ than quote. "Both chains" means Sepolia and Base Sepolia, every time.
 6. **Denizen has used it from a wallet and signed off, in writing.** From a browser wallet on each
    chain, in a session driven by the UAT script (m04-t05): the dapp loaded through the gateway URL
    of criterion 3 — not `localhost`, not `?rpc=` — connects the wallet (the delivered document has a
-   real origin: `window.top === window` and `window.ethereum` present, the probe state-collection
+   real origin: `window.top === window` and `window.ethereum` present, the probe the sibling project
    named and never ran); he creates a distribution with his EOA as owner, pays ETH in, calls
    `distribute`, queues a table change, applies it after the delay, cancels one, and exercises
    `release` or `claim` on an escrowed row; and reads DNZN's distribution, whose owner is the vault,
@@ -134,7 +134,7 @@ than quote. "Both chains" means Sepolia and Base Sepolia, every time.
 8. **Carried out and clean.** `gh issue list -R dnznlabs/rake --label carried --label m04
    --state open` prints nothing; `git status --porcelain` is empty after `forge build --force`,
    `forge test`, `forge snapshot`, `make deploy` and `make chain-doc` on a fresh anvil; CI is green
-   on the merge commit; [state-collection#74](https://github.com/dnznlabs/state-collection/issues/74)
+   on the merge commit; the sibling project's payee issue
    carries a comment naming the chains where `cast code` at `0x6aC98EDA…` is non-empty.
 
 ## Out of scope
@@ -176,7 +176,7 @@ than quote. "Both chains" means Sepolia and Base Sepolia, every time.
   own timelock; costs nothing and reads as DNZN's on an explorer; (2) the anvil rehearsal's
   placeholders (`rehearsal placeholder`, two anvil accounts) — costs a nonsense table under DNZN's
   name on two public chains; (3) skip step 6 on testnets — rejected, criterion 1 and the
-  state-collection gate both need code at the address. *Recommendation:* (1). *Default and
+  the sibling project gate both need code at the address. *Recommendation:* (1). *Default and
   deadline:* (1) with the roster EOAs and 3600, if no answer by m04-t03's scoping; blocks step 6 of
   m04-t03. *Record:* `ROADMAP.md` § Decisions; the values go into `RUNBOOK.md` § Executed on
   testnets, not § 0 (M05's are different).
@@ -268,7 +268,7 @@ Denizen's session, scripted so the evidence is a list of hashes and not a feelin
 ### Phase 5 — Close-out
 
 The architect re-runs criteria 1–8, records them in `CLOSEOUT.md` beside this file, fills
-§ Carried issues at close-out, comments on state-collection#74 with the chains that now carry
+§ Carried issues at close-out, comments on the sibling project's payee issue with the chains that now carry
 code at DNZN's address, and hands M05 the list of what the runbook changed. No task.
 
 **Estimate, labelled as one:** seven tasks and possibly an eighth; three to four weeks of calendar
@@ -284,7 +284,7 @@ relabelled with its reason the same evening, one comment per issue, and the quer
 closed. The dispositions are in the rows below (bold, dated) and in `CLOSEOUT.md` § Carried issues.
 The milestone does not close on that run: criteria 1 (the DNZN address, and the artifact comparison
 against `main`'s `0.8.38` bytes), 3 (Sepolia's hosted gateway, #242), 5 (no published URL) and 8
-(the state-collection#74 comment) each have a clause not met, named plainly there.
+(the the sibling project's payee issue comment) each have a clause not met, named plainly there.
 
 The queue on 2026-11-07, every item labelled `m04`:
 
@@ -307,7 +307,7 @@ The queue on 2026-11-07, every item labelled `m04`:
 
 ## One-way doors
 
-Testnet transactions are public and permanent, and unlike state-collection's M3 these contracts are
+Testnet transactions are public and permanent, and unlike the sibling project's M3 these contracts are
 **not throwaway**: they are the same-address deploy at the addresses M05 will use.
 
 1. **`App` at `0x00A90943…` on two public chains.** After this, a `src/App.sol` byte means a new
@@ -329,7 +329,7 @@ Things that would cost a redeploy or a re-upload to learn late. Each says what s
    service's chain list is a config file we cannot read. The *software* is settled by t02 on anvil
    (same code, our config); the *hosted service* by t04's first `curl` — before that, t03 records
    the gateway URL as "to be measured" and nothing in Phase 2 depends on it.
-2. **A gateway-delivered document may not reach a wallet.** state-collection filed this risk on
+2. **A gateway-delivered document may not reach a wallet.** The sibling project filed this risk on
    2026-09-26 and never ran M3 to measure it: an HTTPS gateway could wrap the document (sandboxed
    frame, `data:` URI) into an opaque origin where no extension injects `window.ethereum`. Criterion
    3 would pass and criterion 6 could not. Settled twice: by t02's probe against the gateway

@@ -8,7 +8,7 @@ refuses a used salt without sending; the owner's drawer queues each of the four 
 pending entries can be cancelled by the owner and applied by anyone once the delay has passed;
 `distribute` and `release` sit under the balance for everyone; a `release` the token refuses renders as
 "retry failed"; a vault signer gets the owner view with copy-calldata instead of a send. Name display is
-ported from state-collection but not exercised: anvil has no registries (decision 13, M04).
+ported from the sibling project but not exercised: anvil has no registries (decision 13, M04).
 
 ## Plan
 
@@ -48,7 +48,7 @@ and record the difference in the handoff. Criterion 4 fails entirely on that bas
 2. **One transaction path, preflighted.** In `index.html`, replace the bare `send` call pattern with
    `tx(to, sig, args, {value, label})`: first `eth_call` with the same `from`/`to`/`data`/`value`;
    on error decode it; only then `send` and `waitReceipt(hash, POLL_MS)`; `status !== '0x1'` paints
-   `reverted` with the explorer link, exactly state-collection's `index.html:488–514` shape. The
+   `reverted` with the explorer link, exactly the sibling project's `index.html:488–514` shape. The
    error object differs by provider: the dev `rpcProvider` throws the JSON-RPC `error` object, so the
    revert bytes are at `error.data` (measured on anvil 2026-10-11: `eth_call` and `eth_estimateGas`
    both return `{"code":3,"message":"execution reverted: custom error 0x30cd7471","data":"0x30cd7471"}`
@@ -135,7 +135,7 @@ and record the difference in the handoff. Criterion 4 fails entirely on that bas
    the bare `false` word → "retry failed", no transaction sent; (b) `cast send <receiver>
    "setAccepting(bool)" true --unlocked --from $SENDER --rpc-url $RPC`, then `release(ETH, receiver)`
    → `status 0x1`, the escrow row disappears and `escrowed(ETH, receiver)` reads 0.
-8. **Name display, ported, unexercised.** Port state-collection `app/src/index.html:224–279` verbatim
+8. **Name display, ported, unexercised.** Port the sibling project `app/src/index.html:224–279` verbatim
    (`NAMES` with ENS, WNS, GNS registries, `namehash`, `ensName`, `regName`, `resolveName`), gated to
    chain 1 and 11155111 as there, priority ENS → WNS → GNS winner alone (decision 13). Reverse display
    wherever an address renders through t02's `ext()`; forward lookup for the load field and the two
@@ -204,7 +204,7 @@ Use a fresh anvil for the recorded run; a second `make deploy` on a live chain m
   137, `propose` 150, `applyQueued` 170 (hash is `keccak256(abi.encode(action, nonce))`), `cancel`
   184; errors and events 32–45. Mocks: `test/mocks/Mocks.sol` (`RevertingReceiver` 8, `MockERC20`
   58 with `Ret.False`).
-- Precedent: state-collection `app/src/index.html` 488–514 (send → receipt → `reverted`), 224–279
+- Precedent: the sibling project `app/src/index.html` 488–514 (send → receipt → `reverted`), 224–279
   (names). t02: `model.js` (`salt`, `decodePending`, `countdown`, `SNAPSHOT_T`), `loadDistro`, the
   `Queued` loader in step 7, `#/create` stub.
 - Measured 2026-10-11 on a fresh anvil: `evm_increaseTime` accepts the plain decimal; `eth_call` and

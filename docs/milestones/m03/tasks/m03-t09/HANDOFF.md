@@ -84,13 +84,13 @@ featured `0x6FaB073Da30B801d71201BDa6218dBAdF4566b80`, escrow demo
 `0xDB951541377C02Fb4663503Ce018444B55AeCfB5`, blocklist token
 `0x68B1D87F95878fE05B998F19b66F4baba5De1aed`.
 
-The browser check ran with `playwright-core` 1.63.0 from `/home/openclaw/src/deadletter/node_modules`,
+The browser check ran with `playwright-core` 1.63.0 from a sibling project's `node_modules`,
 driven from `/tmp/t09walk` — outside the repo, as `AGENTS.md` § The dapp requires.
 
 ### Which chromium launched — #110's evidence
 
 **The cached Playwright chromium launched**, first try, on every one of the nine page loads:
-`/home/openclaw/.cache/ms-playwright/chromium-1243/chrome-linux-arm64/chrome`. The nix chromium was
+the host's own playwright cache, chromium 1243 (arm64). The nix chromium was
 never reached, because there is none on this machine: `ls -d /nix/store/*-chromium-1*/bin` prints
 nothing. `AGENTS.md` § The dapp has the two the wrong way round — it says the cached one "fails on
 `libnspr4.so` and two dozen other missing host libraries" and that the nix one "launches as

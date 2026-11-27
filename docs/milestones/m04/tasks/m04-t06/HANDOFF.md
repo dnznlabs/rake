@@ -113,7 +113,7 @@ changes documentation only, so the two runs measure the same tree for every step
    live inside it (#22, #35, #41, the t03 `forge lint` bullet), so a local addition follows the
    established convention. **Two of the three are generic enough to be an upstream item for
    `shared`'s `forge-anvil` fragment** — the triage-database rule and the `out/` rebuild — on the
-   precedent SECURITY.md records for the large-file guard. Not done here: `~/src/shared` is not this
+   precedent SECURITY.md records for the large-file guard. Not done here: the shared tooling checkout is not this
    task's to edit.
 2. **`slither` is a single-colon target and not a recipe on `test::`.** Chaining it into `test`
    would make every `make test` pay Slither's rebuild of `out/`, and then the next `forge snapshot`

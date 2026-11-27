@@ -2,7 +2,7 @@
 # Decision 29 (`docs/ROADMAP.md`) rules this list — D10 on #87 ("Option 1"), as amended by #91.
 # `App` is what strangers load and its `lock()` is one-way; the deploy scripts set constructor
 # arguments and hand over ownership, Phase 4's runbook runs them, and the method's first finding on
-# `state-collection` was in a deploy script.
+# a sibling project was in a deploy script.
 #
 # Named file by file, never the skill's own discovery: its exclude pattern carries
 # `-not -path '*/lib/*'`, which swallows `src/lib/` too (`README.md` § Scope).

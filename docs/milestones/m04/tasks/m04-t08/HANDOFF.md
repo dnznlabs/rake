@@ -333,7 +333,7 @@ Read back from the coordination service: `status proposed`, `value 0`, `threshol
 `proposed_by 0x5a158af8…bc50d`, and calldata of 48,138 / 42,890 / 18,314 characters whose sha256s are
 `8cee870c…5691a`, `1747296…8fea3` and `7946270a…1438f` — the committed files.
 
-**`POST /proposals` needs `p_threshold`**, which neither the handbook's agent recipe nor § Step 4
+**`POST /proposals` needs `p_threshold`**, which neither the organisation's agent recipe nor § Step 4
 mentions: without it the service answers `400 Invalid proposal threshold`. It must be at least the
 vault's on-chain `threshold()` and at most `ownerCount()`; `2` was sent. Nothing is stored on a 400,
 so the retry is the same POST with the field added.

@@ -252,8 +252,8 @@ and `docs()` repaints identically in either case.
   clothes** — `theme.css:18` sets `display:flex`, `justify-content:space-between`, `padding:16px 0` and
   a bottom rule on every `nav`. The docs rail rendered as a wrapped flex row with a border until three
   properties were undone on `.rail`. The base's own fix is to scope that rule (`.frame>nav`, or a
-  class on the header), which is a `design-base` v2 proposal under `AGENTS.md` § Design, not an edit
-  here. Carried as dnznlabs/design-base#3.
+  class on the header), which is a v2 proposal for the shared design system under `AGENTS.md` § Design, not an edit
+  here. Carried as an issue on the shared design system.
 - **`_push`'s comment and its code disagree about what a token must return.**
   `src/Distribution.sol:275` says a token "must answer with a non-zero word"; line 282 requires
   `abi.decode(data, (uint256)) == 1`. A token returning `2` is treated as failure and escrowed. The

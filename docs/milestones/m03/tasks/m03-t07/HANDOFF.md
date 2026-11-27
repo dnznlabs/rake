@@ -269,7 +269,7 @@ bytecode**, and this one is per-revision.
 ## Deviations from the plan
 
 1. **The dated directory is `audits/2026-11-06`, not `2026-11-02`.** The blinded tree is
-   `~/src/rake-blind-2026-11-02`, cut and staged on 11-02; the run happened on 11-06 because it
+   the blinded tree cut and staged on 11-02; the run happened on 11-06 because it
    waited for a terminal. The launcher dates the output by run date —
    `AUDIT_DATE="${AUDIT_DATE:-$(date +%Y-%m-%d)}"` — so the directory, `AUDIT.md`'s `audit date` and
    `README.md`'s cell all read 2026-11-06 while the tree's name and its commit date read 11-02.
@@ -372,7 +372,7 @@ architect's and are recorded in `TASK.md` § Open questions; both are implemente
   contracts; both are findings about the audit method, and they belong to M04's go/no-go rather than
   to this task.
 - **`devbox run --` ignores the working directory**, so a baseline measured in a `/tmp` worktree is
-  silently measured in `~/src/rake-m03-t07` instead — the branch, compared against itself, reporting
+  silently measured in another worktree of this repository instead — the branch, compared against itself, reporting
   "byte-identical" for free. Every baseline figure here (`App` 7,118, main's 38 ABI names,
   `Distribution`'s ABI) was taken with the pinned binary at its absolute path,
   `/nix/store/aw77rd6y914cdvfgzlklbynzzgcdgz1x-foundry-1.7.1/bin/forge`, with the worktree as cwd.

@@ -276,7 +276,7 @@ chains later.
 ## Out of scope
 
 - **WalletConnect**, its client, a QR code, and the shared library: after launch, scoped under
-  [design-base#4](https://github.com/dnznlabs/design-base/issues/4).
+  the shared design system's own issue for it.
 - **The widget.** `widget.js` keeps reading `window.ethereum`; whether an embedded widget offers a
   picker is a design question there.
 - **A desktop visitor with no extension.** Today's sentence stands.

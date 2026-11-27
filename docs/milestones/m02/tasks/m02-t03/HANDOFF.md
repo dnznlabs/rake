@@ -22,7 +22,7 @@ the owner is (decision 11). The token list and the escrow rows are the chain's o
 token that has appeared in a `Distributed` or `Escrowed` log, read back from `escrowed(token,account)`
 so a released row drops out — which is the answer to t02's deferred question about where a token list
 comes from. `make fixtures` adds the two distributions the escrow and vault paths need and the seed
-does not carry. The names block is ported from state-collection, gated to mainnet and Sepolia, and
+does not carry. The names block is ported from the sibling project, gated to mainnet and Sepolia, and
 makes no request on anvil, as decision 13 and M04 intend.
 
 Two things in the plan turned out to be wrong against the chain, and both are in § Deviations: a
@@ -291,7 +291,7 @@ the architect most needs before t04 is scoped.
   satisfied unless this says plainly that it was not, and could not be. Noted for the TASK.md
   correction at close-out.
 - **`namehash` lives in `model.js`, not beside the rest of the ported names block.** The plan says
-  port state-collection `224–279` verbatim, and also unit-test `namehash` against EIP-137's vectors;
+  port the sibling project `224–279` verbatim, and also unit-test `namehash` against EIP-137's vectors;
   `test/model.test.mjs` tests `model.js`. `namehash` is pure, so it moved; `ensName`, `regName`,
   `resolveName` and `NAMES` need the provider and are in `index.html` as the plan says, comments
   included. Both vectors were re-derived with `cast` rather than quoted from memory —
@@ -386,7 +386,7 @@ _Ruled 2026-10-12: option 1, as shipped — [#55](https://github.com/dnznlabs/ra
 The OpenClaw browser tool cannot reach this box's own dev server — no Chromium on it, and loopback is
 blocked — so every page claim above was taken with Playwright driven from `/tmp/rake-t03-pw`, outside
 the repo, against the chromium already on disk at `~/.cache/ms-playwright/chromium-1243`: the route
-t02 and state-collection's t07 used. Nothing it wrote is in the tree: `git status --porcelain` printed
+t02 and the sibling project's t07 used. Nothing it wrote is in the tree: `git status --porcelain` printed
 nothing after `make fixtures`, after `make chunks` at the end of the recorded run, and before each of
 the four commits on this branch.
 

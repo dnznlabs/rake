@@ -131,7 +131,7 @@ outside the repo.
    done
    ```
 
-   Rehearse it **before** it is written in, per the handbook's `docs/contract-verification.md`
+   Rehearse it **before** it is written in, per the organisation's verification notes
    § Sourcify: run the loop against one address that is not verified on Sourcify (the predicted
    `FACTORY` of step 1, which has no code yet, answers `null`) and quote the non-zero exit; then
    against the three M04 Sepolia addresses (`exact_match` ×3, exit 0). State in the step that the
@@ -316,7 +316,7 @@ outside the repo.
     Record the chain ids beside the step-4 table of § 1. Whether the Product Owner's signing app
     lists each of the four mainnets is his reading, asked in the handoff's § For Denizen (below)
     and recorded there when answered; a chain without a row or without the app is a runbook change
-    first — the on-chain `approve(digest, true)` route the handbook names
+    first — the on-chain `approve(digest, true)` route the organisation's procedure names
     (`docs/multisig-transactions.md:181`), which is unverified in source and is not improvised on
     deploy day (`MILESTONE.md:391-395`).
 
@@ -537,7 +537,7 @@ Sepolia; **every `record:` line is committed before the next transaction** (`:22
     testnet with the new explorer and Sourcify links and one row per testnet marked
     **superseded, pre-#201 bytes** keeping the old links, as `RUNBOOK.md:44` requires; `:17`'s "No
     mainnet deployment exists" stays — that is m05-t02's line. The architect's comment on
-    [state-collection#74](https://github.com/dnznlabs/state-collection/issues/74) with the new
+    the sibling project's payee issue with the new
     predicted address, the chains where `cast codesize` is 45 today, and the sentence that its body's
     `0x6aC98EDA…` is superseded. Every deviation Part B met is a `RUNBOOK.md` change in this PR or
     a one-line reason it is not (M05 criterion 6).
@@ -647,11 +647,11 @@ an address. Baselines are `main` at `78b5eb7`, 2026-11-19.
     `DISTRO` one address on both chains.
 17. **The public record.** `grep -ci superseded README.md` ≥ 2 (baseline 0); § Contracts carries the
     new three addresses; `grep -ci 'No mainnet deployment' README.md` → 1 (unchanged);
-    state-collection#74 carries the new prediction, posted by the architect. The engineer's part is
+    the sibling project's payee issue carries the new prediction, posted by the architect. The engineer's part is
     the landed `$DISTRO` in this handoff; the comment is the architect's, per #74's own "Done when"
     ("rake's architect updates this issue when the first public deploy lands"). The landed
     **mainnet** address is a second update at m05-t02, not this task's: #74's owner line is
-    "Denizen, at M4's gate", and that milestone is titled `# M4 — Mainnet` (`state-collection`
+    "Denizen, at M4's gate", and that milestone is titled `# M4 — Mainnet` (the sibling project
     `docs/milestones/m4/MILESTONE.md:1` at `eec081a`). **This clause is met by the handoff carrying
     the address, never by another repository accepting a comment** (amended 2026-11-20 on the
     Product Owner's word).
@@ -796,6 +796,6 @@ an address. Baselines are `main` at `78b5eb7`, 2026-11-19.
   ([#266](https://github.com/dnznlabs/rake/pull/266) scopes it): the post-UAT bundle rides step 14,
   and its handoff § For the next upload carries the hashes step 14 and criterion 18 check against.
 - drop `d50dbc9` (`mk/10-forge.mk`, `AGENTS.md`, `README.md`): the `setup`/`libs` shape #197 names.
-- handbook `docs/contract-verification.md` § Sourcify; `docs/multisig-transactions.md` § The DNZN
+- the organisation's verification notes § Sourcify; `docs/multisig-transactions.md` § The DNZN
   Creator key, § Setting the key up for `cast`.
-- [state-collection#74](https://github.com/dnznlabs/state-collection/issues/74).
+- the sibling project's payee issue.

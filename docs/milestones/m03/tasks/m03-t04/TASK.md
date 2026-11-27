@@ -87,8 +87,8 @@ ChatGPT`, meeting the method's minimums of 2.1.268 and 0.158.0). Branch `m03/t04
 4. **The blinded tree.** The method's 2026-09-30 lesson (`audits/README.md` § Re-running one leg
    after a fix): a leg started inside this checkout reads this checkout — ten markdown files that
    name every carried weakness, this plan included — and then reports what it read. So the legs
-   run in a directory that holds nothing but the code. Under `~/src/` (never `/tmp`, which is
-   shared), e.g. `~/src/rake-blind-<date>/`:
+   run in a directory that holds nothing but the code. Beside this checkout (never `/tmp`, which is
+   shared), e.g. a `rake-blind-<date>/` directory beside it:
    - `foundry.toml` copied as is (its `fs_permissions` name directories that do not exist there;
      forge does not mind); `src/Distribution.sol`, `src/App.sol`;
      `scripts/forge/Deploy.s.sol`, `scripts/forge/DeployApp.s.sol` (their imports are
@@ -124,7 +124,7 @@ ChatGPT`, meeting the method's minimums of 2.1.268 and 0.158.0). Branch `m03/t04
    other). Then `cd <blind> && KNOWN_ANSWER_FILE=<this checkout>/audits/KNOWN_ANSWER.md make audit`
    with the defaults (`CLAUDE_MODEL=opus`, `CODEX_MODEL=gpt-5.6-sol`); it runs the Codex leg, the
    Claude leg, then the rollup, each at `--loop 1`, and refuses to start if `audits/<date>/`
-   already exists there. `state-collection`'s legs took 696 s and 1,084 s on 2026-09-28 (its
+   already exists there. The sibling project's legs took 696 s and 1,084 s on 2026-09-28 (its
    `AUDIT.md` § Provenance); expect an hour, labelled an estimate, and `LEG_TIMEOUT` is 5,400 s
    per leg. The runner re-points `~/.claude/skills/solidity-auditor` and
    `~/.codex/skills/solidity-auditor` at the pinned clone with `ln -sfn` on every run
@@ -154,7 +154,7 @@ ChatGPT`, meeting the method's minimums of 2.1.268 and 0.158.0). Branch `m03/t04
    or `audits/.skills/`; `grep -c 'ede55c3' audits/<date>/BLIND.md` ≥ 1.
 
 7. **`SECURITY.md`, in multisig.software's shape.** Sections in this order, after that file's
-   (`~/src/multisig/SECURITY.md` on this VM; its § Prior Audits and § Findings — Disposition are the
+   (the `SECURITY.md` of the multisig we sign with; its § Prior Audits and § Findings — Disposition are the
    template, the rest is that project's history):
    - **Prior reviews.** One entry: date, method (`two-model agent review`, the method's own name:
      `audits/README.md` § What an audit here is, and not — quote it, because milestone criterion 4
@@ -320,9 +320,9 @@ criterion compares against the fragment's copy, not `origin/main`, for the reaso
   `templates/forge-audit/files/audits/README.md`), § Scope, § Running it, § Provenance,
   § Re-running one leg after a fix (the blinded tree), § Known limits; `scripts/audit.sh` for what
   the runner records and where the known answer is appended.
-- The worked example: `state-collection`'s `audits/2026-09-28/AUDIT.md` (shape, provenance, leg
+- The worked example: the sibling project's `audits/2026-09-28/AUDIT.md` (shape, provenance, leg
   timings) and `audits/2026-09-30/` (the re-check and the contamination it records).
-- The shape of `SECURITY.md`: multisig.software's, `~/src/multisig/SECURITY.md` on this VM.
+- The shape of `SECURITY.md`: multisig.software's own `SECURITY.md`.
 - [m03-t02 `HANDOFF.md`](../m03-t02/HANDOFF.md) § Bytecode sizes (what the review reads is 8,469
   deployed bytes of `Distribution`, 1,320 of the factory, 7,118 of `App` on `ede55c3`);
   [m03-t01 `HANDOFF.md`](../m03-t01/HANDOFF.md) for #18's and the cap's figures.

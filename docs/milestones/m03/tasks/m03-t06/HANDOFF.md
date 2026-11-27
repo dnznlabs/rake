@@ -3,7 +3,7 @@
 PR: #131 · Branch: `m03/t06-runbook` · 2026-11-01
 
 `RUNBOOK.md` is at the repo root: one ordered list parameterised by network, modelled on
-`state-collection`'s, that places `DistributionFactory`, its implementation and `App` at the same
+The sibling project's, that places `DistributionFactory`, its implementation and `App` at the same
 addresses on every chain of criterion 7 and creates DNZN's distribution at an address predicted
 before any transaction is sent. Both deploy scripts now take a salt, so Foundry routes the salted
 `new` through Arachnid's keyless proxy (decision 33) and the addresses follow the deployer, the salt
@@ -173,7 +173,7 @@ a t05 single-leg re-check that t05's close-out made moot. The third review is m0
    rejected and the error does not say which rule broke. Cost me one failed `create` in the
    rehearsal; now written into step 6.
 5. **A worktree needs no `core.hooksPath` override.** Plain `git commit` in
-   `/home/openclaw/src/rake-m03-t06` ran `pre-commit` and `post-commit` normally — git resolves hooks
+   a second worktree of this repository ran `pre-commit` and `post-commit` normally — git resolves hooks
    from the common git dir. The hazard is only an explicitly-set *relative* path, which resolves
    against the worktree's `.git` **file**.
 6. **`procs/`, `Seed.s.sol` and `Fixtures.s.sol` needed no change**, as the plan expected. `Seed.s.sol`

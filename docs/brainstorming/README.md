@@ -24,7 +24,7 @@ Dropped from the source folder as byte-identical duplicates: `design/handoff/*` 
 
 ## Lineage
 
-This work was generalised into DNZN Base (`../design-base`, `v1/`) and the `dapp` / `onchain-dapp`
+This work was generalised into DNZN Base (the shared design system, `v1/`) and the `dapp` / `onchain-dapp`
 fragments in `../shared/templates`. Those are now the starting points; this folder is the record of
 the Rake-specific choices that fill DNZN Base's four slots: mark (R with split stem), accent (baize,
 oklch hue 230), signature element (the rake bar), footer fact.

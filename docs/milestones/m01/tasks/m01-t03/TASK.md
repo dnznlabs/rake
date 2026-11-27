@@ -89,7 +89,7 @@ runs. The path that bit the scaffold — forge installing the submodules itself 
 `foundry.lock` — is only reachable from a clone that has none. Measured today on `main`:
 
 ```bash
-git clone ~/src-lakos/rake /tmp/rake-clean && cd /tmp/rake-clean     # your own clone path
+git clone <your own clone of this repository> /tmp/rake-clean && cd /tmp/rake-clean     # your own clone path
 ls lib/forge-std | wc -l                                              # 0 — submodules not initialised
 devbox run -- forge build --force                                     # "Missing dependencies found. Installing now..." then Compiler run successful!
 git status --porcelain                                                # empty

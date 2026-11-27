@@ -32,7 +32,7 @@ export SIGNER="--account elanik --password-file $HOME/.config/elanik-wallet/keys
 
 `forge script` takes `--account`, `--password-file` and `--sender` (checked against `forge script
 --help` on 2026-11-07); `cast send` takes `--account`, `--password-file` and `--from`. The
-keystore and password file are the handbook's (`docs/agent-backup-and-restore.md` step 6). Never
+keystore and password file are the organisation's (its backup procedure, step 6). Never
 `--unlocked` on a public chain; never the Creator key for anything but step 6, which is not yours.
 Figures below were read on 2026-11-07; re-run rather than quote.
 
@@ -203,5 +203,5 @@ None. Funding and the Etherscan key are inputs, not rulings; step 0 refuses to s
 - m03-t06 `HANDOFF.md` (the two-anvil rehearsal) and m03-t10 `HANDOFF.md` (the landing with the
   mined salts, the immutable-span comparison, the CREATE2-through-proxy receipt shape).
 - M04 `MILESTONE.md` criteria 1, 2, 3, 7 and risks 4, 5; [#127](https://github.com/dnznlabs/rake/issues/127).
-- The handbook: `docs/multisig-transactions.md` § The DNZN Creator key; `docs/agent-backup-and-restore.md`
+- The organisation's procedures: its rule for the DNZN Creator key; its backup procedure
   step 6 (Elanik's keystore and password file).

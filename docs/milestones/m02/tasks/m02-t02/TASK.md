@@ -31,7 +31,7 @@ entirely, which is what makes them this task's.
    discovery, `switchChain`, `disconnect`, the three menus); replace the look and the views. In
    `layout.html`: the mark is the prototype's R with the split stem (`rake-dapp.html`, the nav lockup
    `<svg>`, and `Rake Brand Sheet.dc.html` for the lockup rules), wordmark `RAKE`, sub-label
-   `DNZN LABS`; nav `distros · docs`; footer exactly as state-collection's
+   `DNZN LABS`; nav `distros · docs`; footer exactly as the sibling project's
    (`app/src/index.html:100` there): left `work no. 001`, right `docs · dnzn labs · v0.1` with
    `id="ver"` (decision 8; the version string stays `__VERSION__`). In `theme.css`: the accent hue
    becomes `230` in both `--accent` declarations (DNZN Base `v1/README.md` § The contract names Rake's
@@ -139,7 +139,7 @@ None. Decisions 1, 2, 6, 7, 8, 9 and 13 cover every choice this task makes.
 - Design: `docs/brainstorming/design/rake-dapp.html` (`vLanding` 314–338, `vDistros` 348–363,
   `detailHTML` 364–405, `resolveName` states 260–271 for the copy only), `design/HANDOFF.md`
   § Tokens, § Type & spacing; DNZN Base `v1/GUIDELINES.md` and `v1/README.md` § The contract.
-- Precedent: state-collection `app/src/index.html` — footer (line 100), `who()` painting before any
+- Precedent: the sibling project `app/src/index.html` — footer (line 100), `who()` painting before any
   network answer, `ext()`; its `CHAINS`/`EXPLORER` shape is the scaffold's.
 - Contract: `src/Distribution.sol` events (lines 32–38), `Created` on the factory (line 297), public
   getters `reserved`, `escrowed`, `queued`.

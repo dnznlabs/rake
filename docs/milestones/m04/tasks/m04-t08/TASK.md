@@ -118,7 +118,7 @@ Everything through `devbox run --`.
 6. **§ Step 4 in `RUNBOOK.md`, rewritten as procedure.** Keep the `dapp-nodev` → chunks → `chain-doc` →
    `sha256sum` shape and the `make deploy` warning; replace the `forge script … $SIGNER` line with
    two routes, in this order: **(a) unanimous, immediate** — the five calls proposed in the multisig
-   dapp (handbook `docs/multisig-transactions.md` § Doing it as a human), each signed by all three Ops
+   dapp (the organisation's multisig procedure, § Doing it as a human), each signed by all three Ops
    owners, which the dapp routes to `TimelockExecutor.forward()`; **(b) threshold, queued** — the same
    five signed by two owners, which `Multisig.execute()` queues for `delay()` = 3,600 s, then
    `executeQueued()` by anyone after the eta, **`add*Chunk` before the setters** because
@@ -195,7 +195,7 @@ second revision, kept for the record):**
      is a stop and a message to the architect.
    - `make dapp-nodev CHAIN_ID=$CHAIN_ID`, then `node tools/step4-calldata.mjs --chain $CHAIN_ID`;
      `git status --porcelain` must be **empty**, or a committed file is stale and this stops.
-   - Propose **three** times, in nonce order, each with **her signature and no other**, by handbook
+   - Propose **three** times, in nonce order, each with **her signature and no other**, by the organisation's
      `docs/multisig-transactions.md` § Doing it as an agent, steps 1–3 — digest from
      `cast call $OWNER 'getTransactionHash(address,uint256,bytes,uint32)(bytes32)' <target> 0 $(cat <file>) <nonce> --rpc-url "$RPC"`,
      `cast wallet sign --no-hash --account <keystore> <digest>`, verified with `cast wallet verify --no-hash`,
@@ -271,7 +271,7 @@ second revision, kept for the record):**
      `0`, three `bytes` equal to `3-addWidgetChunk.hex`, `4-setChunks.hex`, `5-setWidgetChunks.hex` in
      order; the nonce is *N* + 2 and the digest equals `getTransactionHash($OWNER, 0, batch345.hex, N + 2)`
      (at *N* = 3: Sepolia `0x7d2d3128…6c0f5`, Base Sepolia `0xc691bc7e…0f521`); `batch` is a vault
-     self-call: confirm it outside the chat that requested it (handbook § Review checklist).
+     self-call: confirm it outside the chat that requested it (the organisation's review checklist).
    - Then sign all three, submit all three back to back in nonce order (the vault refuses 2 before 1:
      `execute` hashes against `nonce++`), **wait one hour once, not three** — each submit queues its
      own digest at `block.timestamp + 3,600 s` and the three windows run concurrently — then
@@ -409,7 +409,7 @@ the same day), and the one ruling upstream of step 7 closed the same day. None o
 - `RUNBOOK.md` § Step 4, § Executed on testnets (m04-t03), § 1e (Sepolia's gas), § 1g (`ETH_RPC_URL`).
 - m04-t03 `HANDOFF.md` § For t04 (the empty `html()` reading) and § Gates.
 - `src/App.sol:111-168` (the `onlyOwner` setters, `_requireChunk`); `scripts/forge/Chunks.s.sol`.
-- Handbook `docs/multisig-transactions.md` § How a transaction moves, § Doing it as a human, § Review
+- The organisation's multisig procedure § How a transaction moves, § Doing it as a human, § Review
   checklist; `src-company/multisig` `src/mods/TimelockExecutor.sol:35-46` and `src/Multisig.sol:85-100,134-160` at `62eb905`.
 - Since the second revision of 2026-11-16: decision 47 (`ROADMAP.md` § Decisions); [#188](https://github.com/dnznlabs/rake/issues/188)
   (carried, widened 2026-11-16 with the proposal-size cap and its measurement); `RUNBOOK.md` § Step 4 as
@@ -418,5 +418,5 @@ the same day), and the one ruling upstream of step 7 closed the same day. None o
 - Since 2026-11-16: `RUNBOOK.md` § Step 4 (4a–4d, § Gas) at `a1c1896`; [#191](https://github.com/dnznlabs/rake/pull/191)
   and its review (live reads 2026-11-16 01:53Z); [#190](https://github.com/dnznlabs/rake/issues/190) (ruled
   and closed 2026-11-16) and its follow-up [#193](https://github.com/dnznlabs/rake/issues/193) (carried, m04);
-  this task's `HANDOFF.md` (steps 1–7 of the 2026-11-08 plan, the gas table, the pointers); handbook
-  `docs/multisig-transactions.md` § Doing it as an agent, § Review checklist.
+  this task's `HANDOFF.md` (steps 1–7 of the 2026-11-08 plan, the gas table, the pointers); the organisation's
+  multisig procedure, § Doing it as an agent and § Review checklist.

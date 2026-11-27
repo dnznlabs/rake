@@ -106,7 +106,7 @@ Those are the revs `git submodule status` reports (tags `v1.16.2` and `v0.1.26`)
 gitignored and not tracked, so it sits as `?? foundry.lock` and CI's "working tree clean" step would
 fail on such a checkout; CI passes only because `actions/checkout` initialises the submodules first.
 Commit the file as forge writes it. Rejected: gitignoring it — forge treats it as the dependency
-pin, and `state-collection` tracks its own.
+pin, and the sibling project tracks its own.
 
 **Check.** `git ls-files foundry.lock` prints the path; `git status --porcelain` is empty after
 `devbox run -- forge build --force`.

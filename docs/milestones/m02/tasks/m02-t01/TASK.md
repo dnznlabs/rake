@@ -148,7 +148,7 @@ None. The three M02 rulings (#26, #27, #28) gate t03 and t05, not this task.
 - Contract surface: `src/Distribution.sol` — `Snapshot`, `Beneficiary`, `Pending` structs (lines 10–30),
   `create` (line 319), `predict` (line 349); public getters `owner`, `delay`, `nonce`, `description`,
   `queued`, `reserved`, `escrowed`.
-- Precedent: `~/src/state-collection` `app/src/index.html` § names, for how the same `call`/`enc`
+- Precedent: the sibling project's `app/src/index.html` § names, for how the same `call`/`enc`
   pattern is used, and `tools/names-probe.mjs` there as the oracle pattern this task's `abi-vectors.sh`
   follows.
 - Carried: #22 (the `eth_getCode` guard the seed also honours).
