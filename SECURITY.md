@@ -24,10 +24,11 @@ findings apply to all three chains
 **Result:** **0 Critical, 0 High** in all three. 1272: 6 Medium, 12 Low, 8 Informational. 1273:
 1 Medium, 13 Low, 8 Informational. 1274: 3 Medium, 13 Low, 7 Informational. 1272 and 1274 read the
 same implementation independently and agree on substance while rating three items differently, in
-both directions ([`AUDIT.md`](audits/2026-11-26/AUDIT.md) § The implementation was reviewed twice).
+both directions ([`INDEX.md`](audits/external/2026-11-26/INDEX.md) § The implementation was
+reviewed twice).
 **None of it is dispositioned yet** — see the note in § Findings — disposition
-**Full report:** [`audits/2026-11-26/AUDIT.md`](audits/2026-11-26/AUDIT.md) (an index; the three
-reports are filed verbatim beside it, each with its hosted and IPFS links)
+**Full report:** [`audits/external/2026-11-26/INDEX.md`](audits/external/2026-11-26/INDEX.md) (an
+index; each report is filed untouched beside it, with a callout carrying its hosted and IPFS links)
 
 **One finding reopens a vector this file records as closed.** 1273's M-1 locks an `App` whose chunk
 pointer deletes itself: init code can `DELEGATECALL` a self-destruct helper and still return runtime
@@ -178,13 +179,12 @@ additions; § Coverage and § Mutation are the other two.
 
 **The 2026-11-26 commissioned reviews are not in this table yet.** As filed they carry 10 Medium,
 38 Low and 23 Informational across the three reports — **counts per report, not distinct issues**,
-since 1272 and 1274 read the same implementation and overlap heavily. They are filed verbatim under
-[`audits/2026-11-26/`](audits/2026-11-26/AUDIT.md) with no disposition, and triage is tracked
-in [#440](https://github.com/dnznlabs/rake/issues/440). They are listed separately rather than
-merged into F1–F14 because they were read against deployed
-verified source instead of a commit of this repository, so each one needs a disposition that says
-whether a test, a decision or an operational practice already answers it — and the auditor had none
-of those three to read.
+since 1272 and 1274 read the same implementation and overlap heavily. Each report is filed untouched
+under [`audits/external/2026-11-26/`](audits/external/2026-11-26/INDEX.md) with no disposition, and
+triage is tracked in [#440](https://github.com/dnznlabs/rake/issues/440). They are listed separately
+rather than merged into F1–F14 because they were read against deployed verified source instead of a
+commit of this repository, so each one needs a disposition that says whether a test, a decision or
+an operational practice already answers it — and the auditor had none of those three to read.
 
 **Three runs now feed this table, and each numbered its own findings from F1.** To keep one stable
 identifier per issue, the rows keep the 2026-10-30 numbering (**F1–F10**, that run's `AUDIT.md`

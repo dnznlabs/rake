@@ -47,9 +47,13 @@ audits/
     transcripts/
       leg-1-codex.log                everything leg 1 printed, tool calls included
       leg-2-claude.jsonl             leg 2's stream-json, tool calls included
-    <vendor>/
-      <job>/
-        report.md                    a commissioned external review, filed verbatim under a callout
+  external/
+    <YYYY-MM-DD>/
+      INDEX.md                         an index of that day's commissioned reviews — not a rollup
+      <vendor>/
+        <job>/
+          report.md                    the delivered report, untouched
+          README.md                    the callout: where it came from, what it covered, how to check it
 ```
 
 The transcripts are the only evidence of what a leg read, so they are committed with the findings.
@@ -312,31 +316,26 @@ A review bought from a third party is not a leg and does not go through `make au
 because an outside reading of the same code is evidence, and because the alternative is a link in a
 chat log. The rules are few and all of them are about not overstating what arrived.
 
-**Layout.** `audits/<date>/<vendor>/<job>/report.md`, one directory per engagement, filed
-**verbatim**. The date's `AUDIT.md` is then an *index* and says so in its first lines — it is not the
-reconciliation the word means elsewhere here, because there are no legs to reconcile.
+**Layout.** `audits/external/<date>/<vendor>/<job>/`, one directory per engagement. Not the dated
+tree: `audits/<date>/` means a run of this project's own method with a rollup, and a vendor's report
+is neither. The date's index is `INDEX.md` and opens by saying it is an index, because there are no
+legs to reconcile.
 
-**Every filed report opens with a callout** carrying, at minimum: the hosted report, the delivered
-markdown's content address, the engagement record, the target addresses and chain, when it was
-commissioned and pulled, the severity counts as filed, and a marker after which the bytes are the
-vendor's own. Put the verification command in the callout, so a reader can reproduce the delivered
-file from the committed one and check it against the content address without trusting this
-repository. Verify it yourself before committing — a recipe that does not reproduce the bytes is
-worse than none.
+**`report.md` is the delivered file, untouched, and the callout is its sibling `README.md`.** That
+way the committed file carries the vendor's own content address and checking the copy is one
+`cmp` against the gateway, with no extraction recipe for a reader to trust. The callout carries, at
+minimum: the hosted report, the delivered markdown's content address, the engagement record, the
+target addresses and chain, when it was commissioned and pulled, the severity counts as filed, and
+who the vendor is. Verify the check you print, with the file as committed, before committing it.
 
-**A vendor's report is not a disposition.** Nothing in `audits/<date>/` accepts, rejects or fixes
+**A vendor's report is not a disposition.** Nothing in `audits/external/` accepts, rejects or fixes
 anything; dispositions live in `SECURITY.md` § Findings — disposition, with the citation that
 settles each one. An external auditor reads deployed verified source and has neither the tests nor
 the decision log, so a finding may already be answered — say so with the citation, and never read
 the auditor's silence as agreement.
 
-**Filing under a date blocks an internal audit on that date.** `scripts/audit.sh` refuses to start
-when `audits/<date>/` already exists (§ Layout, append-only), so an external report filed today
-means today's `make audit` needs `AUDIT_DATE=<something-else>` or the directory moved aside. That is
-the preflight working as intended; it is listed here so it is not a surprise.
-
-First instance: [`2026-11-26`](2026-11-26/AUDIT.md) — three One Dollar Audit engagements on the Base
-deployments.
+First instance: [`external/2026-11-26`](external/2026-11-26/INDEX.md) — three One Dollar Audit
+engagements on the Base deployments.
 
 ## Known limits
 

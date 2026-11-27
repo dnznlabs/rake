@@ -1,33 +1,3 @@
-# DNZN's distribution — One Dollar Audit, engagement 1274
-
-> **A commissioned external review, filed here verbatim.** It was produced by One Dollar Audit
-> (LeftClaw Services) against the **deployed, Sourcify-verified source** — not against this
-> repository, and not by rake's own two-leg method.
->
-> | | |
-> |:--|:--|
-> | Hosted report (HTML) | <https://leftclaw.services/result/1274.html> |
-> | Delivered markdown, on IPFS | `bafkreib55lzeh5vuuzrkmfdd64uq6kcknvr24v347xong53xqeqlppaoem` — <https://bafkreib55lzeh5vuuzrkmfdd64uq6kcknvr24v347xong53xqeqlppaoem.ipfs.community.bgipfs.com/> |
-> | Engagement record | <https://www.onedollaraudit.com/audit/1274> · job detail <https://leftclaw.services/jobs/1274> |
-> | Target | the DNZN distribution clone [`0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`](https://basescan.org/address/0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199) and, behind it, the `Distribution` implementation `0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`, Base (8453) |
-> | Commissioned | 2026-11-26 18:14:25 CST; report dated 2026-11-27 UTC, pulled 2026-11-27T01:29Z |
-> | Severity counts, as filed | 0 Critical · 0 High · 3 Medium · 13 Low · 7 Informational |
->
-> **Everything below the marker is the delivered file, byte for byte.** The IPFS CID above is of
-> those bytes, so the copy is checkable without trusting this repository:
->
-> ```sh
-> awk 'f{print} /^<!-- DELIVERED REPORT BEGINS -->$/{f=1}' report.md > /tmp/1274.md
-> # CIDv1, raw codec, sha2-256 of /tmp/1274.md == bafkreib55lzeh5vuuzrkmfdd64uq6kcknvr24v347xong53xqeqlppaoem
-> curl -sS -L "https://bafkreib55lzeh5vuuzrkmfdd64uq6kcknvr24v347xong53xqeqlppaoem.ipfs.community.bgipfs.com/" | cmp - /tmp/1274.md && echo identical
-> ```
->
-> Dispositions are **not** in this file and are not the auditor's to make: the index for this date is
-> [`AUDIT.md`](../../AUDIT.md), the method and what an external review is here are in
-> [`audits/README.md`](../../../README.md) § External commissioned reviews, and the project's
-> security posture is [`SECURITY.md`](../../../../SECURITY.md).
-
-<!-- DELIVERED REPORT BEGINS -->
 # Security Audit — vRake DNZN Distribution (LeftClaw job 1274)
 
 **Target (on-chain source, Base, chain id 8453):**

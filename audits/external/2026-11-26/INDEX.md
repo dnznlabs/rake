@@ -1,30 +1,31 @@
 # Commissioned external reviews — 2026-11-26
 
-**Three $1 engagements with One Dollar Audit (LeftClaw Services), filed verbatim under
-`onedollaraudit/<job>/report.md`.** Denizen commissioned them from his own wallet on 2026-11-26
+**Three $1 engagements with One Dollar Audit (LeftClaw Services).** Each delivered report is filed
+untouched at `onedollaraudit/<job>/report.md`, with its callout in the sibling `README.md`. Denizen commissioned them from his own wallet on 2026-11-26
 between 18:05 and 18:14 CST; all three were delivered the same evening and pulled here at
 2026-11-27T01:29Z.
 
-**This file is an index, not a rollup.** It is not the reconciliation that `AUDIT.md` means elsewhere
-in this directory: there are no legs here, and nothing was merged into one set of findings. Each
-report stands as the vendor filed it. See [`../README.md`](../README.md) § External commissioned
-reviews for how this differs from `make audit`, and `SECURITY.md` § Prior reviews for where
-dispositions will go.
+**This is an index, not a rollup.** It deliberately is not an `AUDIT.md`: that name means a run of
+this project's own two-leg method, reconciled into one set of findings, and there are no legs here.
+Each report stands as the vendor filed it, which is also why these live under `audits/external/`
+rather than in the dated tree `make audit` writes. See [`audits/README.md`](../../README.md)
+§ External commissioned reviews for the rules, and [`SECURITY.md`](../../../SECURITY.md) § Prior
+reviews for where dispositions go.
 
 **No finding here is dispositioned yet.** Nothing in this directory has been accepted, rejected,
 fixed or ruled on. Triage is tracked in [#440](https://github.com/dnznlabs/rake/issues/440).
 
 ## The three engagements
 
-| job | target | severity counts, as filed | report | hosted | IPFS CID |
+| job | target | severity counts, as filed | filed | hosted | IPFS CID |
 |:--|:--|:--|:--|:--|:--|
-| [1272](https://www.onedollaraudit.com/audit/1272) | `DistributionFactory` `0x00D19609…7f8E` + the `Distribution` implementation `0xc4eD7EA2…cB0A` | 0C · 0H · **6M** · 12L · 8I | [`report.md`](onedollaraudit/1272/report.md) | [html](https://leftclaw.services/result/1272.html) | `bafkreih2omrnsmbcqmrhkbek7u5tirld6rekeq5unaqte3eukfmnu4slly` |
-| [1273](https://www.onedollaraudit.com/audit/1273) | `App` `0x00a9F390…25BA` | 0C · 0H · **1M** · 13L · 8I | [`report.md`](onedollaraudit/1273/report.md) | [html](https://leftclaw.services/result/1273.html) | `bafkreidt3yk43fimnxzzrrziufujyaaqp3fnjtyrsqx4lru2f3urgwtxde` |
-| [1274](https://www.onedollaraudit.com/audit/1274) | DNZN's distribution clone `0xB611Ff19…5199`, and the implementation behind it | 0C · 0H · **3M** · 13L · 7I | [`report.md`](onedollaraudit/1274/report.md) | [html](https://leftclaw.services/result/1274.html) | `bafkreib55lzeh5vuuzrkmfdd64uq6kcknvr24v347xong53xqeqlppaoem` |
+| [1272](https://www.onedollaraudit.com/audit/1272) | `DistributionFactory` `0x00D19609…7f8E` + the `Distribution` implementation `0xc4eD7EA2…cB0A` | 0C · 0H · **6M** · 12L · 8I | [`report.md`](onedollaraudit/1272/report.md) · [callout](onedollaraudit/1272/README.md) | [html](https://leftclaw.services/result/1272.html) | `bafkreih2omrnsmbcqmrhkbek7u5tirld6rekeq5unaqte3eukfmnu4slly` |
+| [1273](https://www.onedollaraudit.com/audit/1273) | `App` `0x00a9F390…25BA` | 0C · 0H · **1M** · 13L · 8I | [`report.md`](onedollaraudit/1273/report.md) · [callout](onedollaraudit/1273/README.md) | [html](https://leftclaw.services/result/1273.html) | `bafkreidt3yk43fimnxzzrrziufujyaaqp3fnjtyrsqx4lru2f3urgwtxde` |
+| [1274](https://www.onedollaraudit.com/audit/1274) | DNZN's distribution clone `0xB611Ff19…5199`, and the implementation behind it | 0C · 0H · **3M** · 13L · 7I | [`report.md`](onedollaraudit/1274/report.md) · [callout](onedollaraudit/1274/README.md) | [html](https://leftclaw.services/result/1274.html) | `bafkreib55lzeh5vuuzrkmfdd64uq6kcknvr24v347xong53xqeqlppaoem` |
 
-No Critical and no High in any of the three. Every CID above was verified locally against the bytes
-committed here — CIDv1, raw codec, sha2-256 — and each `report.md` carries the command to repeat
-that check from the file itself.
+No Critical and no High in any of the three. Each `report.md` is the delivered file **untouched**, so
+every CID above is that file's own content address — verified locally, CIDv1, raw codec, sha2-256 —
+and each engagement's `README.md` carries the one-command check (`curl … | cmp - report.md`).
 
 ## What they read, and what follows from it
 
@@ -35,7 +36,7 @@ triaging:
 
 1. **The code they reviewed is immutable.** A finding cannot be patched at these addresses; it is
    either operational guidance, a new deployment, or accepted. That is already this project's
-   position on bugs ([`README.md`](../../README.md) § Disclaimer).
+   position on bugs ([`README.md`](../../../README.md) § Disclaimer).
 2. **A finding may already be answered here and the auditor could not know.** Where the test suite
    pins a property or a decision settles a question, the disposition is to say so with the citation —
    not to treat silence as agreement, and not to treat the finding as new.
@@ -72,7 +73,7 @@ simply the harsher one. The disagreements are the triage's job, not this file's.
   this is a same-transaction self-destruct. It needs the owner to install the pointer, so it is an
   owner-trust finding rather than an unprivileged attack — the same framing F11 had.
   **Bounding it today:** `App` is unlocked on all four chains and
-  [decision 74](../../docs/ROADMAP.md#decisions) says there is no plan to call `lock()`, so nothing
+  [decision 74](../../../docs/ROADMAP.md#decisions) says there is no plan to call `lock()`, so nothing
   is locked under a deletable pointer now. It matters for any future lock and for how a reader
   verifies what they are served.
 - **1272 M-2 / 1274 M-01 — a clone cannot be paid by `transfer`/`send`.** Measured, not inferred. It
@@ -91,10 +92,10 @@ sharpens the record.
 
 | external | already here |
 |:--|:--|
-| 1272 M-2 / 1274 M-01 — a clone cannot be paid by a 2,300-gas `transfer`/`send`; measured 4,159 gas cold on Base | [`docs/ROADMAP.md`](../../docs/ROADMAP.md) § Findings carried forward, first bullet — measured in `m01-t01` at 1,662 gas warm, with a cold `DELEGATECALL` adding about 2,600, and `test_receiveUnderStipend` proving the warm path only. Carried issue [#18](https://github.com/dnznlabs/rake/issues/18) (closed). **Two measurements of the same thing; reconcile the numbers rather than filing it as new** |
-| 1272 L-8 / 1274 L-03 — a token balance below `reserved` makes `distribute` revert | [`SECURITY.md`](../../SECURITY.md) § Findings — disposition, **F4**, dispositioned "none needed" under decision 23 and carried as [#19](https://github.com/dnznlabs/rake/issues/19) (closed). Raised by the two-model method on all three of its runs; **these are the fourth and fifth raisings, and the first two to rate it Low** (the 2026-11-06 rollup rated the consequence Medium) |
+| 1272 M-2 / 1274 M-01 — a clone cannot be paid by a 2,300-gas `transfer`/`send`; measured 4,159 gas cold on Base | [`docs/ROADMAP.md`](../../../docs/ROADMAP.md) § Findings carried forward, first bullet — measured in `m01-t01` at 1,662 gas warm, with a cold `DELEGATECALL` adding about 2,600, and `test_receiveUnderStipend` proving the warm path only. Carried issue [#18](https://github.com/dnznlabs/rake/issues/18) (closed). **Two measurements of the same thing; reconcile the numbers rather than filing it as new** |
+| 1272 L-8 / 1274 L-03 — a token balance below `reserved` makes `distribute` revert | [`SECURITY.md`](../../../SECURITY.md) § Findings — disposition, **F4**, dispositioned "none needed" under decision 23 and carried as [#19](https://github.com/dnznlabs/rake/issues/19) (closed). Raised by the two-model method on all three of its runs; **these are the fourth and fifth raisings, and the first two to rate it Low** (the 2026-11-06 rollup rated the consequence Medium) |
 | 1272 I-4 — `release` copies and re-throws recipient-chosen revert data | Carried issue [#20](https://github.com/dnznlabs/rake/issues/20) (closed), `release` bubbling a bare `false` word as revert data. 1272 L-10 and 1274 L-09 sit beside it on the same reliance on the return word, and are not the same item |
-| 1273 M-1 — `lock()` admits a pointer that deletes itself at the end of the transaction | [`SECURITY.md`](../../SECURITY.md) § Findings — disposition, **F11**, fixed by `_requireChunk` against a 7702 delegation designator. A second shape of the same vector, and **not** closed by that fix |
+| 1273 M-1 — `lock()` admits a pointer that deletes itself at the end of the transaction | [`SECURITY.md`](../../../SECURITY.md) § Findings — disposition, **F11**, fixed by `_requireChunk` against a 7702 delegation designator. A second shape of the same vector, and **not** closed by that fix |
 
 What is **not** in our record, as far as I can tell: the unordered application of matured timelock
 actions (1272 M-1 / M-4, 1274 M-03), escrow having no exit for a contract that can neither receive in
@@ -113,4 +114,4 @@ configuration (1272 M-5 / 1274 L-11). Those three are the ones to read as genuin
 | Pulled by | Elanik, 2026-11-27T01:29Z, from each engagement's IPFS link, CIDs verified locally |
 
 **Append-only, like every audit here.** Nothing in this directory is edited later; a correction goes
-in the next audit's `AUDIT.md`, marked as superseding.
+in the next filing or in the next audit's `AUDIT.md`, marked as superseding.

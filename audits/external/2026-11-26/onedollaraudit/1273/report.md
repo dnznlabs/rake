@@ -1,33 +1,3 @@
-# Rake `App` — One Dollar Audit, engagement 1273
-
-> **A commissioned external review, filed here verbatim.** It was produced by One Dollar Audit
-> (LeftClaw Services) against the **deployed, Sourcify-verified source** — not against this
-> repository, and not by rake's own two-leg method.
->
-> | | |
-> |:--|:--|
-> | Hosted report (HTML) | <https://leftclaw.services/result/1273.html> |
-> | Delivered markdown, on IPFS | `bafkreidt3yk43fimnxzzrrziufujyaaqp3fnjtyrsqx4lru2f3urgwtxde` — <https://bafkreidt3yk43fimnxzzrrziufujyaaqp3fnjtyrsqx4lru2f3urgwtxde.ipfs.community.bgipfs.com/> |
-> | Engagement record | <https://www.onedollaraudit.com/audit/1273> · job detail <https://leftclaw.services/jobs/1273> |
-> | Target | `App` [`0x00a9F390A6010d045e0d34856048DdD6910d25BA`](https://basescan.org/address/0x00a9F390A6010d045e0d34856048DdD6910d25BA), Base (8453); the same source is verified at the same address on Ethereum (1) and Base Sepolia (84532) |
-> | Commissioned | 2026-11-26 18:06:30 CST; report dated 2026-11-27 UTC, pulled 2026-11-27T01:29Z |
-> | Severity counts, as filed | 0 Critical · 0 High · 1 Medium · 13 Low · 8 Informational |
->
-> **Everything below the marker is the delivered file, byte for byte.** The IPFS CID above is of
-> those bytes, so the copy is checkable without trusting this repository:
->
-> ```sh
-> awk 'f{print} /^<!-- DELIVERED REPORT BEGINS -->$/{f=1}' report.md > /tmp/1273.md
-> # CIDv1, raw codec, sha2-256 of /tmp/1273.md == bafkreidt3yk43fimnxzzrrziufujyaaqp3fnjtyrsqx4lru2f3urgwtxde
-> curl -sS -L "https://bafkreidt3yk43fimnxzzrrziufujyaaqp3fnjtyrsqx4lru2f3urgwtxde.ipfs.community.bgipfs.com/" | cmp - /tmp/1273.md && echo identical
-> ```
->
-> Dispositions are **not** in this file and are not the auditor's to make: the index for this date is
-> [`AUDIT.md`](../../AUDIT.md), the method and what an external review is here are in
-> [`audits/README.md`](../../../README.md) § External commissioned reviews, and the project's
-> security posture is [`SECURITY.md`](../../../../SECURITY.md).
-
-<!-- DELIVERED REPORT BEGINS -->
 # Security Audit — Rake `App` (on-chain dapp host)
 
 **LeftClaw job:** 1273 · **Date:** 2026-11-27 · **Method:** deep-audit v3 (x-ray pre-scan → context → 6 checklist agents → 12 blind attack agents → reconciliation)

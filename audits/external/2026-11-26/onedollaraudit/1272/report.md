@@ -1,33 +1,3 @@
-# Rake Distribution factory and implementation — One Dollar Audit, engagement 1272
-
-> **A commissioned external review, filed here verbatim.** It was produced by One Dollar Audit
-> (LeftClaw Services) against the **deployed, Sourcify-verified source** — not against this
-> repository, and not by rake's own two-leg method.
->
-> | | |
-> |:--|:--|
-> | Hosted report (HTML) | <https://leftclaw.services/result/1272.html> |
-> | Delivered markdown, on IPFS | `bafkreih2omrnsmbcqmrhkbek7u5tirld6rekeq5unaqte3eukfmnu4slly` — <https://bafkreih2omrnsmbcqmrhkbek7u5tirld6rekeq5unaqte3eukfmnu4slly.ipfs.community.bgipfs.com/> |
-> | Engagement record | <https://www.onedollaraudit.com/audit/1272> · job detail <https://leftclaw.services/jobs/1272> |
-> | Target | `DistributionFactory` [`0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E`](https://basescan.org/address/0x00D19609f2349d4160D2BaBAf46b0Cd1eC6d7f8E) and the `Distribution` implementation [`0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A`](https://basescan.org/address/0xc4eD7EA21B8CC334F08945B4D0c182e0afF8cB0A), Base (8453) |
-> | Commissioned | 2026-11-26 18:05:25 CST; report dated 2026-11-27 UTC, pulled 2026-11-27T01:29Z |
-> | Severity counts, as filed | 0 Critical · 0 High · 6 Medium · 12 Low · 8 Informational |
->
-> **Everything below the marker is the delivered file, byte for byte.** The IPFS CID above is of
-> those bytes, so the copy is checkable without trusting this repository:
->
-> ```sh
-> awk 'f{print} /^<!-- DELIVERED REPORT BEGINS -->$/{f=1}' report.md > /tmp/1272.md
-> # CIDv1, raw codec, sha2-256 of /tmp/1272.md == bafkreih2omrnsmbcqmrhkbek7u5tirld6rekeq5unaqte3eukfmnu4slly
-> curl -sS -L "https://bafkreih2omrnsmbcqmrhkbek7u5tirld6rekeq5unaqte3eukfmnu4slly.ipfs.community.bgipfs.com/" | cmp - /tmp/1272.md && echo identical
-> ```
->
-> Dispositions are **not** in this file and are not the auditor's to make: the index for this date is
-> [`AUDIT.md`](../../AUDIT.md), the method and what an external review is here are in
-> [`audits/README.md`](../../../README.md) § External commissioned reviews, and the project's
-> security posture is [`SECURITY.md`](../../../../SECURITY.md).
-
-<!-- DELIVERED REPORT BEGINS -->
 # Security Audit — Rake Distribution Factory (`Distribution` / `DistributionFactory`)
 
 **LeftClaw job:** 1272 · **Date:** 2026-11-27 · **Method:** deep-audit v3 (x-ray pre-scan → context map → 8 checklist agents → 12 blind attack agents → reconciliation + coverage gate)
