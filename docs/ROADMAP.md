@@ -16,7 +16,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 | [M01 — The contract](milestones/m01/MILESTONE.md) | `Distribution` + factory built from the overview, every test in the definition of done passing, gas snapshot committed, deployed into `make serve` | done 2026-10-11 — t01 (#6), t02 (#11), t03 (#14) and the decision-10 follow-up (#24) merged; every criterion re-run and passing on `main` at `c292106` |
 | [M02 — Dapp and widget on anvil](milestones/m02/MILESTONE.md) | The design prototype rebuilt on DNZN Base, reading `snapshot()` and sending the six writes, hosted by `App` and served end to end from a local chain, and Denizen has ironed out the experience against it | done 2026-10-26 — t01 (#33), t02 (#40), t03 (#52), t04 (#60), t05 (#65), t06 done; Phase 5 signed off by Denizen in [#73](https://github.com/dnznlabs/rake/pull/73) |
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | **done 2026-11-07** — ten tasks (t01–t10), three two-leg reviews (`audits/2026-10-30`, `10-31`, `11-06`), 14 `SECURITY.md` rows, decisions 20–40; `src/` final at `3ad48ec` ([#153](https://github.com/dnznlabs/rake/pull/153)), `FACTORY_SALT`/`APP_SALT` mined against it (decision 37: `0x00D18B5b…`, `0x00A90943…`), `RUNBOOK.md` rehearsed on two anvils with the real Creator key; DNZN's predicted address `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`; criteria 1–8 re-run in [CLOSEOUT.md](milestones/m03/CLOSEOUT.md) |
-| [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | **done 2026-11-19** — sixteen tasks (t01–t16; t12 closed unmerged by decision 62), criteria 1–8 re-run at `2f93d26` in [CLOSEOUT.md](milestones/m04/CLOSEOUT.md), closed on that close-out's merge ([#296](https://github.com/dnznlabs/rake/pull/296), `eec7164`) by decision 64, with criteria 1, 3 and 5's unmet clauses transferred to m05-t01 Part B beside criterion 6's wallet run (decision 63) and criterion 8's state-collection#74 comment drafted and awaiting the Product Owner's word. Scoped 2026-11-07: seven tasks in four phases (Phase 1 done the same day: the dapp's carried items #164 and the `web3://` gateway in the dev stack #163, the ERC-5219 surface's first real consumer; then Slither as a third audit leg gating the deploy, invariant tests beside it, the runbook for real, then the gateway and a host page, then a scripted wallet session with a signoff line); two decisions open ([#156](https://github.com/dnznlabs/rake/issues/156) the test host, [#157](https://github.com/dnznlabs/rake/issues/157) DNZN's testnet table, both ruled); needed testnet ETH on two keys and an Etherscan API key |
+| [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | **done 2026-11-19** — sixteen tasks (t01–t16; t12 closed unmerged by decision 62), criteria 1–8 re-run at `2f93d26` in [CLOSEOUT.md](milestones/m04/CLOSEOUT.md), closed on that close-out's merge ([#296](https://github.com/dnznlabs/rake/pull/296), `eec7164`) by decision 64, with criteria 1, 3 and 5's unmet clauses transferred to m05-t01 Part B beside criterion 6's wallet run (decision 63) and criterion 8's the sibling project's payee issue comment drafted and awaiting the Product Owner's word. Scoped 2026-11-07: seven tasks in four phases (Phase 1 done the same day: the dapp's carried items #164 and the `web3://` gateway in the dev stack #163, the ERC-5219 surface's first real consumer; then Slither as a third audit leg gating the deploy, invariant tests beside it, the runbook for real, then the gateway and a host page, then a scripted wallet session with a signoff line); two decisions open ([#156](https://github.com/dnznlabs/rake/issues/156) the test host, [#157](https://github.com/dnznlabs/rake/issues/157) DNZN's testnet table, both ruled); needed testnet ETH on two keys and an Etherscan API key |
 | [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; the DNZN fund distribution live at its Sepolia address with the Sepolia table, the Ops vault as owner and a 7-day delay (decision 50); dapp mirrored and widget embedded in one DNZN app | **done 2026-11-26** — closed on [`CLOSEOUT.md`](milestones/m05/CLOSEOUT.md): as re-scoped by decision 70, the contracts and the document are live on Base and Ethereum at the testnets' addresses, served at `rake.dnzn.dev` with `/` on Ethereum; the other four chains follow on the Product Owner's word |
 | [M06 — Going public](milestones/m06/MILESTONE.md) | `dnznlabs/rake` is public, as a new repository whose history is one signed commit from the mainnet tag; the private repository is renamed `rake.buildarchive`, archived and never published. Four phases: the labelling of outside issues and comments installed and proven on this repo; a staging tree from the tag with the build-out record removed (milestones, tasks, handoffs, review runs, dev-chain broadcasts), the roadmap reset to the mainnet row, `SECURITY.md` carrying no findings, and every document audited for a reader who has only the repo; a fresh review of the staging tree that must come back clean; then Denizen renames, archives, creates and flips | not started — gated on M05's close-out; scoped when M05 closes (decision 60) |
 | [M07 — Owner integrations](milestones/m07/MILESTONE.md) | Optional, after mainnet. When the connected wallet is a member of the owner rather than the owner, route `propose`/`cancel` into the multisig vault's or Majeur DAO's own submit flow instead of copy-calldata. UI only; no contract change | not started |
@@ -31,7 +31,7 @@ M03 follows M02 rather than M01 because the review covers the `App` host and the
 as `Distribution`; reviewing before M02 means reviewing twice.
 
 **M02 ends on Denizen, not on a check.** Its last phase is a free-form pass over the dapp and widget
-by Denizen on anvil — the same shape as `state-collection` M1 Phase 5 — open-ended, closed by his
+by Denizen on anvil — the same shape as the sibling project's M1 Phase 5 — open-ended, closed by his
 signoff (decision 14). It sits before M03 for the same reason M03 sits after M02: a UI change made
 after the review is a second review, and a contract change made after it is a third. Nothing in M03
 starts until the signoff line is dated. **The docs page is part of that signoff.** `#/docs` ships from
@@ -47,11 +47,11 @@ Tables can drift and every owner action is queued once per chain. M02's acceptan
 that drift rather than present one distribution; M03 must name the factory's byte-identical deploy
 through a deterministic deployer as the one-way door it is.
 
-**Cross-project gate.** `state-collection` M4 is gated on "the fee-splitting contract being ready".
+**Cross-project gate.** The sibling project's M4 is gated on "the fee-splitting contract being ready".
 That gate is satisfiable before Rake M05: the factory uses CREATE2 with a sender-bound salt, so the
-DNZN distribution's address is known the moment the factory's own address is — `state-collection` can
+DNZN distribution's address is known the moment the factory's own address is — the sibling project can
 hardcode it after M03 and ship before Rake is on mainnet, which is exactly the workflow the overview
-names in § 8. Confirm in M03 by predicting the address from the runbook; do not make `state-collection`
+names in § 8. Confirm in M03 by predicting the address from the runbook; do not make the sibling project
 wait for M05.
 
 ## Decisions
@@ -105,12 +105,12 @@ Ruled by Denizen on 2026-10-10, before M01. Each touches contract storage, which
    is the owner, and its members route `propose`/`cancel` through it. The M02 dapp shows the owner
    view to a connected wallet that is the owner, or a signer of an owning vault (probe `isOwner(address)`,
    failing soft), with writes as copy-calldata in v1. `applyQueued` and `distribute` stay direct.
-8. **Footer.** `work no. 001`, as `state-collection` does (`work no. 003`), not the "a public work by
+8. **Footer.** `work no. 001`, as the sibling project does (`work no. 003`), not the "a public work by
    dnzn labs" line the scaffold's `layout.html` and the design prototype carry. M02 fixes the slot.
    **Amended 2026-10-11 in the #40 review:** the right side is the version span alone — the `docs`
-   link `state-collection` carries there is redundant with the header nav and is dropped. The slot
+   link the sibling project carries there is redundant with the header nav and is dropped. The slot
    decision 1 reserves for the DNZN distribution's own page stays reserved; that address exists after
-   M03. Supersedes "footer exactly as state-collection's" in the m02-t02 plan, step 2.
+   M03. Supersedes "footer exactly as the sibling project's" in the m02-t02 plan, step 2.
 9. **Two ABI names differ from the design vocabulary.** The function that runs a queued action is
    `applyQueued(bytes,uint32)`, and the table getter is `beneficiaries()`; the `Snapshot.table` field
    keeps its name. Ruled by Denizen merging PR #6 on 2026-10-11, after `m01-t01` found the planned names
@@ -164,7 +164,7 @@ recommended option.
     chain). Closes overview § 6 "Widget hosting" for the on-chain half; dnzn.dev and IPFS in M05 are
     mirrors of it. M02 `m02-t05` builds it.
 13. **Name display priority is ENS → WNS → GNS, winner alone.** The ruling already made for
-    state-collection (PR #53 there), ported verbatim. Ruled on
+    the sibling project (PR #53 there), ported verbatim. Ruled on
     [#28](https://github.com/dnznlabs/rake/issues/28). Supersedes `design/HANDOFF.md` § Demo → real
     wiring and `DESIGN_HANDOFF.md` § 2.1, which say `.wei → .gwei → .eth`; the brainstorming folder is
     frozen, so this entry is the correction. Rejected: the design order, which would show two DNZN
@@ -176,10 +176,10 @@ recommended option.
     than after it, and anvil is where a change costs least; (b) its own milestone between M02 and M03
     — rejected as ceremony, it has no acceptance criteria but a signoff; (c) inside M03 — rejected,
     the review would read moving code; (d) after M03, before M04 — rejected, each tweak that reaches
-    `src/` or `App` re-opens the review. Shape is `state-collection` M1 Phase 5 verbatim: he executes
+    `src/` or `App` re-opens the review. Shape is the sibling project's M1 Phase 5 verbatim: he executes
     it himself outside the agent loop, opens PRs reviewed here, files anything he wants handed off as
     a task row; anything is fair game with the bill priced per item; closed by a dated signoff
-    (M02 criterion 10). Rejected: closing on an empty task table — the same proposal `state-collection`
+    (M02 criterion 10). Rejected: closing on an empty task table — the same proposal the sibling project
     overruled on 2026-09-17.
 15. **The landing carries the prototype's fee-path diagram.** Ruled by Denizen in the #40 review on
     2026-10-11 ("it added visual clarity"), answering [#44](https://github.com/dnznlabs/rake/issues/44)
@@ -251,7 +251,7 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
 
 20. **The M03 review is the shared `forge-audit` method now, and a paid external review later.**
     D1, ruled on [#78](https://github.com/dnznlabs/rake/issues/78) ("Select Option 3"), as amended
-    by [#91](https://github.com/dnznlabs/rake/pull/91). Phase 3 runs the method `state-collection`
+    by [#91](https://github.com/dnznlabs/rake/pull/91). Phase 3 runs the method the sibling project
     ran on 2026-09-28: two legs from two labs (Codex and Claude, each with the pinned
     `solidity-auditor` skill) over `audits/SCOPE`, reconciled by a rollup into `audits/<date>/AUDIT.md`
     with a provenance block, graded against a known answer the legs are not told. Two models from two
@@ -350,7 +350,7 @@ amended after it opened, the amendment is what was ruled on, and the milestone t
     [#91](https://github.com/dnznlabs/rake/pull/91). `src/Distribution.sol`, `src/App.sol`,
     `scripts/forge/Deploy.s.sol` and `scripts/forge/DeployApp.s.sol`: `App` is what strangers load
     and its `lock()` is one-way; the deploy scripts set constructor arguments and hand over
-    ownership, Phase 4's runbook runs them, and the method's first finding on `state-collection` was
+    ownership, Phase 4's runbook runs them, and the method's first finding on the sibling project was
     in a deploy script. Not `Chunks.s.sol`, `Fixtures.s.sol` or `Seed.s.sol`, which are owner-run on
     a dev chain; every exclusion is written in `audits/SCOPE` with its reason, as the method
     requires. Rejected: `Distribution.sol` only (cheaper, and the roadmap's reason for M03 sitting
@@ -565,7 +565,7 @@ Ruled by Denizen on 2026-11-07, at M04's scoping, each on the issue linked.
     `owner_` passed to `create` stays the Ops vault (decision 35). These are the testnet values; M05's
     are M05's to rule, so they live in `RUNBOOK.md` § Executed on testnets (m04-t03), not in § 0.
     Rejected: the anvil rehearsal's placeholders under DNZN's name on two public chains; skipping
-    step 6 on testnets (criterion 1 and state-collection#74 both need code at the address).
+    step 6 on testnets (criterion 1 and the sibling project's payee issue both need code at the address).
     **Amended 2026-11-08 (m04-t03 review).** Three things pinned before the first testnet `create`:
     (i) **these are the values a testnet step 6 uses** — not placeholders and not M05's; `RUNBOOK.md`
     § Step 6's "M05 values are M05's to fill" refers to the mainnet table, and the m04-t03 handoff's
@@ -736,7 +736,7 @@ convention. Numbered 45 because 44 is taken by
     Creator key; description, table, delay and owner stand); `DNZN_DELAY` 604,800; `OWNER` the Ops vault
     `0x00c0e887…3790`, passed as `create`'s `owner_` directly — `create(owner_, …)` sets the owner, so
     no `transferOwnership`/`acceptOwnership` round follows. Ops is 2-of-3 with a 3,600 s timelock on all
-    six mainnets rake targets (handbook `docs/multisig-transactions.md`, read 2026-10-30), so an owner
+    six mainnets rake targets (the organisation's multisig procedure, read 2026-10-30), so an owner
     action on the distribution is two signatures, Ops's hour, then the distribution's seven days. The
     `create` itself still comes from the Creator key: the salt's top 20 bytes must be `msg.sender`
     (decision 10). Corrects the M05 row and RUNBOOK § Step 6, which said "60/40": the table is
@@ -838,7 +838,7 @@ convention. Numbered 45 because 44 is taken by
     Denizen's EOA.** Ruled by Denizen on 2026-11-18 (Telegram, 15:03 CST): "Oh yeah so it has the
     same address salt. Yes creator key every where not my eoa". Closes M05-D2. Step 6 of `RUNBOOK.md`
     runs as written: `SIGNER` re-exported to the DNZN Creator key `0x68e0741D8d693e14BF56914567eADdC130b186eE`
-    (decision 32, handbook `docs/multisig-transactions.md` § The DNZN Creator key), salt `DNZN_SALT`
+    (decision 32, the organisation's rule for the DNZN Creator key), salt `DNZN_SALT`
     = `CREATOR` ‖ `…0001` (§ 0 line 73), on all six mainnets and, in m05-t01, on Sepolia and Base
     Sepolia again, so the DNZN distribution is one address everywhere the factory is. That address
     is fixed when m05-t01's re-mined factory address is (decision 5, M05-D1) and is recorded there,
@@ -916,7 +916,7 @@ convention. Numbered 45 because 44 is taken by
     which the M05 plan measured on 2026-11-18 on every mainnet it targets
     (`docs/milestones/m05/MILESTONE.md` § Acceptance criteria). No `removeOwner` or `setThreshold`
     self-call is proposed by any rake task, and the deploy tasks' signing route (decision 47) is
-    unchanged. The handbook's `docs/multisig-transactions.md` is rewritten separately to say the
+    unchanged. The organisation's multisig procedure is rewritten separately to say the
     same; this record is rake's. Supersedes nothing in this file; decision 50's "2-of-3" description
     of Ops was read on 2026-10-30, before the fourth owner, and its threshold and delay still hold.
     Rejected: option (2), six `removeOwner` self-calls to match the owner set to where the vault acts
@@ -1047,8 +1047,8 @@ convention. Numbered 45 because 44 is taken by
     the M04 `App` and the `0x71a4…7a4A` distribution, both retired by the redeploy. **Criterion 6 is
     recorded as transferred, not as a pass** — it moved in decision 63 and is verified as m05-t01
     criterion 18b. Criterion 8's comment on
-    [state-collection#74](https://github.com/dnznlabs/state-collection/issues/74) is drafted and
-    unposted in `CLOSEOUT.md` § For state-collection#74, awaiting the Product Owner's word; the
+    the sibling project's payee issue is drafted and
+    unposted in `CLOSEOUT.md` § For the sibling project's payee issue, awaiting the Product Owner's word; the
     recommendation on record is to post it now rather than after the redeploy, and m05-t01 plan step 17
     carries the same comment with the readings. **M04 closes now, not when Part B verifies them** —
     the other way round is the circularity decision 63 removed, since Part B is gated on this
@@ -1129,7 +1129,7 @@ convention. Numbered 45 because 44 is taken by
     a wallet with no extension and no browser of its own (his case: a Tangem card), with the client
     code read on demand from a contract shared by every DNZN app and not carried in this document.
     That library, and whether an app pins it by hash or follows its latest version, is scoped under
-    [design-base#4](https://github.com/dnznlabs/design-base/issues/4). **Why:** the smallest
+    the shared design system's own issue for it. **Why:** the smallest
     WalletConnect client measured 142 to 154 KB gzipped against a 45.5 KB document (#318), so
     inside the document it would be paid on every chain at every upload; the picker and the links
     are a few hundred bytes and need no library, relay or project id. **Accepted with it:** until

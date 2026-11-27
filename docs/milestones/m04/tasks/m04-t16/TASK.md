@@ -232,7 +232,7 @@ on purpose, and says so.
      controls enabled as on `main` for the same account (record the enabled `[data-send]` set
      against `main`'s dev build), `page errors: none`.
 
-7. **`HANDOFF.md`** beside this file, from the handbook template: the AC table with one row per
+7. **`HANDOFF.md`** beside this file, from the standard handoff template: the AC table with one row per
    criterion below, the figures beside step 0's re-run baselines; one row per hunk (steps 2–5)
    with the site, the change, the test or browser step, and the planted red quoted under its exact
    command; the eight `connect a wallet` sites with what each painted in 6 (a); the byte deltas;
@@ -300,7 +300,7 @@ branch point and recorded in the handoff with the commit. Every grep is `grep -i
    figure and the handoff names the added ones per file; `forge test` count unchanged from `main` and
    stated; `make fmt`, `forge lint` and CI pass at the head; `git status --porcelain` empty after
    `make dapp-nodev CHAIN_ID=11155111`; `HANDOFF.md` has an AC table with exactly nine rows, one per
-   criterion here, and the PR is from the handbook template with the architect (`@lakkoss`) as
+   criterion here, and the PR is from the standard handoff template with the architect (`@lakkoss`) as
    reviewer.
 9. **The M05 gate.** This PR merges before m05-t01's Run B step 14 is prepared, and the handoff's
    § For the next upload says so with the hashes and the list of what the bundle carries (m04-t15's

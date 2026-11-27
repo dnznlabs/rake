@@ -254,7 +254,7 @@ which is the one whose page runs the owner probe when `from=` is any account tha
    - (f) **The whole page once more** with no `page.route`, each opened in the same URL form: a
      distribution page, `#/distros`, `#/docs`, `#/create` step 2, `#/` — `page errors: none`.
 
-10. **`HANDOFF.md`** beside this file, from the handbook template: the AC table with one row per
+10. **`HANDOFF.md`** beside this file, from the standard handoff template: the AC table with one row per
     criterion below, the figures beside step 0's re-run baselines; one row per hunk (steps 2–6) with
     the sink or site, the change, the test or browser step, and the planted red quoted under its
     exact command; the three decision 57 sentences quoted **as shipped**; the byte deltas; § For the
@@ -332,7 +332,7 @@ branch point and recorded in the handoff with the commit. Every grep is `grep -i
     `167` and the handoff names the added ones per file; `forge test` count unchanged from `main` and
     stated; `make fmt`, `forge lint` and CI pass at the head; `git status --porcelain` empty after
     `make dapp-nodev CHAIN_ID=11155111`; `HANDOFF.md` has an AC table with exactly twelve rows, one per
-    criterion here, and the PR is from the handbook template with the architect (`@lakkoss`) as
+    criterion here, and the PR is from the standard handoff template with the architect (`@lakkoss`) as
     reviewer.
 12. **The M05 gate.** This PR merges before m05-t01's Run B step 4 is prepared, and the handoff's
     § For the next upload says so with the hashes and the list of what the bundle carries; no upload

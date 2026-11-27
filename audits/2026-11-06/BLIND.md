@@ -16,7 +16,7 @@ a correction while this review was being written, so both are given here and in 
 | Reviewed commit — **frozen head** (this repo) | **`94d028c`** — `chore(gas): re-snapshot for the ForeignChunk check`, the last commit touching `src/`, `test/*.t.sol` or `.gas-snapshot`; the sha the blinded tree is cut at |
 | **Branch head** at the review (this repo) | **`0819552`** — `docs(audit): known answer for 94d028c — 6 present, 10 closed`, the commit after the freeze, which step 5 permits because it touches none of those three paths |
 | Blinded tree commit | **`d07483a8b9f6bcfe6200688bcb2d242450b9d464`** — `rake src/ and deploy scripts at 94d028c, for a blind two-model review` |
-| Blinded tree path | `~/src/rake-blind-2026-11-02` (under `~/src/`, never `/tmp`, which is shared) |
+| Blinded tree path | a blinded tree beside this checkout, never `/tmp`, which is shared |
 | Provenance dirty flag | `dirty: no`, captured at preflight before any leg wrote a byte |
 
 **Both shas are the run's own, and both are still reachable.** The blinded tree's own commit message
@@ -128,7 +128,7 @@ nothing but the code, and the known answer stays in this checkout, reaching the 
 `KNOWN_ANSWER_FILE` as shell-read prompt text rather than as a file any leg could open.
 
 `audits/KNOWN_ANSWER.md` was verified absent from the blinded tree **before and after** the run, and
-re-asserted after the harvest copy: `test ! -e ~/src/rake-blind-2026-11-02/audits/KNOWN_ANSWER.md`
+re-asserted after the harvest copy: `test ! -e <blinded tree>/audits/KNOWN_ANSWER.md`
 passes, and a `find` for `KNOWN_ANSWER*` anywhere in that tree returns nothing.
 
 ### Leg independence, measured again
@@ -187,7 +187,7 @@ have from the source.
 
 ## The launcher, and why a person ran it
 
-`~/src/rake-blind-2026-11-02-launch.sh`, staged under the blinded tree's parent and outside both
+the launch script beside the blinded tree, staged under the blinded tree's parent and outside both
 repositories. It re-checks the preconditions of `TASK.md` step 6 and refuses — **22 distinct
 refusals** — rather than start a run that would have to be thrown away: both trees present, the
 blinded tree still at the staged commit and not the superseded `2026-11-01` tree, the known answer
@@ -205,7 +205,7 @@ agents on this host. Nothing in either tree was edited while a leg ran.
 
 **The directory is dated for the run, not for the tree.** The launcher takes
 `AUDIT_DATE="${AUDIT_DATE:-$(date +%Y-%m-%d)}"`, so the output landed in `audits/2026-11-06/` while
-the blinded tree it ran in is `~/src/rake-blind-2026-11-02`, cut on 11-02 and staged then. The two
+the blinded tree it ran in was cut beside this checkout, cut on 11-02 and staged then. The two
 dates are four days apart because the tree waited for a terminal, not because anything in it changed;
 its commit `d07483a8` is dated 2026-11-02 08:47:13 -0600 and its scoped hashes are the ones above.
 `SKILL_PIN` is unchanged at `f6c7f0de…`, solidity-auditor VERSION 4.

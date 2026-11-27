@@ -46,8 +46,8 @@ and compare above. The ruling and the measurement are both in `SECURITY.md` § T
   byte after this is a new factory address and a new mining run (decision 5).
 - **DNZN's predicted address is `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`**, the same on every
   chain where the factory is at `0x00D18B5b…` and the `create` is sent by the Creator key with
-  `DNZN_SALT` above. Posted to `state-collection`'s tracker for its M4 payee gate:
-  [state-collection#74](https://github.com/dnznlabs/state-collection/issues/74).
+  `DNZN_SALT` above. Posted to the sibling project's tracker for its M4 payee gate:
+  the sibling project's payee issue.
 - Carried, labelled `m04`: #127 (per-chain alias check before the first deploy), #140 (one-creation
   assertion in `build.mjs`), #110 (the chromium note), #148 and #149 (dapp nits from t09), #76 (log
   paging). Plus one docs sentence from decision 23's reaffirmation: the Limits page should name

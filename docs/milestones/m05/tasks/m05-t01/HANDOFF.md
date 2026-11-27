@@ -99,7 +99,7 @@ carried rather than passed.
    keeping all three rows, striking them with `~~…~~` and dating them **superseded 2026-11-19
    (m05-t01, M05-D1)**, and replacing the literal address inside them with that dated note. The rows
    survive as record for Part B to rewrite; the old address remains in git history and on
-   state-collection#74, which Part B comments on.
+   the sibling project's payee issue, which Part B comments on.
 4. **Step 6's exports went into § 0's fence, not step 6's block.** Criterion 7 requires "§ 0 exports
    `DNZN_DESCRIPTION`, `DNZN_TABLE` and `DNZN_DELAY`", and § 0 states that "nothing below hard-codes
    a value that belongs here". Both point the same way, so the three live at `RUNBOOK.md:76-78` and
@@ -126,9 +126,9 @@ carried rather than passed.
    (old tool vs new tool, no flag, one bundle → all six files identical), and `origin/main` at
    `e770054` in a clean throwaway worktree does not reproduce its own committed calldata either
    (same two files differ, with nothing of this branch present). Discovery 1.
-9. **Drop `d50dbc9` is in the `drop` repository, not in `~/src/shared`.** The first port was taken
+9. **Drop `d50dbc9` is in the `drop` repository, not in the shared tooling checkout.** The first port was taken
    from the shared template's `forge-anvil` fragment (`1b10501`), whose comments are shorter. The
-   commit named by `TASK.md` and by #197 was then read at `~/src/drop` `d50dbc9` and the fragment
+   commit named by `TASK.md` and by #197 was then read at that project's checkout, `d50dbc9` and the fragment
    aligned to it verbatim — `LIBS`' three-line comment, the `setup` help text, the eight-line `libs`
    comment and `.PHONY`'s ordering. `LIBS := lib/forge-std lib/solady` is drop's own line, not an
    addition.
@@ -203,7 +203,7 @@ carried rather than passed.
    state § One-way doors 2 describes and nothing here touches it; recorded because step 6's values
    were read *from* it while the thing being built uses the Ops vault as owner and 604800/86400.
 7. **Criterion 17's last clause names the wrong author, and three sources had to be read to see it.**
-   The clause is "state-collection#74 carries **the engineer's** comment with the new address"
+   The clause is "the sibling project's payee issue carries **the engineer's** comment with the new address"
    (`TASK.md:556`). Two other sources say the architect: the m04 draft's preamble ("this is the text
    for the Product Owner to approve, then the architect posts it") and — decisive, because it is the
    commitment made to the other team — #74's own **Done when**, read 2026-11-19 and quoted verbatim:
@@ -214,7 +214,7 @@ carried rather than passed.
    after step 13 regardless. **Ruled 2026-11-20: the amendment landed at `aecedbe`
    ([#299](https://github.com/dnznlabs/rake/pull/299)) before this run's first send, and it carries
    all three defects named here — author, trigger and closure shape. Criterion 17 is now met by this
-   handoff carrying the landed address, never by `state-collection` accepting a comment, and the
+   handoff carrying the landed address, never by the sibling project accepting a comment, and the
    comment itself is the architect's.**
    **The finding behind the contradiction is the dependency shape, not the author:** a criterion in
    this repo cannot be satisfied by an artefact in another repo's issue tracker, because closure
@@ -224,7 +224,7 @@ carried rather than passed.
    time** (architect's ruling 2026-11-19). Textually the testnets are public — #74's "What it is not
    yet" opens "A contract on any public chain. rake M04 executes the runbook on Sepolia and Base
    Sepolia; the mainnets are rake M05", drawing its contrast against the "two anvils" it measured on.
-   But the gate the issue serves consumes a **mainnet** address: `state-collection`'s
+   But the gate the issue serves consumes a **mainnet** address: the sibling project's
    `docs/milestones/m4/MILESTONE.md` at `eec081a` is titled "M4 — Mainnet", its criterion 1 is a
    go/no-go that "names the **mainnet** `payee`", and its § Needs the human adds "its readiness
    blocks mainnet" — so #74's "at M4's gate" is a mainnet gate by their own title, and a testnet
@@ -1448,7 +1448,7 @@ superseded. `:17`'s "No mainnet deployment exists" is untouched — that is m05-
 **Step 17's own checks:** `grep -ci superseded README.md` → **6** (≥ 2 required, 0 before);
 `grep -c 0x00D18B5b README.md` → **2**, and both are the superseded rows (3 before).
 
-**Not this task's:** the `state-collection#74` comment is the **architect's**, by criterion 17 as
+**Not this task's:** the `the sibling project's payee issue` comment is the **architect's**, by criterion 17 as
 amended in [#299](https://github.com/dnznlabs/rake/pull/299).
 
 **M05 criterion 6 — every deviation Part B met is a `RUNBOOK.md` change here or a one-line reason it
@@ -1505,7 +1505,7 @@ three rows ascending at 2,000 / 4,000 / 4,000 with decision 50's names and notes
 **Part A asked one question and nothing else; Part B's step 12 added the three below, and all three
 were put to the Product Owner on 2026-11-19 and answered that evening.** They stand mostly as the
 record of what was asked and what came back: the key is in and proved (`…9SKI`),
-state-collection#74's comment is cleared, and `delay()` came back as one hour against the chain's
+The sibling project's payee issue's comment is cleared, and `delay()` came back as one hour against the chain's
 900. Two live items remain, both
 small — the 4b checklist reads "`delay()` seconds" and neither figure, and the #74 bullet now asks
 for a ruling it did not ask for before. The sittings still come later, when step 14's proposals are
@@ -1556,18 +1556,18 @@ read back and step 15's commands are in this handoff.
   than discovered at 4c. A recollection does not overturn a reading, and the engineer does not
   resolve it either way; an override is a ruling and the architect records it. Waiting on the wrong
   clock is the failure mode.
-- **The state-collection#74 comment: ruled, and it is not the engineer's to post.** **Settled
+- **The the sibling project's payee issue comment: ruled, and it is not the engineer's to post.** **Settled
   2026-11-20 — the amendment landed at `aecedbe` ([#299](https://github.com/dnznlabs/rake/pull/299))
   before this run's first send**, and it carries all three defects Discovery 7 named: criterion 17
-  now reads "state-collection#74 carries the new prediction, posted by the architect", gives the
+  now reads "the sibling project's payee issue carries the new prediction, posted by the architect", gives the
   engineer's part as "the landed `$DISTRO` in this handoff", and states that the clause "is met by
   the handoff carrying the address, **never** by another repository accepting a comment". So the
   engineer posts nothing to another repo in this task, and criterion 17's closure does not wait on
-  `state-collection` at all. Nothing below is an open ask; it is kept as the reasoning the amendment
-  ratified. Criterion 17's last clause read "state-collection#74 carries the engineer's comment with
+  the sibling project at all. Nothing below is an open ask; it is kept as the reasoning the amendment
+  ratified. Criterion 17's last clause read "the sibling project's payee issue carries the engineer's comment with
   the new address", and your OK landed 2026-11-19. It is **not posted** and cannot be until the redeploy, because the
   address it must carry is the one step 13 lands: the m04 draft at `docs/milestones/m04/CLOSEOUT.md`
-  § For state-collection#74 names the pre-redeploy `0x6aC98EDA…` and the then-predicted
+  § For the sibling project's payee issue names the pre-redeploy `0x6aC98EDA…` and the then-predicted
   `0xB611Ff19…`, so the posted text is that draft with the landed address substituted. The
   substitution happens at posting — m04's close-out is merged and out of scope, so it is not edited.
   **The architect posts it, not the engineer, which makes criterion 17's last clause wrong as

@@ -49,7 +49,7 @@ block, `CREATE2` vs a call, the ambiguous-log withhold, `Fixtures.s.sol`'s four 
 ## The one thing measured without a prior — step 5's two launchers
 
 Both run on this host today, 2026-11-07, from `/tmp/m04t01/pw` (outside the repo) through
-`playwright-core` 1.63.0 at `/home/openclaw/src/deadletter/node_modules/playwright-core`:
+`playwright-core` 1.63.0 from a sibling project's `node_modules`:
 
 | launcher | result |
 |:---|:---|

@@ -291,7 +291,7 @@ nothing. Two instruments, one per run:
    - **#197**: not this task's (`make setup`, the libs guard); one line, carried as is, naming the
      task that owns it or `unassigned`.
 
-6. **`HANDOFF.md`** beside this file, from the handbook template: the AC table; the two per-chain hash
+6. **`HANDOFF.md`** beside this file, from the standard handoff template: the AC table; the two per-chain hash
    tables (engineer's column on Sepolia, Denizen's on both); § The wallet path (step 4); § The origin
    probe, Denizen's column; § Carried issues (step 5); § Findings, the issue numbers opened at (m) or
    `none`; § For Denizen, the signoff line's location and the one wording question if (j)'s guard

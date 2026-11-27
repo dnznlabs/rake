@@ -86,7 +86,7 @@ rather than quote.
    **inflated** document's sha256 equals `sha256sum app/dist/index.html`, and `make dapp-nodev` is run
    *after* `make deploy`, which rebuilds the dev bundle last. `m02-t04` teaches `tools/chain-doc.mjs`
    to print that hash. Measured 2026-10-11 as the starting point: prototype 75,876 bytes raw,
-   74,252 stripped, 20,680 gzipped; the state-collection dapp ships at 56,773 raw / 19,672 gzipped in
+   74,252 stripped, 20,680 gzipped; the the sibling project dapp ships at 56,773 raw / 19,672 gzipped in
    one chunk. The real dapp is expected to need two chunks at most — an estimate, re-measured here.
 9. **Clean.** `forge build --force` prints no `Warning (` or `warning[`; `forge lint` and `make fmt`
    silent; `forge snapshot --check` exit 0; `git status --porcelain` empty after `forge build --force`,
@@ -99,7 +99,7 @@ rather than quote.
     text is his, not the draft m02-t04 shipped (criterion 6, roadmap § Order), and the line is not
     dated until he has written it. Criteria 8 and 9 are re-run against the code he signs off, and the
     result is recorded under this line; any other criterion whose inputs
-    Phase 5 touched is re-run with them (see Phase 5 § Consequences). Same rule as `state-collection`
+    Phase 5 touched is re-run with them (see Phase 5 § Consequences). Same rule as the sibling project
     M1 AC 10, decided there on 2026-09-17 over a proposal to close on an empty task table.
 
     **Signed off by Denizen, 2026-10-26.** Phase 5 is closed. The `#/docs` text is his, written
@@ -130,7 +130,7 @@ rather than quote.
 
 ## Out of scope
 
-- Name resolution *exercised*. The ENS/WNS/GNS code lands in `m02-t03`, ported from state-collection's
+- Name resolution *exercised*. The ENS/WNS/GNS code lands in `m02-t03`, ported from the sibling project's
   reference implementation, but anvil has no registries and the dapp has no network but the wallet's,
   so it is first exercised on Sepolia in **M04**. Order of precedence is decision 13.
 - `paid to me` in the dashboard list. No event indexes beneficiaries, so it needs either a scan of
@@ -157,14 +157,14 @@ ruled by Denizen on 2026-10-11 as the recommended option, before t01 started; re
   labelled (decision 11). `m02-t03`.
 - [#27](https://github.com/dnznlabs/rake/issues/27) — widget served by `App` as `widget.js` (decision 12).
   `m02-t05`.
-- [#28](https://github.com/dnznlabs/rake/issues/28) — ENS → WNS → GNS, the state-collection ruling
+- [#28](https://github.com/dnznlabs/rake/issues/28) — ENS → WNS → GNS, the the sibling project ruling
   (decision 13). `m02-t03`.
 
 Merging five docs PRs and five code PRs. No credential, funds or external action: everything is anvil.
 
 **All of Phase 5.** He drives it, executes it in Claude Code and signs it off (criterion 10); review
 here is the only agent participation unless he hands a specific item over. A wallet browser against
-anvil needs the same three MetaMask settings `state-collection` needed — custom network
+anvil needs the same three MetaMask settings the sibling project needed — custom network
 `http://127.0.0.1:8545` chain ID `31337`, anvil key 0 imported, "Allow access to file URLs" on if he
 opens the chain's document over `file://` — each of which presents as "No wallet found." when wrong.
 
@@ -189,7 +189,7 @@ Every screen that reads: landing, list, detail, pending decode, histories, drift
 
 | Task | Goal | Status |
 |:-----|:-----|:-------|
-| [m02-t02](tasks/m02-t02/TASK.md) | The prototype's shell on the scaffold's provider code, rulings 1, 2, 7, 8 and 9 applied; `#/`, `#/distros`, `#/distros/<addr>`; pending actions decoded; `Queued`/`Applied`/`Cancelled` and `Received`/`Distributed`/`Escrowed`/`Released` histories loaded after the snapshot; criteria 3 and 5 | done — [#40](https://github.com/dnznlabs/rake/pull/40) merged 2026-10-11 at `5caf1f3`, approved at `3e846f5` and re-approved at `d456312` after Denizen's six review items; carried [#41](https://github.com/dnznlabs/rake/issues/41), [#42](https://github.com/dnznlabs/rake/issues/42), [#43](https://github.com/dnznlabs/rake/issues/43), [#50](https://github.com/dnznlabs/rake/issues/50), [design-base#2](https://github.com/dnznlabs/design-base/issues/2), [state-collection#69](https://github.com/dnznlabs/state-collection/issues/69) |
+| [m02-t02](tasks/m02-t02/TASK.md) | The prototype's shell on the scaffold's provider code, rulings 1, 2, 7, 8 and 9 applied; `#/`, `#/distros`, `#/distros/<addr>`; pending actions decoded; `Queued`/`Applied`/`Cancelled` and `Received`/`Distributed`/`Escrowed`/`Released` histories loaded after the snapshot; criteria 3 and 5 | done — [#40](https://github.com/dnznlabs/rake/pull/40) merged 2026-10-11 at `5caf1f3`, approved at `3e846f5` and re-approved at `d456312` after Denizen's six review items; carried [#41](https://github.com/dnznlabs/rake/issues/41), [#42](https://github.com/dnznlabs/rake/issues/42), [#43](https://github.com/dnznlabs/rake/issues/43), [#50](https://github.com/dnznlabs/rake/issues/50), an issue on the shared design system, [the sibling project#69](https://github.com/the sibling project/issues/69) |
 
 ### Phase 3 — Writing
 
@@ -212,7 +212,7 @@ Independent of each other; the widget waits on #27, the docs page does not.
 Last phase of M02, after t05 merges. Denizen drives the anvil deployment, finds what is wrong with the
 experience — dapp, widget, docs page — and irons it out. A loop, not a fixed list: it runs as long as
 he is still finding things, and his signoff closes it (criterion 10). Added 2026-10-11 at his request,
-after `state-collection` M1 Phase 5 showed the shape works; roadmap decision 14 records why it sits
+after the sibling project's M1 Phase 5 showed the shape works; roadmap decision 14 records why it sits
 here and not in M03 or before M04.
 
 **He executes this phase himself**, in Claude Code, outside the agent loop, opening PRs for review

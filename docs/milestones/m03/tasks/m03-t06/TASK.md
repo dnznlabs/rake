@@ -80,7 +80,7 @@ commit's and are re-run, not quoted.
 
    Check: the PR body has the heading; `HANDOFF.md` has § For t05 with both paths.
 
-3. **`RUNBOOK.md`, the shape.** Model it on `state-collection`'s (`~/src/state-collection/RUNBOOK.md`
+3. **`RUNBOOK.md`, the shape.** Model it on the sibling project's (the sibling project's `RUNBOOK.md`
    — or Elanik's own clone of it): a header stating what it ends with, then in this order:
    - **§ Not in this runbook.** `lock()` is never sent; it is M05's after mainnet has been watched.
      The word `lock()` appears in this file only in this section, and the section says so with the
@@ -101,11 +101,11 @@ commit's and are re-run, not quoted.
      # filled in by step 1, never by hand
      export PROXY=0x4e59b44847b379578588920cA78FbF26c0B4956C FACTORY= IMPL= APP= DISTRO=
      ```
-     `OWNER` is one value for every chain on purpose, as `state-collection`'s `PAYEE` is: there is
+     `OWNER` is one value for every chain on purpose, as the sibling project's `PAYEE` is: there is
      no second constant to pick the wrong one of. The Ops vault is at this address on all eight
      chains (read 2026-10-30, table on #114; decision 35), so this line never branches by chain. `CREATOR` is a
      placeholder until #90 names the address; the rehearsal uses anvil's first account for it and
-     says so. The creator key's two conditions are referenced to the handbook
+     says so. The creator key's two conditions are referenced to the organisation's procedure
      (`docs/multisig-transactions.md` § The DNZN Creator key), not restated.
    - **§ 1 — the chains.** One table, every chain DNZN's distribution is expected to reach:
      M04's two testnets, M05's four mainnets, M05's stretch row. Columns: chain, ID, RPC, proxy
@@ -204,7 +204,7 @@ commit's and are re-run, not quoted.
    executes it and records the explorer links. No key is needed to write the command.
 
    Step 6 — DNZN's `create`. The signer is the DNZN Creator key (`SIGNER` re-exported to it; the
-   runbook says this is the one step that key signs, referencing the handbook's two conditions).
+   runbook says this is the one step that key signs, referencing the organisation's two conditions).
    First `DISTRO=$(cast call $FACTORY "predict(bytes32)(address)" $DNZN_SALT --rpc-url "$RPC")`,
    then `cast code $DISTRO --rpc-url "$RPC"` must print `0x` (#22, the second place it is
    checked), then the `create(address,uint32,string,(address,uint96,string,string)[],bytes32)` send with
@@ -327,9 +327,9 @@ commit's and are re-run, not quoted.
 - `docs/ROADMAP.md` § Decisions 5 (a new version is a new factory), 10 (sender-bound salts), 29
   (audit scope includes the two deploy scripts), 32 (the creator key), 33 (the keyless proxy, and
   the preflight it requires).
-- `~/src-lakos/handbook/docs/multisig-transactions.md` § Vaults (the Ops address and the chains it
+- the organisation's multisig procedure § Vaults (the Ops address and the chains it
   exists on) and § The DNZN Creator key (the two conditions the runbook references).
-- `state-collection`'s `RUNBOOK.md` — the shape: § Not in this runbook, § 0 variables, numbered
+- the sibling project's `RUNBOOK.md` — the shape: § Not in this runbook, § 0 variables, numbered
   steps with `must print` lines, § Record, § Rehearsed on anvil.
 - `docs/milestones/m03/tasks/m03-t03/HANDOFF.md` § Criterion 8, re-run — the chain-doc equality
   as it is checked.

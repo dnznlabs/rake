@@ -190,7 +190,7 @@ the Ops vault and `APP_VERSION` is `v0.1`.
   `src/`", which this tree satisfies on the opcode reading and not on the literal one. The added
   sentence says so at the point of reading, but whether criterion 4 gains a clause about metadata is
   the architect's call, not this task's — the plan scoped step 5 to one sentence and no row changes.
-- **A stray `anvil` from `~/src/rake-m03-t07` is still listening on `127.0.0.1:8599`** (pid 137811,
+- **A stray `anvil` from another worktree of this repository is still listening on `127.0.0.1:8599`** (pid 137811,
   from that worktree's devbox profile). Not touched here. Worth clearing before the next rehearsal
   picks a port.
 - **`forge lint` is not literally silent**: it prints `No files changed, compilation skipped` and

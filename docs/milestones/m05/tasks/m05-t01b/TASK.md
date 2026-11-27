@@ -44,7 +44,7 @@ both already in `devbox.json` — **no new package**; `slither-mutate` ships ins
    `grep -rli 'slither-mutate' SECURITY.md README.md AGENTS.md audits/README.md` → nothing;
    `test -e docs/THREAT_MODEL.md` → 1. Record the commit.
 
-1. **The threat model — `docs/THREAT_MODEL.md`, new.** No template exists for it in the handbook;
+1. **The threat model — `docs/THREAT_MODEL.md`, new.** No standard template exists for it;
    the shape is the one Pashov's solo reports open with (a § Threat Model with § Privileged Roles &
    Actors, read in `solo/md/MoleculeVesting-security-review.md`), widened to the three axes
    decision 55 named. Four sections:

@@ -72,7 +72,7 @@ Counted at the head, unchanged at **8**. Line numbers are this branch's.
 
 ## Browser check
 
-`playwright-core` 1.63.0 from `/home/openclaw/src/deadletter/node_modules`, the cached arm64 chromium
+`playwright-core` 1.63.0 from a sibling project's `node_modules`, the cached arm64 chromium
 at `~/.cache/ms-playwright/chromium-1243/chrome-linux-arm64/chrome`, `app/dist` served by
 `python3 -m http.server` (127.0.0.1:8111 for this branch, :8112 for `origin/main`). anvil took 8545
 directly — `ss -ltn` showed it free — so `PUBLIC_RPC[31337]` resolved with no route interception.

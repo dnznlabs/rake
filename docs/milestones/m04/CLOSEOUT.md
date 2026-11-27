@@ -13,7 +13,7 @@ below is from that run's log, not quoted from a handoff. Public RPCs:
 **M04 does not close on this run.** Four criteria have a clause that fails or was never met, and
 none of the four is softened below: criterion 1's artifact comparison and its DNZN address, criterion
 3's hosted gateway on Sepolia, criterion 5's published URL, and criterion 8's comment on
-state-collection#74. Each is either a consequence of a ruling already on record (decision 54,
+The sibling project's payee issue. Each is either a consequence of a ruling already on record (decision 54,
 M05-D1, decision 63) or waits on one action of the Product Owner's; § Open at close-out names them.
 
 **Amended 2026-11-19 (decision 64).** M04 closed on this file's merge
@@ -33,7 +33,7 @@ changes; the sentence above describes this run, and the ruling is what the run i
 | 5 | The widget is embedded on a host we do not serve | **fail — no published URL** | The tracked page `tasks/m04-t04/host/index.html` is right: `grep -ci 'w3link.io/widget.js'` → **1**, `data-rake=` → **2** (one distinct value, `0x71a4…7a4A`), `theme.css\|index.html\|localhost` → **0**; `shots/host-headless.png` 66,380 bytes. But `curl -s <url>` cannot be run: the repo records **0** published host-page URLs (m04-t04 AC (e) `not met — Denizen: pending`; m04-t05 row (k) `pending on t04 (e)`), and no screenshot with a wallet exists. Decision 41 makes publishing Denizen's step; it has not happened. § Open at close-out. |
 | 6 | Denizen has used it from a wallet and signed off | **transferred** (decision 63) — not a pass | `ROADMAP.md` carries decision 63 once (`:994`); `UAT.md` exists (63 lines); steps 0–2 merged as [#252](https://github.com/dnznlabs/rake/pull/252) (`66fe915`, 2026-11-18); [#273](https://github.com/dnznlabs/rake/issues/273) and [#274](https://github.com/dnznlabs/rake/issues/274) closed 2026-11-19 by m04-t16 ([#286](https://github.com/dnznlabs/rake/pull/286), `3849cb2`); the wallet run is m05-t01 step 18b and the signoff line is that handoff's (`MILESTONE.md` § Phase 4 Signoff). What M04 proves on this criterion is the script and the headless run, nothing from a wallet. |
 | 7 | The runbook is amended by what happened, not annotated | **pass** | `git log 7b7aa30..2f93d26 -- RUNBOOK.md` → **42** commits, `1 file changed, 1376 insertions(+), 48 deletions(-)`; **16** headings added (§ Which run is this, § Step 4 — the document, via the Ops vault with 4a–4d, § Uploads, § Executed on testnets with two § Record tables, the runtime comparison, base fees, explorer verification, step 6) and **1** removed (the pre-vault § Step 4); `record:` **25** occurrences. m04-t03's four deviations each name their hunk (§ Deviations 1–4); t08's two route changes and t10's two entry points are § Step 4 and § Uploads. § What the runbook changed lists them for M05. |
-| 8 | Carried out and clean | **pass on three clauses; the fourth not met** | `gh issue list --label carried --label m04 --state open` printed **`243 241 174 165 127`** at the start of the run and **nothing** at 02:53Z after the five relabels of § Carried issues (14 `carried` issues open in all, 11 labelled `m05`, 3 with no milestone). `git status --porcelain` **empty** after `forge build --force` (0 warning lines), `forge test` (**124 passed**), `forge snapshot` (`.gas-snapshot` unchanged, 123 rows), and `make deploy` then `make dapp-nodev` and `make chain-doc` on a fresh anvil on port 8573 (`inflated sha256 f804d92a…`, widget `8b6bbc88…` 8,509 bytes, status 200). CI on `2f93d26`: `ci completed success`. **state-collection#74 carries 0 comments** — the comment is drafted in § For state-collection#74 and is not posted; and what it would say is that *no* chain carries code at `0x6aC98EDA…`. |
+| 8 | Carried out and clean | **pass on three clauses; the fourth not met** | `gh issue list --label carried --label m04 --state open` printed **`243 241 174 165 127`** at the start of the run and **nothing** at 02:53Z after the five relabels of § Carried issues (14 `carried` issues open in all, 11 labelled `m05`, 3 with no milestone). `git status --porcelain` **empty** after `forge build --force` (0 warning lines), `forge test` (**124 passed**), `forge snapshot` (`.gas-snapshot` unchanged, 123 rows), and `make deploy` then `make dapp-nodev` and `make chain-doc` on a fresh anvil on port 8573 (`inflated sha256 f804d92a…`, widget `8b6bbc88…` 8,509 bytes, status 200). CI on `2f93d26`: `ci completed success`. **the sibling project's payee issue carries 0 comments** — the comment is drafted in § For the sibling project's payee issue and is not posted; and what it would say is that *no* chain carries code at `0x6aC98EDA…`. |
 
 Gates at `2f93d26`, for the record: `forge test` 124 passed (`forge test --list` 124), node 188
 passed across `test/*.test.mjs`, `.gas-snapshot` 123 rows of which 4 `testFuzz_`, `forge snapshot
@@ -57,7 +57,7 @@ M05-D1 redeploys both testnets from the `0.8.38` bytes, after which the comparis
 deployed factory answers it for `predict($DNZN_SALT)` on both chains, so M03's prediction held; it
 is codeless because the `create` was never sent there (decision 54, m05-t01 Part B), and the re-mine
 moved the factory, so the address M05 creates at is `0xB611Ff19…` (`RUNBOOK.md` § 0). Nothing will
-ever be created at `0x6aC98EDA…`; state-collection's gate has to move with the factory.
+ever be created at `0x6aC98EDA…`; the sibling project's gate has to move with the factory.
 
 ## What the runbook changed — handed to M05
 
@@ -121,7 +121,7 @@ Five were, at the start of the run; the dispositions below were applied with one
 | [#165](https://github.com/dnznlabs/rake/issues/165) window budget | `m04` removed, no milestone label | Decision 62: carried post-mainnet with [#221](https://github.com/dnznlabs/rake/issues/221), reassessed after M05's mainnet upload with a per-load figure from a chain that costs something. |
 | [#127](https://github.com/dnznlabs/rake/issues/127) native-balance alias (F12) | `m04` → `m05` | Both testnets passed the check in m04-t03 (§ Record, `none` on each); the six mainnet readings are M05's — m05-t02 and m05-t03 re-run the `transfer` assertion per chain and t03 closes it with the six-row table, as M05's own § Carried issues already says. |
 
-## For state-collection#74
+## For the sibling project's payee issue
 
 Not posted. The issue has 0 comments; this is the text for the Product Owner to approve, then the
 architect posts it:
@@ -145,7 +145,7 @@ Owner, its URL in that handoff.
 
 **Criterion 1's DNZN address and criterion 3's Sepolia gateway** are consequences of rulings on
 record (decision 54 and M05-D1; #242's third-party condition) and are met, if at all, by m05-t01
-Part B on the redeployed testnets. **Criterion 8's state-collection comment** waits on the OK above.
+Part B on the redeployed testnets. **Criterion 8's the sibling project comment** waits on the OK above.
 **Ruled 2026-11-19 (decision 64):** M04 closed on this file's merge, with criterion 1's artifact
 comparison and DNZN address, criterion 3's document and both hosted gateway checks, and criterion
 5's host page transferred to m05-t01 Part B as its criteria 18c–18f and verified there; criterion 6
@@ -158,7 +158,7 @@ and unposted, awaiting the Product Owner's word.
   init-code hash, so the three testnet contracts are `0.8.34` deployments that M05-D1 replaces; the
   comparison in criterion 1 is the one to repeat against `main` after the redeploy.
 - **DNZN's address is `0xB611Ff193DA8Fa9391C0A3DAa29C3c9a0F4D5199`** at the new factory, never
-  `0x6aC98EDA…`; state-collection#74 is told so once the comment above is approved.
+  `0x6aC98EDA…`; the sibling project's payee issue is told so once the comment above is approved.
 - **The document on both chains is `3751211`'s** (§ Uploads rows 3–4); `main` is three tasks ahead
   of it (t14's R18, t15, t16), and m05-t01 step 14 is the upload that catches up. Sepolia's w3link
   endpoint serves the 2026-11-17 document regardless (#242); Base Sepolia's is current.

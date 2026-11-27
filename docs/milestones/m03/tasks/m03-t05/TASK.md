@@ -269,7 +269,7 @@ numbers below are `src/Distribution.sol` at `ede55c3`, which is what `main` stil
     reports whether each of its six changes held.
 
     - **The blinded tree**, exactly as t04's step 4 built it, at the head from step 9: under
-      `~/src/rake-blind-<date>/`, `foundry.toml`, `src/Distribution.sol`, `src/App.sol`,
+      the blinded tree, `foundry.toml`, `src/Distribution.sol`, `src/App.sol`,
       `scripts/forge/Deploy.s.sol`, `scripts/forge/DeployApp.s.sol`, `lib` as a symlink, `Makefile`,
       `mk/20-audit.mk`, `scripts/audit.sh`, `audits/SCOPE`, `audits/SKILL_PIN`, `audits/prompts/`,
       `.gitignore`'s audit block; one commit naming the head sha and the four sha256s; **not**
@@ -291,7 +291,7 @@ numbers below are `src/Distribution.sol` at `ede55c3`, which is what `main` stil
       staged outside the tree now); where `~/.claude/skills/solidity-auditor` and
       `~/.codex/skills/solidity-auditor` point after the run (expected
       `~/.cache/forge-audit/pashov-skills@f6c7f0de…/…`, no longer into
-      `~/src/rake-blind-2026-10-30`, which may then be removed — say so, do not remove it in this
+      the 2026-10-30 blinded tree, which may then be removed — say so, do not remove it in this
       task); the `upstream` field of the provenance block; whether sub-agent tool calls appear in
       the Claude transcript (the fragment's open question).
     - **Harvest**: `cp -a <blind>/audits/<date> audits/<date>` here, `BLIND.md` beside it in the
@@ -376,7 +376,7 @@ numbers below are `src/Distribution.sol` at `ede55c3`, which is what `main` stil
   rendering already handles an empty list.
 - [#110](https://github.com/dnznlabs/rake/issues/110) (the chromium note): no `app/` tooling runs
   in this task. Close-out relabels it `m04`.
-- Removing `~/src/rake-blind-2026-10-30`. Step 10 records where the skill links point afterwards;
+- Removing the 2026-10-30 blinded tree. Step 10 records where the skill links point afterwards;
   the removal is a one-liner for whoever reads that line, outside the PR.
 - `RUNBOOK.md` and the rehearsal addresses — t06 and close-out (criterion 6 is re-run on the final
   bytecode at Phase 5).

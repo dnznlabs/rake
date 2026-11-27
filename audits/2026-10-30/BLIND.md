@@ -11,7 +11,7 @@ maps it back to the reviewed commit.
 |:--|:--|
 | Reviewed commit (this repo) | **`ede55c3`** — `Merge pull request #103 from dnznlabs/m03/t02-primitive` |
 | Blinded tree commit | **`37eccc212fdb91b6a6db0900eef104130b0c8d42`** — `rake src/ and deploy scripts at ede55c3, for a blind two-model review` |
-| Blinded tree path | `~/src/rake-blind-2026-10-30` (under `~/src/`, never `/tmp`, which is shared) |
+| Blinded tree path | a blinded tree beside this checkout, never `/tmp`, which is shared |
 | Provenance dirty flag | `dirty: no`, captured at preflight before any leg wrote a byte |
 
 The two commits differ because the blinded tree is a separate one-commit repository — `codex exec`

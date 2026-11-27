@@ -3,7 +3,7 @@
 # form; at least one test must fail for each. The baseline is checked green first — `node --test test/`
 # reads the directory as one phantom test and would make every result meaningless.
 set -uo pipefail
-cd ~/src/rake
+cd "$(git rev-parse --show-toplevel)"
 PAGE=app/src/index.html
 cp "$PAGE" /tmp/page-403.orig
 trap 'cp /tmp/page-403.orig "$PAGE"' EXIT

@@ -20,14 +20,13 @@ const require = createRequire(import.meta.url);
 
 const url = process.argv[2];
 const core = process.env.PLAYWRIGHT_CORE;
-/* The fallback is the cached chromium on the machine the recorded runs were taken on, kept so those
-   runs reproduce verbatim rather than needing a second variable. It is one host's path and will not
-   exist on yours: set CHROMIUM to your own, which is why the override comes first. */
-const exe = process.env.CHROMIUM
-  || '/home/openclaw/.cache/ms-playwright/chromium-1243/chrome-linux-arm64/chrome';
+/* The recorded runs used the cached chromium 1243 (arm64) on one host, under that host's own
+   playwright cache. The path was a fallback here until 2026-11-27; it named a machine, so CHROMIUM
+   is now required and the run says so rather than silently using somebody else's layout. */
+const exe = process.env.CHROMIUM;
 const settle = Number(process.env.SETTLE_MS || 4000);
 
-if (!url || !core) {
+if (!url || !core || !exe) {
   console.error('usage: PLAYWRIGHT_CORE=<dir> node origin-probe.mjs <url>');
   process.exit(2);
 }

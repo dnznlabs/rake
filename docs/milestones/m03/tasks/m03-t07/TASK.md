@@ -149,7 +149,7 @@ This task runs beside t06 (see § Sequencing at the end of the plan).
 
 6. **The third review: both legs, blinded, graded.** Exactly t05's step 10, and its handoff § The
    second review is the worked example:
-   - **The blinded tree** at the step 5 head, under `~/src/rake-blind-<date>/`: `foundry.toml`,
+   - **The blinded tree** at the step 5 head, in a blinded tree beside this checkout: `foundry.toml`,
      `src/Distribution.sol`, `src/App.sol`, `scripts/forge/Deploy.s.sol`,
      `scripts/forge/DeployApp.s.sol`, `lib` as a symlink, `Makefile`, `mk/20-audit.mk`,
      `scripts/audit.sh`, `audits/SCOPE`, `audits/SKILL_PIN`, `audits/prompts/`, `.gitignore`'s audit

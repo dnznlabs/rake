@@ -131,7 +131,7 @@ measured 2026-11-17 between 18:58 and 19:01 UTC unless another time is given; re
 3. **The origin probe, headless, both chains.** `docs/milestones/m04/tasks/m04-t04/origin-probe.mjs`,
    tracked beside this file (it is evidence of this task, not a tool of the repo), taking the URL as
    its argument and the `playwright-core` directory from `PLAYWRIGHT_CORE` (the architect used
-   `/home/openclaw/src/deadletter/node_modules/playwright-core`, 1.63.0, read-only): launch the
+   a sibling project's `node_modules/playwright-core`, 1.63.0, read-only): launch the
    cached chromium headless, `goto` the URL with `waitUntil: 'load'`, wait a few seconds for the
    dapp to paint, then evaluate and print `window.top === window`, `typeof window.ethereum`,
    `location.origin`, `document.title`, the first 160 characters of `document.body.innerText`, and
@@ -295,7 +295,7 @@ measured 2026-11-17 between 18:58 and 19:01 UTC unless another time is given; re
    Check: the handoff carries the section with the command and either the dated result or `not yet
    — Run B pending`.
 
-8. **`HANDOFF.md`** beside this file, from the handbook template: the AC table with every figure
+8. **`HANDOFF.md`** beside this file, from the standard handoff template: the AC table with every figure
    measured, the step 0 gateway table, the step 3 probe table with Denizen's column (filled or
    pending), § Deviations, § For the Product Owner (step 5's three asks, the host file's path, the
    `fix` rows if any), § For M04 risks 1 and 2 — one sentence each on what the hosted service

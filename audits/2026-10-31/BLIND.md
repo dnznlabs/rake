@@ -11,7 +11,7 @@ maps it back to the reviewed commit.
 |:--|:--|
 | Reviewed commit (this repo) | **`b0fb4e3`** — `chore(gas): re-snapshot after the three fixes`, the head m03-t05 froze at step 9 |
 | Blinded tree commit | **`b2ed0609293efb997771d80ee320a63d2921fd6f`** — `rake src/ and deploy scripts at b0fb4e3, for a blind two-model review` |
-| Blinded tree path | `~/src/rake-blind-2026-10-31` (under `~/src/`, never `/tmp`, which is shared) |
+| Blinded tree path | a blinded tree beside this checkout, never `/tmp`, which is shared |
 | Provenance dirty flag | `dirty: no`, captured at preflight before any leg wrote a byte |
 
 The two commits differ because the blinded tree is a separate one-commit repository — `codex exec`
@@ -150,7 +150,7 @@ from the source:
 
 ## The launcher, and why a person ran it
 
-`~/src/rake-blind-2026-10-31-launch.sh`, staged under the blinded tree's parent and outside both
+the launch script beside the blinded tree, staged under the blinded tree's parent and outside both
 repositories. It re-checks twelve preconditions and refuses rather than start a run that would have
 to be thrown away: both trees present, the known answer present in the checkout and **absent from
 the blinded tree**, the runner honouring `KNOWN_ANSWER_FILE`, the four scoped hashes matching, the

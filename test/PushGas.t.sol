@@ -62,8 +62,8 @@ interface IMultisigWallet {
 /// is that a warm measurement flatters this path: a distribution's first touch of a recipient, and
 /// the recipient's first touch of the singleton behind it, both pay the 2,600-gas cold-account cost.
 contract PushGasTest is Test {
-    /// @dev Canonical Safe v1.4.1 (one address on every supported chain), and the codehash upstream
-    /// pins in `src-company/multisig`'s `test/SafeComparison.t.sol`. No fallback handler is etched:
+    /// @dev Canonical Safe v1.4.1 (one address on every supported chain), and the codehash the
+    /// multisig we sign with pins in its own Safe-comparison test. No fallback handler is etched:
     /// it is not on the `receive` path, and `setup` skips it when it is `address(0)`.
     address internal constant SAFE_SINGLETON = 0x41675C099F32341bf84BFc5382aF534df5C7461a;
     address internal constant SAFE_FACTORY = 0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67;

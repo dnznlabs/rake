@@ -132,7 +132,7 @@ testnets have no stop** — their fees are wei, and a testnet send is never defe
 A fee above the stop for days is not a reason to put a buffer in a hot key: it is a top-up and a
 raised rule, by the Product Owner's word. The stop defers a send; it never silently widens the budget.
 
-**`OWNER` is one value for every chain on purpose**, as `state-collection`'s `PAYEE` is: there is no
+**`OWNER` is one value for every chain on purpose**, as a sibling DNZN project's `PAYEE` is: there is no
 second constant to pick the wrong one of. The Ops vault is at this address on all eight chains of
 § 1 — read 2026-10-30, table on [#114](https://github.com/dnznlabs/rake/issues/114), ruled as
 **decision 35** after Denizen placed Treasury and Ops on Base Sepolia at their addresses — so this
@@ -167,12 +167,12 @@ Both rehearsals stand the signing account in for the creator key when they send 
 real `DNZN_SALT` reverts `SaltDoesNotStartWith` from any other sender — so the address their `create`
 lands is the rehearsal's, while `predict($DNZN_SALT)` above is this one; § Rehearsed on anvil says so
 for its own run. The creator key's two conditions — salted creates only, and never an owner or a signer for anything
-else — are the handbook's, in `docs/multisig-transactions.md` § The DNZN Creator key, and are
-referenced rather than restated so there is one copy of them.
+else — are the organisation's, set outside this repository. They are stated here and nowhere else
+in it, so there is one copy.
 
-**Setting the creator key up for `cast`** is the handbook's too: `docs/multisig-transactions.md`
-§ Setting the key up for `cast` covers `cast wallet import dnzn-creator --interactive`, verifying
-the address, and backing up the key itself before step 6 runs anywhere. Done, step 6's `SENDER` is
+**Setting the creator key up for `cast`** is the organisation's procedure too, and it is this:
+`cast wallet import dnzn-creator --interactive`, verify the address it prints, and back the key
+itself up before step 6 runs anywhere. Done, step 6's `SENDER` is
 `--account dnzn-creator --password-file <file> --from <address>` — step 6 is a `cast send`, so it
 takes the `$SENDER` spelling of § 0 and not `$SIGNER`'s.
 
@@ -852,7 +852,7 @@ they were generated for.
 
 #### 4b — the product owner reviews and signs
 
-In the multisig dapp, open each of the three proposals — handbook § Doing it as a human, *Sign* —
+In the multisig dapp, open each of the three proposals by hand, in the signing flow a person uses —
 and before signing it, against a checkout of the commit 4a recorded. **First, that commit is still
 what `main` builds**, or nothing below is worth checking:
 
@@ -885,7 +885,7 @@ No `current` means `main` has moved under the proposals: do not sign, and 4a is 
 4. **The nonce is the live one plus two** and the digest equals `getTransactionHash($OWNER, 0,
    batch345.hex, <nonce>)` on the vault.
 
-`batch` is a vault self-call, which the handbook's review checklist marks high risk; confirm it
+`batch` is a vault self-call, which the organisation's review rule marks high risk; confirm it
 outside the chat that requested it. Then sign. With two signatures a proposal is at threshold. Sign
 all three before submitting any (4c): a gap in the nonce sequence stalls the ones behind it.
 
@@ -894,7 +894,7 @@ all three before submitting any (4c): a gap in the nonce sequence stalls the one
 1. **Submit all three** (either signer), back to back, in nonce order: 1, then 2, then the batch. Each
    `execute()` checks the signatures, consumes its nonce and **queues** the call at
    `eta = block.timestamp + delay()` — nothing reaches `App` yet. Here the vault does enforce the
-   order: `execute` hashes against `nonce++` (`src/Multisig.sol:136` of src-company/multisig at
+   order: `execute` hashes against `nonce++` (`src/Multisig.sol:136` of `src-company/multisig` at
    `62eb905`), so proposal 2's signatures, made over the digest at *N* + 1, are `InvalidSig` while the
    nonce is still *N*. Submit 2 before 1 and it is refused; nothing is lost but the gas.
 2. **Wait one `delay()`, not three.** Each submit queues its digest at its own
@@ -1409,7 +1409,7 @@ done
 lines* and nothing else: an address Sourcify does not hold answers `null`, which reads like a blank
 line to anyone skimming, so the comparison is made by the shell and the step stops on it rather than
 leaving a human to notice a missing word. Rehearsed in both directions before it was written in
-(m05-t01, 2026-11-19, handbook `docs/contract-verification.md` § Sourcify): against an address with
+(m05-t01, 2026-11-19, and recorded with the organisation's verification notes): against an address with
 no code it printed `null` and exited **1**; against the three M04 Sepolia addresses it printed
 `exact_match` three times and exited **0**.
 
@@ -1440,9 +1440,8 @@ unchanged ABI on a new chain is all `Duplicated:`; an ABI change shows up as `Im
 ### Step 6 — DNZN's `create`
 
 **This is the one step the DNZN Creator key signs**, and the only one. Re-export `SENDER` to that
-key for this step and back afterwards. Its two conditions are the handbook's, in
-`docs/multisig-transactions.md` § The DNZN Creator key — salted creates only, and never an owner or
-a signer for anything else.
+key for this step and back afterwards. Its two conditions are the organisation's — salted creates
+only, and never an owner or a signer for anything else.
 
 ```sh
 DISTRO=$(cast call $FACTORY "predict(bytes32)(address)" $DNZN_SALT --rpc-url "$RPC")
@@ -2269,7 +2268,7 @@ revert at execution, not at queue time.
 
 **`forward()` is not a threshold route**, which is the trap worth stating once: it requires
 `ownerCount()` signatures for everything except `cancelQueued`, plus `forwardEnabled`
-(`src/mods/TimelockExecutor.sol:41-47` of src-company/multisig, identical at `62eb905` and
+(`src/mods/TimelockExecutor.sol:41-47` of `src-company/multisig`, identical at `62eb905` and
 `cbfa345`), so a threshold signature set sent through it reverts `InvalidSig` on the
 `sigs.length == required * 65` check.
 Read on both chains 2026-11-08: Ops `ownerCount()` **3**, `threshold()` **2**, `delay()` **3600**,
