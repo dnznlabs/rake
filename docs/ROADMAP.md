@@ -18,7 +18,7 @@ demonstrably met — a command someone else can run and watch pass, not a judgem
 | [M03 — Hardening and deploy readiness](milestones/m03/MILESTONE.md) | Independent security review dispositioned in `SECURITY.md`, the open measurements closed, and a runbook for a same-address deploy on every target chain | **done 2026-11-07** — ten tasks (t01–t10), three two-leg reviews (`audits/2026-10-30`, `10-31`, `11-06`), 14 `SECURITY.md` rows, decisions 20–40; `src/` final at `3ad48ec` ([#153](https://github.com/dnznlabs/rake/pull/153)), `FACTORY_SALT`/`APP_SALT` mined against it (decision 37: `0x00D18B5b…`, `0x00A90943…`), `RUNBOOK.md` rehearsed on two anvils with the real Creator key; DNZN's predicted address `0x6aC98EDA2553dD67dBb1c4b23F5bb34c63E13F9f`; criteria 1–8 re-run in [CLOSEOUT.md](milestones/m03/CLOSEOUT.md) |
 | [M04 — Testnets](milestones/m04/MILESTONE.md) | The runbook executed on Sepolia and Base Sepolia, the dapp read through a `web3://` gateway, the widget embedded on a test host, and Denizen accepts it from a browser wallet | **done 2026-11-19** — sixteen tasks (t01–t16; t12 closed unmerged by decision 62), criteria 1–8 re-run at `2f93d26` in [CLOSEOUT.md](milestones/m04/CLOSEOUT.md), closed on that close-out's merge ([#296](https://github.com/dnznlabs/rake/pull/296), `eec7164`) by decision 64, with criteria 1, 3 and 5's unmet clauses transferred to m05-t01 Part B beside criterion 6's wallet run (decision 63) and criterion 8's the sibling project's payee issue comment drafted and awaiting the Product Owner's word. Scoped 2026-11-07: seven tasks in four phases (Phase 1 done the same day: the dapp's carried items #164 and the `web3://` gateway in the dev stack #163, the ERC-5219 surface's first real consumer; then Slither as a third audit leg gating the deploy, invariant tests beside it, the runbook for real, then the gateway and a host page, then a scripted wallet session with a signoff line); two decisions open ([#156](https://github.com/dnznlabs/rake/issues/156) the test host, [#157](https://github.com/dnznlabs/rake/issues/157) DNZN's testnet table, both ruled); needed testnet ETH on two keys and an Etherscan API key |
 | [M05 — Mainnet](milestones/m05/MILESTONE.md) | The runbook on Ethereum, Base, Arbitrum and OP Mainnet at one address, with MegaETH and Robinhood Chain as a stretch row; the DNZN fund distribution live at its Sepolia address with the Sepolia table, the Ops vault as owner and a 7-day delay (decision 50); dapp mirrored and widget embedded in one DNZN app | **done 2026-11-26** — closed on [`CLOSEOUT.md`](milestones/m05/CLOSEOUT.md): as re-scoped by decision 70, the contracts and the document are live on Base and Ethereum at the testnets' addresses, served at `rake.dnzn.dev` with `/` on Ethereum; the other four chains follow on the Product Owner's word |
-| [M06 — Going public](milestones/m06/MILESTONE.md) | `dnznlabs/rake` is public, as a new repository whose history is one signed commit from the mainnet tag; the private repository is renamed `rake.buildarchive`, archived and never published. Four phases: the labelling of outside issues and comments installed and proven on this repo; a staging tree from the tag with the build-out record removed (milestones, tasks, handoffs, review runs, dev-chain broadcasts), the roadmap reset to the mainnet row, `SECURITY.md` carrying no findings, and every document audited for a reader who has only the repo; a fresh review of the staging tree that must come back clean; then Denizen renames, archives, creates and flips | not started — gated on M05's close-out; scoped when M05 closes (decision 60) |
+| M06 — Going public | `dnznlabs/rake` is public as itself: the same repository, with its history, its issues and its pull requests. Before the flip, a review of everything the flip publishes; names of projects that are not public yet and machine-local paths taken out of the tree (decision 75 and the changes around it); a private route for reporting a vulnerability; and issues, comments and pull requests limited to collaborators until outside contributions can be handled. An earlier plan, a new repository with one commit and the build history archived, was set aside: the records here cite commits, and a reader should be able to open them | in progress, 2026-11-26 — not a tasked milestone; the remaining steps are the Product Owner's |
 | [M07 — Owner integrations](milestones/m07/MILESTONE.md) | Optional, after mainnet. When the connected wallet is a member of the owner rather than the owner, route `propose`/`cancel` into the multisig vault's or Majeur DAO's own submit flow instead of copy-calldata. UI only; no contract change | not started |
 
 ## Order
@@ -941,7 +941,7 @@ convention. Numbered 45 because 44 is taken by
     Rejected: option (2), a landing under dnzn.dev linking each chain's gateway URL and serving no
     bundle (not a mirror in decision 12's sense).
 
-60. **Going public is its own milestone, M06, between mainnet and owner integrations; owner
+60. *Superseded in part by 76 on 2026-11-26; kept as ruled.* **Going public is its own milestone, M06, between mainnet and owner integrations; owner
     integrations moves from M06 to M07.** Ruled by Denizen on 2026-11-19 (Telegram, 09:18 CST),
     with the procedure agreed the same morning. The public repository is a new one whose history
     starts at the mainnet tag; the private one is archived under the `.buildarchive` suffix, never
@@ -1324,6 +1324,19 @@ convention. Numbered 45 because 44 is taken by
     lost**: the files are whole in the history, and a future audit commits its transcripts as
     before, with the same removal once its findings are filed. **Rejected:** redaction in place,
     and leaving them in the tree.
+
+76. **This repository goes public as itself, history and issues included, with its door shut.**
+    Ruled by Denizen on 2026-11-26 (Telegram, 18:41 to 23:07 CST), superseding decision 60's new
+    repository. The records here cite commits, and a one-commit history would leave those
+    citations pointing at nothing a reader can open; the findings found and fixed are the best
+    evidence the review method has. Before the flip, everything it publishes was reviewed and no
+    secret was found in any of it; he ruled that names of projects not yet public and
+    machine-local paths come out of the tree and stay in the history, that nothing under `app/`,
+    `src/` or `test/` changes for it, and that the author address on the first commit stands.
+    **Door shut:** issues, comments and pull requests are limited to collaborators until outside
+    contributions can be handled, and open when someone asks. **Rejected:** the new repository of
+    decision 60, which is kept as the route for a repository that holds something that cannot be
+    public; and rewriting history, which breaks every commit reference and signature.
 
 ## Findings carried forward
 

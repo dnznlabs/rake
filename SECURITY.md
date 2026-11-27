@@ -4,6 +4,16 @@
 > method, dispositions every finding and every carried issue, states the invariants the test suite
 > holds, and says plainly what the review did not cover.
 
+## Reporting a vulnerability
+
+Report it privately, through this repository's **Security** tab → **Report a vulnerability**
+(GitHub's private vulnerability reporting). Only the maintainers see the report. Please do not open
+a public issue or pull request for a security problem.
+
+Say which contract or page, on which chain, and what you saw; a transaction hash or a failing test
+is the fastest route to an answer. The contracts are immutable, so a confirmed bug is not patched in
+place: it is recorded here with its disposition, and a fix is a new address. There is no bug bounty.
+
 ## Prior reviews
 
 **Date:** 2026-11-26 — **commissioned external review, not this project's own method**
