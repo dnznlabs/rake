@@ -176,10 +176,12 @@ additions; § Coverage and § Mutation are the other two.
 
 ## Findings — disposition
 
-**The 2026-11-26 commissioned reviews are not in this table yet.** Their 10 Medium, 38 Low and 23
-Informational items are filed verbatim under [`audits/2026-11-26/`](audits/2026-11-26/AUDIT.md) with
-no disposition, and triage is tracked in [#440](https://github.com/dnznlabs/rake/issues/440). They
-are listed separately rather than merged into F1–F14 because they were read against deployed
+**The 2026-11-26 commissioned reviews are not in this table yet.** As filed they carry 10 Medium,
+38 Low and 23 Informational across the three reports — **counts per report, not distinct issues**,
+since 1272 and 1274 read the same implementation and overlap heavily. They are filed verbatim under
+[`audits/2026-11-26/`](audits/2026-11-26/AUDIT.md) with no disposition, and triage is tracked
+in [#440](https://github.com/dnznlabs/rake/issues/440). They are listed separately rather than
+merged into F1–F14 because they were read against deployed
 verified source instead of a commit of this repository, so each one needs a disposition that says
 whether a test, a decision or an operational practice already answers it — and the auditor had none
 of those three to read.
