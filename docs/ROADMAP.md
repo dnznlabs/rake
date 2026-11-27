@@ -1312,9 +1312,10 @@ convention. Numbered 45 because 44 is taken by
     **Rejected:** revisiting at decision 45's 90-day mark, the architect's recommendation, and a
     fixed watch period.
 
-75. **Review transcripts are kept in the history rather than in the tree.** Ruled by Denizen on
-    2026-11-26 as part of the fix-forward pass before this repository is made public; the
-    recommendation and its alternatives are recorded with that ruling. The four leg transcripts
+75. **Review transcripts are kept in the history rather than in the tree.** Taken by **default**:
+    the plan for this pass carried the question with three options, a recommendation from the
+    architect and this option as the default if nothing was said, and it merged on 2026-11-26
+    unanswered. So this is the default standing, not a ruling anyone made. The four leg transcripts
     carried the bulk of the machine-local detail in the tree, and the two ways to keep them
     browsable were both worse: redacting them makes an edited transcript, which `audits/README.md`
     says is no longer evidence of what a leg read, and leaving them means publishing that detail.
