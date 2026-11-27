@@ -13,6 +13,9 @@ skill             https://github.com/pashov/skills @ f6c7f0de9cce16f6aa9c57aaac1
 leg 1             codex codex-cli 0.158.0 · requested gpt-5.6-sol → observed gpt-5.6-sol · effort high · 1 pass · 340s wall
 leg 2             claude 2.1.310 (Claude Code) · requested opus → observed claude-opus-5-5 · 1 pass · 440s wall
 tokens            leg 1 116,064 · leg 2 1148597
+transcripts       kept in history only, out of the tree since 2026-11-27 — read them with
+                  `git show b2ec617:audits/2026-10-31/transcripts/leg-1-codex.log` and
+                  `git show 7fa5cbd:audits/2026-10-31/transcripts/leg-2-claude.jsonl`
 ```
 
 `b2ed060` is the blind review repository's own commit. Its message says it is "rake src/ and deploy
